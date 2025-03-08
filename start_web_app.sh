@@ -39,6 +39,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# 激活虚拟环境
+source venv/bin/activate
+
 # 构建命令
 CMD="python web_app.py"
 
