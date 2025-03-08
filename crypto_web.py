@@ -38,6 +38,9 @@ price_data = {}  # 价格数据
 balance_data = {}  # 余额数据
 arbitrage_opportunities = []  # 套利机会
 
+# 添加常量
+ARBITRAGE_THRESHOLD = 0.5  # 套利阈值，0.5%
+
 # 初始化交易所连接
 def init_exchanges():
     """初始化交易所API连接"""

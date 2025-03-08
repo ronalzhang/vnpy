@@ -166,13 +166,13 @@ function updatePriceTable(exchangeData) {
             tr.classList.add('table-primary');
         }
         
-        // 添加差价警告样式
+        // 添加差价警告样式 (增加差价阈值到0.5%)
         if (maxDiffPct > 0.5) {
             tr.classList.add('table-success');
         }
         
         tr.innerHTML = `
-            <td class="text-center">${symbol}</td>
+            <td class="text-center"><strong>${symbol}</strong></td>
             <td class="text-end">${binancePrice ? formatPrice(binancePrice.buy) : '-'}</td>
             <td class="text-end">${okexPrice ? formatPrice(okexPrice.buy) : '-'}</td>
             <td class="text-end">${bitgetPrice ? formatPrice(bitgetPrice.buy) : '-'}</td>
@@ -200,13 +200,11 @@ function updateArbitrageTable(opportunities) {
     opportunities.slice(0, 10).forEach(opportunity => {
         const tr = document.createElement('tr');
         
-        // 根据差价添加行样式
-        if (opportunity.diff_pct > 0.5) {
+        // 根据差价添加行样式 (增加差价阈值到0.5%)
+        if (opportunity.diff_pct > 0.8) {
             tr.classList.add('table-success');
-        } else if (opportunity.diff_pct > 0.2) {
+        } else if (opportunity.diff_pct > 0.5) {
             tr.classList.add('table-warning');
-        } else {
-            tr.classList.add('text-muted');
         }
         
         tr.innerHTML = `
@@ -224,6 +222,15 @@ function updateArbitrageTable(opportunities) {
         
         tbody.appendChild(tr);
     });
+    
+    // 添加套利日志（只记录大于0.5%的机会）
+    if (opportunities.length > 0 && opportunities[0].diff_pct >= 0.5) {
+        const topOpp = opportunities[0];
+        addLog(
+            'ARBITRAGE', 
+            `发现套利机会: ${topOpp.symbol} ${formatExchangeName(topOpp.buy_exchange)}(${formatPrice(topOpp.buy_price)}) → ${formatExchangeName(topOpp.sell_exchange)}(${formatPrice(topOpp.sell_price)}), 差价: ${formatPrice(topOpp.diff)} (${formatPercentage(topOpp.diff_pct)})`
+        );
+    }
 }
 
 // 获取套利数据
