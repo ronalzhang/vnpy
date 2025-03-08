@@ -9,12 +9,20 @@ body {
     font-weight: 600;
 }
 
+/* 容器样式 - 确保全宽显示 */
+.container-fluid {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    max-width: 100%;
+}
+
 /* 卡片样式 */
 .card {
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
     border-radius: 0.5rem;
     border: none;
     margin-bottom: 1.5rem;
+    width: 100%;
 }
 
 .card-header {
@@ -27,6 +35,7 @@ body {
 .status-card {
     background-color: #fff;
     transition: all 0.3s ease;
+    height: 100%;
 }
 
 .status-card:hover {
@@ -42,6 +51,28 @@ body {
 
 .table-sm td, .table-sm th {
     padding: 0.5rem;
+}
+
+/* 表格响应式容器 */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 表格固定宽度列 */
+.table th[style*="width"], 
+.table td[style*="width"] {
+    width: auto !important;
+    min-width: var(--width, auto);
+}
+
+.table th[style*="width: 10%"] {
+    --width: 10%;
+}
+
+.table th[style*="width: 70%"] {
+    --width: 70%;
 }
 
 /* 账户余额样式 */
@@ -60,10 +91,16 @@ body {
     background-color: rgba(25, 135, 84, 0.1) !important;
 }
 
+#arbitrage-data .table-warning {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
 /* 日志容器 */
 .log-container {
-    max-height: 300px;
+    max-height: 400px;
     overflow-y: auto;
+    margin-bottom: 0;
+    width: 100%;
 }
 
 .log-container::-webkit-scrollbar {
@@ -162,4 +199,31 @@ body {
     padding-top: 0.25rem;
     padding-bottom: 0.25rem;
     font-size: 0.85rem;
+    min-width: 150px;
 }
+
+/* 市场数据表格 */
+#market-data .table {
+    margin-bottom: 0;
+}
+
+#market-data .table th,
+#market-data .table td {
+    text-align: center;
+}
+
+#market-data .table th[class*="text-"],
+#market-data .table td[class*="text-"] {
+    text-align: inherit;
+}
+
+/* 套利机会表格 */
+#logs .card-body {
+    padding: 0;
+}
+
+#logs .list-group-item {
+    border-left: none;
+    border-right: none;
+}
+
