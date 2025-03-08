@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>加密货币套利监控系统</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=1.1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <!-- 引入Bootstrap CSS（替换为国内CDN） -->
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
     <!-- 引入Font Awesome图标（替换为国内CDN） -->
@@ -77,15 +77,12 @@
                             <table class="table table-hover table-bordered">
                                 <thead class="table-light">
                                     <tr>
-                                        <th rowspan="2" class="align-middle text-center" style="width: 10%">交易对</th>
-                                        <th colspan="3" class="text-center" style="width: 70%">交易所</th>
-                                        <th rowspan="2" class="align-middle text-center" style="width: 10%">深度</th>
-                                        <th rowspan="2" class="align-middle text-center" style="width: 10%">差价</th>
-                                    </tr>
-                                    <tr>
+                                        <th class="text-center" style="width: 10%">交易对</th>
                                         <th class="text-center">Binance</th>
                                         <th class="text-center">OKX</th>
-                                        <th class="text-center">Bitget</th>
+                                        <th class="text-center">BitGet</th>
+                                        <th class="text-center" style="width: 10%">深度</th>
+                                        <th class="text-center" style="width: 10%">差价</th>
                                     </tr>
                                 </thead>
                                 <tbody id="price-data">

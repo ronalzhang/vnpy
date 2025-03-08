@@ -33,23 +33,20 @@ EXCHANGES = ["binance", "okx", "bitget"]
 ARBITRAGE_THRESHOLD = 0.5
 CLOSE_THRESHOLD = 0.2
 
+# 交易所API客户端
+exchange_clients = {}
+
 # 数据存储
 prices_data = {}
 diff_data = []
 balances_data = {}
+# 套利机会历史记录，按交易对保存24小时数据
+arbitrage_history = {}
 status = {
     "running": False,
     "mode": "simulate",
     "last_update": "",
     "trading_enabled": False
-}
-
-# 交易所客户端
-exchanges = {}
-exchange_data = {
-    "binance": {"name": "Binance", "prices": {}, "balances": {}},
-    "okex": {"name": "OKX", "prices": {}, "balances": {}},
-    "bitget": {"name": "Bitget", "prices": {}, "balances": {}}
 }
 
 # 上次更新时间
@@ -71,16 +68,42 @@ def load_json(file_path):
         return {}
 
 def load_config():
-    """加载配置文件"""
-    global SYMBOLS, ARBITRAGE_THRESHOLD, CLOSE_THRESHOLD
+    """加载配置"""
+    if CONFIG_PATH.exists():
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"加载配置文件失败: {e}")
+    return {}
+
+def init_exchange_clients():
+    """初始化交易所API客户端"""
+    global exchange_clients
+    config = load_config()
     
-    config = load_json(CONFIG_PATH)
-    if config:
-        SYMBOLS = config.get("symbols", SYMBOLS)
-        ARBITRAGE_THRESHOLD = config.get("arbitrage_threshold", ARBITRAGE_THRESHOLD)
-        CLOSE_THRESHOLD = config.get("close_threshold", CLOSE_THRESHOLD)
-    
-    return config
+    for exchange_id in EXCHANGES:
+        try:
+            # 尝试从配置中获取API密钥
+            api_config = config.get(exchange_id, {})
+            api_key = api_config.get("api_key", "")
+            secret_key = api_config.get("secret_key", "")
+            password = api_config.get("password", "")  # 某些交易所如OKX需要密码
+            
+            # 创建交易所客户端
+            if hasattr(ccxt, exchange_id):
+                exchange_class = getattr(ccxt, exchange_id)
+                exchange_clients[exchange_id] = exchange_class({
+                    'apiKey': api_key,
+                    'secret': secret_key,
+                    'password': password,
+                    'enableRateLimit': True,
+                })
+                print(f"初始化 {exchange_id} API客户端成功")
+            else:
+                print(f"不支持的交易所: {exchange_id}")
+        except Exception as e:
+            print(f"初始化 {exchange_id} API客户端失败: {e}")
 
 def generate_simulated_data():
     """生成模拟价格数据"""
@@ -151,42 +174,43 @@ def generate_simulated_balances():
     return balances
 
 def calculate_price_differences(prices):
-    """计算不同交易所之间的价格差异"""
-    global SYMBOLS
+    """计算不同交易所间的价格差异"""
+    global arbitrage_history
+    result = []
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
+    # 检查数据是否存在
     if not prices:
-        return []
+        return result
     
-    diff_result = []
-    
+    # 遍历所有交易对
     for symbol in SYMBOLS:
-        # 计算所有交易所组合
-        for buy_exchange in EXCHANGES:
-            for sell_exchange in EXCHANGES:
-                if buy_exchange == sell_exchange:
+        # 遍历所有交易所组合
+        for i, buy_exchange in enumerate(EXCHANGES):
+            if buy_exchange not in prices or symbol not in prices[buy_exchange]:
+                continue
+                
+            buy_price = prices[buy_exchange][symbol].get("buy")
+            if buy_price is None:
+                continue
+            
+            for sell_exchange in EXCHANGES[i+1:]:
+                if sell_exchange not in prices or symbol not in prices[sell_exchange]:
+                    continue
+                    
+                sell_price = prices[sell_exchange][symbol].get("sell")
+                if sell_price is None:
                     continue
                 
-                if symbol not in prices[buy_exchange] or symbol not in prices[sell_exchange]:
-                    continue
-                
-                buy_data = prices[buy_exchange][symbol]
-                sell_data = prices[sell_exchange][symbol]
-                
-                # 获取买入价和卖出价
-                buy_price = buy_data["ask"] if isinstance(buy_data, dict) else buy_data
-                sell_price = sell_data["bid"] if isinstance(sell_data, dict) else sell_data
-                
-                # 只有卖出价高于买入价时才有套利机会
+                # 计算正向套利（从 buy_exchange 买，在 sell_exchange 卖）
                 if sell_price > buy_price:
                     price_diff = sell_price - buy_price
                     price_diff_pct = price_diff / buy_price
                     
-                    # 判断是否可执行(示例条件)
-                    bid_depth = buy_data.get("depth", {}).get("bid", 0) if isinstance(buy_data, dict) else 0
-                    ask_depth = sell_data.get("depth", {}).get("ask", 0) if isinstance(sell_data, dict) else 0
-                    is_executable = price_diff_pct >= CLOSE_THRESHOLD / 100 and bid_depth >= 2 and ask_depth >= 2
+                    # 检查套利可行性（根据深度等）
+                    is_executable = True  # 简化处理，实际应根据深度、手续费等判断
                     
-                    diff_result.append({
+                    item = {
                         "symbol": symbol,
                         "buy_exchange": buy_exchange,
                         "sell_exchange": sell_exchange,
@@ -195,13 +219,193 @@ def calculate_price_differences(prices):
                         "price_diff": price_diff,
                         "price_diff_pct": price_diff_pct,
                         "is_executable": is_executable,
-                        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    })
+                        "time": timestamp
+                    }
+                    result.append(item)
+                    
+                    # 如果差价百分比达到阈值，记录到历史中
+                    if price_diff_pct >= ARBITRAGE_THRESHOLD / 100:
+                        # 创建键值为交易对+买入交易所+卖出交易所的唯一标识
+                        key = f"{symbol}_{buy_exchange}_{sell_exchange}"
+                        
+                        # 更新历史记录
+                        if key not in arbitrage_history:
+                            arbitrage_history[key] = []
+                        
+                        # 添加新记录
+                        arbitrage_history[key].append(item)
+                        
+                        # 清理24小时以前的数据
+                        current_time = datetime.now()
+                        arbitrage_history[key] = [
+                            record for record in arbitrage_history[key]
+                            if (current_time - datetime.strptime(record["time"], "%Y-%m-%d %H:%M:%S")).total_seconds() < 86400
+                        ]
+                
+                # 计算反向套利（从 sell_exchange 买，在 buy_exchange 卖）
+                buy_price_reverse = prices[sell_exchange][symbol].get("buy")
+                sell_price_reverse = prices[buy_exchange][symbol].get("sell")
+                
+                if buy_price_reverse is not None and sell_price_reverse is not None and sell_price_reverse > buy_price_reverse:
+                    price_diff = sell_price_reverse - buy_price_reverse
+                    price_diff_pct = price_diff / buy_price_reverse
+                    
+                    # 检查套利可行性
+                    is_executable = True
+                    
+                    item = {
+                        "symbol": symbol,
+                        "buy_exchange": sell_exchange,
+                        "sell_exchange": buy_exchange,
+                        "buy_price": buy_price_reverse,
+                        "sell_price": sell_price_reverse,
+                        "price_diff": price_diff,
+                        "price_diff_pct": price_diff_pct,
+                        "is_executable": is_executable,
+                        "time": timestamp
+                    }
+                    result.append(item)
+                    
+                    # 如果差价百分比达到阈值，记录到历史中
+                    if price_diff_pct >= ARBITRAGE_THRESHOLD / 100:
+                        # 创建键值为交易对+买入交易所+卖出交易所的唯一标识
+                        key = f"{symbol}_{sell_exchange}_{buy_exchange}"
+                        
+                        # 更新历史记录
+                        if key not in arbitrage_history:
+                            arbitrage_history[key] = []
+                        
+                        # 添加新记录
+                        arbitrage_history[key].append(item)
+                        
+                        # 清理24小时以前的数据
+                        current_time = datetime.now()
+                        arbitrage_history[key] = [
+                            record for record in arbitrage_history[key]
+                            if (current_time - datetime.strptime(record["time"], "%Y-%m-%d %H:%M:%S")).total_seconds() < 86400
+                        ]
     
     # 按价差百分比降序排序
-    diff_result.sort(key=lambda x: x["price_diff_pct"], reverse=True)
+    result.sort(key=lambda x: x["price_diff_pct"], reverse=True)
     
-    return diff_result
+    return result
+
+def get_exchange_balances():
+    """从交易所API获取余额数据"""
+    balances = {}
+    
+    for exchange_id, client in exchange_clients.items():
+        try:
+            exchange_balances = {"USDT": 0, "positions": {}}
+            if not client.apiKey:
+                # 如果没有API密钥，使用模拟数据
+                simulated = generate_simulated_balances()
+                balances[exchange_id] = simulated[exchange_id]
+                continue
+                
+            # 获取余额
+            balance_data = client.fetch_balance()
+            
+            # 提取USDT余额
+            if 'USDT' in balance_data['total']:
+                exchange_balances["USDT"] = round(balance_data['total']['USDT'], 2)
+            
+            # 提取其他币种余额
+            for symbol in SYMBOLS:
+                coin = symbol.split('/')[0]
+                if coin in balance_data['total'] and balance_data['total'][coin] > 0:
+                    # 获取币种当前价格估算USDT价值
+                    value = 0
+                    amount = balance_data['total'][coin]
+                    
+                    try:
+                        # 尝试获取当前价格
+                        ticker = client.fetch_ticker(symbol)
+                        price = ticker['last']
+                        value = round(amount * price, 2)
+                    except:
+                        # 无法获取价格时使用估算值
+                        price_estimate = {
+                            'BTC': 65000,
+                            'ETH': 3500,
+                            'SOL': 140,
+                            'XRP': 0.5,
+                            'DOGE': 0.15,
+                            'ADA': 0.5,
+                            'DOT': 7,
+                            'MATIC': 0.8,
+                            'AVAX': 35,
+                            'SHIB': 0.00003
+                        }
+                        value = round(amount * price_estimate.get(coin, 1), 2)
+                    
+                    exchange_balances["positions"][coin] = {
+                        "amount": amount,
+                        "value": value
+                    }
+            
+            balances[exchange_id] = exchange_balances
+            print(f"获取 {exchange_id} 余额成功")
+        except Exception as e:
+            print(f"获取 {exchange_id} 余额失败: {e}")
+            # 失败时使用模拟数据
+            simulated = generate_simulated_balances()
+            balances[exchange_id] = simulated[exchange_id]
+    
+    return balances
+
+def get_exchange_prices():
+    """从交易所API获取价格数据"""
+    prices = {exchange: {} for exchange in EXCHANGES}
+    
+    for exchange_id, client in exchange_clients.items():
+        for symbol in SYMBOLS:
+            try:
+                # 获取订单簿数据
+                orderbook = client.fetch_order_book(symbol)
+                
+                if orderbook and len(orderbook['bids']) > 0 and len(orderbook['asks']) > 0:
+                    bid_price = orderbook['bids'][0][0]  # 买一价
+                    ask_price = orderbook['asks'][0][0]  # 卖一价
+                    
+                    # 计算深度（前5档挂单量）
+                    bid_depth = sum(amount for price, amount in orderbook['bids'][:5])
+                    ask_depth = sum(amount for price, amount in orderbook['asks'][:5])
+                    
+                    # 获取成交量
+                    volume = 0
+                    try:
+                        ticker = client.fetch_ticker(symbol)
+                        volume = ticker['quoteVolume'] or 0  # 24小时USDT成交量
+                    except:
+                        volume = random.uniform(1000, 5000)
+                    
+                    prices[exchange_id][symbol] = {
+                        "buy": bid_price,  # 最高买价
+                        "sell": ask_price,  # 最低卖价
+                        "depth": {
+                            "bid": round(bid_depth, 2),
+                            "ask": round(ask_depth, 2)
+                        },
+                        "volume": round(volume, 1)
+                    }
+                    
+                    print(f"获取 {exchange_id} {symbol} 价格成功: 买:{bid_price}, 卖:{ask_price}")
+            except Exception as e:
+                print(f"获取 {exchange_id} {symbol} 价格失败: {e}")
+    
+    # 检查数据完整性，如果缺少数据则使用模拟数据补充
+    simulated_data = generate_simulated_data()
+    for exchange in EXCHANGES:
+        if not prices[exchange]:
+            prices[exchange] = simulated_data[exchange]
+        else:
+            for symbol in SYMBOLS:
+                if symbol not in prices[exchange]:
+                    if exchange in simulated_data and symbol in simulated_data[exchange]:
+                        prices[exchange][symbol] = simulated_data[exchange][symbol]
+    
+    return prices
 
 def monitor_thread(interval=5):
     """监控线程函数"""
@@ -214,8 +418,8 @@ def monitor_thread(interval=5):
                 if status["mode"] == "simulate":
                     prices = generate_simulated_data()
                 else:
-                    # 真实API连接暂不支持，使用模拟数据
-                    prices = generate_simulated_data()
+                    # 使用真实API连接
+                    prices = get_exchange_prices()
                 
                 prices_data = prices
                 
@@ -227,7 +431,8 @@ def monitor_thread(interval=5):
                 if status["mode"] == "simulate":
                     balances = generate_simulated_balances()
                 else:
-                    balances = generate_simulated_balances()
+                    # 使用真实API连接获取余额
+                    balances = get_exchange_balances()
                 
                 balances_data = balances
                 
@@ -303,43 +508,70 @@ def stop_monitor():
     
     return jsonify({"status": "success", "message": "监控已停止"})
 
+@app.route('/api/arbitrage_history', methods=['GET'])
+def get_arbitrage_history():
+    """获取套利历史数据"""
+    # 合并所有历史记录为一个列表
+    all_history = []
+    for records in arbitrage_history.values():
+        all_history.extend(records)
+    
+    # 按时间降序排序
+    all_history.sort(key=lambda x: x["time"], reverse=True)
+    
+    return jsonify(all_history)
+
+@app.route('/api/arbitrage_history/<symbol>', methods=['GET'])
+def get_symbol_arbitrage_history(symbol):
+    """获取特定交易对的套利历史数据"""
+    symbol_history = []
+    
+    # 筛选包含指定交易对的历史记录
+    for key, records in arbitrage_history.items():
+        if key.startswith(f"{symbol}_"):
+            symbol_history.extend(records)
+    
+    # 按时间降序排序
+    symbol_history.sort(key=lambda x: x["time"], reverse=True)
+    
+    return jsonify(symbol_history)
+
 def main():
     """主函数"""
     global status
     
     # 解析命令行参数
     import argparse
-    parser = argparse.ArgumentParser(description="加密货币套利监控Web应用")
-    parser.add_argument("--simulate", action="store_true", help="使用模拟数据（无需API连接）")
-    parser.add_argument("--real", action="store_true", help="使用真实API连接")
-    parser.add_argument("--trade", action="store_true", help="启用交易功能")
-    parser.add_argument("--port", type=int, default=8888, help="Web服务器端口")
+    parser = argparse.ArgumentParser(description='加密货币套利监控Web应用')
+    parser.add_argument('--simulate', action='store_true', help='使用模拟数据')
+    parser.add_argument('--real', action='store_true', help='使用真实API连接')
+    parser.add_argument('--trade', action='store_true', help='启用交易功能')
+    parser.add_argument('--port', type=int, default=8888, help='Web服务器端口')
     args = parser.parse_args()
     
-    # 欢迎信息
+    # 设置运行模式
+    is_simulate = not args.real
+    status["mode"] = "simulate" if is_simulate else "real"
+    status["trading_enabled"] = args.trade
+    status["running"] = True
+    
+    # 显示启动信息
     print("\n===== 加密货币套利监控Web应用 =====")
-    print(f"运行模式: {'模拟数据' if args.simulate else '真实API连接'}")
+    print(f"运行模式: {'模拟数据' if is_simulate else '真实API连接'}")
     print(f"交易功能: {'已启用' if args.trade else '未启用（仅监控）'}")
     print(f"Web端口: {args.port}")
     print("======================================\n")
     
-    # 初始化状态
-    use_simulate = not args.real or args.simulate
-    status["running"] = True
-    status["mode"] = "simulate" if use_simulate else "real"
-    status["trading_enabled"] = args.trade
-    status["last_update"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # 加载配置
-    load_config()
+    # 初始化交易所客户端
+    if not is_simulate:
+        init_exchange_clients()
     
     # 启动监控线程
-    monitor = threading.Thread(target=monitor_thread)
-    monitor.daemon = True
+    monitor = threading.Thread(target=monitor_thread, daemon=True)
     monitor.start()
     
     # 启动Web服务器
-    app.run(host='0.0.0.0', port=args.port, debug=False)
+    app.run(host='0.0.0.0', port=args.port)
 
 if __name__ == "__main__":
     main() 

@@ -137,7 +137,7 @@ function updatePriceTable(pricesData) {
         const okxPrice = pricesData.okx && pricesData.okx[symbol];
         const bitgetPrice = pricesData.bitget && pricesData.bitget[symbol];
         
-        if (!binancePrice && !okxPrice && !bitgetPrice) continue;
+        // 即使没有数据也显示行
         
         // 计算最大差价
         let maxDiffPct = 0;
@@ -159,9 +159,21 @@ function updatePriceTable(pricesData) {
         
         // 计算最大深度
         let maxDepth = 0;
-        if (binancePrice) maxDepth = Math.max(maxDepth, binancePrice.depth || 0);
-        if (okxPrice) maxDepth = Math.max(maxDepth, okxPrice.depth || 0);
-        if (bitgetPrice) maxDepth = Math.max(maxDepth, bitgetPrice.depth || 0);
+        if (binancePrice && binancePrice.depth) {
+            const bidDepth = binancePrice.depth.bid || 0;
+            const askDepth = binancePrice.depth.ask || 0;
+            maxDepth = Math.max(maxDepth, bidDepth + askDepth);
+        }
+        if (okxPrice && okxPrice.depth) {
+            const bidDepth = okxPrice.depth.bid || 0;
+            const askDepth = okxPrice.depth.ask || 0;
+            maxDepth = Math.max(maxDepth, bidDepth + askDepth);
+        }
+        if (bitgetPrice && bitgetPrice.depth) {
+            const bidDepth = bitgetPrice.depth.bid || 0;
+            const askDepth = bitgetPrice.depth.ask || 0;
+            maxDepth = Math.max(maxDepth, bidDepth + askDepth);
+        }
         
         // 创建表格行
         const tr = document.createElement('tr');
@@ -181,8 +193,8 @@ function updatePriceTable(pricesData) {
             <td class="text-end">${binancePrice ? formatPrice(binancePrice.buy) : '-'}</td>
             <td class="text-end">${okxPrice ? formatPrice(okxPrice.buy) : '-'}</td>
             <td class="text-end">${bitgetPrice ? formatPrice(bitgetPrice.buy) : '-'}</td>
-            <td class="text-end">${formatDepth(maxDepth)}</td>
-            <td class="text-end">${formatPercentage(maxDiffPct)}</td>
+            <td class="text-end">${maxDepth > 0 ? formatDepth(maxDepth) : '-'}</td>
+            <td class="text-end">${maxDiffPct > 0 ? formatPercentage(maxDiffPct) : '-'}</td>
         `;
         
         tbody.appendChild(tr);
