@@ -14,12 +14,6 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any
 from loguru import logger
-import pandas as pd
-from vnpy.trader.object import TickData
-from vnpy.trader.constant import Exchange
-from vnpy_okex import OkexGateway
-from vnpy_binance import BinanceGateway
-from vnpy_bitget import BitgetGateway
 import ccxt
 
 from flask import Flask, jsonify, render_template, request, Response
