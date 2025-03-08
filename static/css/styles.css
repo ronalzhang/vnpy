@@ -1,0 +1,165 @@
+/* 全局样式 */
+body {
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+/* 标题样式 */
+.navbar-brand {
+    font-weight: 600;
+}
+
+/* 卡片样式 */
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border-radius: 0.5rem;
+    border: none;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    border-top-left-radius: 0.5rem !important;
+    border-top-right-radius: 0.5rem !important;
+    font-weight: 600;
+}
+
+/* 系统状态卡片 */
+.status-card {
+    background-color: #fff;
+    transition: all 0.3s ease;
+}
+
+.status-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+/* 价格表格样式 */
+.table th {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.table-sm td, .table-sm th {
+    padding: 0.5rem;
+}
+
+/* 账户余额样式 */
+.balance-info h4 {
+    font-weight: 700;
+    color: #0d6efd;
+    margin-bottom: 0;
+}
+
+.balance-info h6 {
+    margin-bottom: 0.25rem;
+}
+
+/* 套利机会表格 */
+#arbitrage-data .table-success {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+/* 日志容器 */
+.log-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.log-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.log-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.log-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.log-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* 徽章样式 */
+.badge {
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+}
+
+/* 表格响应式调整 */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .card-header h5 {
+        font-size: 1rem;
+    }
+    
+    .balance-info h4 {
+        font-size: 1.25rem;
+    }
+}
+
+/* 价格上涨下跌颜色 */
+.price-up {
+    color: #198754 !important;
+}
+
+.price-down {
+    color: #dc3545 !important;
+}
+
+/* 加载动画 */
+.loading {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 0.2em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border .75s linear infinite;
+}
+
+/* 工具提示 */
+.tooltip {
+    position: absolute;
+    z-index: 1070;
+    display: block;
+    margin: 0;
+    font-family: var(--bs-font-sans-serif);
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left;
+    text-decoration: none;
+    text-shadow: none;
+    text-transform: none;
+    letter-spacing: normal;
+    word-break: normal;
+    word-spacing: normal;
+    white-space: normal;
+    line-break: auto;
+    font-size: 0.875rem;
+    word-wrap: break-word;
+    opacity: 0;
+}
+
+/* 按钮交互效果 */
+.btn:focus {
+    box-shadow: none;
+}
+
+.btn-sm {
+    font-size: 0.8rem;
+}
+
+/* 下拉菜单样式 */
+.form-select-sm {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    font-size: 0.85rem;
+}

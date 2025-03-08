@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加密货币套利监控系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- 引入Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入Font Awesome图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-chart-line me-2"></i>加密货币套利监控系统
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#market-data">市场数据</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#account-balance">账户余额</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#api-docs">API文档</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container my-4">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card status-card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-satellite-dish me-2"></i>系统状态</h5>
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <span id="status-indicator" class="badge bg-success">运行中</span>
+                                <span id="mode-indicator" class="badge bg-info ms-2">模拟模式</span>
+                            </div>
+                            <div>
+                                <button id="start-btn" class="btn btn-sm btn-success me-2">
+                                    <i class="fas fa-play me-1"></i>启动
+                                </button>
+                                <button id="stop-btn" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-stop me-1"></i>停止
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">上次更新: <span id="last-update">2025-03-09 12:34:56</span></small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="account-balance" class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>账户余额和持仓</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs" id="balanceTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="binance-tab" data-bs-toggle="tab" data-bs-target="#binance" type="button" role="tab">Binance</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="okx-tab" data-bs-toggle="tab" data-bs-target="#okx" type="button" role="tab">OKX</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="bitget-tab" data-bs-toggle="tab" data-bs-target="#bitget" type="button" role="tab">Bitget</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content p-3" id="balanceTabContent">
+                            <div class="tab-pane fade show active" id="binance" role="tabpanel">
+                                <div class="balance-info mb-3">
+                                    <h6 class="text-muted">USDT余额</h6>
+                                    <h4>12,345.67 <small>USDT</small></h4>
+                                </div>
+                                <h6>持仓情况</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>币种</th>
+                                            <th>数量</th>
+                                            <th>价值 (USDT)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="binance-positions">
+                                        <tr>
+                                            <td>BTC</td>
+                                            <td>0.12345</td>
+                                            <td>7,893.45</td>
+                                        </tr>
+                                        <tr>
+                                            <td>ETH</td>
+                                            <td>1.5432</td>
+                                            <td>5,231.89</td>
+                                        </tr>
+                                        <tr>
+                                            <td>SOL</td>
+                                            <td>12.345</td>
+                                            <td>1,765.32</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-pane fade" id="okx" role="tabpanel">
+                                <!-- OKX内容结构类似 -->
+                                <div class="balance-info mb-3">
+                                    <h6 class="text-muted">USDT余额</h6>
+                                    <h4>9,876.54 <small>USDT</small></h4>
+                                </div>
+                                <h6>持仓情况</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>币种</th>
+                                            <th>数量</th>
+                                            <th>价值 (USDT)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="okx-positions">
+                                        <tr>
+                                            <td>BTC</td>
+                                            <td>0.08765</td>
+                                            <td>5,612.34</td>
+                                        </tr>
+                                        <tr>
+                                            <td>ETH</td>
+                                            <td>2.1098</td>
+                                            <td>7,189.75</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-pane fade" id="bitget" role="tabpanel">
+                                <!-- Bitget内容结构类似 -->
+                                <div class="balance-info mb-3">
+                                    <h6 class="text-muted">USDT余额</h6>
+                                    <h4>7,654.32 <small>USDT</small></h4>
+                                </div>
+                                <h6>持仓情况</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>币种</th>
+                                            <th>数量</th>
+                                            <th>价值 (USDT)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bitget-positions">
+                                        <tr>
+                                            <td>BTC</td>
+                                            <td>0.05432</td>
+                                            <td>3,476.23</td>
+                                        </tr>
+                                        <tr>
+                                            <td>SOL</td>
+                                            <td>32.109</td>
+                                            <td>4,589.12</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div id="market-data" class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>市场数据监控
+                            <span class="float-end">
+                                <select id="symbol-select" class="form-select form-select-sm">
+                                    <option value="BTC/USDT">BTC/USDT</option>
+                                    <option value="ETH/USDT">ETH/USDT</option>
+                                    <option value="SOL/USDT">SOL/USDT</option>
+                                    <option value="XRP/USDT">XRP/USDT</option>
+                                </select>
+                            </span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>交易所</th>
+                                        <th>买入价</th>
+                                        <th>卖出价</th>
+                                        <th>24h交易量</th>
+                                        <th>深度 (买/卖)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="price-data">
+                                    <tr>
+                                        <td>Binance</td>
+                                        <td>64,123.45</td>
+                                        <td>64,156.78</td>
+                                        <td>5,432.1 BTC</td>
+                                        <td>12.5 / 8.3 BTC</td>
+                                    </tr>
+                                    <tr>
+                                        <td>OKX</td>
+                                        <td>64,098.76</td>
+                                        <td>64,189.32</td>
+                                        <td>4,321.0 BTC</td>
+                                        <td>9.8 / 7.6 BTC</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Bitget</td>
+                                        <td>64,201.23</td>
+                                        <td>64,267.89</td>
+                                        <td>3,210.9 BTC</td>
+                                        <td>7.2 / 5.4 BTC</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h5>套利机会</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>买入交易所</th>
+                                            <th>卖出交易所</th>
+                                            <th>买入价</th>
+                                            <th>卖出价</th>
+                                            <th>差价</th>
+                                            <th>差价比例</th>
+                                            <th>可执行</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="arbitrage-data">
+                                        <tr class="table-success">
+                                            <td>OKX</td>
+                                            <td>Bitget</td>
+                                            <td>64,098.76</td>
+                                            <td>64,267.89</td>
+                                            <td>169.13</td>
+                                            <td>0.26%</td>
+                                            <td><i class="fas fa-check-circle text-success"></i></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Binance</td>
+                                            <td>Bitget</td>
+                                            <td>64,123.45</td>
+                                            <td>64,267.89</td>
+                                            <td>144.44</td>
+                                            <td>0.23%</td>
+                                            <td><i class="fas fa-check-circle text-success"></i></td>
+                                        </tr>
+                                        <tr class="text-muted">
+                                            <td>Binance</td>
+                                            <td>OKX</td>
+                                            <td>64,123.45</td>
+                                            <td>64,189.32</td>
+                                            <td>65.87</td>
+                                            <td>0.10%</td>
+                                            <td><i class="fas fa-times-circle text-danger"></i></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-history me-2"></i>操作日志</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="log-container">
+                            <ul class="list-group list-group-flush" id="operation-logs">
+                                <li class="list-group-item">
+                                    <span class="text-muted">[2025-03-09 12:34:56]</span> 
+                                    <span class="badge bg-info">INFO</span> 
+                                    系统启动，使用模拟模式
+                                </li>
+                                <li class="list-group-item">
+                                    <span class="text-muted">[2025-03-09 12:35:01]</span> 
+                                    <span class="badge bg-success">ARBITRAGE</span> 
+                                    发现套利机会: BTC/USDT OKX(64098.76) → Bitget(64267.89), 差价: 169.13 (0.26%)
+                                </li>
+                                <li class="list-group-item">
+                                    <span class="text-muted">[2025-03-09 12:35:30]</span> 
+                                    <span class="badge bg-warning">WARNING</span> 
+                                    Binance API 请求延迟较高: 1523ms
+                                </li>
+                                <li class="list-group-item">
+                                    <span class="text-muted">[2025-03-09 12:36:05]</span> 
+                                    <span class="badge bg-danger">ERROR</span> 
+                                    无法连接到 Bitget API，正在重试...
+                                </li>
+                                <li class="list-group-item">
+                                    <span class="text-muted">[2025-03-09 12:36:12]</span> 
+                                    <span class="badge bg-success">SUCCESS</span> 
+                                    已重新连接到 Bitget API
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>加密货币套利监控系统</h5>
+                    <p class="text-muted">实时监控多个交易所的价格差异，寻找套利机会。</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">服务器时间: <span id="server-time">2025-03-09 12:34:56</span></p>
+                    <p class="text-muted">版本: 1.0.0</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 引入Bootstrap和JS文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
