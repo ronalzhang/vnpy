@@ -1,8 +1,53 @@
 # Python
-*.pyc
-*.pyo
-*.pyd
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
 *.egg-info/
+.installed.cfg
+*.egg
+
+# 日志和临时文件
+logs/
+*.log
+*.csv
+*.dat
+*.pid
+*.env
+*.pot
+*.po
+*.mo
+*.swp
+*.db
+*.sqlite3
+nohup.out
+
+# 操作系统和IDE
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 项目特定
+crypto_config.json
+api_server.pid
 
 # Jupyter
 .ipynb_checkpoints
@@ -16,7 +61,6 @@
 x64
 
 # Temp
-build
 dist
 *.local
 
@@ -35,5 +79,4 @@ _static
 _templates
 
 # Misc
-.DS_Store
 *.mo
