@@ -88,15 +88,16 @@ function stopMonitoring() {
 
 // 获取价格数据
 function fetchPriceData() {
-    fetch('/api/data')
+    // 获取状态信息
+    fetch('/api/status')
         .then(response => response.json())
-        .then(data => {
-            lastUpdateTime = data.last_update;
+        .then(statusData => {
+            lastUpdateTime = statusData.last_update;
             document.getElementById('last-update').textContent = lastUpdateTime;
             
             // 检查模式
             const modeIndicator = document.getElementById('mode-indicator');
-            if (data.mode === 'simulation') {
+            if (statusData.mode === 'simulate') {
                 modeIndicator.textContent = '模拟模式';
                 modeIndicator.classList.remove('bg-primary');
                 modeIndicator.classList.add('bg-info');
@@ -106,39 +107,43 @@ function fetchPriceData() {
                 modeIndicator.classList.add('bg-primary');
             }
             
-            // 获取所有交易对价格
-            updatePriceTable(data.exchanges);
-            
-            // 更新套利数据
-            if (data.exchanges.arbitrage) {
-                updateArbitrageTable(data.exchanges.arbitrage);
-            }
+            // 获取价格数据
+            fetch('/api/prices')
+                .then(response => response.json())
+                .then(pricesData => {
+                    // 更新价格表格
+                    updatePriceTable(pricesData);
+                })
+                .catch(error => {
+                    console.error('获取价格数据失败:', error);
+                    addLog('ERROR', '获取价格数据失败: ' + error.message);
+                });
         })
         .catch(error => {
-            console.error('获取价格数据失败:', error);
-            addLog('ERROR', '获取价格数据失败: ' + error.message);
+            console.error('获取状态数据失败:', error);
+            addLog('ERROR', '获取状态数据失败: ' + error.message);
         });
 }
 
 // 更新价格表格
-function updatePriceTable(exchangeData) {
+function updatePriceTable(pricesData) {
     const tbody = document.getElementById('price-data');
     tbody.innerHTML = '';
     
     // 遍历所有交易对
     for (const symbol of SYMBOLS) {
         // 检查是否有数据
-        const binancePrice = exchangeData.binance.prices[symbol];
-        const okexPrice = exchangeData.okex.prices[symbol];
-        const bitgetPrice = exchangeData.bitget.prices[symbol];
+        const binancePrice = pricesData.binance && pricesData.binance[symbol];
+        const okxPrice = pricesData.okx && pricesData.okx[symbol];
+        const bitgetPrice = pricesData.bitget && pricesData.bitget[symbol];
         
-        if (!binancePrice && !okexPrice && !bitgetPrice) continue;
+        if (!binancePrice && !okxPrice && !bitgetPrice) continue;
         
         // 计算最大差价
         let maxDiffPct = 0;
-        if (binancePrice && okexPrice) {
-            const diff1 = Math.abs(binancePrice.sell / okexPrice.buy - 1) * 100;
-            const diff2 = Math.abs(okexPrice.sell / binancePrice.buy - 1) * 100;
+        if (binancePrice && okxPrice) {
+            const diff1 = Math.abs(binancePrice.sell / okxPrice.buy - 1) * 100;
+            const diff2 = Math.abs(okxPrice.sell / binancePrice.buy - 1) * 100;
             maxDiffPct = Math.max(maxDiffPct, diff1, diff2);
         }
         if (binancePrice && bitgetPrice) {
@@ -146,16 +151,16 @@ function updatePriceTable(exchangeData) {
             const diff2 = Math.abs(bitgetPrice.sell / binancePrice.buy - 1) * 100;
             maxDiffPct = Math.max(maxDiffPct, diff1, diff2);
         }
-        if (okexPrice && bitgetPrice) {
-            const diff1 = Math.abs(okexPrice.sell / bitgetPrice.buy - 1) * 100;
-            const diff2 = Math.abs(bitgetPrice.sell / okexPrice.buy - 1) * 100;
+        if (okxPrice && bitgetPrice) {
+            const diff1 = Math.abs(okxPrice.sell / bitgetPrice.buy - 1) * 100;
+            const diff2 = Math.abs(bitgetPrice.sell / okxPrice.buy - 1) * 100;
             maxDiffPct = Math.max(maxDiffPct, diff1, diff2);
         }
         
         // 计算最大深度
         let maxDepth = 0;
         if (binancePrice) maxDepth = Math.max(maxDepth, binancePrice.depth || 0);
-        if (okexPrice) maxDepth = Math.max(maxDepth, okexPrice.depth || 0);
+        if (okxPrice) maxDepth = Math.max(maxDepth, okxPrice.depth || 0);
         if (bitgetPrice) maxDepth = Math.max(maxDepth, bitgetPrice.depth || 0);
         
         // 创建表格行
@@ -174,7 +179,7 @@ function updatePriceTable(exchangeData) {
         tr.innerHTML = `
             <td class="text-center"><strong>${symbol}</strong></td>
             <td class="text-end">${binancePrice ? formatPrice(binancePrice.buy) : '-'}</td>
-            <td class="text-end">${okexPrice ? formatPrice(okexPrice.buy) : '-'}</td>
+            <td class="text-end">${okxPrice ? formatPrice(okxPrice.buy) : '-'}</td>
             <td class="text-end">${bitgetPrice ? formatPrice(bitgetPrice.buy) : '-'}</td>
             <td class="text-end">${formatDepth(maxDepth)}</td>
             <td class="text-end">${formatPercentage(maxDiffPct)}</td>
@@ -235,10 +240,10 @@ function updateArbitrageTable(opportunities) {
 
 // 获取套利数据
 function fetchArbitrageData() {
-    fetch('/api/arbitrage')
+    fetch('/api/diff')
         .then(response => response.json())
         .then(data => {
-            updateArbitrageTable(data.opportunities);
+            updateArbitrageTable(data);
         })
         .catch(error => {
             console.error('获取套利数据失败:', error);
@@ -251,11 +256,11 @@ function fetchBalanceData() {
         .then(response => response.json())
         .then(data => {
             // 更新Binance余额
-            updateExchangeBalance('binance', data.balances.binance);
+            updateExchangeBalance('binance', data.binance);
             // 更新OKX余额
-            updateExchangeBalance('okx', data.balances.okex);
+            updateExchangeBalance('okx', data.okx);
             // 更新Bitget余额
-            updateExchangeBalance('bitget', data.balances.bitget);
+            updateExchangeBalance('bitget', data.bitget);
         })
         .catch(error => {
             console.error('获取余额数据失败:', error);
@@ -293,8 +298,8 @@ function updateExchangeBalance(exchange, balanceData) {
             .then(response => response.json())
             .then(data => {
                 const symbol = `${asset}/USDT`;
-                if (data.prices[symbol] && data.prices[symbol][exchange]) {
-                    valueInUsdt = amount * data.prices[symbol][exchange].buy;
+                if (data[exchange] && data[exchange][symbol]) {
+                    valueInUsdt = amount * data[exchange][symbol].buy;
                 }
                 
                 const tr = document.createElement('tr');
@@ -383,6 +388,7 @@ function formatExchangeName(exchange) {
     const names = {
         'binance': 'Binance',
         'okex': 'OKX',
+        'okx': 'OKX',
         'bitget': 'Bitget'
     };
     return names[exchange] || exchange;
