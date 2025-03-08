@@ -30,6 +30,108 @@ VeighNa是一套基于Python的开源量化交易系统开发框架，在开源�
   <img src ="https://vnpy.oss-cn-shanghai.aliyuncs.com/github_wx.png"/, width=250>
 </p>
 
+# 加密货币套利交易系统
+
+一个轻量级的加密货币跨交易所套利交易系统，支持实时监控价格差异和自动交易。
+
+## 主要功能
+
+- 实时监控多个交易所（OKX、Binance、Bitget）的加密货币价格
+- 自动计算不同交易所间的价格差异
+- 识别套利机会
+- 支持模拟交易和真实交易
+- REST API接口，端口8888
+
+## 系统组件
+
+- `crypto_api_server.py`: 带有REST API的Web服务器（端口8888）
+- `crypto_monitor.py`: 命令行监控工具
+- `start_api_server.sh` / `stop_api_server.sh`: 启动/停止API服务器的Shell脚本
+- `crypto_config.json`: 交易所API和套利参数配置
+
+## 快速开始
+
+### 配置
+
+编辑 `crypto_config.json` 文件，设置交易所API密钥和套利参数：
+
+```json
+{
+    "api_keys": {
+        "okex": {
+            "key": "你的OKX API密钥",
+            "secret": "你的OKX API密钥",
+            "passphrase": "你的OKX API密钥"
+        },
+        "binance": {
+            "key": "你的Binance API密钥",
+            "secret": "你的Binance API密钥"
+        },
+        "bitget": {
+            "key": "你的Bitget API密钥",
+            "secret": "你的Bitget API密钥",
+            "passphrase": "你的Bitget API密钥"
+        }
+    },
+    "proxy": {
+        "enabled": false,
+        "host": "127.0.0.1",
+        "port": 7890
+    },
+    "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"],
+    "arbitrage_threshold": 0.5,
+    "close_threshold": 0.2
+}
+```
+
+### 使用命令行监控
+
+```bash
+# 使用模拟数据（无需API密钥）
+python crypto_monitor.py --simulate
+
+# 使用真实API数据
+python crypto_monitor.py --real
+
+# 启用交易功能
+python crypto_monitor.py --real --trade
+```
+
+### 启动API服务器（端口8888）
+
+```bash
+# 使用模拟数据
+./start_api_server.sh
+
+# 使用真实API数据
+./start_api_server.sh --real
+
+# 启用交易功能
+./start_api_server.sh --real --trade
+```
+
+### API端点
+
+- `GET /api/status` - 获取服务器状态
+- `GET /api/prices` - 获取所有价格数据
+- `GET /api/diff` - 获取价格差异数据
+- `GET /api/symbols` - 获取交易对列表
+- `POST /api/start` - 启动监控
+- `POST /api/stop` - 停止监控
+
+## 依赖项
+
+- Python 3.7+
+- ccxt
+- Flask
+- loguru
+- pandas
+
+## 安装
+
+```bash
+pip install ccxt flask loguru pandas
+```
 
 ## 功能特点
 
