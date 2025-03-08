@@ -221,10 +221,12 @@ def calculate_price_differences(prices):
                         "is_executable": is_executable,
                         "time": timestamp
                     }
-                    result.append(item)
                     
-                    # 如果差价百分比达到阈值，记录到历史中
+                    # 只将差价大于等于阈值的套利机会添加到结果中
                     if price_diff_pct >= ARBITRAGE_THRESHOLD / 100:
+                        result.append(item)
+                        
+                        # 记录到历史中
                         # 创建键值为交易对+买入交易所+卖出交易所的唯一标识
                         key = f"{symbol}_{buy_exchange}_{sell_exchange}"
                         
@@ -264,10 +266,12 @@ def calculate_price_differences(prices):
                         "is_executable": is_executable,
                         "time": timestamp
                     }
-                    result.append(item)
                     
-                    # 如果差价百分比达到阈值，记录到历史中
+                    # 只将差价大于等于阈值的套利机会添加到结果中
                     if price_diff_pct >= ARBITRAGE_THRESHOLD / 100:
+                        result.append(item)
+                        
+                        # 记录到历史中
                         # 创建键值为交易对+买入交易所+卖出交易所的唯一标识
                         key = f"{symbol}_{sell_exchange}_{buy_exchange}"
                         
@@ -285,7 +289,7 @@ def calculate_price_differences(prices):
                             if (current_time - datetime.strptime(record["time"], "%Y-%m-%d %H:%M:%S")).total_seconds() < 86400
                         ]
     
-    # 按价差百分比降序排序
+    # result已经只包含符合阈值的套利机会，按价差百分比降序排序
     result.sort(key=lambda x: x["price_diff_pct"], reverse=True)
     
     return result
@@ -296,63 +300,230 @@ def get_exchange_balances():
     
     for exchange_id, client in exchange_clients.items():
         try:
-            exchange_balances = {"USDT": 0, "positions": {}}
-            if not client.apiKey:
-                # 如果没有API密钥，使用模拟数据
+            exchange_balances = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
+            
+            # 检查API密钥是否配置
+            if not client or not hasattr(client, 'apiKey') or not client.apiKey:
+                print(f"交易所 {exchange_id} 没有配置API密钥或客户端初始化失败，使用模拟数据")
                 simulated = generate_simulated_balances()
                 balances[exchange_id] = simulated[exchange_id]
                 continue
                 
-            # 获取余额
-            balance_data = client.fetch_balance()
-            
-            # 提取USDT余额
-            if 'USDT' in balance_data['total']:
-                exchange_balances["USDT"] = round(balance_data['total']['USDT'], 2)
-            
-            # 提取其他币种余额
-            for symbol in SYMBOLS:
-                coin = symbol.split('/')[0]
-                if coin in balance_data['total'] and balance_data['total'][coin] > 0:
-                    # 获取币种当前价格估算USDT价值
-                    value = 0
-                    amount = balance_data['total'][coin]
-                    
-                    try:
-                        # 尝试获取当前价格
-                        ticker = client.fetch_ticker(symbol)
-                        price = ticker['last']
-                        value = round(amount * price, 2)
-                    except:
-                        # 无法获取价格时使用估算值
-                        price_estimate = {
-                            'BTC': 65000,
-                            'ETH': 3500,
-                            'SOL': 140,
-                            'XRP': 0.5,
-                            'DOGE': 0.15,
-                            'ADA': 0.5,
-                            'DOT': 7,
-                            'MATIC': 0.8,
-                            'AVAX': 35,
-                            'SHIB': 0.00003
+            try:
+                # 获取余额数据
+                print(f"尝试获取 {exchange_id} 的真实账户余额...")
+                balance_data = client.fetch_balance()
+                
+                # 确保数据结构完整
+                if not balance_data or 'total' not in balance_data:
+                    raise Exception(f"获取到的余额数据格式异常: {balance_data}")
+                
+                # 提取USDT余额
+                if 'USDT' in balance_data['total']:
+                    exchange_balances["USDT"] = round(balance_data['total']['USDT'], 2)
+                    # 添加可用和锁定余额
+                    exchange_balances["USDT_available"] = round(balance_data.get('free', {}).get('USDT', 0), 2)
+                    exchange_balances["USDT_locked"] = round(balance_data.get('used', {}).get('USDT', 0), 2)
+                
+                # 提取其他币种余额
+                for symbol in SYMBOLS:
+                    coin = symbol.split('/')[0]
+                    if coin in balance_data['total'] and balance_data['total'][coin] > 0:
+                        # 获取币种当前价格估算USDT价值
+                        value = 0
+                        total_amount = balance_data['total'][coin]
+                        available_amount = balance_data.get('free', {}).get(coin, 0)
+                        locked_amount = balance_data.get('used', {}).get(coin, 0)
+                        
+                        try:
+                            # 尝试获取当前价格
+                            ticker = client.fetch_ticker(symbol)
+                            price = ticker['last']
+                            value = round(total_amount * price, 2)
+                        except Exception as e:
+                            print(f"获取 {exchange_id} {symbol} 价格失败: {e}")
+                            # 无法获取价格时使用估算值
+                            price_estimate = {
+                                'BTC': 65000,
+                                'ETH': 3500,
+                                'SOL': 140,
+                                'XRP': 0.5,
+                                'DOGE': 0.15,
+                                'ADA': 0.5,
+                                'DOT': 7,
+                                'MATIC': 0.8,
+                                'AVAX': 35,
+                                'SHIB': 0.00003
+                            }
+                            value = round(total_amount * price_estimate.get(coin, 1), 2)
+                        
+                        exchange_balances["positions"][coin] = {
+                            "amount": total_amount,
+                            "available": available_amount,
+                            "locked": locked_amount,
+                            "value": value
                         }
-                        value = round(amount * price_estimate.get(coin, 1), 2)
-                    
-                    exchange_balances["positions"][coin] = {
-                        "amount": amount,
-                        "value": value
-                    }
-            
-            balances[exchange_id] = exchange_balances
-            print(f"获取 {exchange_id} 余额成功")
+                
+                balances[exchange_id] = exchange_balances
+                print(f"获取 {exchange_id} 余额成功")
+            except Exception as e:
+                print(f"获取 {exchange_id} 余额失败: {e}, 尝试使用替代方法")
+                # 尝试使用替代方法获取余额
+                try:
+                    if exchange_id == 'binance':
+                        balances[exchange_id] = get_binance_balance(client)
+                    elif exchange_id == 'okx':
+                        balances[exchange_id] = get_okx_balance(client)
+                    elif exchange_id == 'bitget':
+                        balances[exchange_id] = get_bitget_balance(client)
+                    else:
+                        raise Exception("不支持的交易所")
+                except Exception as e2:
+                    print(f"获取 {exchange_id} 余额的替代方法也失败: {e2}，使用模拟数据")
+                    simulated = generate_simulated_balances()
+                    balances[exchange_id] = simulated[exchange_id]
         except Exception as e:
-            print(f"获取 {exchange_id} 余额失败: {e}")
-            # 失败时使用模拟数据
+            print(f"获取 {exchange_id} 余额过程中出现异常: {e}，使用模拟数据")
             simulated = generate_simulated_balances()
             balances[exchange_id] = simulated[exchange_id]
     
     return balances
+
+def get_binance_balance(client):
+    """获取币安余额的替代方法"""
+    try:
+        balance = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
+        account = client.private_get_account()
+        
+        for asset in account.get('balances', []):
+            symbol = asset.get('asset')
+            free = float(asset.get('free', 0))
+            locked = float(asset.get('locked', 0))
+            total = free + locked
+            
+            if symbol == 'USDT':
+                balance["USDT"] = round(total, 2)
+                balance["USDT_available"] = round(free, 2)
+                balance["USDT_locked"] = round(locked, 2)
+            elif total > 0:
+                price = 0
+                try:
+                    ticker = client.fetch_ticker(f"{symbol}/USDT")
+                    price = ticker['last']
+                except:
+                    # 使用估计价格
+                    price_estimate = {
+                        'BTC': 65000, 'ETH': 3500, 'SOL': 140, 'XRP': 0.5,
+                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'MATIC': 0.8,
+                        'AVAX': 35, 'SHIB': 0.00003
+                    }
+                    price = price_estimate.get(symbol, 0)
+                
+                if price > 0:
+                    value = round(total * price, 2)
+                    balance["positions"][symbol] = {
+                        "amount": total,
+                        "available": free,
+                        "locked": locked,
+                        "value": value
+                    }
+        
+        return balance
+    except Exception as e:
+        print(f"获取币安余额的替代方法失败: {e}")
+        raise e
+
+def get_okx_balance(client):
+    """获取OKX余额的替代方法"""
+    try:
+        balance = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
+        funding_accounts = client.private_get_asset_balances({'ccy': ''})
+        
+        for asset in funding_accounts.get('data', []):
+            symbol = asset.get('ccy')
+            available = float(asset.get('availBal', 0))
+            frozen = float(asset.get('frozenBal', 0))
+            total = available + frozen
+            
+            if symbol == 'USDT':
+                balance["USDT"] = round(total, 2)
+                balance["USDT_available"] = round(available, 2)
+                balance["USDT_locked"] = round(frozen, 2)
+            elif total > 0:
+                price = 0
+                try:
+                    ticker = client.fetch_ticker(f"{symbol}/USDT")
+                    price = ticker['last']
+                except:
+                    # 使用估计价格
+                    price_estimate = {
+                        'BTC': 65000, 'ETH': 3500, 'SOL': 140, 'XRP': 0.5,
+                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'MATIC': 0.8,
+                        'AVAX': 35, 'SHIB': 0.00003
+                    }
+                    price = price_estimate.get(symbol, 0)
+                
+                if price > 0:
+                    value = round(total * price, 2)
+                    balance["positions"][symbol] = {
+                        "amount": total,
+                        "available": available,
+                        "locked": frozen,
+                        "value": value
+                    }
+        
+        return balance
+    except Exception as e:
+        print(f"获取OKX余额的替代方法失败: {e}")
+        raise e
+
+def get_bitget_balance(client):
+    """获取Bitget余额的替代方法"""
+    try:
+        balance = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
+        
+        # 对于Bitget，尝试直接调用fetch_balance
+        balances = client.fetch_balance()
+        
+        if 'USDT' in balances['total']:
+            balance["USDT"] = round(balances['total']['USDT'], 2)
+            balance["USDT_available"] = round(balances['free'].get('USDT', 0), 2)
+            balance["USDT_locked"] = round(balances['used'].get('USDT', 0), 2)
+        
+        # 处理其他资产
+        for symbol in SYMBOLS:
+            coin = symbol.split('/')[0]
+            if coin in balances['total'] and balances['total'][coin] > 0:
+                total = balances['total'][coin]
+                available = balances['free'].get(coin, 0)
+                locked = balances['used'].get(coin, 0)
+                
+                price = 0
+                try:
+                    ticker = client.fetch_ticker(symbol)
+                    price = ticker['last']
+                except:
+                    # 使用估计价格
+                    price_estimate = {
+                        'BTC': 65000, 'ETH': 3500, 'SOL': 140, 'XRP': 0.5,
+                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'MATIC': 0.8,
+                        'AVAX': 35, 'SHIB': 0.00003
+                    }
+                    price = price_estimate.get(coin, 0)
+                
+                if price > 0:
+                    value = round(total * price, 2)
+                    balance["positions"][coin] = {
+                        "amount": total,
+                        "available": available,
+                        "locked": locked,
+                        "value": value
+                    }
+        
+        return balance
+    except Exception as e:
+        print(f"获取Bitget余额的替代方法失败: {e}")
+        raise e
 
 def get_exchange_prices():
     """从交易所API获取价格数据"""

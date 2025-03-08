@@ -167,15 +167,29 @@
                         <div class="tab-content p-3" id="balanceTabContent">
                             <div class="tab-pane fade show active" id="binance" role="tabpanel">
                                 <div class="balance-info mb-3">
-                                    <h6 class="text-muted">USDT余额</h6>
-                                    <h4>12,345.67 <small>USDT</small></h4>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">总余额 (USDT)</h6>
+                                            <h4 id="binance-balance">12,345.67</h4>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">可用 (USDT)</h6>
+                                            <h4 id="binance-available">12,340.00</h4>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">锁定 (USDT)</h6>
+                                            <h4 id="binance-locked">5.67</h4>
+                                        </div>
+                                    </div>
                                 </div>
                                 <h6>持仓情况</h6>
                                 <table class="table table-sm table-hover">
                                     <thead class="table-light">
                                         <tr>
                                             <th>币种</th>
-                                            <th>数量</th>
+                                            <th>总数量</th>
+                                            <th>可用</th>
+                                            <th>锁定</th>
                                             <th>价值 (USDT)</th>
                                         </tr>
                                     </thead>
@@ -183,6 +197,8 @@
                                         <tr>
                                             <td>BTC</td>
                                             <td>0.12345</td>
+                                            <td>0.12345</td>
+                                            <td>0.00000</td>
                                             <td>7,893.45</td>
                                         </tr>
                                     </tbody>
@@ -190,15 +206,29 @@
                             </div>
                             <div class="tab-pane fade" id="okx" role="tabpanel">
                                 <div class="balance-info mb-3">
-                                    <h6 class="text-muted">USDT余额</h6>
-                                    <h4>9,876.54 <small>USDT</small></h4>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">总余额 (USDT)</h6>
+                                            <h4 id="okx-balance">9,876.54</h4>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">可用 (USDT)</h6>
+                                            <h4 id="okx-available">9,800.00</h4>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">锁定 (USDT)</h6>
+                                            <h4 id="okx-locked">76.54</h4>
+                                        </div>
+                                    </div>
                                 </div>
                                 <h6>持仓情况</h6>
                                 <table class="table table-sm table-hover">
                                     <thead class="table-light">
                                         <tr>
                                             <th>币种</th>
-                                            <th>数量</th>
+                                            <th>总数量</th>
+                                            <th>可用</th>
+                                            <th>锁定</th>
                                             <th>价值 (USDT)</th>
                                         </tr>
                                     </thead>
@@ -206,6 +236,8 @@
                                         <tr>
                                             <td>BTC</td>
                                             <td>0.08765</td>
+                                            <td>0.08765</td>
+                                            <td>0.00000</td>
                                             <td>5,612.34</td>
                                         </tr>
                                     </tbody>
@@ -213,15 +245,29 @@
                             </div>
                             <div class="tab-pane fade" id="bitget" role="tabpanel">
                                 <div class="balance-info mb-3">
-                                    <h6 class="text-muted">USDT余额</h6>
-                                    <h4>7,654.32 <small>USDT</small></h4>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">总余额 (USDT)</h6>
+                                            <h4 id="bitget-balance">7,654.32</h4>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">可用 (USDT)</h6>
+                                            <h4 id="bitget-available">7,600.00</h4>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted">锁定 (USDT)</h6>
+                                            <h4 id="bitget-locked">54.32</h4>
+                                        </div>
+                                    </div>
                                 </div>
                                 <h6>持仓情况</h6>
                                 <table class="table table-sm table-hover">
                                     <thead class="table-light">
                                         <tr>
                                             <th>币种</th>
-                                            <th>数量</th>
+                                            <th>总数量</th>
+                                            <th>可用</th>
+                                            <th>锁定</th>
                                             <th>价值 (USDT)</th>
                                         </tr>
                                     </thead>
@@ -229,6 +275,8 @@
                                         <tr>
                                             <td>BTC</td>
                                             <td>0.05432</td>
+                                            <td>0.05432</td>
+                                            <td>0.00000</td>
                                             <td>3,476.23</td>
                                         </tr>
                                     </tbody>

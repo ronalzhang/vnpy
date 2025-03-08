@@ -285,12 +285,25 @@ function updateExchangeBalance(exchange, balanceData) {
     
     // 获取USDT余额
     const usdtBalance = balanceData.USDT || 0;
+    const usdtAvailable = balanceData.USDT_available || 0;
+    const usdtLocked = balanceData.USDT_locked || 0;
     const exchangeId = exchange === 'okx' ? 'okx' : exchange; // 处理ID不一致问题
     
     // 更新USDT余额显示
-    const balanceElement = document.querySelector(`#${exchangeId} .balance-info h4`);
+    const balanceElement = document.getElementById(`${exchangeId}-balance`);
     if (balanceElement) {
-        balanceElement.innerHTML = `${formatNumber(usdtBalance)} <small>USDT</small>`;
+        balanceElement.textContent = formatNumber(usdtBalance);
+    }
+    
+    // 更新可用和锁定余额
+    const availableElement = document.getElementById(`${exchangeId}-available`);
+    if (availableElement) {
+        availableElement.textContent = formatNumber(usdtAvailable);
+    }
+    
+    const lockedElement = document.getElementById(`${exchangeId}-locked`);
+    if (lockedElement) {
+        lockedElement.textContent = formatNumber(usdtLocked);
     }
     
     // 更新持仓表格
@@ -299,44 +312,65 @@ function updateExchangeBalance(exchange, balanceData) {
     
     tbody.innerHTML = '';
     
-    // 添加所有非USDT资产
-    for (const [asset, amount] of Object.entries(balanceData)) {
-        if (asset === 'USDT' || amount <= 0) continue;
-        
-        // 估算USDT价值（简化计算，实际应该使用实时价格）
-        let valueInUsdt = 0;
-        
-        fetch('/api/prices')
-            .then(response => response.json())
-            .then(data => {
-                const symbol = `${asset}/USDT`;
-                if (data[exchange] && data[exchange][symbol]) {
-                    valueInUsdt = amount * data[exchange][symbol].buy;
-                }
-                
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${asset}</td>
-                    <td>${formatNumber(amount, 8)}</td>
-                    <td>${formatNumber(valueInUsdt)}</td>
-                `;
-                tbody.appendChild(tr);
-            })
-            .catch(() => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${asset}</td>
-                    <td>${formatNumber(amount, 8)}</td>
-                    <td>-</td>
-                `;
-                tbody.appendChild(tr);
-            });
+    // 添加所有持仓资产
+    if (balanceData.positions) {
+        // 新的数据结构
+        for (const [asset, positionData] of Object.entries(balanceData.positions)) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${asset}</td>
+                <td>${formatNumber(positionData.amount, 8)}</td>
+                <td>${formatNumber(positionData.available || positionData.amount, 8)}</td>
+                <td>${formatNumber(positionData.locked || 0, 8)}</td>
+                <td>${formatNumber(positionData.value, 2)}</td>
+            `;
+            tbody.appendChild(tr);
+        }
+    } else {
+        // 兼容旧数据结构
+        for (const [asset, amount] of Object.entries(balanceData)) {
+            if (asset === 'USDT' || asset === 'USDT_available' || asset === 'USDT_locked' || amount <= 0) continue;
+            
+            // 估算USDT价值（简化计算，实际应该使用实时价格）
+            let valueInUsdt = 0;
+            
+            fetch('/api/prices')
+                .then(response => response.json())
+                .then(data => {
+                    const symbol = `${asset}/USDT`;
+                    if (data[exchange] && data[exchange][symbol]) {
+                        valueInUsdt = amount * data[exchange][symbol].buy;
+                    }
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${asset}</td>
+                        <td>${formatNumber(amount, 8)}</td>
+                        <td>${formatNumber(amount, 8)}</td>
+                        <td>${formatNumber(0, 8)}</td>
+                        <td>${formatNumber(valueInUsdt)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                })
+                .catch(() => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${asset}</td>
+                        <td>${formatNumber(amount, 8)}</td>
+                        <td>${formatNumber(amount, 8)}</td>
+                        <td>${formatNumber(0, 8)}</td>
+                        <td>-</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+        }
     }
     
     // 如果没有持仓，显示提示
-    if (Object.keys(balanceData).length <= 1) { // 只有USDT
+    if ((balanceData.positions && Object.keys(balanceData.positions).length === 0) || 
+        (!balanceData.positions && Object.keys(balanceData).length <= 3)) { // 只有USDT相关字段
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="3" class="text-center">暂无持仓</td>`;
+        tr.innerHTML = `<td colspan="5" class="text-center">暂无持仓</td>`;
         tbody.appendChild(tr);
     }
 }
