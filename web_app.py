@@ -20,6 +20,7 @@ from vnpy.trader.constant import Exchange
 from vnpy_okex import OkexGateway
 from vnpy_binance import BinanceGateway
 from vnpy_bitget import BitgetGateway
+import ccxt
 
 from flask import Flask, jsonify, render_template, request, Response
 
