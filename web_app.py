@@ -77,33 +77,66 @@ def load_config():
             print(f"加载配置文件失败: {e}")
     return {}
 
-def init_exchange_clients():
+def init_api_clients():
     """初始化交易所API客户端"""
-    global exchange_clients
-    config = load_config()
+    global exchange_clients, use_simulation, status
     
-    for exchange_id in EXCHANGES:
-        try:
-            # 尝试从配置中获取API密钥
-            api_config = config.get(exchange_id, {})
-            api_key = api_config.get("api_key", "")
-            secret_key = api_config.get("secret_key", "")
-            password = api_config.get("password", "")  # 某些交易所如OKX需要密码
-            
-            # 创建交易所客户端
-            if hasattr(ccxt, exchange_id):
-                exchange_class = getattr(ccxt, exchange_id)
-                exchange_clients[exchange_id] = exchange_class({
-                    'apiKey': api_key,
-                    'secret': secret_key,
-                    'password': password,
-                    'enableRateLimit': True,
-                })
-                print(f"初始化 {exchange_id} API客户端成功")
+    # 读取配置文件
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            config = json.load(f)
+        
+        # 检查是否所有交易所都缺少有效的API密钥
+        all_missing_api = True
+        
+        # 初始化交易所API客户端
+        for exchange_id in EXCHANGES:
+            if exchange_id in config and "api_key" in config[exchange_id] and config[exchange_id]["api_key"]:
+                try:
+                    # 尝试创建客户端
+                    exchange_class = getattr(ccxt, exchange_id)
+                    client = exchange_class({
+                        'apiKey': config[exchange_id]["api_key"],
+                        'secret': config[exchange_id]["secret_key"],
+                        'password': config[exchange_id].get("password", ""),
+                        'enableRateLimit': True
+                    })
+                    
+                    # 设置代理（如果配置）
+                    if "proxy" in config and config["proxy"]:
+                        client.proxies = {
+                            'http': config["proxy"],
+                            'https': config["proxy"]
+                        }
+                    
+                    # 测试API连接
+                    try:
+                        client.fetch_balance()
+                        print(f"初始化 {exchange_id} API客户端成功")
+                        exchange_clients[exchange_id] = client
+                        all_missing_api = False
+                    except Exception as e:
+                        print(f"API连接测试失败 {exchange_id}: {e}，可能是API密钥无效或限制")
+                        # 仍然添加客户端，但后续会使用模拟数据
+                        exchange_clients[exchange_id] = client
+                except Exception as e:
+                    print(f"初始化 {exchange_id} API客户端失败: {e}")
             else:
-                print(f"不支持的交易所: {exchange_id}")
-        except Exception as e:
-            print(f"初始化 {exchange_id} API客户端失败: {e}")
+                print(f"交易所 {exchange_id} 未配置API密钥")
+        
+        # 如果所有交易所都没有有效的API密钥，使用模拟模式
+        if all_missing_api:
+            use_simulation = True
+            status["mode"] = "simulate"
+            print("所有交易所API密钥无效或未配置，启用模拟模式")
+        else:
+            use_simulation = False
+            status["mode"] = "real"
+            print("已配置至少一个有效的API密钥，使用真实API连接")
+    except Exception as e:
+        print(f"初始化API客户端出错: {e}")
+        use_simulation = True
+        status["mode"] = "simulate"
 
 def generate_simulated_data():
     """生成模拟价格数据"""
@@ -143,31 +176,45 @@ def generate_simulated_data():
     return prices
 
 def generate_simulated_balances():
-    """生成模拟账户余额数据"""
-    global EXCHANGES, SYMBOLS
-    
+    """生成模拟的余额数据"""
     balances = {}
     
     for exchange in EXCHANGES:
+        # 生成随机USDT余额
+        usdt_balance = round(random.uniform(5000, 20000), 2)
+        usdt_available = round(usdt_balance * random.uniform(0.7, 0.9), 2)
+        usdt_locked = round(usdt_balance - usdt_available, 2)
+        
         balances[exchange] = {
-            "USDT": round(random.uniform(5000, 15000), 2),
+            "USDT": usdt_balance,
+            "USDT_available": usdt_available,
+            "USDT_locked": usdt_locked,
             "positions": {}
         }
         
-        # 为每个交易对生成持仓
+        # 为每个交易对随机生成持仓
         for symbol in SYMBOLS:
             coin = symbol.split('/')[0]
-            if random.random() > 0.3:  # 70%的概率有持仓
-                amount = round(random.uniform(0.01, 10) * (1 if coin == "BTC" else (20 if coin == "ETH" else 100)), 5)
-                value = round(amount * (
+            
+            # 70%概率有持仓
+            if random.random() > 0.3:
+                total_amount = round(random.uniform(0.01, 10) * (1 if coin == "BTC" else (20 if coin == "ETH" else 100)), 5)
+                available_amount = round(total_amount * random.uniform(0.6, 1.0), 5)
+                locked_amount = round(total_amount - available_amount, 5)
+                
+                price = (
                     random.uniform(60000, 70000) if coin == "BTC" else 
                     random.uniform(3000, 4000) if coin == "ETH" else
                     random.uniform(100, 150) if coin == "SOL" else
                     random.uniform(0.45, 0.55)
-                ), 2)
+                )
+                
+                value = round(total_amount * price, 2)
                 
                 balances[exchange]["positions"][coin] = {
-                    "amount": amount,
+                    "amount": total_amount,
+                    "available": available_amount,
+                    "locked": locked_amount,
                     "value": value
                 }
     
@@ -227,14 +274,9 @@ def calculate_price_differences(prices):
                         result.append(item)
                         
                         # 记录到历史中
-                        # 创建键值为交易对+买入交易所+卖出交易所的唯一标识
                         key = f"{symbol}_{buy_exchange}_{sell_exchange}"
-                        
-                        # 更新历史记录
                         if key not in arbitrage_history:
                             arbitrage_history[key] = []
-                        
-                        # 添加新记录
                         arbitrage_history[key].append(item)
                         
                         # 清理24小时以前的数据
@@ -272,14 +314,9 @@ def calculate_price_differences(prices):
                         result.append(item)
                         
                         # 记录到历史中
-                        # 创建键值为交易对+买入交易所+卖出交易所的唯一标识
                         key = f"{symbol}_{sell_exchange}_{buy_exchange}"
-                        
-                        # 更新历史记录
                         if key not in arbitrage_history:
                             arbitrage_history[key] = []
-                        
-                        # 添加新记录
                         arbitrage_history[key].append(item)
                         
                         # 清理24小时以前的数据
@@ -289,7 +326,7 @@ def calculate_price_differences(prices):
                             if (current_time - datetime.strptime(record["time"], "%Y-%m-%d %H:%M:%S")).total_seconds() < 86400
                         ]
     
-    # result已经只包含符合阈值的套利机会，按价差百分比降序排序
+    # 按价差百分比降序排序
     result.sort(key=lambda x: x["price_diff_pct"], reverse=True)
     
     return result
@@ -297,6 +334,10 @@ def calculate_price_differences(prices):
 def get_exchange_balances():
     """从交易所API获取余额数据"""
     balances = {}
+    
+    # 如果是模拟模式，直接返回模拟数据
+    if status["mode"] == "simulate":
+        return generate_simulated_balances()
     
     for exchange_id, client in exchange_clients.items():
         try:
@@ -355,7 +396,8 @@ def get_exchange_balances():
                                 'AVAX': 35,
                                 'SHIB': 0.00003
                             }
-                            value = round(total_amount * price_estimate.get(coin, 1), 2)
+                            price = price_estimate.get(coin, 0)
+                            value = round(total_amount * price, 2)
                         
                         exchange_balances["positions"][coin] = {
                             "amount": total_amount,
@@ -735,7 +777,7 @@ def main():
     
     # 初始化交易所客户端
     if not is_simulate:
-        init_exchange_clients()
+        init_api_clients()
     
     # 启动监控线程
     monitor = threading.Thread(target=monitor_thread, daemon=True)
