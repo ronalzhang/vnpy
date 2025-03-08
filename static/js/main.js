@@ -1,9 +1,8 @@
 // 全局变量
-let currentSymbol = 'BTC/USDT';
-let isMonitoring = true;
-let isSimulateMode = true;
-let refreshInterval = null;
-let lastPrices = {};
+let currentSymbol = "BTC/USDT";
+let isMonitoring = false;
+let updateInterval = null;
+let lastUpdateTime = null;
 
 // DOM 元素
 const statusIndicator = document.getElementById('status-indicator');
@@ -17,114 +16,305 @@ const priceDataTable = document.getElementById('price-data');
 const arbitrageDataTable = document.getElementById('arbitrage-data');
 const operationLogs = document.getElementById('operation-logs');
 
-// 初始化函数
-function init() {
-    // 注册事件监听器
-    startButton.addEventListener('click', startMonitoring);
-    stopButton.addEventListener('click', stopMonitoring);
-    symbolSelect.addEventListener('change', handleSymbolChange);
-    
-    // 启动数据刷新
-    startDataRefresh();
-    
-    // 更新服务器时间
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化界面
+    setupEventListeners();
     updateServerTime();
     
-    // 初始状态设置
-    updateStatus();
+    // 初始化下拉框默认值
+    document.getElementById('symbol-select').value = currentSymbol;
+    
+    // 启动自动监控
+    startMonitoring();
+});
+
+// 设置事件监听器
+function setupEventListeners() {
+    // 交易对选择
+    document.getElementById('symbol-select').addEventListener('change', function() {
+        currentSymbol = this.value;
+        fetchPriceData();
+    });
+    
+    // 开始/停止监控按钮
+    document.getElementById('start-btn').addEventListener('click', startMonitoring);
+    document.getElementById('stop-btn').addEventListener('click', stopMonitoring);
 }
 
 // 开始监控
 function startMonitoring() {
-    if (!isMonitoring) {
-        isMonitoring = true;
-        updateStatus();
-        startDataRefresh();
+    if (isMonitoring) return;
+    
+    isMonitoring = true;
+    document.getElementById('status-indicator').classList.remove('bg-warning');
+    document.getElementById('status-indicator').classList.add('bg-success');
+    document.getElementById('status-indicator').textContent = '运行中';
+    
+    // 立即获取数据
+    fetchPriceData();
+    fetchArbitrageData();
+    fetchBalanceData();
+    
+    // 设置定时刷新（每5秒）
+    updateInterval = setInterval(function() {
+        fetchPriceData();
+        fetchArbitrageData();
+        updateServerTime();
         
-        // 通过API启动监控
-        fetch('/api/start', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                simulate: isSimulateMode
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            addLog('INFO', '监控已启动');
-        })
-        .catch(error => {
-            addLog('ERROR', '启动监控失败: ' + error);
-        });
-    }
+        // 每分钟更新余额数据
+        if (new Date().getSeconds() < 5) {
+            fetchBalanceData();
+        }
+    }, 5000);
+    
+    // 添加日志
+    addLog('INFO', '开始监控市场数据');
 }
 
 // 停止监控
 function stopMonitoring() {
-    if (isMonitoring) {
-        isMonitoring = false;
-        updateStatus();
-        stopDataRefresh();
-        
-        // 通过API停止监控
-        fetch('/api/stop', {
-            method: 'POST'
-        })
+    if (!isMonitoring) return;
+    
+    isMonitoring = false;
+    clearInterval(updateInterval);
+    document.getElementById('status-indicator').classList.remove('bg-success');
+    document.getElementById('status-indicator').classList.add('bg-warning');
+    document.getElementById('status-indicator').textContent = '已停止';
+    
+    // 添加日志
+    addLog('INFO', '停止监控市场数据');
+}
+
+// 获取价格数据
+function fetchPriceData() {
+    fetch('/api/data')
         .then(response => response.json())
         .then(data => {
-            addLog('INFO', '监控已停止');
+            lastUpdateTime = data.last_update;
+            document.getElementById('last-update').textContent = lastUpdateTime;
+            
+            // 检查模式
+            const modeIndicator = document.getElementById('mode-indicator');
+            if (data.mode === 'simulation') {
+                modeIndicator.textContent = '模拟模式';
+                modeIndicator.classList.remove('bg-primary');
+                modeIndicator.classList.add('bg-info');
+            } else {
+                modeIndicator.textContent = '实盘模式';
+                modeIndicator.classList.remove('bg-info');
+                modeIndicator.classList.add('bg-primary');
+            }
+            
+            // 获取所有交易对价格
+            updatePriceTable(data.exchanges);
+            
+            // 更新套利数据
+            if (data.exchanges.arbitrage) {
+                updateArbitrageTable(data.exchanges.arbitrage);
+            }
         })
         .catch(error => {
-            addLog('ERROR', '停止监控失败: ' + error);
+            console.error('获取价格数据失败:', error);
+            addLog('ERROR', '获取价格数据失败: ' + error.message);
         });
+}
+
+// 更新价格表格
+function updatePriceTable(exchangeData) {
+    const tbody = document.getElementById('price-data');
+    tbody.innerHTML = '';
+    
+    // 遍历所有交易对
+    for (const symbol of SYMBOLS) {
+        // 检查是否有数据
+        const binancePrice = exchangeData.binance.prices[symbol];
+        const okexPrice = exchangeData.okex.prices[symbol];
+        const bitgetPrice = exchangeData.bitget.prices[symbol];
+        
+        if (!binancePrice && !okexPrice && !bitgetPrice) continue;
+        
+        // 计算最大差价
+        let maxDiffPct = 0;
+        if (binancePrice && okexPrice) {
+            const diff1 = Math.abs(binancePrice.sell / okexPrice.buy - 1) * 100;
+            const diff2 = Math.abs(okexPrice.sell / binancePrice.buy - 1) * 100;
+            maxDiffPct = Math.max(maxDiffPct, diff1, diff2);
+        }
+        if (binancePrice && bitgetPrice) {
+            const diff1 = Math.abs(binancePrice.sell / bitgetPrice.buy - 1) * 100;
+            const diff2 = Math.abs(bitgetPrice.sell / binancePrice.buy - 1) * 100;
+            maxDiffPct = Math.max(maxDiffPct, diff1, diff2);
+        }
+        if (okexPrice && bitgetPrice) {
+            const diff1 = Math.abs(okexPrice.sell / bitgetPrice.buy - 1) * 100;
+            const diff2 = Math.abs(bitgetPrice.sell / okexPrice.buy - 1) * 100;
+            maxDiffPct = Math.max(maxDiffPct, diff1, diff2);
+        }
+        
+        // 计算最大深度
+        let maxDepth = 0;
+        if (binancePrice) maxDepth = Math.max(maxDepth, binancePrice.depth || 0);
+        if (okexPrice) maxDepth = Math.max(maxDepth, okexPrice.depth || 0);
+        if (bitgetPrice) maxDepth = Math.max(maxDepth, bitgetPrice.depth || 0);
+        
+        // 创建表格行
+        const tr = document.createElement('tr');
+        
+        // 高亮当前选中交易对
+        if (symbol === currentSymbol) {
+            tr.classList.add('table-primary');
+        }
+        
+        // 添加差价警告样式
+        if (maxDiffPct > 0.5) {
+            tr.classList.add('table-success');
+        }
+        
+        tr.innerHTML = `
+            <td class="text-center">${symbol}</td>
+            <td class="text-end">${binancePrice ? formatPrice(binancePrice.buy) : '-'}</td>
+            <td class="text-end">${okexPrice ? formatPrice(okexPrice.buy) : '-'}</td>
+            <td class="text-end">${bitgetPrice ? formatPrice(bitgetPrice.buy) : '-'}</td>
+            <td class="text-end">${formatDepth(maxDepth)}</td>
+            <td class="text-end">${formatPercentage(maxDiffPct)}</td>
+        `;
+        
+        tbody.appendChild(tr);
     }
 }
 
-// 切换交易对
-function handleSymbolChange(event) {
-    currentSymbol = event.target.value;
-    fetchPriceData();
-    addLog('INFO', `已切换到 ${currentSymbol}`);
-}
-
-// 开始数据刷新
-function startDataRefresh() {
-    if (refreshInterval) {
-        clearInterval(refreshInterval);
+// 更新套利表格
+function updateArbitrageTable(opportunities) {
+    const tbody = document.getElementById('arbitrage-data');
+    tbody.innerHTML = '';
+    
+    if (!opportunities || opportunities.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="8" class="text-center">暂无套利机会</td>`;
+        tbody.appendChild(tr);
+        return;
     }
     
-    fetchPriceData();
-    refreshInterval = setInterval(() => {
-        fetchPriceData();
-        updateServerTime();
-    }, 5000); // 每5秒刷新一次
+    // 显示前10个机会
+    opportunities.slice(0, 10).forEach(opportunity => {
+        const tr = document.createElement('tr');
+        
+        // 根据差价添加行样式
+        if (opportunity.diff_pct > 0.5) {
+            tr.classList.add('table-success');
+        } else if (opportunity.diff_pct > 0.2) {
+            tr.classList.add('table-warning');
+        } else {
+            tr.classList.add('text-muted');
+        }
+        
+        tr.innerHTML = `
+            <td>${opportunity.symbol}</td>
+            <td>${formatExchangeName(opportunity.buy_exchange)}</td>
+            <td>${formatExchangeName(opportunity.sell_exchange)}</td>
+            <td class="text-end">${formatPrice(opportunity.buy_price)}</td>
+            <td class="text-end">${formatPrice(opportunity.sell_price)}</td>
+            <td class="text-end">${formatPrice(opportunity.diff)}</td>
+            <td class="text-end">${formatPercentage(opportunity.diff_pct)}</td>
+            <td class="text-center">${opportunity.executable ? 
+                '<i class="fas fa-check-circle text-success"></i>' : 
+                '<i class="fas fa-times-circle text-danger"></i>'}</td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
 }
 
-// 停止数据刷新
-function stopDataRefresh() {
-    if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-    }
+// 获取套利数据
+function fetchArbitrageData() {
+    fetch('/api/arbitrage')
+        .then(response => response.json())
+        .then(data => {
+            updateArbitrageTable(data.opportunities);
+        })
+        .catch(error => {
+            console.error('获取套利数据失败:', error);
+        });
 }
 
-// 更新系统状态显示
-function updateStatus() {
-    if (isMonitoring) {
-        statusIndicator.textContent = '运行中';
-        statusIndicator.className = 'badge bg-success';
-        startButton.disabled = true;
-        stopButton.disabled = false;
-    } else {
-        statusIndicator.textContent = '已停止';
-        statusIndicator.className = 'badge bg-secondary';
-        startButton.disabled = false;
-        stopButton.disabled = true;
+// 获取余额数据
+function fetchBalanceData() {
+    fetch('/api/balances')
+        .then(response => response.json())
+        .then(data => {
+            // 更新Binance余额
+            updateExchangeBalance('binance', data.balances.binance);
+            // 更新OKX余额
+            updateExchangeBalance('okx', data.balances.okex);
+            // 更新Bitget余额
+            updateExchangeBalance('bitget', data.balances.bitget);
+        })
+        .catch(error => {
+            console.error('获取余额数据失败:', error);
+        });
+}
+
+// 更新交易所余额信息
+function updateExchangeBalance(exchange, balanceData) {
+    if (!balanceData) return;
+    
+    // 获取USDT余额
+    const usdtBalance = balanceData.USDT || 0;
+    const exchangeId = exchange === 'okx' ? 'okx' : exchange; // 处理ID不一致问题
+    
+    // 更新USDT余额显示
+    const balanceElement = document.querySelector(`#${exchangeId} .balance-info h4`);
+    if (balanceElement) {
+        balanceElement.innerHTML = `${formatNumber(usdtBalance)} <small>USDT</small>`;
     }
     
-    modeIndicator.textContent = isSimulateMode ? '模拟模式' : '真实模式';
+    // 更新持仓表格
+    const tbody = document.getElementById(`${exchangeId}-positions`);
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    // 添加所有非USDT资产
+    for (const [asset, amount] of Object.entries(balanceData)) {
+        if (asset === 'USDT' || amount <= 0) continue;
+        
+        // 估算USDT价值（简化计算，实际应该使用实时价格）
+        let valueInUsdt = 0;
+        
+        fetch('/api/prices')
+            .then(response => response.json())
+            .then(data => {
+                const symbol = `${asset}/USDT`;
+                if (data.prices[symbol] && data.prices[symbol][exchange]) {
+                    valueInUsdt = amount * data.prices[symbol][exchange].buy;
+                }
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${asset}</td>
+                    <td>${formatNumber(amount, 8)}</td>
+                    <td>${formatNumber(valueInUsdt)}</td>
+                `;
+                tbody.appendChild(tr);
+            })
+            .catch(() => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${asset}</td>
+                    <td>${formatNumber(amount, 8)}</td>
+                    <td>-</td>
+                `;
+                tbody.appendChild(tr);
+            });
+    }
+    
+    // 如果没有持仓，显示提示
+    if (Object.keys(balanceData).length <= 1) { // 只有USDT
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="3" class="text-center">暂无持仓</td>`;
+        tbody.appendChild(tr);
+    }
 }
 
 // 更新服务器时间
@@ -138,175 +328,14 @@ function updateServerTime() {
         minute: '2-digit',
         second: '2-digit',
         hour12: false
-    });
-    serverTimeEl.textContent = timeString;
-    lastUpdateEl.textContent = timeString;
+    }).replace(/\//g, '-');
+    
+    document.getElementById('server-time').textContent = timeString;
 }
 
-// 获取价格数据
-function fetchPriceData() {
-    if (!isMonitoring) return;
-    
-    fetch('/api/prices')
-        .then(response => response.json())
-        .then(data => {
-            updatePriceTable(data);
-            calculateArbitrage(data);
-            updateLastPrices(data);
-        })
-        .catch(error => {
-            addLog('ERROR', '获取价格数据失败: ' + error);
-        });
-}
-
-// 更新价格表格
-function updatePriceTable(data) {
-    if (!data) return;
-    
-    const exchanges = Object.keys(data);
-    priceDataTable.innerHTML = '';
-    
-    exchanges.forEach(exchange => {
-        const symbolData = data[exchange][currentSymbol];
-        if (!symbolData) return;
-        
-        const row = document.createElement('tr');
-        
-        // 生成随机买卖价和交易量 (实际项目中会使用真实数据)
-        const bid = typeof symbolData === 'object' ? symbolData.bid : symbolData * 0.9995;
-        const ask = typeof symbolData === 'object' ? symbolData.ask : symbolData * 1.0005;
-        const volume = Math.round(Math.random() * 5000 + 1000) / 10;
-        const depth = {
-            bid: (Math.random() * 10 + 5).toFixed(1),
-            ask: (Math.random() * 8 + 3).toFixed(1)
-        };
-        
-        // 检查价格变化，添加上涨/下跌颜色
-        let bidClass = '';
-        let askClass = '';
-        if (lastPrices[exchange] && lastPrices[exchange][currentSymbol]) {
-            const lastBid = lastPrices[exchange][currentSymbol].bid || 0;
-            const lastAsk = lastPrices[exchange][currentSymbol].ask || 0;
-            
-            bidClass = bid > lastBid ? 'price-up' : bid < lastBid ? 'price-down' : '';
-            askClass = ask > lastAsk ? 'price-up' : ask < lastAsk ? 'price-down' : '';
-        }
-        
-        row.innerHTML = `
-            <td>${exchange}</td>
-            <td class="${bidClass}">${formatNumber(bid)}</td>
-            <td class="${askClass}">${formatNumber(ask)}</td>
-            <td>${volume} ${currentSymbol.split('/')[0]}</td>
-            <td>${depth.bid} / ${depth.ask} ${currentSymbol.split('/')[0]}</td>
-        `;
-        
-        priceDataTable.appendChild(row);
-    });
-}
-
-// 计算套利机会
-function calculateArbitrage(data) {
-    if (!data) return;
-    
-    const exchanges = Object.keys(data);
-    const arbitrageOpportunities = [];
-    
-    // 计算所有可能的交易所对
-    for (let i = 0; i < exchanges.length; i++) {
-        for (let j = 0; j < exchanges.length; j++) {
-            if (i === j) continue;
-            
-            const buyExchange = exchanges[i];
-            const sellExchange = exchanges[j];
-            
-            const buyPrice = typeof data[buyExchange][currentSymbol] === 'object' 
-                ? data[buyExchange][currentSymbol].ask 
-                : data[buyExchange][currentSymbol] * 1.0005;
-                
-            const sellPrice = typeof data[sellExchange][currentSymbol] === 'object' 
-                ? data[sellExchange][currentSymbol].bid 
-                : data[sellExchange][currentSymbol] * 0.9995;
-            
-            if (sellPrice > buyPrice) {
-                const priceDiff = sellPrice - buyPrice;
-                const priceDiffPct = (priceDiff / buyPrice) * 100;
-                
-                // 只显示价差大于0.1%的机会
-                if (priceDiffPct > 0.1) {
-                    arbitrageOpportunities.push({
-                        buyExchange,
-                        sellExchange,
-                        buyPrice,
-                        sellPrice,
-                        priceDiff,
-                        priceDiffPct,
-                        isExecutable: priceDiffPct > 0.2 // 假设差价大于0.2%才可执行
-                    });
-                }
-            }
-        }
-    }
-    
-    // 按价差百分比降序排序
-    arbitrageOpportunities.sort((a, b) => b.priceDiffPct - a.priceDiffPct);
-    
-    // 更新UI
-    updateArbitrageTable(arbitrageOpportunities);
-    
-    // 记录新的套利机会
-    const significantOpportunities = arbitrageOpportunities.filter(opp => opp.priceDiffPct > 0.2);
-    if (significantOpportunities.length > 0) {
-        const topOpp = significantOpportunities[0];
-        addLog('ARBITRAGE', `发现套利机会: ${currentSymbol} ${topOpp.buyExchange}(${formatNumber(topOpp.buyPrice)}) → ${topOpp.sellExchange}(${formatNumber(topOpp.sellPrice)}), 差价: ${formatNumber(topOpp.priceDiff)} (${topOpp.priceDiffPct.toFixed(2)}%)`);
-    }
-}
-
-// 更新套利表格
-function updateArbitrageTable(opportunities) {
-    arbitrageDataTable.innerHTML = '';
-    
-    if (opportunities.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="7" class="text-center">当前没有套利机会</td>`;
-        arbitrageDataTable.appendChild(row);
-        return;
-    }
-    
-    // 显示前3个最佳机会
-    const displayOpps = opportunities.slice(0, 3);
-    
-    displayOpps.forEach(opp => {
-        const row = document.createElement('tr');
-        if (opp.isExecutable) {
-            row.classList.add('table-success');
-        } else if (opp.priceDiffPct < 0.15) {
-            row.classList.add('text-muted');
-        }
-        
-        row.innerHTML = `
-            <td>${opp.buyExchange}</td>
-            <td>${opp.sellExchange}</td>
-            <td>${formatNumber(opp.buyPrice)}</td>
-            <td>${formatNumber(opp.sellPrice)}</td>
-            <td>${formatNumber(opp.priceDiff)}</td>
-            <td>${opp.priceDiffPct.toFixed(2)}%</td>
-            <td>${opp.isExecutable 
-                ? '<i class="fas fa-check-circle text-success"></i>' 
-                : '<i class="fas fa-times-circle text-danger"></i>'}</td>
-        `;
-        
-        arbitrageDataTable.appendChild(row);
-    });
-}
-
-// 更新历史价格记录
-function updateLastPrices(data) {
-    // 深拷贝当前价格数据
-    lastPrices = JSON.parse(JSON.stringify(data));
-}
-
-// 添加日志
+// 添加操作日志
 function addLog(level, message) {
+    const logs = document.getElementById('operation-logs');
     const now = new Date();
     const timeString = now.toLocaleString('zh-CN', {
         year: 'numeric',
@@ -316,47 +345,83 @@ function addLog(level, message) {
         minute: '2-digit',
         second: '2-digit',
         hour12: false
-    });
+    }).replace(/\//g, '-');
+    
+    const li = document.createElement('li');
+    li.className = 'list-group-item';
     
     let badgeClass = 'bg-info';
-    switch (level) {
-        case 'ERROR':
-            badgeClass = 'bg-danger';
-            break;
-        case 'WARNING':
-            badgeClass = 'bg-warning';
-            break;
-        case 'ARBITRAGE':
-            badgeClass = 'bg-success';
-            break;
-        case 'SUCCESS':
-            badgeClass = 'bg-success';
-            break;
-    }
+    if (level === 'ERROR') badgeClass = 'bg-danger';
+    else if (level === 'WARNING') badgeClass = 'bg-warning';
+    else if (level === 'SUCCESS') badgeClass = 'bg-success';
+    else if (level === 'ARBITRAGE') badgeClass = 'bg-primary';
     
-    const logItem = document.createElement('li');
-    logItem.className = 'list-group-item';
-    logItem.innerHTML = `
+    li.innerHTML = `
         <span class="text-muted">[${timeString}]</span> 
         <span class="badge ${badgeClass}">${level}</span> 
         ${message}
     `;
     
-    operationLogs.prepend(logItem);
+    // 添加到顶部
+    logs.insertBefore(li, logs.firstChild);
     
     // 限制日志条数
-    if (operationLogs.children.length > 50) {
-        operationLogs.removeChild(operationLogs.lastChild);
+    if (logs.children.length > 50) {
+        logs.removeChild(logs.lastChild);
     }
 }
 
-// 格式化数字
-function formatNumber(num) {
-    return num.toLocaleString('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+// 格式化交易所名称
+function formatExchangeName(exchange) {
+    const names = {
+        'binance': 'Binance',
+        'okex': 'OKX',
+        'bitget': 'Bitget'
+    };
+    return names[exchange] || exchange;
+}
+
+// 格式化价格数字
+function formatPrice(price) {
+    if (price === undefined || price === null) return '-';
+    
+    // 根据价格大小调整精度
+    let precision = 2;
+    if (price < 0.01) precision = 6;
+    else if (price < 1) precision = 4;
+    else if (price < 10) precision = 3;
+    else if (price >= 10000) precision = 0;
+    
+    return price.toLocaleString('en-US', {
+        minimumFractionDigits: precision,
+        maximumFractionDigits: precision
     });
 }
 
-// 页面加载时初始化
-document.addEventListener('DOMContentLoaded', init);
+// 格式化百分比
+function formatPercentage(value) {
+    if (value === undefined || value === null) return '-';
+    return value.toFixed(3) + '%';
+}
+
+// 格式化深度
+function formatDepth(depth) {
+    if (depth === undefined || depth === null) return '-';
+    return depth.toFixed(4);
+}
+
+// 格式化普通数字
+function formatNumber(num, precision = 2) {
+    if (num === undefined || num === null) return '-';
+    return num.toLocaleString('en-US', {
+        minimumFractionDigits: precision,
+        maximumFractionDigits: precision
+    });
+}
+
+// 交易对列表
+const SYMBOLS = [
+    "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT",
+    "ADA/USDT", "DOT/USDT", "MATIC/USDT", "AVAX/USDT", "SHIB/USDT"
+];
+

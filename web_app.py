@@ -13,16 +13,27 @@ import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any
+from loguru import logger
+import pandas as pd
+from vnpy.trader.object import TickData
+from vnpy.trader.constant import Exchange
+from vnpy_okex import OkexGateway
+from vnpy_binance import BinanceGateway
+from vnpy_bitget import BitgetGateway
 
 from flask import Flask, jsonify, render_template, request, Response
 
 # 创建Flask应用
 app = Flask(__name__)
+app.config['JSON_SORT_KEYS'] = False
 
 # 全局变量
 CONFIG_FILE = "crypto_config.json"
 CONFIG_PATH = Path(__file__).parent.joinpath(CONFIG_FILE)
-SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"]
+SYMBOLS = [
+    "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT",
+    "ADA/USDT", "DOT/USDT", "MATIC/USDT", "AVAX/USDT", "SHIB/USDT"
+]
 EXCHANGES = ["binance", "okx", "bitget"]
 ARBITRAGE_THRESHOLD = 0.5
 CLOSE_THRESHOLD = 0.2
@@ -37,6 +48,19 @@ status = {
     "last_update": "",
     "trading_enabled": False
 }
+
+# 交易所客户端
+exchanges = {}
+exchange_data = {
+    "binance": {"name": "Binance", "prices": {}, "balances": {}},
+    "okex": {"name": "OKX", "prices": {}, "balances": {}},
+    "bitget": {"name": "Bitget", "prices": {}, "balances": {}}
+}
+
+# 上次更新时间
+last_update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+running = True
+use_simulation = False
 
 # 辅助函数
 def load_json(file_path):
