@@ -301,9 +301,13 @@ function renderBalanceData(balances) {
             const availableBalance = document.getElementById(`${exchange}-available`);
             const lockedBalance = document.getElementById(`${exchange}-locked`);
             
-            if (totalBalance) totalBalance.textContent = balances[exchange].total.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            if (availableBalance) availableBalance.textContent = balances[exchange].available.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            if (lockedBalance) lockedBalance.textContent = balances[exchange].locked.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const total = balances[exchange].total || 0;
+            const available = balances[exchange].available || 0;
+            const locked = balances[exchange].locked || 0;
+            
+            if (totalBalance) totalBalance.textContent = Number(total).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (availableBalance) availableBalance.textContent = Number(available).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (lockedBalance) lockedBalance.textContent = Number(locked).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             
             // 更新持仓情况
             const positionsTable = document.getElementById(`${exchange}-positions`);
@@ -315,31 +319,38 @@ function renderBalanceData(balances) {
                     
                     // 币种
                     const coinCell = document.createElement('td');
-                    coinCell.textContent = position.coin;
+                    coinCell.textContent = position.coin || '-';
                     row.appendChild(coinCell);
                     
                     // 总数量
                     const totalCell = document.createElement('td');
-                    totalCell.textContent = position.total;
+                    const totalAmount = position.total || 0;
+                    totalCell.textContent = Number(totalAmount).toFixed(3);
                     row.appendChild(totalCell);
                     
                     // 可用
                     const availableCell = document.createElement('td');
-                    availableCell.textContent = position.available;
+                    const availableAmount = position.available || 0;
+                    availableCell.textContent = Number(availableAmount).toFixed(3);
                     row.appendChild(availableCell);
                     
                     // 锁定
                     const lockedCell = document.createElement('td');
-                    lockedCell.textContent = position.locked;
+                    const lockedAmount = position.locked || 0;
+                    lockedCell.textContent = Number(lockedAmount).toFixed(3);
                     row.appendChild(lockedCell);
                     
                     // 价值
                     const valueCell = document.createElement('td');
-                    valueCell.textContent = position.value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const value = position.value || 0;
+                    valueCell.textContent = Number(value).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     row.appendChild(valueCell);
                     
                     positionsTable.appendChild(row);
                 }
+            } else if (positionsTable) {
+                // 如果没有持仓数据，显示空状态
+                positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
             }
         }
     }
