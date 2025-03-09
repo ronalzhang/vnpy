@@ -62,7 +62,7 @@ status = {
 }
 
 # 上次更新时间
-ndef load_arbitrage_history():
+def load_arbitrage_history():
     """从文件加载套利历史记录"""
     global arbitrage_history
     try:
