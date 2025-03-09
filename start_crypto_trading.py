@@ -43,7 +43,7 @@ crypto_engine = None
 event_engine = None
 main_engine = None
 is_running = False
-mode = 'simulate'  # 或 'real'
+mode = 'real'  # 或 'real'
 last_update = None
 arbitrage_count = 0  # 当前可执行的套利机会数量
 
@@ -59,15 +59,29 @@ def start_system():
                 event_engine = EventEngine()
                 crypto_engine = CryptoArbitrageEngine(event_engine)
                 init_result = crypto_engine.init_engine(
-                    settings=prepare_config(api_keys_required=False),
-                    verbose=False,
-                    enable_trading=False,
-                    simulate=True
+                    settings=prepare_config(api_keys_required=True),
+                    verbose=True,
+                    enable_trading=True,
+                    simulate=False
                 )
+                
+                # 如果初始化失败(比如API密钥无效),则回退到模拟模式
+                if not init_result:
+                    print("实盘模式初始化失败,切换到模拟模式")
+                    crypto_engine = CryptoArbitrageEngine(event_engine)
+                    init_result = crypto_engine.init_engine(
+                        settings=prepare_config(api_keys_required=False),
+                        verbose=False,
+                        enable_trading=False,
+                        simulate=True
+                    )
             
             crypto_engine.start()
             is_running = True
             last_update = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # 更新运行模式
+            global mode
+            mode = 'real' if not crypto_engine.simulate else 'simulate'
             return jsonify({"status": "success", "message": "系统已启动"})
         else:
             return jsonify({"status": "error", "message": "系统已经在运行中"})
