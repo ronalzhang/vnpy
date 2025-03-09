@@ -380,5 +380,103 @@
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.2.1/chart.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+    // 添加全局变量记录当前模式
+    let currentMode = 'real';  // 默认为实盘模式
+
+    // 更新系统状态显示
+    function updateStatus(running, mode, arbitrageCount) {
+        const statusBadge = document.getElementById('status-badge');
+        const modeBadge = document.getElementById('mode-badge');
+        const arbitrageCountBadge = document.getElementById('arbitrage-count-badge');
+        const toggleBtn = document.getElementById('toggle-btn');
+        
+        // 更新运行状态
+        statusBadge.textContent = running ? '运行中' : '已停止';
+        statusBadge.className = `badge ${running ? 'bg-success' : 'bg-secondary'}`;
+        
+        // 更新模式状态（保持当前模式）
+        if (mode) {
+            currentMode = mode;
+        }
+        modeBadge.textContent = currentMode === 'real' ? '实盘' : '模拟';
+        modeBadge.className = `badge ${currentMode === 'real' ? 'bg-primary' : 'bg-warning'}`;
+        
+        // 更新套利机会计数
+        arbitrageCountBadge.textContent = `套利:${arbitrageCount || 0}`;
+        
+        // 更新按钮状态
+        toggleBtn.textContent = running ? '停止运行' : '启动运行';
+        toggleBtn.className = `btn ${running ? 'btn-danger' : 'btn-primary'}`;
+        toggleBtn.dataset.running = running;
+    }
+
+    // 切换系统运行状态
+    async function toggleSystem() {
+        const toggleBtn = document.getElementById('toggle-btn');
+        const running = toggleBtn.dataset.running === 'true';
+        
+        try {
+            if (running) {
+                // 停止系统
+                const response = await fetch('/api/stop', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    updateStatus(false, currentMode, 0);  // 保持当前模式
+                } else {
+                    alert('停止失败: ' + result.message);
+                }
+            } else {
+                // 启动系统
+                const response = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        simulate: currentMode === 'simulate'  // 使用当前记录的模式
+                    })
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    updateStatus(true, currentMode, 0);  // 保持当前模式
+                } else {
+                    alert('启动失败: ' + result.message);
+                }
+            }
+        } catch (error) {
+            console.error('操作失败:', error);
+            alert('操作失败: ' + error.message);
+        }
+    }
+
+    // 定期更新状态
+    async function updateSystemStatus() {
+        try {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+            updateStatus(data.running, data.mode, data.arbitrage_count);
+        } catch (error) {
+            console.error('获取状态失败:', error);
+        }
+    }
+
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        // 绑定按钮点击事件
+        document.getElementById('toggle-btn').addEventListener('click', toggleSystem);
+        
+        // 立即更新一次状态
+        updateSystemStatus();
+        
+        // 每5秒更新一次状态
+        setInterval(updateSystemStatus, 5000);
+    });
+    </script>
 </body>
 </html>

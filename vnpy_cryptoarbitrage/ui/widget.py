@@ -116,22 +116,19 @@ class CryptoArbitrageWidget(QtWidgets.QWidget):
 
         self.main_engine = main_engine
         self.event_engine = event_engine
-        self.crypto_engine = main_engine.get_engine(APP_NAME)
+        self.crypto_engine = None
         
-        # 如果通过普通方式无法获取到引擎，尝试从应用实例中获取
-        if not self.crypto_engine:
-            app = main_engine.apps.get(APP_NAME)
-            if app:
-                self.crypto_engine = app.engine
+        # 添加运行模式状态记录
+        self.last_mode = "real"  # 默认为实盘模式
         
-        # 输出引擎状态信息
-        if self.crypto_engine:
-            print(f"成功获取到CryptoArbitrage引擎实例")
-        else:
-            print(f"警告: 无法获取CryptoArbitrage引擎实例!")
-        
+        # 初始化界面
         self.init_ui()
+        
+        # 注册事件处理函数
         self.register_event()
+        
+        # 初始化引擎
+        self.init_engine()
 
     def init_ui(self) -> None:
         """初始化界面"""
@@ -227,6 +224,27 @@ class CryptoArbitrageWidget(QtWidgets.QWidget):
     def start_monitor(self) -> None:
         """启动监控"""
         try:
+            # 使用上次的运行模式
+            if not self.crypto_engine:
+                # 初始化引擎
+                event_engine = EventEngine()
+                self.crypto_engine = CryptoArbitrageEngine(event_engine)
+                init_result = self.crypto_engine.init_engine(
+                    settings=prepare_config(api_keys_required=True),
+                    verbose=True,
+                    enable_trading=True,
+                    simulate=False if self.last_mode == "real" else True  # 使用记录的模式
+                )
+                
+                # 如果初始化失败(比如API密钥无效),则提示错误
+                if not init_result:
+                    QtWidgets.QMessageBox.warning(
+                        self,
+                        "启动失败",
+                        "实盘模式初始化失败，请检查API配置"
+                    )
+                    return
+            
             self.crypto_engine.start(enable_trading=False)
             self.monitor_button.setEnabled(False)
             self.trade_button.setEnabled(True)
@@ -237,6 +255,7 @@ class CryptoArbitrageWidget(QtWidgets.QWidget):
                 # 没有连接到交易所，可能是模拟模式
                 self.simulation_label.setText("⚠️ 模拟模式")
                 self.simulation_label.setStyleSheet("color: orange; font-weight: bold;")
+                self.last_mode = "simulate"
             else:
                 # 检查连接的交易所类型
                 has_real_exchange = False
@@ -252,9 +271,11 @@ class CryptoArbitrageWidget(QtWidgets.QWidget):
                 if has_real_exchange:
                     self.simulation_label.setText("✅ 实盘模式")
                     self.simulation_label.setStyleSheet("color: green; font-weight: bold;")
+                    self.last_mode = "real"
                 else:
                     self.simulation_label.setText("⚠️ 模拟模式")
                     self.simulation_label.setStyleSheet("color: orange; font-weight: bold;")
+                    self.last_mode = "simulate"
         except Exception as e:
             QtWidgets.QMessageBox.warning(
                 self,
@@ -292,9 +313,11 @@ class CryptoArbitrageWidget(QtWidgets.QWidget):
             self.trade_button.setEnabled(False)
             self.stop_button.setEnabled(False)
             
-            # 重置模拟模式标签
-            self.simulation_label.setText("🔄 未启动")
-            self.simulation_label.setStyleSheet("color: gray; font-weight: bold;")
+            # 保持模式标签显示，但添加停止状态指示
+            current_text = self.simulation_label.text()
+            if "已停止" not in current_text:
+                self.simulation_label.setText(f"{current_text} (已停止)")
+                self.simulation_label.setStyleSheet(self.simulation_label.styleSheet() + "; opacity: 0.7;")
         except Exception as e:
             QtWidgets.QMessageBox.warning(
                 self,
