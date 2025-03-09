@@ -387,10 +387,10 @@
                                     <tr>
                                         <th>时间</th>
                                         <th>交易对</th>
-                                        <th>买入交易所</th>
-                                        <th>卖出交易所</th>
-                                        <th>买入价格</th>
-                                        <th>卖出价格</th>
+                                        <th>买入所</th>
+                                        <th>卖出所</th>
+                                        <th>买入价</th>
+                                        <th>卖出价</th>
                                         <th>数量</th>
                                         <th>投入</th>
                                         <th>回报</th>
@@ -751,8 +751,8 @@
                 <td>${opp.buy_price.toFixed(3)}</td>
                 <td>${opp.sell_price.toFixed(3)}</td>
                 <td>${opp.depth}</td>
-                <td>${invested.toFixed(2)} → ${returned.toFixed(2)}</td>
-                <td class="${profitClass}">${profit.toFixed(2)} (${efficiency}%)</td>
+                <td>${invested.toFixed(2)}</td>
+                <td class="${profitClass}">${returned.toFixed(2)} (${efficiency}%)</td>
                 <td><span class="strategy-status ${statusClass}">${status}</span></td>
             `;
             
