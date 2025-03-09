@@ -116,10 +116,11 @@ function initPrivacySettings() {
 
 // 更新余额显示
 function updateBalanceDisplay(isPrivate) {
-    const balanceElements = document.querySelectorAll('.balance-info h4, .table td');
+    const balanceElements = document.querySelectorAll('.balance-info h4, .table td:not(:first-child)');
     balanceElements.forEach(element => {
         if (element.dataset.value) {
-            element.textContent = isPrivate ? '******' : element.dataset.value;
+            element.textContent = element.dataset.value;
+            element.classList.toggle('privacy-blur', isPrivate);
         }
     });
 }
@@ -362,15 +363,18 @@ function renderBalanceData(balances) {
             
             if (totalBalance) {
                 totalBalance.dataset.value = balances[exchange].USDT || '-';
-                totalBalance.textContent = isPrivate ? '******' : totalBalance.dataset.value;
+                totalBalance.textContent = totalBalance.dataset.value;
+                totalBalance.classList.toggle('privacy-blur', isPrivate);
             }
             if (availableBalance) {
                 availableBalance.dataset.value = balances[exchange].USDT_available || '-';
-                availableBalance.textContent = isPrivate ? '******' : availableBalance.dataset.value;
+                availableBalance.textContent = availableBalance.dataset.value;
+                availableBalance.classList.toggle('privacy-blur', isPrivate);
             }
             if (lockedBalance) {
                 lockedBalance.dataset.value = balances[exchange].USDT_locked || '-';
-                lockedBalance.textContent = isPrivate ? '******' : lockedBalance.dataset.value;
+                lockedBalance.textContent = lockedBalance.dataset.value;
+                lockedBalance.classList.toggle('privacy-blur', isPrivate);
             }
             
             // 更新持仓情况
@@ -391,25 +395,29 @@ function renderBalanceData(balances) {
                         // 总数量
                         const totalCell = document.createElement('td');
                         totalCell.dataset.value = position.amount || '-';
-                        totalCell.textContent = isPrivate ? '******' : totalCell.dataset.value;
+                        totalCell.textContent = totalCell.dataset.value;
+                        totalCell.classList.toggle('privacy-blur', isPrivate);
                         row.appendChild(totalCell);
                         
                         // 可用
                         const availableCell = document.createElement('td');
                         availableCell.dataset.value = position.available || '-';
-                        availableCell.textContent = isPrivate ? '******' : availableCell.dataset.value;
+                        availableCell.textContent = availableCell.dataset.value;
+                        availableCell.classList.toggle('privacy-blur', isPrivate);
                         row.appendChild(availableCell);
                         
                         // 锁定
                         const lockedCell = document.createElement('td');
                         lockedCell.dataset.value = position.locked || '-';
-                        lockedCell.textContent = isPrivate ? '******' : lockedCell.dataset.value;
+                        lockedCell.textContent = lockedCell.dataset.value;
+                        lockedCell.classList.toggle('privacy-blur', isPrivate);
                         row.appendChild(lockedCell);
                         
                         // 价值
                         const valueCell = document.createElement('td');
                         valueCell.dataset.value = position.value || '-';
-                        valueCell.textContent = isPrivate ? '******' : valueCell.dataset.value;
+                        valueCell.textContent = valueCell.dataset.value;
+                        valueCell.classList.toggle('privacy-blur', isPrivate);
                         row.appendChild(valueCell);
                         
                         positionsTable.appendChild(row);

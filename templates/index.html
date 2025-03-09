@@ -20,6 +20,19 @@
             overflow-x: auto;
         }
         
+        /* 余额隐私模式样式 */
+        .privacy-blur {
+            filter: blur(4px);
+            -webkit-filter: blur(4px);
+            user-select: none;
+        }
+        
+        /* 鼠标悬停时取消模糊效果 */
+        .privacy-blur:hover {
+            filter: none;
+            -webkit-filter: none;
+        }
+        
         /* 套利步骤样式 */
         .step-container {
             display: flex;
