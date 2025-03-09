@@ -11,7 +11,6 @@ const lastUpdateEl = document.getElementById('last-update');
 const serverTimeEl = document.getElementById('server-time');
 const startButton = document.getElementById('start-btn');
 const stopButton = document.getElementById('stop-btn');
-// const symbolSelect = document.getElementById('symbol-select'); // 交易对选择功能已移除
 const priceDataTable = document.getElementById('price-data');
 const arbitrageDataTable = document.getElementById('arbitrage-data');
 const operationLogs = document.getElementById('operation-logs');
@@ -31,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 设置事件监听器
 function setupEventListeners() {
-    // 交易对选择功能已移除
+// 交易对选择功能已移除
     
     // 开始/停止监控按钮
     document.getElementById('start-btn').addEventListener('click', startMonitoring);
