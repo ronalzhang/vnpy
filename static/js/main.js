@@ -308,42 +308,46 @@ function renderBalanceData(balances) {
             
             // 更新持仓情况
             const positionsTable = document.getElementById(`${exchange}-positions`);
-            if (positionsTable && balances[exchange].positions) {
+            if (positionsTable) {
                 positionsTable.innerHTML = '';
                 
-                for (const position of balances[exchange].positions) {
-                    const row = document.createElement('tr');
-                    
-                    // 币种
-                    const coinCell = document.createElement('td');
-                    coinCell.textContent = position.coin || '-';
-                    row.appendChild(coinCell);
-                    
-                    // 总数量
-                    const totalCell = document.createElement('td');
-                    totalCell.textContent = position.total || '-';
-                    row.appendChild(totalCell);
-                    
-                    // 可用
-                    const availableCell = document.createElement('td');
-                    availableCell.textContent = position.available || '-';
-                    row.appendChild(availableCell);
-                    
-                    // 锁定
-                    const lockedCell = document.createElement('td');
-                    lockedCell.textContent = position.locked || '-';
-                    row.appendChild(lockedCell);
-                    
-                    // 价值
-                    const valueCell = document.createElement('td');
-                    valueCell.textContent = position.value || '-';
-                    row.appendChild(valueCell);
-                    
-                    positionsTable.appendChild(row);
+                // 检查positions是否为数组且有数据
+                const positions = balances[exchange].positions;
+                if (Array.isArray(positions) && positions.length > 0) {
+                    for (const position of positions) {
+                        const row = document.createElement('tr');
+                        
+                        // 币种
+                        const coinCell = document.createElement('td');
+                        coinCell.textContent = position.coin || '-';
+                        row.appendChild(coinCell);
+                        
+                        // 总数量
+                        const totalCell = document.createElement('td');
+                        totalCell.textContent = position.total || '-';
+                        row.appendChild(totalCell);
+                        
+                        // 可用
+                        const availableCell = document.createElement('td');
+                        availableCell.textContent = position.available || '-';
+                        row.appendChild(availableCell);
+                        
+                        // 锁定
+                        const lockedCell = document.createElement('td');
+                        lockedCell.textContent = position.locked || '-';
+                        row.appendChild(lockedCell);
+                        
+                        // 价值
+                        const valueCell = document.createElement('td');
+                        valueCell.textContent = position.value || '-';
+                        row.appendChild(valueCell);
+                        
+                        positionsTable.appendChild(row);
+                    }
+                } else {
+                    // 如果没有持仓数据或positions不是数组，显示空状态
+                    positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
                 }
-            } else if (positionsTable) {
-                // 如果没有持仓数据，显示空状态
-                positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
             }
         }
     }
