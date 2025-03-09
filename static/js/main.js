@@ -31,10 +31,10 @@ function initButtons() {
     
     if (startBtn) {
         startBtn.addEventListener('click', function() {
-            fetch('/api/start_system', { method: 'POST' })
+            fetch('/api/start', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
+                    if (data.status === 'success') {
                         addLogEntry('INFO', '系统已启动');
                         updateSystemStatus();
                     } else {
@@ -50,10 +50,10 @@ function initButtons() {
     
     if (stopBtn) {
         stopBtn.addEventListener('click', function() {
-            fetch('/api/stop_system', { method: 'POST' })
+            fetch('/api/stop', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
+                    if (data.status === 'success') {
                         addLogEntry('INFO', '系统已停止');
                         updateSystemStatus();
                     } else {
@@ -79,11 +79,11 @@ function updateAllData() {
 
 // 更新市场数据
 function updateMarketData() {
-    fetch('/api/market_data')
+    fetch('/api/prices')
         .then(response => response.json())
         .then(data => {
-            if (data && data.prices) {
-                renderPriceTable(data.prices);
+            if (data) {
+                renderPriceTable(data);
             } else {
                 console.error('获取到的市场数据格式不正确:', data);
             }
@@ -121,7 +121,7 @@ function renderPriceTable(pricesData) {
                 const sellPrice = pricesData[exchange][symbol].sell;
                 
                 if (buyPrice && sellPrice) {
-                    priceCell.innerHTML = `<span class="text-success">${buyPrice}</span> / <span class="text-danger">${sellPrice}</span>`;
+                    priceCell.innerHTML = `${buyPrice.toFixed(2)}/${sellPrice.toFixed(2)}`;
                 } else {
                     priceCell.innerHTML = '<span class="text-muted">暂无数据</span>';
                 }
@@ -132,11 +132,47 @@ function renderPriceTable(pricesData) {
             row.appendChild(priceCell);
         }
         
-        // 添加净利润列
-        const profitCell = document.createElement('td');
-        profitCell.className = 'text-center';
-        profitCell.innerHTML = '<span class="text-muted">-</span>';
-        row.appendChild(profitCell);
+        // 计算并添加差价列
+        const diffCell = document.createElement('td');
+        diffCell.className = 'text-center';
+        
+        // 找出所有交易所中的最低卖价（买入价）和最高买价（卖出价）
+        let minAskPrice = Infinity;  // 最低卖价（我们的买入价）
+        let maxBidPrice = 0;         // 最高买价（我们的卖出价）
+        let validPrices = false;
+        
+        for (const exchange of EXCHANGES) {
+            if (pricesData[exchange] && pricesData[exchange][symbol]) {
+                const askPrice = pricesData[exchange][symbol].sell;  // 交易所的卖价（我们的买入价）
+                const bidPrice = pricesData[exchange][symbol].buy;   // 交易所的买价（我们的卖出价）
+                
+                if (askPrice && bidPrice) {
+                    minAskPrice = Math.min(minAskPrice, askPrice);
+                    maxBidPrice = Math.max(maxBidPrice, bidPrice);
+                    validPrices = true;
+                }
+            }
+        }
+        
+        // 计算差价百分比
+        if (validPrices && minAskPrice !== Infinity && maxBidPrice > 0) {
+            const diffPct = ((maxBidPrice - minAskPrice) / minAskPrice) * 100;
+            if (diffPct > 0) {
+                let colorClass = '';
+                if (diffPct >= 1) {
+                    colorClass = 'text-warning';  // 金色，表示高套利机会
+                } else if (diffPct >= 0.5) {
+                    colorClass = 'text-muted';    // 灰色，表示有套利机会
+                }
+                diffCell.innerHTML = `<span class="${colorClass}">${diffPct.toFixed(2)}%</span>`;
+            } else {
+                diffCell.innerHTML = `<span>${diffPct.toFixed(2)}%</span>`;
+            }
+        } else {
+            diffCell.innerHTML = '<span class="text-muted">-</span>';
+        }
+        
+        row.appendChild(diffCell);
         
         // 添加行到表格
         tableBody.appendChild(row);
@@ -145,16 +181,16 @@ function renderPriceTable(pricesData) {
 
 // 更新套利数据
 function updateArbitrageData() {
-    fetch('/api/arbitrage_opportunities')
+    fetch('/api/diff')
         .then(response => response.json())
         .then(data => {
-            if (data && data.opportunities) {
-                renderArbitrageTable(data.opportunities);
+            if (data) {
+                renderArbitrageTable(data);
                 
                 // 更新套利机会数量
                 const arbitrageCount = document.getElementById('arbitrage-count');
                 if (arbitrageCount) {
-                    arbitrageCount.textContent = data.opportunities.length;
+                    arbitrageCount.textContent = data.length;
                 }
             }
         })
@@ -243,11 +279,11 @@ function renderArbitrageTable(opportunities) {
 
 // 更新账户余额数据
 function updateBalanceData() {
-    fetch('/api/account_balances')
+    fetch('/api/balances')
         .then(response => response.json())
         .then(data => {
-            if (data && data.balances) {
-                renderBalanceData(data.balances);
+            if (data) {
+                renderBalanceData(data);
             }
         })
         .catch(error => {
@@ -311,7 +347,7 @@ function renderBalanceData(balances) {
 
 // 更新系统状态
 function updateSystemStatus() {
-    fetch('/api/system_status')
+    fetch('/api/status')
         .then(response => response.json())
         .then(data => {
             if (data) {
