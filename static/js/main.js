@@ -11,6 +11,9 @@ const EXCHANGE_FEES = {
 document.addEventListener('DOMContentLoaded', function() {
     console.log("页面加载完成，初始化系统...");
     
+    // 设置API基础URL
+    window.API_BASE_URL = 'http://localhost:8888';
+    
     // 初始化系统状态
     updateSystemStatus();
     
@@ -31,7 +34,7 @@ function initButtons() {
     
     if (startBtn) {
         startBtn.addEventListener('click', function() {
-            fetch('/api/start', { method: 'POST' })
+            fetch(window.API_BASE_URL + '/api/start', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
@@ -50,7 +53,7 @@ function initButtons() {
     
     if (stopBtn) {
         stopBtn.addEventListener('click', function() {
-            fetch('/api/stop', { method: 'POST' })
+            fetch(window.API_BASE_URL + '/api/stop', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
@@ -79,7 +82,7 @@ function updateAllData() {
 
 // 更新市场数据
 function updateMarketData() {
-    fetch('/api/prices')
+    fetch(window.API_BASE_URL + '/api/prices')
         .then(response => response.json())
         .then(data => {
             if (data) {
@@ -181,7 +184,7 @@ function renderPriceTable(pricesData) {
 
 // 更新套利数据
 function updateArbitrageData() {
-    fetch('/api/diff')
+    fetch(window.API_BASE_URL + '/api/diff')
         .then(response => response.json())
         .then(data => {
             if (data) {
@@ -279,7 +282,7 @@ function renderArbitrageTable(opportunities) {
 
 // 更新账户余额数据
 function updateBalanceData() {
-    fetch('/api/balances')
+    fetch(window.API_BASE_URL + '/api/balances')
         .then(response => response.json())
         .then(data => {
             if (data) {
@@ -355,7 +358,7 @@ function renderBalanceData(balances) {
 
 // 更新系统状态
 function updateSystemStatus() {
-    fetch('/api/status')
+    fetch(window.API_BASE_URL + '/api/status')
         .then(response => response.json())
         .then(data => {
             if (data) {
