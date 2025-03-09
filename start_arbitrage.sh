@@ -11,8 +11,8 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="$LOG_DIR/web_app_$TIMESTAMP.log"
 
 # 默认参数
-SIMULATE=true
-TRADE=false
+SIMULATE=false
+TRADE=true
 PORT=8888
 
 # 解析命令行参数
