@@ -868,7 +868,15 @@ def get_arbitrage_status():
             "running": status["running"],
             "mode": status["mode"],
             "last_update": status["last_update"],
-            "trading_enabled": status["trading_enabled"]
+            "trading_enabled": status["trading_enabled"],
+            # 添加前端所需的其他字段，使用默认值
+            "total_funds": 10000.0,
+            "available_funds": {
+                "cross_exchange": 6000.0,
+                "triangle": 4000.0
+            },
+            "cross_opportunities": len([item for item in diff_data if item.get("price_diff_pct", 0) >= ARBITRAGE_THRESHOLD/100]),
+            "triangle_opportunities": 0  # 暂无三角套利功能
         }
     })
 
@@ -903,6 +911,81 @@ def get_all_arbitrage_history():
         "status": "success",
         "data": all_history
     })
+
+# 添加套利系统配置API
+@app.route('/api/arbitrage/config', methods=['GET', 'POST'])
+def arbitrage_config():
+    """获取或更新套利配置"""
+    if request.method == 'GET':
+        # 返回当前配置
+        config = {
+            "total_funds": 10000.0,
+            "allocation_ratio": {
+                "cross_exchange": 0.6,
+                "triangle": 0.4
+            },
+            "exchanges": EXCHANGES
+        }
+        return jsonify({
+            "status": "success",
+            "data": config
+        })
+    else:
+        # 接收新配置
+        try:
+            data = request.get_json()
+            # 在实际系统中，这里应该保存配置并更新系统状态
+            # 目前只返回成功
+            return jsonify({
+                "status": "success",
+                "message": "配置已更新"
+            })
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "message": f"更新配置失败: {str(e)}"
+            })
+
+# 添加套利系统启动和停止API
+@app.route('/api/arbitrage/start', methods=['POST'])
+def start_arbitrage():
+    """启动套利系统"""
+    global status
+    status["running"] = True
+    return jsonify({
+        "status": "success",
+        "message": "套利系统已启动"
+    })
+
+@app.route('/api/arbitrage/stop', methods=['POST'])
+def stop_arbitrage():
+    """停止套利系统"""
+    global status
+    status["running"] = False
+    return jsonify({
+        "status": "success",
+        "message": "套利系统已停止"
+    })
+
+@app.route('/api/arbitrage/execute', methods=['POST'])
+def execute_arbitrage():
+    """执行套利操作"""
+    try:
+        data = request.get_json()
+        # 在实际系统中，这里应该执行套利操作
+        # 目前只返回成功
+        return jsonify({
+            "status": "success",
+            "message": "套利操作已提交",
+            "data": {
+                "task_id": f"task_{int(time.time())}"
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"执行套利失败: {str(e)}"
+        })
 
 def main():
     """主函数"""

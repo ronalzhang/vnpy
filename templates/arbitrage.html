@@ -426,6 +426,11 @@
         
         // 更新状态UI
         function updateStatusUI(status) {
+            if (!status) {
+                addLog("错误", "收到空的状态数据");
+                return;
+            }
+            
             systemStatus = status;
             
             // 更新状态标签
@@ -440,23 +445,37 @@
             }
             
             // 更新最后更新时间
-            $("#last-update").text("最后更新：" + status.last_update);
+            $("#last-update").text("最后更新：" + (status.last_update || "未知"));
             
-            // 更新资金信息
-            $("#total-funds").text("¥" + status.total_funds.toFixed(2));
-            const availableFunds = status.available_funds.cross_exchange + status.available_funds.triangle;
+            // 更新资金信息 - 添加安全检查
+            const totalFunds = status.total_funds !== undefined ? status.total_funds : 0;
+            $("#total-funds").text("¥" + totalFunds.toFixed(2));
+            
+            // 安全获取可用资金
+            let availableFunds = 0;
+            if (status.available_funds) {
+                const crossFunds = status.available_funds.cross_exchange || 0;
+                const triangleFunds = status.available_funds.triangle || 0;
+                availableFunds = crossFunds + triangleFunds;
+            }
             $("#available-funds").text("¥" + availableFunds.toFixed(2));
             
-            // 更新机会数量
-            $("#cross-opportunities").text(status.cross_opportunities);
-            $("#triangle-opportunities").text(status.triangle_opportunities);
+            // 更新机会数量 - 添加安全检查
+            $("#cross-opportunities").text(status.cross_opportunities || 0);
+            $("#triangle-opportunities").text(status.triangle_opportunities || 0);
         }
         
         // 更新套利机会UI
         function updateOpportunitiesUI(opportunities) {
+            // 确保opportunities是数组
+            if (!Array.isArray(opportunities)) {
+                opportunities = [];
+                addLog("警告", "未收到有效的套利机会数据");
+            }
+            
             // 分离跨所和三角套利机会
-            const crossOpportunities = opportunities.filter(o => o.type === "cross_exchange");
-            const triangleOpportunities = opportunities.filter(o => o.type === "triangle");
+            const crossOpportunities = opportunities.filter(o => o && o.type === "cross_exchange");
+            const triangleOpportunities = opportunities.filter(o => o && o.type === "triangle");
             
             // 更新跨所套利表格
             let crossHtml = "";
@@ -464,15 +483,21 @@
                 crossHtml = "<tr><td colspan='5' class='text-center'>暂无套利机会</td></tr>";
             } else {
                 crossOpportunities.forEach(opp => {
-                    const profitClass = opp.net_profit_pct > 0 ? "text-profit" : "text-loss";
-                    const profitPercent = (opp.net_profit_pct * 100).toFixed(3) + "%";
-                    const opportunityId = `${opp.buy_exchange}_${opp.sell_exchange}_${opp.symbol}`;
+                    // 安全获取属性，提供默认值
+                    const symbol = opp.symbol || "未知";
+                    const buyExchange = opp.buy_exchange || "未知";
+                    const sellExchange = opp.sell_exchange || "未知";
+                    const netProfitPct = opp.net_profit_pct || 0;
+                    
+                    const profitClass = netProfitPct > 0 ? "text-profit" : "text-loss";
+                    const profitPercent = (netProfitPct * 100).toFixed(3) + "%";
+                    const opportunityId = `${buyExchange}_${sellExchange}_${symbol}`;
                     
                     crossHtml += `
                         <tr>
-                            <td>${opp.symbol}</td>
-                            <td>${opp.buy_exchange}</td>
-                            <td>${opp.sell_exchange}</td>
+                            <td>${symbol}</td>
+                            <td>${buyExchange}</td>
+                            <td>${sellExchange}</td>
                             <td class="${profitClass}">${profitPercent}</td>
                             <td>
                                 <button class="btn btn-sm btn-primary execute-btn" 
@@ -493,14 +518,27 @@
                 triangleHtml = "<tr><td colspan='4' class='text-center'>暂无套利机会</td></tr>";
             } else {
                 triangleOpportunities.forEach(opp => {
-                    const profitClass = opp.profit_percent > 0 ? "text-profit" : "text-loss";
-                    const profitPercent = opp.profit_percent.toFixed(3) + "%";
-                    const pathStr = opp.steps ? opp.steps.map(s => s.symbol).join(" → ") : "未知路径";
-                    const opportunityId = `${opp.exchange_id}_${opp.path ? opp.path[0].symbol : "unknown"}`;
+                    // 安全获取属性，提供默认值
+                    const exchangeId = opp.exchange_id || "未知";
+                    const profitPercent = (opp.profit_percent || 0).toFixed(3) + "%";
+                    const profitClass = (opp.profit_percent || 0) > 0 ? "text-profit" : "text-loss";
+                    
+                    // 安全构建路径字符串
+                    let pathStr = "未知路径";
+                    if (opp.steps && Array.isArray(opp.steps)) {
+                        pathStr = opp.steps.map(s => s.symbol || "未知").join(" → ");
+                    }
+                    
+                    // 安全构建ID
+                    let firstSymbol = "unknown";
+                    if (opp.path && Array.isArray(opp.path) && opp.path.length > 0) {
+                        firstSymbol = opp.path[0].symbol || "unknown";
+                    }
+                    const opportunityId = `${exchangeId}_${firstSymbol}`;
                     
                     triangleHtml += `
                         <tr>
-                            <td>${opp.exchange_id}</td>
+                            <td>${exchangeId}</td>
                             <td>${pathStr}</td>
                             <td class="${profitClass}">${profitPercent}</td>
                             <td>
@@ -526,19 +564,31 @@
         
         // 更新活跃任务UI
         function updateTasksUI(tasks) {
+            // 确保tasks是数组
+            if (!Array.isArray(tasks)) {
+                tasks = [];
+                addLog("警告", "未收到有效的任务数据");
+            }
+            
             let html = "";
             if (tasks.length === 0) {
                 html = "<tr><td colspan='4' class='text-center'>暂无活跃任务</td></tr>";
             } else {
                 tasks.forEach(task => {
-                    const statusBadge = getStatusBadge(task.status);
+                    // 安全获取属性
+                    const id = task.id || "未知";
+                    const type = task.type || "未知";
+                    const status = task.status || "未知";
+                    const startTime = task.start_time || "";
+                    
+                    const statusBadge = getStatusBadge(status);
                     
                     html += `
                         <tr>
-                            <td>${task.id}</td>
-                            <td>${getTypeName(task.type)}</td>
+                            <td>${id}</td>
+                            <td>${getTypeName(type)}</td>
                             <td>${statusBadge}</td>
-                            <td>${formatDateTime(task.start_time)}</td>
+                            <td>${formatDateTime(startTime)}</td>
                         </tr>
                     `;
                 });
@@ -548,27 +598,42 @@
         
         // 更新历史记录UI
         function updateHistoryUI(history) {
+            // 确保history是数组
+            if (!Array.isArray(history)) {
+                history = [];
+                addLog("警告", "未收到有效的历史数据");
+            }
+            
             let html = "";
             if (history.length === 0) {
                 html = "<tr><td colspan='4' class='text-center'>暂无历史记录</td></tr>";
             } else {
                 history.forEach(item => {
-                    const statusBadge = getStatusBadge(item.status);
+                    // 安全获取属性
+                    const id = item.id || "未知";
+                    const type = item.type || "未知";
+                    const status = item.status || "未知";
+                    
+                    const statusBadge = getStatusBadge(status);
                     let profit = "未知";
                     let profitClass = "";
                     
-                    if (item.type === "cross_exchange" && item.profit) {
-                        profit = item.profit.toFixed(2) + " (" + item.profit_percent.toFixed(2) + "%)";
-                        profitClass = item.profit > 0 ? "text-profit" : "text-loss";
-                    } else if (item.type === "triangle" && item.actual_profit) {
-                        profit = item.actual_profit.toFixed(2) + " (" + item.actual_profit_percent.toFixed(2) + "%)";
-                        profitClass = item.actual_profit > 0 ? "text-profit" : "text-loss";
+                    if (type === "cross_exchange" && item.profit !== undefined) {
+                        const profitVal = item.profit || 0;
+                        const profitPercentVal = item.profit_percent || 0;
+                        profit = profitVal.toFixed(2) + " (" + profitPercentVal.toFixed(2) + "%)";
+                        profitClass = profitVal > 0 ? "text-profit" : "text-loss";
+                    } else if (type === "triangle" && item.actual_profit !== undefined) {
+                        const profitVal = item.actual_profit || 0;
+                        const profitPercentVal = item.actual_profit_percent || 0;
+                        profit = profitVal.toFixed(2) + " (" + profitPercentVal.toFixed(2) + "%)";
+                        profitClass = profitVal > 0 ? "text-profit" : "text-loss";
                     }
                     
                     html += `
                         <tr>
-                            <td>${item.id}</td>
-                            <td>${getTypeName(item.type)}</td>
+                            <td>${id}</td>
+                            <td>${getTypeName(type)}</td>
                             <td>${statusBadge}</td>
                             <td class="${profitClass}">${profit}</td>
                         </tr>
