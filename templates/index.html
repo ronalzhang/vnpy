@@ -348,6 +348,34 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- 资金效率统计 -->
+                            <div class="col-md-12 mt-3">
+                                <div class="card h-100 border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-muted mb-3">资金效率统计</h6>
+                                        <div class="row g-3">
+                                            <div class="col-4">
+                                                <div class="d-flex justify-content-between">
+                                                    <span>总投入:</span>
+                                                    <span id="total-invested" class="fw-bold">0.00 USDT</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="d-flex justify-content-between">
+                                                    <span>总回报:</span>
+                                                    <span id="total-return" class="fw-bold">0.00 USDT</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="d-flex justify-content-between">
+                                                    <span>资金效率:</span>
+                                                    <span id="capital-efficiency" class="fw-bold text-success">0.000%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -364,8 +392,8 @@
                                         <th>买入价格</th>
                                         <th>卖出价格</th>
                                         <th>数量</th>
-                                        <th>预期收益</th>
-                                        <th>实际收益</th>
+                                        <th>投入</th>
+                                        <th>回报</th>
                                         <th>状态</th>
                                     </tr>
                                 </thead>
@@ -644,18 +672,149 @@
         }
     }
 
-    // 定期更新状态
+    // 更新策略执行记录和统计数据
+    function updateStrategyStats(opportunities) {
+        if (!opportunities || !opportunities.length) return;
+
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        // 过滤今日可执行的套利机会
+        const executableOpps = opportunities.filter(opp => opp.executable);
+        const todayOpps = executableOpps.filter(opp => new Date(opp.timestamp) >= todayStart);
+        
+        // 更新统计数据
+        const totalCount = todayOpps.length;
+        const successCount = todayOpps.filter(opp => opp.diff_percent >= 0.2).length;
+        const successRate = totalCount ? ((successCount / totalCount) * 100).toFixed(1) : '0.0';
+        
+        // 计算套利周期的资金效率
+        let totalInvested = 0;  // 总投入资金
+        let totalReturn = 0;    // 总回报资金
+        
+        todayOpps.forEach(opp => {
+            // 投入资金 = 买入价 * 数量
+            const invested = opp.buy_price * opp.depth;
+            totalInvested += invested;
+            
+            // 回报资金 = 卖出价 * 数量
+            const returned = opp.sell_price * opp.depth;
+            totalReturn += returned;
+        });
+        
+        // 计算资金使用效率
+        const efficiency = totalInvested > 0 ? ((totalReturn / totalInvested - 1) * 100).toFixed(3) : '0.000';
+        
+        // 更新显示
+        document.getElementById('today-trade-count').textContent = totalCount;
+        document.getElementById('today-success-rate').textContent = `${successRate}%`;
+        document.getElementById('today-profit').textContent = `${(totalReturn - totalInvested).toFixed(2)} USDT`;
+        document.getElementById('today-avg-return').textContent = `${efficiency}%`;
+        
+        // 更新资金效率统计
+        document.getElementById('total-invested').textContent = `${totalInvested.toFixed(2)} USDT`;
+        document.getElementById('total-return').textContent = `${totalReturn.toFixed(2)} USDT`;
+        document.getElementById('capital-efficiency').textContent = `${efficiency}%`;
+        
+        // 更新详细记录
+        updateStrategyDetails(todayOpps);
+    }
+
+    // 更新策略详细记录
+    function updateStrategyDetails(opportunities) {
+        const tbody = document.getElementById('strategy-details');
+        tbody.innerHTML = ''; // 清空现有记录
+        
+        opportunities.forEach(opp => {
+            const row = document.createElement('tr');
+            const time = new Date(opp.timestamp).toLocaleTimeString();
+            
+            // 计算投入和回报
+            const invested = opp.buy_price * opp.depth;
+            const returned = opp.sell_price * opp.depth;
+            const profit = returned - invested;
+            const efficiency = ((returned / invested - 1) * 100).toFixed(3);
+            
+            const profitClass = profit > 0 ? 'text-success' : 
+                              profit < 0 ? 'text-danger' : '';
+            
+            // 判断状态
+            const status = opp.diff_percent >= 0.2 ? 'success' : 
+                          opp.diff_percent >= 0.1 ? 'pending' : 'failed';
+            const statusClass = `status-${status}`;
+            
+            row.innerHTML = `
+                <td>${time}</td>
+                <td>${opp.symbol}</td>
+                <td>${opp.buy_exchange}</td>
+                <td>${opp.sell_exchange}</td>
+                <td>${opp.buy_price.toFixed(3)}</td>
+                <td>${opp.sell_price.toFixed(3)}</td>
+                <td>${opp.depth}</td>
+                <td>${invested.toFixed(2)} → ${returned.toFixed(2)}</td>
+                <td class="${profitClass}">${profit.toFixed(2)} (${efficiency}%)</td>
+                <td><span class="strategy-status ${statusClass}">${status}</span></td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+    }
+
+    // 更新资金分布（使用价格数据估算）
+    function updateBalanceDistribution(priceData) {
+        if (!priceData || !priceData.length) return;
+        
+        // 使用交易量作为资金分布的估算依据
+        const volumes = {
+            'binance': 0,
+            'okx': 0,
+            'bitget': 0
+        };
+        
+        priceData.forEach(item => {
+            if (item.binance_volume) volumes.binance += item.binance_volume;
+            if (item.okx_volume) volumes.okx += item.okx_volume;
+            if (item.bitget_volume) volumes.bitget += item.bitget_volume;
+        });
+        
+        const total = Object.values(volumes).reduce((sum, vol) => sum + vol, 0);
+        
+        for (const [exchange, volume] of Object.entries(volumes)) {
+            const percentage = total ? ((volume / total) * 100).toFixed(1) : '33.3';
+            const bar = document.getElementById(`${exchange}-balance-bar`);
+            if (bar) {
+                bar.style.width = `${percentage}%`;
+                bar.textContent = `${exchange.toUpperCase()}: ${percentage}%`;
+            }
+        }
+    }
+
+    // 修改updateSystemStatus函数
     async function updateSystemStatus() {
         try {
-            const response = await fetch('/api/status');
-            const data = await response.json();
-            if (data.mode) {
-                currentMode = data.mode;
-                localStorage.setItem('tradingMode', data.mode);  // 保存到本地存储
+            // 获取系统状态
+            const statusResponse = await fetch('/api/status');
+            const statusData = await statusResponse.json();
+            
+            // 更新状态显示
+            if (statusData.mode) {
+                currentMode = statusData.mode;
+                localStorage.setItem('tradingMode', statusData.mode);
             }
-            updateStatus(data.running, currentMode, data.arbitrage_count);
+            updateStatus(statusData.running, currentMode, statusData.arbitrage_count);
+            
+            // 如果系统在运行，获取套利数据并更新统计
+            if (statusData.running) {
+                const diffResponse = await fetch('/api/diff');
+                const opportunities = await diffResponse.json();
+                
+                // 使用套利数据更新统计和详细信息
+                updateStrategyStats(opportunities);
+                // 使用套利数据更新资金分布估算
+                updateBalanceDistribution(opportunities);
+            }
         } catch (error) {
-            console.error('获取状态失败:', error);
+            console.error('获取数据失败:', error);
         }
     }
 
@@ -726,97 +885,6 @@
         
         // 清空详细记录
         document.getElementById('strategy-details').innerHTML = '';
-    }
-
-    // 添加新的策略执行记录
-    function addStrategyRecord(record) {
-        const tbody = document.getElementById('strategy-details');
-        const row = document.createElement('tr');
-        
-        // 格式化时间
-        const time = new Date(record.timestamp).toLocaleTimeString();
-        
-        // 计算实际收益
-        const actualProfit = record.actualProfit ? record.actualProfit.toFixed(2) : '-';
-        const profitClass = record.actualProfit > 0 ? 'text-success' : 
-                           record.actualProfit < 0 ? 'text-danger' : '';
-        
-        // 状态样式
-        const statusClass = record.status === 'success' ? 'status-success' :
-                           record.status === 'pending' ? 'status-pending' :
-                           'status-failed';
-        
-        row.innerHTML = `
-            <td>${time}</td>
-            <td>${record.symbol}</td>
-            <td>${record.buyExchange}</td>
-            <td>${record.sellExchange}</td>
-            <td>${record.buyPrice.toFixed(2)}</td>
-            <td>${record.sellPrice.toFixed(2)}</td>
-            <td>${record.amount}</td>
-            <td>${record.expectedProfit.toFixed(2)} USDT</td>
-            <td class="${profitClass}">${actualProfit} USDT</td>
-            <td><span class="strategy-status ${statusClass}">${record.status}</span></td>
-        `;
-        
-        tbody.insertBefore(row, tbody.firstChild);
-        
-        // 如果记录数超过100条，删除最早的记录
-        if (tbody.children.length > 100) {
-            tbody.removeChild(tbody.lastChild);
-        }
-        
-        // 更新今日统计
-        updateDailyStats();
-    }
-
-    // 更新资金分布进度条
-    function updateBalanceDistribution(balances) {
-        const total = Object.values(balances).reduce((sum, val) => sum + val, 0);
-        
-        for (const [exchange, balance] of Object.entries(balances)) {
-            const percentage = ((balance / total) * 100).toFixed(1);
-            const bar = document.getElementById(`${exchange.toLowerCase()}-balance-bar`);
-            if (bar) {
-                bar.style.width = `${percentage}%`;
-                bar.textContent = `${exchange}: ${percentage}%`;
-            }
-        }
-    }
-
-    // 更新今日统计数据
-    function updateDailyStats() {
-        const tbody = document.getElementById('strategy-details');
-        const records = Array.from(tbody.children);
-        
-        // 只统计今天的记录
-        const today = new Date().toDateString();
-        const todayRecords = records.filter(row => {
-            const time = row.cells[0].textContent;
-            return new Date(time).toDateString() === today;
-        });
-        
-        // 计算统计数据
-        const totalCount = todayRecords.length;
-        const successCount = todayRecords.filter(row => 
-            row.querySelector('.status-success')
-        ).length;
-        
-        const successRate = totalCount ? ((successCount / totalCount) * 100).toFixed(1) : '0.0';
-        
-        const profits = todayRecords.map(row => {
-            const profitText = row.cells[8].textContent;
-            return parseFloat(profitText) || 0;
-        });
-        
-        const totalProfit = profits.reduce((sum, profit) => sum + profit, 0);
-        const avgReturn = totalCount ? ((totalProfit / totalCount) * 100).toFixed(2) : '0.00';
-        
-        // 更新显示
-        document.getElementById('today-trade-count').textContent = totalCount;
-        document.getElementById('today-success-rate').textContent = `${successRate}%`;
-        document.getElementById('today-profit').textContent = `${totalProfit.toFixed(2)} USDT`;
-        document.getElementById('today-avg-return').textContent = `${avgReturn}%`;
     }
 
     // 记录资金转移
