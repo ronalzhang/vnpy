@@ -586,6 +586,41 @@ def get_exchange_prices():
     prices = {exchange: {} for exchange in EXCHANGES}
     
     for exchange_id, client in exchange_clients.items():
+        # 检查客户端配置
+        if exchange_id == 'okx':
+            # 因为OKX可能需要特殊处理密码中的特殊字符
+            # 打印一些调试信息，不包含敏感信息
+            print(f"获取 {exchange_id} 价格数据，客户端配置：apiKey长度={len(client.apiKey) if hasattr(client, 'apiKey') and client.apiKey else 0}, password长度={len(client.password) if hasattr(client, 'password') and client.password else 0}")
+            
+            # 可以检查并尝试重新初始化OKX客户端
+            try:
+                # 先尝试获取一个数据，看是否正常工作
+                test_ticker = client.fetch_ticker("BTC/USDT")
+                print(f"OKX API连接正常: 能够获取BTC/USDT行情")
+            except Exception as e:
+                print(f"OKX API连接问题: {e}")
+                
+                # 尝试读取配置文件并重新创建客户端
+                try:
+                    with open(CONFIG_PATH, "r") as f:
+                        config = json.load(f)
+                    
+                    if 'okx' in config and 'api_key' in config['okx'] and 'secret_key' in config['okx'] and 'password' in config['okx']:
+                        print("尝试重新创建OKX客户端...")
+                        new_client = ccxt.okx({
+                            'apiKey': config['okx']['api_key'],
+                            'secret': config['okx']['secret_key'],
+                            'password': config['okx']['password'],  # 确保使用原始密码，包括特殊字符
+                            'enableRateLimit': True
+                        })
+                        exchange_clients['okx'] = new_client
+                        client = new_client
+                        print("OKX客户端重新创建完成")
+                    else:
+                        print("OKX配置不完整，无法重新创建客户端")
+                except Exception as e:
+                    print(f"重新创建OKX客户端失败: {e}")
+        
         for symbol in SYMBOLS:
             try:
                 # 获取订单簿数据
