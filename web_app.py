@@ -774,6 +774,11 @@ def home():
     """首页"""
     return render_template('index.html')
 
+@app.route('/arbitrage.html')
+def arbitrage():
+    """套利分析页面"""
+    return render_template('arbitrage.html')
+
 @app.route('/api/status', methods=['GET'])
 def get_status():
     """获取服务器状态"""
