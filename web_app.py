@@ -578,12 +578,35 @@ def get_exchange_prices():
                 orderbook = client.fetch_order_book(symbol)
                 
                 if orderbook and len(orderbook['bids']) > 0 and len(orderbook['asks']) > 0:
-                    bid_price = orderbook['bids'][0][0]  # 买一价
-                    ask_price = orderbook['asks'][0][0]  # 卖一价
-                    
-                    # 计算深度（前5档挂单量）
-                    bid_depth = sum(amount for price, amount in orderbook['bids'][:5])
-                    ask_depth = sum(amount for price, amount in orderbook['asks'][:5])
+                    # OKX交易所API返回的订单簿格式可能与标准不同，需要特殊处理
+                    if exchange_id == 'okx':
+                        try:
+                            # OKX可能返回[price, amount, ...]格式
+                            if len(orderbook['bids'][0]) > 2:
+                                bid_price = float(orderbook['bids'][0][0])
+                                ask_price = float(orderbook['asks'][0][0])
+                            else:
+                                bid_price = orderbook['bids'][0][0]
+                                ask_price = orderbook['asks'][0][0]
+                                
+                            # 计算深度（前5档挂单量）
+                            if len(orderbook['bids'][0]) > 2:
+                                bid_depth = sum(float(item[1]) for item in orderbook['bids'][:5])
+                                ask_depth = sum(float(item[1]) for item in orderbook['asks'][:5])
+                            else:
+                                bid_depth = sum(amount for price, amount in orderbook['bids'][:5])
+                                ask_depth = sum(amount for price, amount in orderbook['asks'][:5])
+                        except Exception as e:
+                            print(f"处理OKX订单簿格式出错: {e}")
+                            continue
+                    else:
+                        # 标准格式处理
+                        bid_price = orderbook['bids'][0][0]  # 买一价
+                        ask_price = orderbook['asks'][0][0]  # 卖一价
+                        
+                        # 计算深度（前5档挂单量）
+                        bid_depth = sum(amount for price, amount in orderbook['bids'][:5])
+                        ask_depth = sum(amount for price, amount in orderbook['asks'][:5])
                     
                     # 获取成交量
                     volume = 0
