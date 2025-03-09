@@ -21,26 +21,15 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <nav class="navbar navbar-expand navbar-dark bg-dark">
             <div class="container-fluid">
                 <a class="navbar-brand" href="#">
                     <i class="fas fa-chart-line me-2"></i>校长的量化系统
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="#market-data">市场数据</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="arbitrage.html">套利分析</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#logs">操作日志</a>
-                        </li>
-                    </ul>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link active" href="#market-data">市场数据</a>
+                    <a class="nav-link" href="arbitrage.html">套利分析</a>
+                    <a class="nav-link" href="#logs">操作日志</a>
                 </div>
             </div>
         </nav>
@@ -65,12 +54,11 @@
                             <table class="table table-hover table-bordered">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="text-center" style="width: 10%">交易对</th>
+                                        <th class="text-center" style="width: 8%">币种</th>
                                         <th class="text-center">Binance</th>
                                         <th class="text-center">OKX</th>
                                         <th class="text-center">BitGet</th>
-                                        <th class="text-center" style="width: 10%">深度</th>
-                                        <th class="text-center" style="width: 10%">差价</th>
+                                        <th class="text-center" style="width: 6%">差价</th>
                                     </tr>
                                 </thead>
                                 <tbody id="price-data">
@@ -85,14 +73,15 @@
                                 <table class="table table-sm table-bordered table-hover">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>交易对</th>
-                                            <th>买入交易所</th>
-                                            <th>卖出交易所</th>
-                                            <th>买入价</th>
-                                            <th>卖出价</th>
-                                            <th>差价</th>
-                                            <th>差价(%)</th>
-                                            <th>可执行</th>
+                                            <th style="width: 8%">交易对</th>
+                                            <th style="width: 10%">买入所</th>
+                                            <th style="width: 10%">卖出所</th>
+                                            <th style="width: 12%">买入价</th>
+                                            <th style="width: 12%">卖出价</th>
+                                            <th style="width: 10%">深度</th>
+                                            <th style="width: 10%">差价</th>
+                                            <th style="width: 10%">差价(%)</th>
+                                            <th style="width: 8%">可执行</th>
                                         </tr>
                                     </thead>
                                     <tbody id="arbitrage-data">

@@ -127,6 +127,9 @@ function updatePriceTable(pricesData) {
     
     // 遍历所有交易对
     for (const symbol of SYMBOLS) {
+        // 提取币种名称（移除/USDT部分）
+        const coin = symbol.split('/')[0];
+        
         // 检查是否有数据
         const binancePrice = pricesData.binance && pricesData.binance[symbol];
         const okxPrice = pricesData.okx && pricesData.okx[symbol];
@@ -152,7 +155,7 @@ function updatePriceTable(pricesData) {
             maxDiffPct = Math.max(maxDiffPct, diff1, diff2);
         }
         
-        // 计算最大深度
+        // 计算最大深度 (深度数据移动到套利机会表中显示)
         let maxDepth = 0;
         if (binancePrice && binancePrice.depth) {
             const bidDepth = binancePrice.depth.bid || 0;
@@ -184,11 +187,10 @@ function updatePriceTable(pricesData) {
         }
         
         tr.innerHTML = `
-            <td class="text-center"><strong>${symbol}</strong></td>
+            <td class="text-center"><strong>${coin}</strong></td>
             <td class="text-end">${binancePrice ? formatPrice(binancePrice.buy) : '-'}</td>
             <td class="text-end">${okxPrice ? formatPrice(okxPrice.buy) : '-'}</td>
             <td class="text-end">${bitgetPrice ? formatPrice(bitgetPrice.buy) : '-'}</td>
-            <td class="text-end">${maxDepth > 0 ? formatDepth(maxDepth) : '-'}</td>
             <td class="text-end">${maxDiffPct > 0 ? formatPercentage(maxDiffPct) : '-'}</td>
         `;
         
@@ -198,50 +200,58 @@ function updatePriceTable(pricesData) {
 
 // 更新套利表格
 function updateArbitrageTable(opportunities) {
-    const tbody = document.getElementById('arbitrage-data');
-    tbody.innerHTML = '';
+    const arbitrageTable = document.getElementById('arbitrage-data');
+    arbitrageTable.innerHTML = '';
     
     if (!opportunities || opportunities.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="8" class="text-center">暂无套利机会</td>`;
-        tbody.appendChild(tr);
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="9" class="text-center">当前无套利机会</td>';
+        arbitrageTable.appendChild(row);
         return;
     }
     
-    // 显示前10个机会
-    opportunities.slice(0, 10).forEach(opportunity => {
-        const tr = document.createElement('tr');
+    // 添加前5个最佳机会
+    const topOpportunities = opportunities.slice(0, 5);
+    
+    for (const opp of topOpportunities) {
+        // 提取币种名称（移除/USDT部分）
+        const coin = opp.symbol.split('/')[0];
         
-        // 根据差价添加行样式 (增加差价阈值到0.5%)
-        if (opportunity.diff_pct > 0.8) {
-            tr.classList.add('table-success');
-        } else if (opportunity.diff_pct > 0.5) {
-            tr.classList.add('table-warning');
+        // 计算深度
+        let depth = 0;
+        // 尝试获取买入交易所的深度
+        if (opp.buy_depth) {
+            depth = opp.buy_depth;
+        } else {
+            // 后端可能没有直接提供深度数据，使用默认值
+            depth = 0;
         }
         
-        tr.innerHTML = `
-            <td>${opportunity.symbol}</td>
-            <td>${formatExchangeName(opportunity.buy_exchange)}</td>
-            <td>${formatExchangeName(opportunity.sell_exchange)}</td>
-            <td class="text-end">${formatPrice(opportunity.buy_price)}</td>
-            <td class="text-end">${formatPrice(opportunity.sell_price)}</td>
-            <td class="text-end">${formatPrice(opportunity.diff)}</td>
-            <td class="text-end">${formatPercentage(opportunity.diff_pct)}</td>
-            <td class="text-center">${opportunity.executable ? 
-                '<i class="fas fa-check-circle text-success"></i>' : 
-                '<i class="fas fa-times-circle text-danger"></i>'}</td>
+        // 创建行
+        const row = document.createElement('tr');
+        
+        // 添加价差警告样式
+        if (opp.price_diff_pct >= 0.01) {
+            row.classList.add('table-success');
+        }
+        
+        // 格式化买入/卖出交易所名称（缩短显示）
+        const buyExchange = formatExchangeName(opp.buy_exchange);
+        const sellExchange = formatExchangeName(opp.sell_exchange);
+        
+        row.innerHTML = `
+            <td class="text-center">${coin}</td>
+            <td class="text-center">${buyExchange}</td>
+            <td class="text-center">${sellExchange}</td>
+            <td class="text-end">${formatPrice(opp.buy_price)}</td>
+            <td class="text-end">${formatPrice(opp.sell_price)}</td>
+            <td class="text-end">${formatDepth(depth)}</td>
+            <td class="text-end">${formatPrice(opp.price_diff)}</td>
+            <td class="text-end">${formatPercentage(opp.price_diff_pct)}</td>
+            <td class="text-center">${opp.is_executable ? '<span class="badge bg-success">可执行</span>' : '<span class="badge bg-secondary">不可执行</span>'}</td>
         `;
         
-        tbody.appendChild(tr);
-    });
-    
-    // 添加套利日志（只记录大于0.5%的机会）
-    if (opportunities.length > 0 && opportunities[0].diff_pct >= 0.5) {
-        const topOpp = opportunities[0];
-        addLog(
-            'ARBITRAGE', 
-            `发现套利机会: ${topOpp.symbol} ${formatExchangeName(topOpp.buy_exchange)}(${formatPrice(topOpp.buy_price)}) → ${formatExchangeName(topOpp.sell_exchange)}(${formatPrice(topOpp.sell_price)}), 差价: ${formatPrice(topOpp.diff)} (${formatPercentage(topOpp.diff_pct)})`
-        );
+        arbitrageTable.appendChild(row);
     }
 }
 
@@ -276,97 +286,47 @@ function fetchBalanceData() {
 
 // 更新交易所余额信息
 function updateExchangeBalance(exchange, balanceData) {
-    if (!balanceData) return;
+    // 获取相关元素
+    const balanceEl = document.getElementById(`${exchange}-balance`);
+    const availableEl = document.getElementById(`${exchange}-available`);
+    const lockedEl = document.getElementById(`${exchange}-locked`);
+    const positionsTable = document.getElementById(`${exchange}-positions`);
     
-    // 获取USDT余额
-    const usdtBalance = balanceData.USDT || 0;
-    const usdtAvailable = balanceData.USDT_available || 0;
-    const usdtLocked = balanceData.USDT_locked || 0;
-    const exchangeId = exchange === 'okx' ? 'okx' : exchange; // 处理ID不一致问题
-    
-    // 更新USDT余额显示
-    const balanceElement = document.getElementById(`${exchangeId}-balance`);
-    if (balanceElement) {
-        balanceElement.textContent = formatNumber(usdtBalance);
+    if (!balanceData) {
+        return;
     }
     
-    // 更新可用和锁定余额
-    const availableElement = document.getElementById(`${exchangeId}-available`);
-    if (availableElement) {
-        availableElement.textContent = formatNumber(usdtAvailable);
-    }
+    // 更新USDT余额数据
+    if (balanceEl) balanceEl.textContent = formatNumber(balanceData.USDT || 0);
+    if (availableEl) availableEl.textContent = formatNumber(balanceData.USDT_available || 0);
+    if (lockedEl) lockedEl.textContent = formatNumber(balanceData.USDT_locked || 0);
     
-    const lockedElement = document.getElementById(`${exchangeId}-locked`);
-    if (lockedElement) {
-        lockedElement.textContent = formatNumber(usdtLocked);
-    }
-    
-    // 更新持仓表格
-    const tbody = document.getElementById(`${exchangeId}-positions`);
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    // 添加所有持仓资产
-    if (balanceData.positions) {
-        // 新的数据结构
-        for (const [asset, positionData] of Object.entries(balanceData.positions)) {
+    // 更新持仓数据
+    if (positionsTable) {
+        positionsTable.innerHTML = '';
+        
+        // 检查是否有持仓
+        if (!balanceData.positions || Object.keys(balanceData.positions).length === 0) {
             const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${asset}</td>
-                <td>${formatNumber(positionData.amount, 8)}</td>
-                <td>${formatNumber(positionData.available || positionData.amount, 8)}</td>
-                <td>${formatNumber(positionData.locked || 0, 8)}</td>
-                <td>${formatNumber(positionData.value, 2)}</td>
-            `;
-            tbody.appendChild(tr);
+            tr.innerHTML = '<td colspan="5" class="text-center">无持仓</td>';
+            positionsTable.appendChild(tr);
+            return;
         }
-    } else {
-        // 兼容旧数据结构
-        for (const [asset, amount] of Object.entries(balanceData)) {
-            if (asset === 'USDT' || asset === 'USDT_available' || asset === 'USDT_locked' || amount <= 0) continue;
-            
-            // 估算USDT价值（简化计算，实际应该使用实时价格）
-            let valueInUsdt = 0;
-            
-            fetch('/api/prices')
-                .then(response => response.json())
-                .then(data => {
-                    const symbol = `${asset}/USDT`;
-                    if (data[exchange] && data[exchange][symbol]) {
-                        valueInUsdt = amount * data[exchange][symbol].buy;
-                    }
-                    
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${asset}</td>
-                        <td>${formatNumber(amount, 8)}</td>
-                        <td>${formatNumber(amount, 8)}</td>
-                        <td>${formatNumber(0, 8)}</td>
-                        <td>${formatNumber(valueInUsdt)}</td>
-                    `;
-                    tbody.appendChild(tr);
-                })
-                .catch(() => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${asset}</td>
-                        <td>${formatNumber(amount, 8)}</td>
-                        <td>${formatNumber(amount, 8)}</td>
-                        <td>${formatNumber(0, 8)}</td>
-                        <td>-</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+        
+        // 添加持仓数据
+        for (const [coin, position] of Object.entries(balanceData.positions)) {
+            if (position.amount > 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${coin}</td>
+                    <td>${formatNumber(position.amount, 2)}</td>
+                    <td>${formatNumber(position.available, 2)}</td>
+                    <td>${formatNumber(position.locked, 2)}</td>
+                    <td>${formatNumber(position.value, 2)}</td>
+                `;
+                positionsTable.appendChild(tr);
+            }
         }
-    }
-    
-    // 如果没有持仓，显示提示
-    if ((balanceData.positions && Object.keys(balanceData.positions).length === 0) || 
-        (!balanceData.positions && Object.keys(balanceData).length <= 3)) { // 只有USDT相关字段
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="5" class="text-center">暂无持仓</td>`;
-        tbody.appendChild(tr);
     }
 }
 
@@ -461,7 +421,7 @@ function formatPercentage(value) {
 // 格式化深度
 function formatDepth(depth) {
     if (depth === undefined || depth === null) return '-';
-    return depth.toFixed(4);
+    return depth.toFixed(2);
 }
 
 // 格式化普通数字
@@ -476,6 +436,6 @@ function formatNumber(num, precision = 2) {
 // 交易对列表
 const SYMBOLS = [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT",
-    "ADA/USDT", "DOT/USDT", "MATIC/USDT", "AVAX/USDT", "SHIB/USDT"
+    "ADA/USDT", "DOT/USDT", "AVAX/USDT", "SHIB/USDT"
 ];
 
