@@ -311,46 +311,50 @@ function renderBalanceData(balances) {
             
             // 更新持仓情况
             const positionsTable = document.getElementById(`${exchange}-positions`);
-            if (positionsTable && balances[exchange].positions) {
+            if (positionsTable) {
                 positionsTable.innerHTML = '';
                 
-                for (const position of balances[exchange].positions) {
-                    const row = document.createElement('tr');
-                    
-                    // 币种
-                    const coinCell = document.createElement('td');
-                    coinCell.textContent = position.coin || '-';
-                    row.appendChild(coinCell);
-                    
-                    // 总数量
-                    const totalCell = document.createElement('td');
-                    const totalAmount = position.total || 0;
-                    totalCell.textContent = Number(totalAmount).toFixed(3);
-                    row.appendChild(totalCell);
-                    
-                    // 可用
-                    const availableCell = document.createElement('td');
-                    const availableAmount = position.available || 0;
-                    availableCell.textContent = Number(availableAmount).toFixed(3);
-                    row.appendChild(availableCell);
-                    
-                    // 锁定
-                    const lockedCell = document.createElement('td');
-                    const lockedAmount = position.locked || 0;
-                    lockedCell.textContent = Number(lockedAmount).toFixed(3);
-                    row.appendChild(lockedCell);
-                    
-                    // 价值
-                    const valueCell = document.createElement('td');
-                    const value = position.value || 0;
-                    valueCell.textContent = Number(value).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                    row.appendChild(valueCell);
-                    
-                    positionsTable.appendChild(row);
+                // 检查positions是否存在且是数组
+                const positions = balances[exchange].positions;
+                if (Array.isArray(positions) && positions.length > 0) {
+                    for (const position of positions) {
+                        const row = document.createElement('tr');
+                        
+                        // 币种
+                        const coinCell = document.createElement('td');
+                        coinCell.textContent = position.coin || '-';
+                        row.appendChild(coinCell);
+                        
+                        // 总数量
+                        const totalCell = document.createElement('td');
+                        const totalAmount = position.total || 0;
+                        totalCell.textContent = Number(totalAmount).toFixed(3);
+                        row.appendChild(totalCell);
+                        
+                        // 可用
+                        const availableCell = document.createElement('td');
+                        const availableAmount = position.available || 0;
+                        availableCell.textContent = Number(availableAmount).toFixed(3);
+                        row.appendChild(availableCell);
+                        
+                        // 锁定
+                        const lockedCell = document.createElement('td');
+                        const lockedAmount = position.locked || 0;
+                        lockedCell.textContent = Number(lockedAmount).toFixed(3);
+                        row.appendChild(lockedCell);
+                        
+                        // 价值
+                        const valueCell = document.createElement('td');
+                        const value = position.value || 0;
+                        valueCell.textContent = Number(value).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        row.appendChild(valueCell);
+                        
+                        positionsTable.appendChild(row);
+                    }
+                } else {
+                    // 如果没有持仓数据，显示空状态
+                    positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
                 }
-            } else if (positionsTable) {
-                // 如果没有持仓数据，显示空状态
-                positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
             }
         }
     }
