@@ -101,8 +101,12 @@ function initPrivacySettings() {
             // 更新图标
             const icon = togglePrivacyBtn.querySelector('i');
             if (icon) {
-                icon.className = isPrivate ? 'fas fa-eye' : 'fas fa-eye-slash';
+                icon.className = isPrivate ? 'fas fa-eye-slash' : 'fas fa-eye';
             }
+            
+            // 更新按钮样式
+            togglePrivacyBtn.classList.toggle('btn-outline-light');
+            togglePrivacyBtn.classList.toggle('btn-light');
             
             // 更新所有余额显示
             updateBalanceDisplay(isPrivate);
