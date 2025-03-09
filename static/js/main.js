@@ -1,3 +1,416 @@
+// 常量定义
+const SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT", "ADA/USDT", "DOT/USDT", "AVAX/USDT", "SHIB/USDT"];
+const EXCHANGES = ["binance", "okx", "bitget"];
+const EXCHANGE_FEES = {
+    "binance": 0.1,
+    "okx": 0.1,
+    "bitget": 0.1
+};
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("页面加载完成，初始化系统...");
+    
+    // 初始化系统状态
+    updateSystemStatus();
+    
+    // 定时更新数据
+    setInterval(updateAllData, 5000);
+    
+    // 初始化按钮事件
+    initButtons();
+    
+    // 首次加载数据
+    updateAllData();
+});
+
+// 初始化按钮事件
+function initButtons() {
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    
+    if (startBtn) {
+        startBtn.addEventListener('click', function() {
+            fetch('/api/start_system', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addLogEntry('INFO', '系统已启动');
+                        updateSystemStatus();
+                    } else {
+                        addLogEntry('ERROR', '系统启动失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('启动系统出错:', error);
+                    addLogEntry('ERROR', '系统启动请求失败');
+                });
+        });
+    }
+    
+    if (stopBtn) {
+        stopBtn.addEventListener('click', function() {
+            fetch('/api/stop_system', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addLogEntry('INFO', '系统已停止');
+                        updateSystemStatus();
+                    } else {
+                        addLogEntry('ERROR', '系统停止失败: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('停止系统出错:', error);
+                    addLogEntry('ERROR', '系统停止请求失败');
+                });
+        });
+    }
+}
+
+// 更新所有数据
+function updateAllData() {
+    updateMarketData();
+    updateArbitrageData();
+    updateBalanceData();
+    updateSystemStatus();
+    updateServerTime();
+}
+
+// 更新市场数据
+function updateMarketData() {
+    fetch('/api/market_data')
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.prices) {
+                renderPriceTable(data.prices);
+            } else {
+                console.error('获取到的市场数据格式不正确:', data);
+            }
+        })
+        .catch(error => {
+            console.error('获取市场数据出错:', error);
+        });
+}
+
+// 渲染价格表格
+function renderPriceTable(pricesData) {
+    const tableBody = document.getElementById('price-data');
+    if (!tableBody) return;
+    
+    // 清空表格
+    tableBody.innerHTML = '';
+    
+    // 遍历所有交易对
+    for (const symbol of SYMBOLS) {
+        const row = document.createElement('tr');
+        
+        // 添加币种列
+        const symbolCell = document.createElement('td');
+        symbolCell.className = 'text-center';
+        symbolCell.textContent = symbol.replace('/USDT', '');
+        row.appendChild(symbolCell);
+        
+        // 添加各交易所价格列
+        for (const exchange of EXCHANGES) {
+            const priceCell = document.createElement('td');
+            priceCell.className = 'text-center';
+            
+            if (pricesData[exchange] && pricesData[exchange][symbol]) {
+                const buyPrice = pricesData[exchange][symbol].buy;
+                const sellPrice = pricesData[exchange][symbol].sell;
+                
+                if (buyPrice && sellPrice) {
+                    priceCell.innerHTML = `<span class="text-success">${buyPrice}</span> / <span class="text-danger">${sellPrice}</span>`;
+                } else {
+                    priceCell.innerHTML = '<span class="text-muted">暂无数据</span>';
+                }
+            } else {
+                priceCell.innerHTML = '<span class="text-muted">暂无数据</span>';
+            }
+            
+            row.appendChild(priceCell);
+        }
+        
+        // 添加净利润列
+        const profitCell = document.createElement('td');
+        profitCell.className = 'text-center';
+        profitCell.innerHTML = '<span class="text-muted">-</span>';
+        row.appendChild(profitCell);
+        
+        // 添加行到表格
+        tableBody.appendChild(row);
+    }
+}
+
+// 更新套利数据
+function updateArbitrageData() {
+    fetch('/api/arbitrage_opportunities')
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.opportunities) {
+                renderArbitrageTable(data.opportunities);
+                
+                // 更新套利机会数量
+                const arbitrageCount = document.getElementById('arbitrage-count');
+                if (arbitrageCount) {
+                    arbitrageCount.textContent = data.opportunities.length;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('获取套利数据出错:', error);
+        });
+}
+
+// 渲染套利表格
+function renderArbitrageTable(opportunities) {
+    const tableBody = document.getElementById('arbitrage-data');
+    if (!tableBody) return;
+    
+    // 清空表格
+    tableBody.innerHTML = '';
+    
+    if (opportunities.length === 0) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 9;
+        cell.className = 'text-center text-muted';
+        cell.textContent = '暂无套利机会';
+        row.appendChild(cell);
+        tableBody.appendChild(row);
+        return;
+    }
+    
+    // 添加套利机会
+    for (const opp of opportunities) {
+        const row = document.createElement('tr');
+        
+        // 交易对
+        const symbolCell = document.createElement('td');
+        symbolCell.textContent = opp.symbol;
+        row.appendChild(symbolCell);
+        
+        // 买入所
+        const buyExchangeCell = document.createElement('td');
+        buyExchangeCell.textContent = opp.buyExchange;
+        row.appendChild(buyExchangeCell);
+        
+        // 卖出所
+        const sellExchangeCell = document.createElement('td');
+        sellExchangeCell.textContent = opp.sellExchange;
+        row.appendChild(sellExchangeCell);
+        
+        // 买入价
+        const buyPriceCell = document.createElement('td');
+        buyPriceCell.textContent = opp.buyPrice.toFixed(2);
+        row.appendChild(buyPriceCell);
+        
+        // 卖出价
+        const sellPriceCell = document.createElement('td');
+        sellPriceCell.textContent = opp.sellPrice.toFixed(2);
+        row.appendChild(sellPriceCell);
+        
+        // 深度
+        const depthCell = document.createElement('td');
+        depthCell.textContent = opp.depth ? opp.depth.toFixed(4) : '-';
+        row.appendChild(depthCell);
+        
+        // 差价
+        const diffCell = document.createElement('td');
+        diffCell.textContent = opp.priceDiff.toFixed(2);
+        row.appendChild(diffCell);
+        
+        // 差价百分比
+        const diffPctCell = document.createElement('td');
+        diffPctCell.className = 'text-success';
+        diffPctCell.textContent = opp.priceDiffPct.toFixed(2) + '%';
+        row.appendChild(diffPctCell);
+        
+        // 可执行
+        const executableCell = document.createElement('td');
+        executableCell.className = 'text-center';
+        if (opp.executable) {
+            executableCell.innerHTML = '<span class="badge bg-success">是</span>';
+        } else {
+            executableCell.innerHTML = '<span class="badge bg-secondary">否</span>';
+        }
+        row.appendChild(executableCell);
+        
+        tableBody.appendChild(row);
+    }
+}
+
+// 更新账户余额数据
+function updateBalanceData() {
+    fetch('/api/account_balances')
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.balances) {
+                renderBalanceData(data.balances);
+            }
+        })
+        .catch(error => {
+            console.error('获取账户余额数据出错:', error);
+        });
+}
+
+// 渲染账户余额数据
+function renderBalanceData(balances) {
+    // 更新各交易所余额
+    for (const exchange of EXCHANGES) {
+        if (balances[exchange]) {
+            // 更新总余额、可用余额和锁定余额
+            const totalBalance = document.getElementById(`${exchange}-balance`);
+            const availableBalance = document.getElementById(`${exchange}-available`);
+            const lockedBalance = document.getElementById(`${exchange}-locked`);
+            
+            if (totalBalance) totalBalance.textContent = balances[exchange].total.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (availableBalance) availableBalance.textContent = balances[exchange].available.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (lockedBalance) lockedBalance.textContent = balances[exchange].locked.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            // 更新持仓情况
+            const positionsTable = document.getElementById(`${exchange}-positions`);
+            if (positionsTable && balances[exchange].positions) {
+                positionsTable.innerHTML = '';
+                
+                for (const position of balances[exchange].positions) {
+                    const row = document.createElement('tr');
+                    
+                    // 币种
+                    const coinCell = document.createElement('td');
+                    coinCell.textContent = position.coin;
+                    row.appendChild(coinCell);
+                    
+                    // 总数量
+                    const totalCell = document.createElement('td');
+                    totalCell.textContent = position.total;
+                    row.appendChild(totalCell);
+                    
+                    // 可用
+                    const availableCell = document.createElement('td');
+                    availableCell.textContent = position.available;
+                    row.appendChild(availableCell);
+                    
+                    // 锁定
+                    const lockedCell = document.createElement('td');
+                    lockedCell.textContent = position.locked;
+                    row.appendChild(lockedCell);
+                    
+                    // 价值
+                    const valueCell = document.createElement('td');
+                    valueCell.textContent = position.value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    row.appendChild(valueCell);
+                    
+                    positionsTable.appendChild(row);
+                }
+            }
+        }
+    }
+}
+
+// 更新系统状态
+function updateSystemStatus() {
+    fetch('/api/system_status')
+        .then(response => response.json())
+        .then(data => {
+            if (data) {
+                // 更新状态指示器
+                const statusIndicator = document.getElementById('status-indicator');
+                if (statusIndicator) {
+                    statusIndicator.textContent = data.running ? '运行中' : '已停止';
+                    statusIndicator.className = data.running ? 'badge bg-success' : 'badge bg-danger';
+                }
+                
+                // 更新模式指示器
+                const modeIndicator = document.getElementById('mode-indicator');
+                if (modeIndicator) {
+                    modeIndicator.textContent = data.mode === 'simulate' ? '模拟模式' : '实盘模式';
+                    modeIndicator.className = data.mode === 'simulate' ? 'badge bg-info' : 'badge bg-warning';
+                }
+                
+                // 更新最后更新时间
+                const lastUpdate = document.getElementById('last-update');
+                if (lastUpdate && data.last_update) {
+                    lastUpdate.textContent = data.last_update;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('获取系统状态出错:', error);
+        });
+}
+
+// 更新服务器时间
+function updateServerTime() {
+    const serverTime = document.getElementById('server-time');
+    if (serverTime) {
+        const now = new Date();
+        serverTime.textContent = now.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    }
+}
+
+// 添加日志条目
+function addLogEntry(level, message) {
+    const logsList = document.getElementById('operation-logs');
+    if (!logsList) return;
+    
+    const now = new Date();
+    const timeStr = now.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    
+    const li = document.createElement('li');
+    li.className = 'list-group-item';
+    
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'text-muted';
+    timeSpan.textContent = `[${timeStr}]`;
+    
+    const levelBadge = document.createElement('span');
+    levelBadge.className = `badge ${getBadgeClass(level)} ms-2`;
+    levelBadge.textContent = level;
+    
+    li.appendChild(timeSpan);
+    li.appendChild(levelBadge);
+    li.appendChild(document.createTextNode(' ' + message));
+    
+    // 添加到列表顶部
+    logsList.insertBefore(li, logsList.firstChild);
+    
+    // 限制日志条目数量
+    if (logsList.children.length > 100) {
+        logsList.removeChild(logsList.lastChild);
+    }
+}
+
+// 获取日志级别对应的徽章类
+function getBadgeClass(level) {
+    switch (level.toUpperCase()) {
+        case 'INFO': return 'bg-info';
+        case 'WARNING': return 'bg-warning';
+        case 'ERROR': return 'bg-danger';
+        case 'SUCCESS': return 'bg-success';
+        case 'ARBITRAGE': return 'bg-success';
+        default: return 'bg-secondary';
+    }
+}
+
+// 套利机会查找函数
 function findArbitrageOpportunities(pricesData) {
     let opportunities = [];
     
