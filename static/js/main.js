@@ -455,7 +455,7 @@ function formatPrice(price) {
 // 格式化百分比
 function formatPercentage(value) {
     if (value === undefined || value === null) return '-';
-    return (value * 100).toFixed(3) + '%';
+    return value.toFixed(3) + '%';
 }
 
 // 格式化深度
