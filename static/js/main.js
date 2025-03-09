@@ -302,29 +302,29 @@ function renderBalanceData(balances) {
             const availableBalance = document.getElementById(`${exchange}-available`);
             const lockedBalance = document.getElementById(`${exchange}-locked`);
             
-            if (totalBalance) totalBalance.textContent = balances[exchange].total || '-';
-            if (availableBalance) availableBalance.textContent = balances[exchange].available || '-';
-            if (lockedBalance) lockedBalance.textContent = balances[exchange].locked || '-';
+            if (totalBalance) totalBalance.textContent = balances[exchange].USDT || '-';
+            if (availableBalance) availableBalance.textContent = balances[exchange].USDT_available || '-';
+            if (lockedBalance) lockedBalance.textContent = balances[exchange].USDT_locked || '-';
             
             // 更新持仓情况
             const positionsTable = document.getElementById(`${exchange}-positions`);
             if (positionsTable) {
                 positionsTable.innerHTML = '';
                 
-                // 检查positions是否为数组且有数据
+                // 检查positions是否有数据
                 const positions = balances[exchange].positions;
-                if (Array.isArray(positions) && positions.length > 0) {
-                    for (const position of positions) {
+                if (positions && Object.keys(positions).length > 0) {
+                    for (const [coin, position] of Object.entries(positions)) {
                         const row = document.createElement('tr');
                         
                         // 币种
                         const coinCell = document.createElement('td');
-                        coinCell.textContent = position.coin || '-';
+                        coinCell.textContent = coin;
                         row.appendChild(coinCell);
                         
                         // 总数量
                         const totalCell = document.createElement('td');
-                        totalCell.textContent = position.total || '-';
+                        totalCell.textContent = position.amount || '-';
                         row.appendChild(totalCell);
                         
                         // 可用
@@ -345,7 +345,7 @@ function renderBalanceData(balances) {
                         positionsTable.appendChild(row);
                     }
                 } else {
-                    // 如果没有持仓数据或positions不是数组，显示空状态
+                    // 如果没有持仓数据，显示空状态
                     positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
                 }
             }
