@@ -45,6 +45,7 @@ main_engine = None
 is_running = False
 mode = 'simulate'  # 或 'real'
 last_update = None
+arbitrage_count = 0  # 当前可执行的套利机会数量
 
 @app.route('/api/start', methods=['POST'])
 def start_system():
@@ -92,11 +93,27 @@ def stop_system():
 @app.route('/api/status')
 def get_status():
     """获取系统状态"""
+    global arbitrage_count
     return jsonify({
         "running": is_running,
         "mode": mode,
-        "last_update": last_update
+        "arbitrage_count": arbitrage_count
     })
+
+@app.route('/api/diff')
+def get_arbitrage_diff():
+    """获取套利差价数据"""
+    global arbitrage_count
+    try:
+        if crypto_engine and is_running:
+            opportunities = crypto_engine.get_arbitrage_opportunities()
+            # 更新可执行套利机会数量
+            arbitrage_count = len([opp for opp in opportunities if opp.get('executable', False)])
+            return jsonify(opportunities)
+        return jsonify([])
+    except Exception as e:
+        print(f"获取套利差价出错: {str(e)}")
+        return jsonify([])
 
 def create_qapp():
     """创建QT应用程序实例"""

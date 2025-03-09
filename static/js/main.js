@@ -23,6 +23,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化按钮事件
     initButtons();
     
+    // 初始化余额隐私设置
+    initPrivacySettings();
+    
     // 首次加载数据
     updateAllData();
 });
@@ -81,6 +84,40 @@ function initButtons() {
                 });
         });
     }
+}
+
+// 初始化余额隐私设置
+function initPrivacySettings() {
+    const togglePrivacyBtn = document.getElementById('toggle-privacy');
+    if (togglePrivacyBtn) {
+        // 默认开启隐私模式
+        let isPrivate = true;
+        document.body.classList.add('privacy-mode');
+        
+        togglePrivacyBtn.addEventListener('click', function() {
+            isPrivate = !isPrivate;
+            document.body.classList.toggle('privacy-mode');
+            
+            // 更新图标
+            const icon = togglePrivacyBtn.querySelector('i');
+            if (icon) {
+                icon.className = isPrivate ? 'fas fa-eye' : 'fas fa-eye-slash';
+            }
+            
+            // 更新所有余额显示
+            updateBalanceDisplay(isPrivate);
+        });
+    }
+}
+
+// 更新余额显示
+function updateBalanceDisplay(isPrivate) {
+    const balanceElements = document.querySelectorAll('.balance-info h4, .table td');
+    balanceElements.forEach(element => {
+        if (element.dataset.value) {
+            element.textContent = isPrivate ? '******' : element.dataset.value;
+        }
+    });
 }
 
 // 更新所有数据
@@ -309,6 +346,8 @@ function updateBalanceData() {
 
 // 渲染账户余额数据
 function renderBalanceData(balances) {
+    const isPrivate = document.body.classList.contains('privacy-mode');
+    
     // 更新各交易所余额
     for (const exchange of EXCHANGES) {
         if (balances[exchange]) {
@@ -317,16 +356,24 @@ function renderBalanceData(balances) {
             const availableBalance = document.getElementById(`${exchange}-available`);
             const lockedBalance = document.getElementById(`${exchange}-locked`);
             
-            if (totalBalance) totalBalance.textContent = balances[exchange].USDT || '-';
-            if (availableBalance) availableBalance.textContent = balances[exchange].USDT_available || '-';
-            if (lockedBalance) lockedBalance.textContent = balances[exchange].USDT_locked || '-';
+            if (totalBalance) {
+                totalBalance.dataset.value = balances[exchange].USDT || '-';
+                totalBalance.textContent = isPrivate ? '******' : totalBalance.dataset.value;
+            }
+            if (availableBalance) {
+                availableBalance.dataset.value = balances[exchange].USDT_available || '-';
+                availableBalance.textContent = isPrivate ? '******' : availableBalance.dataset.value;
+            }
+            if (lockedBalance) {
+                lockedBalance.dataset.value = balances[exchange].USDT_locked || '-';
+                lockedBalance.textContent = isPrivate ? '******' : lockedBalance.dataset.value;
+            }
             
             // 更新持仓情况
             const positionsTable = document.getElementById(`${exchange}-positions`);
             if (positionsTable) {
                 positionsTable.innerHTML = '';
                 
-                // 检查positions是否有数据
                 const positions = balances[exchange].positions;
                 if (positions && Object.keys(positions).length > 0) {
                     for (const [coin, position] of Object.entries(positions)) {
@@ -339,28 +386,31 @@ function renderBalanceData(balances) {
                         
                         // 总数量
                         const totalCell = document.createElement('td');
-                        totalCell.textContent = position.amount || '-';
+                        totalCell.dataset.value = position.amount || '-';
+                        totalCell.textContent = isPrivate ? '******' : totalCell.dataset.value;
                         row.appendChild(totalCell);
                         
                         // 可用
                         const availableCell = document.createElement('td');
-                        availableCell.textContent = position.available || '-';
+                        availableCell.dataset.value = position.available || '-';
+                        availableCell.textContent = isPrivate ? '******' : availableCell.dataset.value;
                         row.appendChild(availableCell);
                         
                         // 锁定
                         const lockedCell = document.createElement('td');
-                        lockedCell.textContent = position.locked || '-';
+                        lockedCell.dataset.value = position.locked || '-';
+                        lockedCell.textContent = isPrivate ? '******' : lockedCell.dataset.value;
                         row.appendChild(lockedCell);
                         
                         // 价值
                         const valueCell = document.createElement('td');
-                        valueCell.textContent = position.value || '-';
+                        valueCell.dataset.value = position.value || '-';
+                        valueCell.textContent = isPrivate ? '******' : valueCell.dataset.value;
                         row.appendChild(valueCell);
                         
                         positionsTable.appendChild(row);
                     }
                 } else {
-                    // 如果没有持仓数据，显示空状态
                     positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
                 }
             }
@@ -376,7 +426,7 @@ function updateSystemStatus() {
             // 更新状态标签
             const statusBadge = document.getElementById('status-badge');
             const modeBadge = document.getElementById('mode-badge');
-            const updateBadge = document.getElementById('update-badge');
+            const arbitrageCountBadge = document.getElementById('arbitrage-count-badge');
             
             if (statusBadge) {
                 statusBadge.textContent = data.running ? '运行中' : '已停止';
@@ -388,9 +438,9 @@ function updateSystemStatus() {
                 modeBadge.className = 'badge ' + (data.mode === 'simulate' ? 'bg-warning' : 'bg-danger');
             }
             
-            if (updateBadge && data.last_update) {
-                updateBadge.textContent = data.last_update;
-                updateBadge.className = 'badge bg-info';
+            if (arbitrageCountBadge && data.arbitrage_count !== undefined) {
+                arbitrageCountBadge.textContent = `套利:${data.arbitrage_count}`;
+                arbitrageCountBadge.className = 'badge ' + (data.arbitrage_count > 0 ? 'bg-success' : 'bg-secondary');
             }
 
             // 更新按钮状态

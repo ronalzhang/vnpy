@@ -163,7 +163,7 @@
                     <div class="d-flex gap-2">
                         <span id="status-badge" class="badge bg-secondary">已停止</span>
                         <span id="mode-badge" class="badge bg-warning">模拟</span>
-                        <span id="update-badge" class="badge bg-info">-</span>
+                        <span id="arbitrage-count-badge" class="badge bg-success">套利:0</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -177,7 +177,12 @@
             <div class="col-md-8">
                 <div id="account-balance" class="card">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>账户余额和持仓</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>账户余额和持仓</h5>
+                            <button id="toggle-privacy" class="btn btn-sm btn-light" title="切换余额显示">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <ul class="nav nav-tabs" id="balanceTab" role="tablist">
