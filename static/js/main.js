@@ -40,7 +40,13 @@ function initButtons() {
             // 在请求发送前禁用按钮,防止重复点击
             toggleBtn.disabled = true;
             
-            fetch(window.API_BASE_URL + endpoint, { method: 'POST' })
+            fetch(window.API_BASE_URL + endpoint, { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})  // 发送空对象作为请求体
+            })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
@@ -367,40 +373,38 @@ function updateSystemStatus() {
     fetch(window.API_BASE_URL + '/api/status')
         .then(response => response.json())
         .then(data => {
-            if (data) {
-                // 更新状态指示器
-                const statusIndicator = document.getElementById('status-indicator');
-                if (statusIndicator) {
-                    statusIndicator.textContent = data.running ? '运行中' : '已停止';
-                    statusIndicator.className = data.running ? 'badge bg-success' : 'badge bg-danger';
-                }
-                
-                // 更新模式指示器
-                const modeIndicator = document.getElementById('mode-indicator');
-                if (modeIndicator) {
-                    modeIndicator.textContent = data.mode === 'simulate' ? '模拟模式' : '实盘模式';
-                    modeIndicator.className = data.mode === 'simulate' ? 'badge bg-info' : 'badge bg-warning';
-                }
-                
-                // 更新最后更新时间
-                const lastUpdate = document.getElementById('last-update');
-                if (lastUpdate && data.last_update) {
-                    lastUpdate.textContent = data.last_update;
-                }
-                
-                // 更新按钮状态
-                const toggleBtn = document.getElementById('toggle-btn');
-                if (toggleBtn) {
-                    toggleBtn.setAttribute('data-running', data.running);
-                    if (data.running) {
-                        toggleBtn.textContent = '停止运行';
-                        toggleBtn.classList.remove('btn-primary');
-                        toggleBtn.classList.add('btn-danger');
-                    } else {
-                        toggleBtn.textContent = '启动运行';
-                        toggleBtn.classList.remove('btn-danger');
-                        toggleBtn.classList.add('btn-primary');
-                    }
+            // 更新状态标签
+            const statusBadge = document.getElementById('status-badge');
+            const modeBadge = document.getElementById('mode-badge');
+            const updateBadge = document.getElementById('update-badge');
+            
+            if (statusBadge) {
+                statusBadge.textContent = data.running ? '运行中' : '已停止';
+                statusBadge.className = 'badge ' + (data.running ? 'bg-success' : 'bg-secondary');
+            }
+            
+            if (modeBadge) {
+                modeBadge.textContent = data.mode === 'simulate' ? '模拟' : '实盘';
+                modeBadge.className = 'badge ' + (data.mode === 'simulate' ? 'bg-warning' : 'bg-danger');
+            }
+            
+            if (updateBadge && data.last_update) {
+                updateBadge.textContent = data.last_update;
+                updateBadge.className = 'badge bg-info';
+            }
+
+            // 更新按钮状态
+            const toggleBtn = document.getElementById('toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.setAttribute('data-running', data.running);
+                if (data.running) {
+                    toggleBtn.textContent = '停止运行';
+                    toggleBtn.classList.remove('btn-primary');
+                    toggleBtn.classList.add('btn-danger');
+                } else {
+                    toggleBtn.textContent = '启动运行';
+                    toggleBtn.classList.remove('btn-danger');
+                    toggleBtn.classList.add('btn-primary');
                 }
             }
         })

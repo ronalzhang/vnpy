@@ -154,37 +154,21 @@
             </div>
         </div>
         
-        <!-- 中间：系统状态和账户余额 (分两列) -->
+        <!-- 中间：系统控制和账户余额 (分两列) -->
         <div class="row mb-4">
-            <!-- 系统控制按钮 -->
+            <!-- 系统控制 -->
             <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">系统控制</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <button id="toggle-btn" class="btn btn-primary" data-running="false">
-                            启动运行
-                        </button>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>系统控制</span>
+                    <div class="d-flex gap-2">
+                        <span id="status-badge" class="badge bg-secondary">已停止</span>
+                        <span id="mode-badge" class="badge bg-warning">模拟</span>
+                        <span id="update-badge" class="badge bg-info">-</span>
                     </div>
                 </div>
-            </div>
-            
-            <!-- 系统状态 -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">系统状态</h5>
-                </div>
                 <div class="card-body">
-                    <div class="row align-items-center">
-                        <div class="col">
-                            <span id="status-indicator" class="badge bg-danger">已停止</span>
-                            <span id="mode-indicator" class="badge bg-info ms-2">模拟模式</span>
-                            <span class="badge bg-secondary ms-2">套利机会: <span id="arbitrage-count">0</span></span>
-                        </div>
-                        <div class="col text-end">
-                            <small class="text-muted">最后更新: <span id="last-update">-</span></small>
-                        </div>
+                    <div class="d-grid">
+                        <button id="toggle-btn" class="btn btn-primary" data-running="false">启动运行</button>
                     </div>
                 </div>
             </div>
