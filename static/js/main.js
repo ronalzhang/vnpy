@@ -283,6 +283,7 @@ function updateBalanceData() {
         .then(response => response.json())
         .then(data => {
             if (data) {
+                console.log('API返回的余额数据:', data);  // 添加日志
                 renderBalanceData(data);
             }
         })
@@ -296,65 +297,55 @@ function renderBalanceData(balances) {
     // 更新各交易所余额
     for (const exchange of EXCHANGES) {
         if (balances[exchange]) {
+            console.log(`${exchange}交易所的数据:`, balances[exchange]);  // 添加日志
+            
             // 更新总余额、可用余额和锁定余额
             const totalBalance = document.getElementById(`${exchange}-balance`);
             const availableBalance = document.getElementById(`${exchange}-available`);
             const lockedBalance = document.getElementById(`${exchange}-locked`);
             
-            const total = balances[exchange].total || 0;
-            const available = balances[exchange].available || 0;
-            const locked = balances[exchange].locked || 0;
-            
-            if (totalBalance) totalBalance.textContent = Number(total).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            if (availableBalance) availableBalance.textContent = Number(available).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            if (lockedBalance) lockedBalance.textContent = Number(locked).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (totalBalance) totalBalance.textContent = balances[exchange].total;
+            if (availableBalance) availableBalance.textContent = balances[exchange].available;
+            if (lockedBalance) lockedBalance.textContent = balances[exchange].locked;
             
             // 更新持仓情况
             const positionsTable = document.getElementById(`${exchange}-positions`);
-            if (positionsTable) {
+            if (positionsTable && balances[exchange].positions) {
                 positionsTable.innerHTML = '';
                 
-                // 检查positions是否存在且是数组
-                const positions = balances[exchange].positions;
-                if (Array.isArray(positions) && positions.length > 0) {
-                    for (const position of positions) {
-                        const row = document.createElement('tr');
-                        
-                        // 币种
-                        const coinCell = document.createElement('td');
-                        coinCell.textContent = position.coin || '-';
-                        row.appendChild(coinCell);
-                        
-                        // 总数量
-                        const totalCell = document.createElement('td');
-                        const totalAmount = position.total || 0;
-                        totalCell.textContent = Number(totalAmount).toFixed(3);
-                        row.appendChild(totalCell);
-                        
-                        // 可用
-                        const availableCell = document.createElement('td');
-                        const availableAmount = position.available || 0;
-                        availableCell.textContent = Number(availableAmount).toFixed(3);
-                        row.appendChild(availableCell);
-                        
-                        // 锁定
-                        const lockedCell = document.createElement('td');
-                        const lockedAmount = position.locked || 0;
-                        lockedCell.textContent = Number(lockedAmount).toFixed(3);
-                        row.appendChild(lockedCell);
-                        
-                        // 价值
-                        const valueCell = document.createElement('td');
-                        const value = position.value || 0;
-                        valueCell.textContent = Number(value).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                        row.appendChild(valueCell);
-                        
-                        positionsTable.appendChild(row);
-                    }
-                } else {
-                    // 如果没有持仓数据，显示空状态
-                    positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
+                for (const position of balances[exchange].positions) {
+                    const row = document.createElement('tr');
+                    
+                    // 币种
+                    const coinCell = document.createElement('td');
+                    coinCell.textContent = position.coin;
+                    row.appendChild(coinCell);
+                    
+                    // 总数量
+                    const totalCell = document.createElement('td');
+                    totalCell.textContent = position.total;
+                    row.appendChild(totalCell);
+                    
+                    // 可用
+                    const availableCell = document.createElement('td');
+                    availableCell.textContent = position.available;
+                    row.appendChild(availableCell);
+                    
+                    // 锁定
+                    const lockedCell = document.createElement('td');
+                    lockedCell.textContent = position.locked;
+                    row.appendChild(lockedCell);
+                    
+                    // 价值
+                    const valueCell = document.createElement('td');
+                    valueCell.textContent = position.value;
+                    row.appendChild(valueCell);
+                    
+                    positionsTable.appendChild(row);
                 }
+            } else if (positionsTable) {
+                // 如果没有持仓数据，显示空状态
+                positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
             }
         }
     }
