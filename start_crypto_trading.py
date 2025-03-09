@@ -12,6 +12,8 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
+from flask import Flask, jsonify
+from flask_cors import CORS
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -32,6 +34,69 @@ from vnpy_cryptoarbitrage.utility import load_json, save_json
 CONFIG_FILE = "crypto_config.json"
 CONFIG_PATH = Path(current_dir).joinpath(CONFIG_FILE)
 
+# 创建Flask应用
+app = Flask(__name__)
+CORS(app)
+
+# 全局变量
+crypto_engine = None
+event_engine = None
+main_engine = None
+is_running = False
+mode = 'simulate'  # 或 'real'
+last_update = None
+
+@app.route('/api/start', methods=['POST'])
+def start_system():
+    """启动系统"""
+    global is_running, last_update, crypto_engine
+    
+    try:
+        if not is_running:
+            if not crypto_engine:
+                # 初始化引擎
+                event_engine = EventEngine()
+                crypto_engine = CryptoArbitrageEngine(event_engine)
+                init_result = crypto_engine.init_engine(
+                    settings=prepare_config(api_keys_required=False),
+                    verbose=False,
+                    enable_trading=False,
+                    simulate=True
+                )
+            
+            crypto_engine.start()
+            is_running = True
+            last_update = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return jsonify({"status": "success", "message": "系统已启动"})
+        else:
+            return jsonify({"status": "error", "message": "系统已经在运行中"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/stop', methods=['POST'])
+def stop_system():
+    """停止系统"""
+    global is_running, last_update, crypto_engine
+    
+    try:
+        if is_running and crypto_engine:
+            crypto_engine.stop()
+            is_running = False
+            last_update = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return jsonify({"status": "success", "message": "系统已停止"})
+        else:
+            return jsonify({"status": "error", "message": "系统未在运行"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/status')
+def get_status():
+    """获取系统状态"""
+    return jsonify({
+        "running": is_running,
+        "mode": mode,
+        "last_update": last_update
+    })
 
 def create_qapp():
     """创建QT应用程序实例"""
@@ -135,74 +200,8 @@ def main(use_real_api: bool = False, verbose: bool = False, enable_trading: bool
     print(f"日志模式: {verbose_str}")
     print(f"监控模式: {auto_str}\n")
     
-    try:
-        # 创建Qt应用
-        qapp = create_qapp()
-        
-        # 准备配置
-        if use_real_api and not simulate:
-            print("加载API配置...")
-            config = prepare_config(api_keys_required=True)
-        else:
-            print("加载基本配置（无需API密钥）...")
-            config = prepare_config(api_keys_required=False)
-        
-        # 创建事件引擎
-        event_engine = EventEngine()
-        
-        # 创建套利引擎
-        engine = CryptoArbitrageEngine(event_engine)
-        init_result = engine.init_engine(
-            settings=config, 
-            verbose=verbose, 
-            enable_trading=enable_trading,
-            simulate=simulate
-        )
-        
-        if not init_result and use_real_api and not simulate:
-            msg = "初始化交易所API连接失败，请检查配置和网络。\n\n是否切换到模拟模式继续？"
-            reply = QMessageBox.question(
-                None, 
-                "连接失败", 
-                msg,
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes
-            )
-            
-            if reply == QMessageBox.Yes:
-                print("切换到模拟模式...")
-                engine = CryptoArbitrageEngine(event_engine)
-                engine.init_engine(
-                    settings=config, 
-                    verbose=verbose, 
-                    enable_trading=False,  # 模拟模式禁用交易
-                    simulate=True
-                )
-            else:
-                print("用户取消启动")
-                sys.exit(1)
-        
-        # 创建主窗口
-        # 注意：由于我们没有使用MainEngine，我们需要调整CryptoArbitrageWidget的使用方式
-        main_engine = MainEngine(event_engine)
-        main_window = CryptoArbitrageWidget(main_engine, event_engine)
-        
-        # 手动设置引擎实例
-        main_window.crypto_engine = engine
-        main_window.show()
-        
-        # 自动开始监控
-        if auto_start:
-            main_window.start_monitor()
-        
-        # 运行应用
-        sys.exit(qapp.exec())
-        
-    except Exception as e:
-        print(f"启动失败: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    # 启动Flask API服务
+    app.run(host='0.0.0.0', port=8888)
 
 
 if __name__ == "__main__":

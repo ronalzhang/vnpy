@@ -29,43 +29,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 初始化按钮事件
 function initButtons() {
-    const startBtn = document.getElementById('start-btn');
-    const stopBtn = document.getElementById('stop-btn');
+    const toggleBtn = document.getElementById('toggle-btn');
     
-    if (startBtn) {
-        startBtn.addEventListener('click', function() {
-            fetch(window.API_BASE_URL + '/api/start', { method: 'POST' })
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            const isRunning = toggleBtn.getAttribute('data-running') === 'true';
+            
+            const endpoint = isRunning ? '/api/stop' : '/api/start';
+            
+            // 在请求发送前禁用按钮,防止重复点击
+            toggleBtn.disabled = true;
+            
+            fetch(window.API_BASE_URL + endpoint, { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        addLogEntry('INFO', '系统已启动');
+                        const newStatus = !isRunning;
+                        toggleBtn.setAttribute('data-running', newStatus);
+                        
+                        // 更新按钮文本和样式
+                        if (newStatus) {
+                            toggleBtn.textContent = '停止运行';
+                            toggleBtn.classList.remove('btn-primary');
+                            toggleBtn.classList.add('btn-danger');
+                            addLogEntry('INFO', '系统已启动');
+                        } else {
+                            toggleBtn.textContent = '启动运行';
+                            toggleBtn.classList.remove('btn-danger');
+                            toggleBtn.classList.add('btn-primary');
+                            addLogEntry('INFO', '系统已停止');
+                        }
+                        
                         updateSystemStatus();
                     } else {
-                        addLogEntry('ERROR', '系统启动失败: ' + data.message);
+                        addLogEntry('ERROR', (isRunning ? '停止' : '启动') + '失败: ' + data.message);
                     }
                 })
                 .catch(error => {
-                    console.error('启动系统出错:', error);
-                    addLogEntry('ERROR', '系统启动请求失败');
-                });
-        });
-    }
-    
-    if (stopBtn) {
-        stopBtn.addEventListener('click', function() {
-            fetch(window.API_BASE_URL + '/api/stop', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        addLogEntry('INFO', '系统已停止');
-                        updateSystemStatus();
-                    } else {
-                        addLogEntry('ERROR', '系统停止失败: ' + data.message);
-                    }
+                    console.error((isRunning ? '停止' : '启动') + '系统出错:', error);
+                    addLogEntry('ERROR', '系统' + (isRunning ? '停止' : '启动') + '请求失败');
                 })
-                .catch(error => {
-                    console.error('停止系统出错:', error);
-                    addLogEntry('ERROR', '系统停止请求失败');
+                .finally(() => {
+                    // 请求完成后重新启用按钮
+                    toggleBtn.disabled = false;
                 });
         });
     }
@@ -380,6 +386,21 @@ function updateSystemStatus() {
                 const lastUpdate = document.getElementById('last-update');
                 if (lastUpdate && data.last_update) {
                     lastUpdate.textContent = data.last_update;
+                }
+                
+                // 更新按钮状态
+                const toggleBtn = document.getElementById('toggle-btn');
+                if (toggleBtn) {
+                    toggleBtn.setAttribute('data-running', data.running);
+                    if (data.running) {
+                        toggleBtn.textContent = '停止运行';
+                        toggleBtn.classList.remove('btn-primary');
+                        toggleBtn.classList.add('btn-danger');
+                    } else {
+                        toggleBtn.textContent = '启动运行';
+                        toggleBtn.classList.remove('btn-danger');
+                        toggleBtn.classList.add('btn-primary');
+                    }
                 }
             }
         })

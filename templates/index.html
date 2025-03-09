@@ -156,28 +156,34 @@
         
         <!-- 中间：系统状态和账户余额 (分两列) -->
         <div class="row mb-4">
+            <!-- 系统控制按钮 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">系统控制</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button id="toggle-btn" class="btn btn-primary" data-running="false">
+                            启动运行
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 系统状态 -->
-            <div class="col-md-4">
-                <div class="card status-card">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="fas fa-satellite-dish me-2"></i>系统状态</h5>
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <span id="status-indicator" class="badge bg-success">运行中</span>
-                                <span id="mode-indicator" class="badge bg-info ms-2">模拟模式</span>
-                                <span id="arbitrage-count" class="badge bg-secondary ms-2" title="当前套利机会数量">0</span>
-                            </div>
-                            <div>
-                                <button id="start-btn" class="btn btn-sm btn-success me-2">
-                                    <i class="fas fa-play me-1"></i>启动
-                                </button>
-                                <button id="stop-btn" class="btn btn-sm btn-danger">
-                                    <i class="fas fa-stop me-1"></i>停止
-                                </button>
-                            </div>
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">系统状态</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <span id="status-indicator" class="badge bg-danger">已停止</span>
+                            <span id="mode-indicator" class="badge bg-info ms-2">模拟模式</span>
+                            <span class="badge bg-secondary ms-2">套利机会: <span id="arbitrage-count">0</span></span>
                         </div>
-                        <div class="mt-2">
-                            <small class="text-muted">上次更新: <span id="last-update">2025-03-09 12:34:56</span></small>
+                        <div class="col text-end">
+                            <small class="text-muted">最后更新: <span id="last-update">-</span></small>
                         </div>
                     </div>
                 </div>
