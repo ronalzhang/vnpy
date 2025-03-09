@@ -13,9 +13,49 @@
     <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.3.0/css/all.min.css">
     <style>
         .log-container {
-            max-height: 400px;
+            height: 300px !important;
             overflow-y: auto;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 0 0 0.25rem 0.25rem;
         }
+        
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .log-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .log-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        #operation-logs {
+            margin-bottom: 0;
+        }
+        
+        #operation-logs .list-group-item {
+            border-left: none;
+            border-right: none;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+        
+        #operation-logs .list-group-item:first-child {
+            border-top: none;
+        }
+        
+        #operation-logs .list-group-item:last-child {
+            border-bottom: none;
+        }
+        
         .table-responsive {
             overflow-x: auto;
         }
@@ -338,21 +378,17 @@
             <div class="col-12">
                 <div id="logs" class="card">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-history me-2"></i>操作日志</h5>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-history me-2"></i>操作日志</h5>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearLogs()">
+                                <i class="fas fa-trash-alt me-1"></i>清空日志
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body p-0">
-                        <div class="log-container">
-                            <ul class="list-group list-group-flush" id="operation-logs">
-                                <li class="list-group-item">
-                                    <span class="text-muted">[2025-03-09 12:34:56]</span> 
-                                    <span class="badge bg-info">INFO</span> 
-                                    系统启动，使用模拟模式
-                                </li>
-                                <li class="list-group-item">
-                                    <span class="text-muted">[2025-03-09 12:35:01]</span> 
-                                    <span class="badge bg-success">ARBITRAGE</span> 
-                                    发现套利机会: BTC/USDT OKX(64098.76) → Bitget(64267.89), 差价: 169.13 (0.26%)
-                                </li>
+                        <div class="log-container" style="height: 300px; overflow-y: auto; background-color: #f8f9fa;">
+                            <ul class="list-group list-group-flush" id="operation-logs" style="max-height: 100%;">
+                                <!-- 日志内容会动态添加到这里 -->
                             </ul>
                         </div>
                     </div>
@@ -482,6 +518,37 @@
         // 每5秒更新一次状态
         setInterval(updateSystemStatus, 5000);
     });
+
+    // 添加清空日志的函数
+    function clearLogs() {
+        const logsContainer = document.getElementById('operation-logs');
+        if (logsContainer) {
+            logsContainer.innerHTML = '';
+        }
+    }
+    
+    // 添加新日志时自动滚动到底部
+    function addLog(logText) {
+        const logsContainer = document.getElementById('operation-logs');
+        const logContainer = document.querySelector('.log-container');
+        
+        if (logsContainer && logContainer) {
+            const logItem = document.createElement('li');
+            logItem.className = 'list-group-item';
+            logItem.innerHTML = logText;
+            logsContainer.appendChild(logItem);
+            
+            // 自动滚动到底部
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // 如果日志条目超过1000条，删除最早的日志
+            const maxLogs = 1000;
+            const logs = logsContainer.children;
+            if (logs.length > maxLogs) {
+                logsContainer.removeChild(logs[0]);
+            }
+        }
+    }
     </script>
 </body>
 </html>
