@@ -151,18 +151,38 @@ class TriangleArbitrage:
             exchange = self.exchanges.get(exchange_id)
             if not exchange:
                 logger.error(f"交易所 {exchange_id} 未初始化")
-                return {}
+                return {"bid": None, "ask": None, "last": None, "volume": 0}
             
             ticker = exchange.fetch_ticker(symbol)
-            return {
-                "bid": ticker['bid'],  # 买一价
-                "ask": ticker['ask'],  # 卖一价
-                "last": ticker['last'],  # 最新成交价
-                "volume": ticker['baseVolume']  # 24小时成交量
+            
+            # 确保所有必要的价格字段都有值
+            result = {
+                "bid": ticker.get('bid'),  # 买一价
+                "ask": ticker.get('ask'),  # 卖一价
+                "last": ticker.get('last'),  # 最新成交价
+                "volume": ticker.get('baseVolume', 0)  # 24小时成交量
             }
+            
+            # 检查必要的价格字段是否为None，如果是则用替代值
+            if result["bid"] is None and result["last"] is not None:
+                result["bid"] = result["last"] * 0.9999  # 略低于last价格
+            
+            if result["ask"] is None and result["last"] is not None:
+                result["ask"] = result["last"] * 1.0001  # 略高于last价格
+            
+            if result["last"] is None and (result["bid"] is not None and result["ask"] is not None):
+                result["last"] = (result["bid"] + result["ask"]) / 2
+            
+            # 最后检查，如果关键价格仍然为None，则返回空结果
+            if result["bid"] is None or result["ask"] is None or result["last"] is None:
+                logger.warning(f"获取 {exchange_id} 的 {symbol} 价格不完整")
+                return {"bid": None, "ask": None, "last": None, "volume": 0}
+            
+            return result
+        
         except Exception as e:
             logger.error(f"获取交易所 {exchange_id} 的 {symbol} 价格失败: {e}")
-            return {}
+            return {"bid": None, "ask": None, "last": None, "volume": 0}
     
     def calculate_path_profit(self, exchange_id: str, path: List[Dict], start_amount: float = 100.0) -> Dict:
         """计算套利路径的预期收益"""
@@ -196,40 +216,56 @@ class TriangleArbitrage:
                 
                 # 获取价格
                 ticker = self.get_ticker_price(exchange_id, symbol)
-                if not ticker:
-                    result["message"] = f"无法获取 {symbol} 价格"
+                if not ticker or ticker["bid"] is None or ticker["ask"] is None:
+                    result["message"] = f"无法获取 {symbol} 有效价格"
                     return result
                 
                 # 根据方向计算交易金额
-                if direction == "buy":
-                    # 买入: 用当前货币购买目标货币
-                    price = ticker["ask"]  # 使用卖一价（对我们来说是买入价）
-                    # 扣除手续费
-                    amount_after_fee = current_amount * (1 - fee_percent)
-                    # 买入后获得的数量
-                    next_amount = amount_after_fee / price
-                else:  # direction == "sell"
-                    # 卖出: 卖出当前货币获得目标货币
-                    price = ticker["bid"]  # 使用买一价（对我们来说是卖出价）
-                    # 卖出获得的金额
-                    next_amount = current_amount * price
-                    # 扣除手续费
-                    next_amount = next_amount * (1 - fee_percent)
-                
-                # 记录步骤信息
-                step_info = {
-                    "symbol": symbol,
-                    "direction": direction,
-                    "price": price,
-                    "before_amount": current_amount,
-                    "after_amount": next_amount
-                }
-                steps_info.append(step_info)
-                
-                # 更新当前金额
-                current_amount = next_amount
+                try:
+                    if direction == "buy":
+                        # 买入: 用当前货币购买目标货币
+                        price = ticker["ask"]  # 使用卖一价（对我们来说是买入价）
+                        if price <= 0:
+                            result["message"] = f"{symbol} 买入价格无效: {price}"
+                            return result
+                            
+                        # 扣除手续费
+                        amount_after_fee = current_amount * (1 - fee_percent)
+                        # 买入后获得的数量
+                        next_amount = amount_after_fee / price
+                    else:  # direction == "sell"
+                        # 卖出: 卖出当前货币获得目标货币
+                        price = ticker["bid"]  # 使用买一价（对我们来说是卖出价）
+                        if price <= 0:
+                            result["message"] = f"{symbol} 卖出价格无效: {price}"
+                            return result
+                            
+                        # 卖出获得的金额
+                        next_amount = current_amount * price
+                        # 扣除手续费
+                        next_amount = next_amount * (1 - fee_percent)
+                    
+                    # 记录步骤信息
+                    step_info = {
+                        "symbol": symbol,
+                        "direction": direction,
+                        "price": price,
+                        "before_amount": current_amount,
+                        "after_amount": next_amount
+                    }
+                    steps_info.append(step_info)
+                    
+                    # 更新当前金额
+                    current_amount = next_amount
+                except (TypeError, ZeroDivisionError) as e:
+                    result["message"] = f"计算 {symbol} {direction} 交易时出错: {e}"
+                    return result
             
             # 计算收益率
+            if start_amount <= 0:
+                result["message"] = "起始金额必须大于0"
+                return result
+            
             profit = current_amount - start_amount
             profit_percent = (profit / start_amount) * 100
             

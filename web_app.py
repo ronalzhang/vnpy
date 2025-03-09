@@ -37,7 +37,7 @@ CONFIG_FILE = "crypto_config.json"
 CONFIG_PATH = Path(__file__).parent.joinpath(CONFIG_FILE)
 SYMBOLS = [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT",
-    "ADA/USDT", "DOT/USDT", "MATIC/USDT", "AVAX/USDT", "SHIB/USDT"
+    "ADA/USDT", "DOT/USDT", "AVAX/USDT", "SHIB/USDT"
 ]
 EXCHANGES = ["binance", "okx", "bitget"]
 ARBITRAGE_THRESHOLD = 0.5
@@ -439,7 +439,6 @@ def get_exchange_balances():
                                 'DOGE': 0.15,
                                 'ADA': 0.5,
                                 'DOT': 7,
-                                'MATIC': 0.8,
                                 'AVAX': 35,
                                 'SHIB': 0.00003
                             }
@@ -503,8 +502,8 @@ def get_binance_balance(client):
                     # 使用估计价格
                     price_estimate = {
                         'BTC': 65000, 'ETH': 3500, 'SOL': 140, 'XRP': 0.5,
-                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'MATIC': 0.8,
-                        'AVAX': 35, 'SHIB': 0.00003
+                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'AVAX': 35,
+                        'SHIB': 0.00003
                     }
                     price = price_estimate.get(symbol, 0)
                 
@@ -547,8 +546,8 @@ def get_okx_balance(client):
                     # 使用估计价格
                     price_estimate = {
                         'BTC': 65000, 'ETH': 3500, 'SOL': 140, 'XRP': 0.5,
-                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'MATIC': 0.8,
-                        'AVAX': 35, 'SHIB': 0.00003
+                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'AVAX': 35,
+                        'SHIB': 0.00003
                     }
                     price = price_estimate.get(symbol, 0)
                 
@@ -595,8 +594,8 @@ def get_bitget_balance(client):
                     # 使用估计价格
                     price_estimate = {
                         'BTC': 65000, 'ETH': 3500, 'SOL': 140, 'XRP': 0.5,
-                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'MATIC': 0.8,
-                        'AVAX': 35, 'SHIB': 0.00003
+                        'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'AVAX': 35,
+                        'SHIB': 0.00003
                     }
                     price = price_estimate.get(coin, 0)
                 
