@@ -17,6 +17,8 @@ from loguru import logger
 import ccxt
 
 from flask import Flask, jsonify, render_template, request, Response
+import os
+import pickle
 
 # 创建Flask应用
 app = Flask(__name__)
@@ -40,6 +42,8 @@ exchange_clients = {}
 prices_data = {}
 diff_data = []
 balances_data = {}
+# 历史数据文件路径
+ARBITRAGE_HISTORY_FILE = "arbitrage_history.pkl"
 # 套利机会历史记录，按交易对保存24小时数据
 arbitrage_history = {}
 status = {
@@ -50,6 +54,25 @@ status = {
 }
 
 # 上次更新时间
+ndef load_arbitrage_history():
+    """从文件加载套利历史记录"""
+    global arbitrage_history
+    try:
+        if os.path.exists(ARBITRAGE_HISTORY_FILE):
+            with open(ARBITRAGE_HISTORY_FILE, "rb") as f:
+                arbitrage_history = pickle.load(f)
+                logger.info(f"已从文件加载{sum(len(records) for records in arbitrage_history.values())}条套利历史记录")
+    except Exception as e:
+        logger.error(f"加载套利历史记录出错: {e}")
+
+def save_arbitrage_history():
+    """保存套利历史记录到文件"""
+    try:
+        with open(ARBITRAGE_HISTORY_FILE, "wb") as f:
+            pickle.dump(arbitrage_history, f)
+        logger.info(f"已保存{sum(len(records) for records in arbitrage_history.values())}条套利历史记录到文件")
+    except Exception as e:
+        logger.error(f"保存套利历史记录出错: {e}")
 last_update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 running = True
 use_simulation = False
@@ -342,6 +365,8 @@ def calculate_price_differences(prices):
     
     # 按价差百分比降序排序
     result.sort(key=lambda x: x["price_diff_pct"], reverse=True)
+    # 保存历史记录
+    save_arbitrage_history()
     
     return result
 
@@ -835,6 +860,8 @@ def main():
     args = parser.parse_args()
     
     # 设置运行模式
+    # 加载历史记录
+    load_arbitrage_history()
     is_simulate = not args.real
     status["mode"] = "simulate" if is_simulate else "real"
     status["trading_enabled"] = args.trade

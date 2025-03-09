@@ -227,3 +227,4 @@ body {
     border-right: none;
 }
 
+/* 确保账户余额在窄屏下一排显示 */ .balance-info .col-md-4 { min-width: 33%; flex: 0 0 33%; max-width: 33%; padding-left: 10px; padding-right: 10px; } .balance-info h4 { font-size: 1.2rem; } .balance-info h6 { font-size: 0.8rem; } @media (max-width: 768px) { .balance-info .row { flex-wrap: nowrap; overflow-x: auto; } }
