@@ -382,7 +382,7 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
     // 添加全局变量记录当前模式
-    let currentMode = 'real';  // 默认为实盘模式
+    let currentMode = localStorage.getItem('tradingMode') || 'real';  // 从本地存储读取模式，默认为实盘模式
 
     // 更新系统状态显示
     function updateStatus(running, mode, arbitrageCount) {
@@ -398,6 +398,7 @@
         // 更新模式状态（保持当前模式）
         if (mode) {
             currentMode = mode;
+            localStorage.setItem('tradingMode', mode);  // 保存到本地存储
         }
         modeBadge.textContent = currentMode === 'real' ? '实盘' : '模拟';
         modeBadge.className = `badge ${currentMode === 'real' ? 'bg-primary' : 'bg-warning'}`;
@@ -460,7 +461,11 @@
         try {
             const response = await fetch('/api/status');
             const data = await response.json();
-            updateStatus(data.running, data.mode, data.arbitrage_count);
+            if (data.mode) {
+                currentMode = data.mode;
+                localStorage.setItem('tradingMode', data.mode);  // 保存到本地存储
+            }
+            updateStatus(data.running, currentMode, data.arbitrage_count);
         } catch (error) {
             console.error('获取状态失败:', error);
         }

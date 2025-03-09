@@ -53,6 +53,9 @@ def start_system():
     global is_running, last_update, crypto_engine, mode
     
     try:
+        data = request.get_json() or {}
+        simulate = data.get('simulate', False)  # 默认为实盘模式
+        
         if not is_running:
             if not crypto_engine:
                 # 初始化引擎
@@ -62,7 +65,7 @@ def start_system():
                     settings=prepare_config(api_keys_required=True),
                     verbose=True,
                     enable_trading=True,
-                    simulate=False if mode == 'real' else True  # 使用当前记录的模式
+                    simulate=simulate  # 使用前端传递的模式
                 )
                 
                 # 如果初始化失败(比如API密钥无效),则提示错误
@@ -72,8 +75,8 @@ def start_system():
             crypto_engine.start()
             is_running = True
             last_update = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            # 更新运行模式（保持当前模式）
-            mode = 'real' if not crypto_engine.simulate else 'simulate'
+            # 更新运行模式（使用前端传递的模式）
+            mode = 'simulate' if simulate else 'real'
             return jsonify({"status": "success", "message": "系统已启动"})
         else:
             return jsonify({"status": "error", "message": "系统已经在运行中"})
