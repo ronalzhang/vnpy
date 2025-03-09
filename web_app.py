@@ -95,10 +95,17 @@ def init_api_clients():
                 try:
                     # 尝试创建客户端
                     exchange_class = getattr(ccxt, exchange_id)
+                    
+                    # 获取API密钥配置
+                    api_key = config[exchange_id]["api_key"]
+                    secret_key = config[exchange_id]["secret_key"]
+                    password = config[exchange_id].get("password", "")
+                    
+                    # 创建客户端
                     client = exchange_class({
-                        'apiKey': config[exchange_id]["api_key"],
-                        'secret': config[exchange_id]["secret_key"],
-                        'password': config[exchange_id].get("password", ""),
+                        'apiKey': api_key,
+                        'secret': secret_key,
+                        'password': password,  # 保留原始密码，包括特殊字符
                         'enableRateLimit': True
                     })
                     
@@ -111,7 +118,14 @@ def init_api_clients():
                     
                     # 测试API连接
                     try:
-                        client.fetch_balance()
+                        print(f"测试 {exchange_id} API连接...")
+                        # 确保API密钥有效
+                        if exchange_id == 'okx':
+                            # OKX特殊处理，获取账户信息
+                            client.fetch_balance()
+                        else:
+                            client.fetch_balance()
+                            
                         print(f"初始化 {exchange_id} API客户端成功")
                         exchange_clients[exchange_id] = client
                         all_missing_api = False
