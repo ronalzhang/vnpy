@@ -858,6 +858,35 @@ def get_symbol_arbitrage_history(symbol):
     
     return jsonify(symbol_history)
 
+# 添加套利分析页面所需的API路由
+@app.route('/api/arbitrage/status', methods=['GET'])
+def get_arbitrage_status():
+    """获取套利系统状态"""
+    return jsonify(status)
+
+@app.route('/api/arbitrage/opportunities', methods=['GET'])
+def get_arbitrage_opportunities():
+    """获取套利机会"""
+    return jsonify(diff_data)
+
+@app.route('/api/arbitrage/tasks', methods=['GET'])
+def get_arbitrage_tasks():
+    """获取套利任务"""
+    # 简单返回空列表，因为当前没有任务系统
+    return jsonify([])
+
+@app.route('/api/arbitrage/history', methods=['GET'])
+def get_all_arbitrage_history():
+    """获取所有套利历史"""
+    all_history = []
+    for records in arbitrage_history.values():
+        all_history.extend(records)
+    
+    # 按时间降序排序
+    all_history.sort(key=lambda x: x["time"], reverse=True)
+    
+    return jsonify(all_history)
+
 def main():
     """主函数"""
     global status
