@@ -20,6 +20,14 @@ from flask import Flask, jsonify, render_template, request, Response
 import os
 import pickle
 
+# 导入套利系统模块
+try:
+    from integrate_arbitrage import init_arbitrage_system
+    ARBITRAGE_ENABLED = True
+except ImportError:
+    logger.warning("套利系统模块未找到，套利功能将被禁用")
+    ARBITRAGE_ENABLED = False
+
 # 创建Flask应用
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -857,6 +865,7 @@ def main():
     parser.add_argument('--real', action='store_true', help='使用真实API连接')
     parser.add_argument('--trade', action='store_true', help='启用交易功能')
     parser.add_argument('--port', type=int, default=8888, help='Web服务器端口')
+    parser.add_argument('--arbitrage', action='store_true', help='启用套利系统')
     args = parser.parse_args()
     
     # 设置运行模式
@@ -871,6 +880,7 @@ def main():
     print("\n===== 加密货币套利监控Web应用 =====")
     print(f"运行模式: {'模拟数据' if is_simulate else '真实API连接'}")
     print(f"交易功能: {'已启用' if args.trade else '未启用（仅监控）'}")
+    print(f"套利系统: {'已启用' if args.arbitrage and ARBITRAGE_ENABLED else '未启用'}")
     print(f"Web端口: {args.port}")
     print("======================================\n")
     
@@ -881,6 +891,22 @@ def main():
     # 启动监控线程
     monitor = threading.Thread(target=monitor_thread, daemon=True)
     monitor.start()
+    
+    # 初始化套利系统
+    if args.arbitrage and ARBITRAGE_ENABLED:
+        try:
+            # 创建套利配置
+            arbitrage_config = {
+                "total_funds": 10000,  # 默认10,000 USDT
+                "exchanges": EXCHANGES,
+                "symbols": SYMBOLS
+            }
+            
+            # 初始化套利系统
+            init_arbitrage_system(app, arbitrage_config)
+            logger.info("套利系统初始化成功")
+        except Exception as e:
+            logger.error(f"套利系统初始化失败: {e}")
     
     # 启动Web服务器
     app.run(host='0.0.0.0', port=args.port)

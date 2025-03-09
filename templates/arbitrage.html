@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加密货币套利系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        body { 
+            padding-top: 20px; 
+            background-color: #f5f8fa;
+        }
+        .header {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e7e9ec;
+            padding-bottom: 10px;
+        }
+        .card {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e7e9ec;
+        }
+        .text-profit {
+            color: #28a745;
+        }
+        .text-loss {
+            color: #dc3545;
+        }
+        .badge-success {
+            background-color: #28a745;
+        }
+        .badge-warning {
+            background-color: #ffc107;
+        }
+        .badge-danger {
+            background-color: #dc3545;
+        }
+        .badge-info {
+            background-color: #17a2b8;
+        }
+        .table th {
+            background-color: #f8f9fa;
+        }
+        .stats-card {
+            text-align: center;
+            padding: 15px;
+        }
+        .stats-card .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .stats-card .label {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        #log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="row">
+                <div class="col-md-6">
+                    <h2><i class="fa fa-exchange"></i> 加密货币套利系统</h2>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div id="system-status" class="badge bg-success">运行中</div>
+                    <div id="last-update">最后更新：加载中...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- 系统状态卡片 -->
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fa fa-dashboard"></i> 套利系统仪表盘</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="stats-card">
+                                    <div class="value" id="total-funds">¥0</div>
+                                    <div class="label">总资金</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stats-card">
+                                    <div class="value" id="available-funds">¥0</div>
+                                    <div class="label">可用资金</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stats-card">
+                                    <div class="value" id="cross-opportunities">0</div>
+                                    <div class="label">跨所套利机会</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stats-card">
+                                    <div class="value" id="triangle-opportunities">0</div>
+                                    <div class="label">三角套利机会</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12 text-center">
+                                <button id="start-btn" class="btn btn-success me-2"><i class="fa fa-play"></i> 启动系统</button>
+                                <button id="stop-btn" class="btn btn-danger me-2"><i class="fa fa-pause"></i> 停止系统</button>
+                                <button id="settings-btn" class="btn btn-primary me-2"><i class="fa fa-cog"></i> 系统设置</button>
+                                <button id="refresh-btn" class="btn btn-secondary"><i class="fa fa-refresh"></i> 刷新数据</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- 跨所套利机会 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fa fa-building"></i> 跨所套利机会</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>交易对</th>
+                                        <th>买入所</th>
+                                        <th>卖出所</th>
+                                        <th>净收益</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cross-arbitrage-data">
+                                    <tr>
+                                        <td colspan="5" class="text-center">加载中...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 三角套利机会 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fa fa-retweet"></i> 三角套利机会</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>交易所</th>
+                                        <th>路径</th>
+                                        <th>收益率</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="triangle-arbitrage-data">
+                                    <tr>
+                                        <td colspan="4" class="text-center">加载中...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- 活跃套利任务 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fa fa-tasks"></i> 活跃套利任务</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>类型</th>
+                                        <th>状态</th>
+                                        <th>开始时间</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="active-tasks-data">
+                                    <tr>
+                                        <td colspan="4" class="text-center">暂无活跃任务</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 套利历史 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fa fa-history"></i> 套利历史</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>类型</th>
+                                        <th>状态</th>
+                                        <th>收益</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-data">
+                                    <tr>
+                                        <td colspan="4" class="text-center">暂无历史记录</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 日志面板 -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fa fa-terminal"></i> 系统日志</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="log-container">
+                            <div class="log-entry">系统初始化中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 模态对话框：系统设置 -->
+    <div class="modal fade" id="settings-modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">套利系统设置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="settings-form">
+                        <div class="mb-3">
+                            <label for="total-funds-input" class="form-label">总资金 (USDT)</label>
+                            <input type="number" class="form-control" id="total-funds-input" value="10000">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">资金分配比例</label>
+                            <div class="input-group mb-2">
+                                <span class="input-group-text">跨所套利</span>
+                                <input type="number" class="form-control" id="cross-ratio-input" value="60">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <div class="input-group">
+                                <span class="input-group-text">三角套利</span>
+                                <input type="number" class="form-control" id="triangle-ratio-input" value="40">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">交易所</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="exchange-binance" checked>
+                                <label class="form-check-label" for="exchange-binance">Binance</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="exchange-okx" checked>
+                                <label class="form-check-label" for="exchange-okx">OKX</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="exchange-bitget" checked>
+                                <label class="form-check-label" for="exchange-bitget">Bitget</label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="save-settings-btn">保存设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script>
+        // 全局变量
+        let systemStatus = { running: false };
+        
+        // 页面加载完成后执行
+        $(document).ready(function() {
+            // 初始化UI事件
+            initUIEvents();
+            
+            // 加载初始数据
+            refreshData();
+            
+            // 每30秒自动刷新数据
+            setInterval(refreshData, 30000);
+            
+            // 添加日志
+            addLog("系统", "套利系统界面初始化完成");
+        });
+        
+        // 初始化UI事件
+        function initUIEvents() {
+            // 按钮事件
+            $("#start-btn").click(startSystem);
+            $("#stop-btn").click(stopSystem);
+            $("#refresh-btn").click(refreshData);
+            $("#settings-btn").click(showSettings);
+            $("#save-settings-btn").click(saveSettings);
+            
+            // 禁用停止按钮（初始状态）
+            $("#stop-btn").prop("disabled", true);
+        }
+        
+        // 刷新数据
+        function refreshData() {
+            // 获取系统状态
+            $.get("/api/arbitrage/status", function(response) {
+                if (response.status === "success") {
+                    updateStatusUI(response.data);
+                } else {
+                    addLog("错误", "获取系统状态失败: " + response.message);
+                }
+            });
+            
+            // 获取套利机会
+            $.get("/api/arbitrage/opportunities", function(response) {
+                if (response.status === "success") {
+                    updateOpportunitiesUI(response.data);
+                } else {
+                    addLog("错误", "获取套利机会失败: " + response.message);
+                }
+            });
+            
+            // 获取活跃任务
+            $.get("/api/arbitrage/tasks", function(response) {
+                if (response.status === "success") {
+                    updateTasksUI(response.data);
+                } else {
+                    addLog("错误", "获取活跃任务失败: " + response.message);
+                }
+            });
+            
+            // 获取历史记录
+            $.get("/api/arbitrage/history", function(response) {
+                if (response.status === "success") {
+                    updateHistoryUI(response.data);
+                } else {
+                    addLog("错误", "获取历史记录失败: " + response.message);
+                }
+            });
+        }
+        
+        // 更新状态UI
+        function updateStatusUI(status) {
+            systemStatus = status;
+            
+            // 更新状态标签
+            if (status.running) {
+                $("#system-status").removeClass("bg-danger").addClass("bg-success").text("运行中");
+                $("#start-btn").prop("disabled", true);
+                $("#stop-btn").prop("disabled", false);
+            } else {
+                $("#system-status").removeClass("bg-success").addClass("bg-danger").text("已停止");
+                $("#start-btn").prop("disabled", false);
+                $("#stop-btn").prop("disabled", true);
+            }
+            
+            // 更新最后更新时间
+            $("#last-update").text("最后更新：" + status.last_update);
+            
+            // 更新资金信息
+            $("#total-funds").text("¥" + status.total_funds.toFixed(2));
+            const availableFunds = status.available_funds.cross_exchange + status.available_funds.triangle;
+            $("#available-funds").text("¥" + availableFunds.toFixed(2));
+            
+            // 更新机会数量
+            $("#cross-opportunities").text(status.cross_opportunities);
+            $("#triangle-opportunities").text(status.triangle_opportunities);
+        }
+        
+        // 更新套利机会UI
+        function updateOpportunitiesUI(opportunities) {
+            // 分离跨所和三角套利机会
+            const crossOpportunities = opportunities.filter(o => o.type === "cross_exchange");
+            const triangleOpportunities = opportunities.filter(o => o.type === "triangle");
+            
+            // 更新跨所套利表格
+            let crossHtml = "";
+            if (crossOpportunities.length === 0) {
+                crossHtml = "<tr><td colspan='5' class='text-center'>暂无套利机会</td></tr>";
+            } else {
+                crossOpportunities.forEach(opp => {
+                    const profitClass = opp.net_profit_pct > 0 ? "text-profit" : "text-loss";
+                    const profitPercent = (opp.net_profit_pct * 100).toFixed(3) + "%";
+                    const opportunityId = `${opp.buy_exchange}_${opp.sell_exchange}_${opp.symbol}`;
+                    
+                    crossHtml += `
+                        <tr>
+                            <td>${opp.symbol}</td>
+                            <td>${opp.buy_exchange}</td>
+                            <td>${opp.sell_exchange}</td>
+                            <td class="${profitClass}">${profitPercent}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary execute-btn" 
+                                    data-type="cross_exchange" 
+                                    data-id="${opportunityId}">
+                                    执行
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            $("#cross-arbitrage-data").html(crossHtml);
+            
+            // 更新三角套利表格
+            let triangleHtml = "";
+            if (triangleOpportunities.length === 0) {
+                triangleHtml = "<tr><td colspan='4' class='text-center'>暂无套利机会</td></tr>";
+            } else {
+                triangleOpportunities.forEach(opp => {
+                    const profitClass = opp.profit_percent > 0 ? "text-profit" : "text-loss";
+                    const profitPercent = opp.profit_percent.toFixed(3) + "%";
+                    const pathStr = opp.steps ? opp.steps.map(s => s.symbol).join(" → ") : "未知路径";
+                    const opportunityId = `${opp.exchange_id}_${opp.path ? opp.path[0].symbol : "unknown"}`;
+                    
+                    triangleHtml += `
+                        <tr>
+                            <td>${opp.exchange_id}</td>
+                            <td>${pathStr}</td>
+                            <td class="${profitClass}">${profitPercent}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary execute-btn" 
+                                    data-type="triangle" 
+                                    data-id="${opportunityId}">
+                                    执行
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            $("#triangle-arbitrage-data").html(triangleHtml);
+            
+            // 绑定执行按钮事件
+            $(".execute-btn").click(function() {
+                const type = $(this).data("type");
+                const id = $(this).data("id");
+                executeArbitrage(type, id);
+            });
+        }
+        
+        // 更新活跃任务UI
+        function updateTasksUI(tasks) {
+            let html = "";
+            if (tasks.length === 0) {
+                html = "<tr><td colspan='4' class='text-center'>暂无活跃任务</td></tr>";
+            } else {
+                tasks.forEach(task => {
+                    const statusBadge = getStatusBadge(task.status);
+                    
+                    html += `
+                        <tr>
+                            <td>${task.id}</td>
+                            <td>${getTypeName(task.type)}</td>
+                            <td>${statusBadge}</td>
+                            <td>${formatDateTime(task.start_time)}</td>
+                        </tr>
+                    `;
+                });
+            }
+            $("#active-tasks-data").html(html);
+        }
+        
+        // 更新历史记录UI
+        function updateHistoryUI(history) {
+            let html = "";
+            if (history.length === 0) {
+                html = "<tr><td colspan='4' class='text-center'>暂无历史记录</td></tr>";
+            } else {
+                history.forEach(item => {
+                    const statusBadge = getStatusBadge(item.status);
+                    let profit = "未知";
+                    let profitClass = "";
+                    
+                    if (item.type === "cross_exchange" && item.profit) {
+                        profit = item.profit.toFixed(2) + " (" + item.profit_percent.toFixed(2) + "%)";
+                        profitClass = item.profit > 0 ? "text-profit" : "text-loss";
+                    } else if (item.type === "triangle" && item.actual_profit) {
+                        profit = item.actual_profit.toFixed(2) + " (" + item.actual_profit_percent.toFixed(2) + "%)";
+                        profitClass = item.actual_profit > 0 ? "text-profit" : "text-loss";
+                    }
+                    
+                    html += `
+                        <tr>
+                            <td>${item.id}</td>
+                            <td>${getTypeName(item.type)}</td>
+                            <td>${statusBadge}</td>
+                            <td class="${profitClass}">${profit}</td>
+                        </tr>
+                    `;
+                });
+            }
+            $("#history-data").html(html);
+        }
+        
+        // 启动系统
+        function startSystem() {
+            $.post("/api/arbitrage/start", function(response) {
+                if (response.status === "success") {
+                    addLog("系统", "套利系统启动成功");
+                    refreshData();
+                } else {
+                    addLog("错误", "套利系统启动失败: " + response.message);
+                }
+            });
+        }
+        
+        // 停止系统
+        function stopSystem() {
+            $.post("/api/arbitrage/stop", function(response) {
+                if (response.status === "success") {
+                    addLog("系统", "套利系统停止成功");
+                    refreshData();
+                } else {
+                    addLog("错误", "套利系统停止失败: " + response.message);
+                }
+            });
+        }
+        
+        // 显示设置对话框
+        function showSettings() {
+            // 加载当前配置
+            $.get("/api/arbitrage/config", function(response) {
+                if (response.status === "success") {
+                    const config = response.data;
+                    
+                    // 设置表单值
+                    $("#total-funds-input").val(config.total_funds);
+                    $("#cross-ratio-input").val(config.allocation_ratio.cross_exchange * 100);
+                    $("#triangle-ratio-input").val(config.allocation_ratio.triangle * 100);
+                    
+                    // 设置交易所复选框
+                    $("#exchange-binance").prop("checked", config.exchanges.includes("binance"));
+                    $("#exchange-okx").prop("checked", config.exchanges.includes("okx"));
+                    $("#exchange-bitget").prop("checked", config.exchanges.includes("bitget"));
+                    
+                    // 显示对话框
+                    const modal = new bootstrap.Modal(document.getElementById("settings-modal"));
+                    modal.show();
+                } else {
+                    addLog("错误", "获取套利配置失败: " + response.message);
+                }
+            });
+        }
+        
+        // 保存设置
+        function saveSettings() {
+            // 验证输入
+            const totalFunds = parseFloat($("#total-funds-input").val());
+            const crossRatio = parseFloat($("#cross-ratio-input").val()) / 100;
+            const triangleRatio = parseFloat($("#triangle-ratio-input").val()) / 100;
+            
+            if (isNaN(totalFunds) || totalFunds <= 0) {
+                alert("总资金必须是正数");
+                return;
+            }
+            
+            if (isNaN(crossRatio) || isNaN(triangleRatio) || 
+                crossRatio < 0 || triangleRatio < 0 || 
+                Math.abs(crossRatio + triangleRatio - 1.0) > 0.001) {
+                alert("资金分配比例之和必须为100%");
+                return;
+            }
+            
+            // 获取选中的交易所
+            const exchanges = [];
+            if ($("#exchange-binance").prop("checked")) exchanges.push("binance");
+            if ($("#exchange-okx").prop("checked")) exchanges.push("okx");
+            if ($("#exchange-bitget").prop("checked")) exchanges.push("bitget");
+            
+            if (exchanges.length < 2) {
+                alert("必须选择至少两个交易所");
+                return;
+            }
+            
+            // 创建配置对象
+            const config = {
+                total_funds: totalFunds,
+                allocation_ratio: {
+                    cross_exchange: crossRatio,
+                    triangle: triangleRatio
+                },
+                exchanges: exchanges
+            };
+            
+            // 发送配置更新请求
+            $.ajax({
+                url: "/api/arbitrage/config",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(config),
+                success: function(response) {
+                    if (response.status === "success") {
+                        addLog("系统", "套利配置更新成功");
+                        
+                        // 关闭对话框
+                        bootstrap.Modal.getInstance(document.getElementById("settings-modal")).hide();
+                        
+                        // 刷新数据
+                        refreshData();
+                    } else {
+                        addLog("错误", "套利配置更新失败: " + response.message);
+                    }
+                }
+            });
+        }
+        
+        // 执行套利
+        function executeArbitrage(type, opportunityId) {
+            const data = {
+                type: type,
+                opportunity_id: opportunityId
+            };
+            
+            $.ajax({
+                url: "/api/arbitrage/execute",
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(data),
+                success: function(response) {
+                    if (response.status === "success") {
+                        addLog("套利", `${getTypeName(type)}套利执行已提交`);
+                        setTimeout(refreshData, 2000);
+                    } else {
+                        addLog("错误", `执行套利失败: ${response.message}`);
+                    }
+                }
+            });
+        }
+        
+        // 添加日志
+        function addLog(type, message) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            const logEntry = `<div class="log-entry">[${timeStr}] [${type}] ${message}</div>`;
+            
+            const logContainer = $("#log-container");
+            logContainer.append(logEntry);
+            
+            // 自动滚动到底部
+            logContainer.scrollTop(logContainer[0].scrollHeight);
+        }
+        
+        // 获取状态标签
+        function getStatusBadge(status) {
+            let badgeClass = "bg-secondary";
+            let statusText = status;
+            
+            switch (status) {
+                case "executing":
+                    badgeClass = "bg-primary";
+                    statusText = "执行中";
+                    break;
+                case "pending":
+                    badgeClass = "bg-warning";
+                    statusText = "等待中";
+                    break;
+                case "completed":
+                    badgeClass = "bg-success";
+                    statusText = "已完成";
+                    break;
+                case "failed":
+                    badgeClass = "bg-danger";
+                    statusText = "失败";
+                    break;
+            }
+            
+            return `<span class="badge ${badgeClass}">${statusText}</span>`;
+        }
+        
+        // 获取类型名称
+        function getTypeName(type) {
+            switch (type) {
+                case "cross_exchange":
+                    return "跨所套利";
+                case "triangle":
+                    return "三角套利";
+                default:
+                    return type;
+            }
+        }
+        
+        // 格式化日期时间
+        function formatDateTime(dateTimeStr) {
+            if (!dateTimeStr) return "未知";
+            
+            try {
+                // 尝试解析日期时间字符串
+                const date = new Date(dateTimeStr);
+                return date.toLocaleString();
+            } catch (e) {
+                return dateTimeStr;
+            }
+        }
+    </script>
+</body>
+</html> 
