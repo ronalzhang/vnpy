@@ -328,8 +328,8 @@
             // 加载初始数据
             refreshData();
             
-            // 每30秒自动刷新数据
-            setInterval(refreshData, 30000);
+            // 每120秒自动刷新数据 (增加刷新间隔)
+            setInterval(refreshData, 120000);
             
             // 添加日志
             addLog("系统", "套利系统界面初始化完成");
@@ -340,7 +340,10 @@
             // 按钮事件
             $("#start-btn").click(startSystem);
             $("#stop-btn").click(stopSystem);
-            $("#refresh-btn").click(refreshData);
+            $("#refresh-btn").click(function() {
+                $(this).data("manual-refresh", true);
+                refreshData();
+            });
             $("#settings-btn").click(showSettings);
             $("#save-settings-btn").click(saveSettings);
             
@@ -350,41 +353,75 @@
         
         // 刷新数据
         function refreshData() {
+            // 记录最后刷新时间
+            const now = new Date();
+            const timeString = now.toTimeString().split(' ')[0];
+            
+            // 只在第一次加载和手动刷新时添加刷新日志
+            if (!window.lastRefreshTime || ($("#refresh-btn").data("manual-refresh") === true)) {
+                addLog("系统", "正在刷新数据...");
+                $("#refresh-btn").data("manual-refresh", false);
+            }
+            window.lastRefreshTime = now;
+            
             // 获取系统状态
-            $.get("/api/arbitrage/status", function(response) {
-                if (response.status === "success") {
-                    updateStatusUI(response.data);
-                } else {
-                    addLog("错误", "获取系统状态失败: " + response.message);
-                }
-            });
+            $.get("/api/arbitrage/status")
+                .done(function(response) {
+                    if (response.status === "success") {
+                        updateStatusUI(response.data);
+                    } else {
+                        // 静默处理常规错误，只在手动刷新时显示
+                        if ($("#refresh-btn").data("manual-refresh") === true) {
+                            addLog("错误", "获取系统状态失败: " + response.message);
+                        }
+                    }
+                })
+                .fail(function(xhr, status, error) {
+                    // 只记录连接失败的错误
+                    addLog("错误", "获取系统状态失败: " + error);
+                });
             
             // 获取套利机会
-            $.get("/api/arbitrage/opportunities", function(response) {
-                if (response.status === "success") {
-                    updateOpportunitiesUI(response.data);
-                } else {
-                    addLog("错误", "获取套利机会失败: " + response.message);
-                }
-            });
+            $.get("/api/arbitrage/opportunities")
+                .done(function(response) {
+                    if (response.status === "success") {
+                        updateOpportunitiesUI(response.data);
+                    }
+                })
+                .fail(function(xhr, status, error) {
+                    // 静默处理，除非是连接错误
+                    if (error && error !== "undefined") {
+                        addLog("错误", "获取套利机会失败: " + error);
+                    }
+                });
             
             // 获取活跃任务
-            $.get("/api/arbitrage/tasks", function(response) {
-                if (response.status === "success") {
-                    updateTasksUI(response.data);
-                } else {
-                    addLog("错误", "获取活跃任务失败: " + response.message);
-                }
-            });
+            $.get("/api/arbitrage/tasks")
+                .done(function(response) {
+                    if (response.status === "success") {
+                        updateTasksUI(response.data);
+                    }
+                })
+                .fail(function(xhr, status, error) {
+                    // 静默处理，除非是连接错误
+                    if (error && error !== "undefined") {
+                        addLog("错误", "获取活跃任务失败: " + error);
+                    }
+                });
             
             // 获取历史记录
-            $.get("/api/arbitrage/history", function(response) {
-                if (response.status === "success") {
-                    updateHistoryUI(response.data);
-                } else {
-                    addLog("错误", "获取历史记录失败: " + response.message);
-                }
-            });
+            $.get("/api/arbitrage/history")
+                .done(function(response) {
+                    if (response.status === "success") {
+                        updateHistoryUI(response.data);
+                    }
+                })
+                .fail(function(xhr, status, error) {
+                    // 静默处理，除非是连接错误
+                    if (error && error !== "undefined") {
+                        addLog("错误", "获取历史记录失败: " + error);
+                    }
+                });
         }
         
         // 更新状态UI
@@ -676,17 +713,31 @@
             });
         }
         
-        // 添加日志
+        // 添加日志到日志面板
         function addLog(type, message) {
             const now = new Date();
-            const timeStr = now.toLocaleTimeString();
-            const logEntry = `<div class="log-entry">[${timeStr}] [${type}] ${message}</div>`;
+            const timeString = now.toTimeString().split(' ')[0];
+            const logEntry = `[${timeString}] [${type}] ${message}`;
             
-            const logContainer = $("#log-container");
-            logContainer.append(logEntry);
+            // 获取当前日志内容
+            const $logContainer = $("#log-container");
+            const $logs = $logContainer.find("div");
             
-            // 自动滚动到底部
-            logContainer.scrollTop(logContainer[0].scrollHeight);
+            // 如果日志超过100条，删除最旧的日志
+            if ($logs.length >= 100) {
+                $logs.first().remove();
+            }
+            
+            // 添加新日志
+            $logContainer.append(`<div class="log-entry">${logEntry}</div>`);
+            
+            // 滚动到底部
+            $logContainer.scrollTop($logContainer[0].scrollHeight);
+            
+            // 只在控制台打印错误日志，减少控制台输出
+            if (type === "错误") {
+                console.error(logEntry);
+            }
         }
         
         // 获取状态标签

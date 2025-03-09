@@ -862,18 +862,32 @@ def get_symbol_arbitrage_history(symbol):
 @app.route('/api/arbitrage/status', methods=['GET'])
 def get_arbitrage_status():
     """获取套利系统状态"""
-    return jsonify(status)
+    return jsonify({
+        "status": "success",
+        "data": {
+            "running": status["running"],
+            "mode": status["mode"],
+            "last_update": status["last_update"],
+            "trading_enabled": status["trading_enabled"]
+        }
+    })
 
 @app.route('/api/arbitrage/opportunities', methods=['GET'])
 def get_arbitrage_opportunities():
     """获取套利机会"""
-    return jsonify(diff_data)
+    return jsonify({
+        "status": "success",
+        "data": diff_data
+    })
 
 @app.route('/api/arbitrage/tasks', methods=['GET'])
 def get_arbitrage_tasks():
     """获取套利任务"""
     # 简单返回空列表，因为当前没有任务系统
-    return jsonify([])
+    return jsonify({
+        "status": "success",
+        "data": []
+    })
 
 @app.route('/api/arbitrage/history', methods=['GET'])
 def get_all_arbitrage_history():
@@ -885,7 +899,10 @@ def get_all_arbitrage_history():
     # 按时间降序排序
     all_history.sort(key=lambda x: x["time"], reverse=True)
     
-    return jsonify(all_history)
+    return jsonify({
+        "status": "success",
+        "data": all_history
+    })
 
 def main():
     """主函数"""
