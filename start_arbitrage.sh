@@ -10,8 +10,8 @@ mkdir -p $LOG_DIR
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 LOG_FILE="$LOG_DIR/web_app_$TIMESTAMP.log"
 
-# 默认参数
-SIMULATE=false
+# 默认参数 - 修改为默认实盘模式
+SIMULATE=false  # 默认使用实盘模式
 TRADE=true
 PORT=8888
 
@@ -19,8 +19,8 @@ PORT=8888
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
-        --real)
-            SIMULATE=false
+        --simulate)  # 修改参数，只有明确指定--simulate才使用模拟模式
+            SIMULATE=true
             shift
             ;;
         --trade)

@@ -387,7 +387,10 @@ class CryptoArbitrageEngine:
         
         # 初始化交易所连接（如果尚未初始化）
         if not self.exchanges and not self.simulate_mode:
-            self.init_exchanges()
+            init_result = self.init_exchanges()
+            if not init_result:
+                self.write_log("实盘API初始化失败，请检查配置", level="ERROR", force=True)
+                return
         
         # 检查余额
         if not self.simulate_mode:
@@ -1267,8 +1270,12 @@ class CryptoArbitrageEngine:
         # 初始化交易所
         if not simulate:
             api_ok = self.init_exchanges()
+            if not api_ok:
+                self.write_log("实盘API初始化失败，请检查配置", level="ERROR", force=True)
+                return False
         else:
             self.write_log("启动模拟数据模式，将使用模拟数据而不是真实API连接", level="INFO", force=True)
+            self.create_simulation_data()
             api_ok = True
         
         return api_ok

@@ -43,14 +43,14 @@ crypto_engine = None
 event_engine = None
 main_engine = None
 is_running = False
-mode = 'real'  # 或 'real'
+mode = 'real'  # 默认为实盘模式
 last_update = None
 arbitrage_count = 0  # 当前可执行的套利机会数量
 
 @app.route('/api/start', methods=['POST'])
 def start_system():
     """启动系统"""
-    global is_running, last_update, crypto_engine
+    global is_running, last_update, crypto_engine, mode
     
     try:
         if not is_running:
@@ -62,25 +62,17 @@ def start_system():
                     settings=prepare_config(api_keys_required=True),
                     verbose=True,
                     enable_trading=True,
-                    simulate=False
+                    simulate=False  # 默认使用实盘模式
                 )
                 
-                # 如果初始化失败(比如API密钥无效),则回退到模拟模式
+                # 如果初始化失败(比如API密钥无效),则提示错误
                 if not init_result:
-                    print("实盘模式初始化失败,切换到模拟模式")
-                    crypto_engine = CryptoArbitrageEngine(event_engine)
-                    init_result = crypto_engine.init_engine(
-                        settings=prepare_config(api_keys_required=False),
-                        verbose=False,
-                        enable_trading=False,
-                        simulate=True
-                    )
+                    return jsonify({"status": "error", "message": "实盘模式初始化失败，请检查API配置"})
             
             crypto_engine.start()
             is_running = True
             last_update = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             # 更新运行模式
-            global mode
             mode = 'real' if not crypto_engine.simulate else 'simulate'
             return jsonify({"status": "success", "message": "系统已启动"})
         else:
@@ -236,8 +228,6 @@ def main(use_real_api: bool = False, verbose: bool = False, enable_trading: bool
 
 
 if __name__ == "__main__":
-    import argparse
-    
     parser = argparse.ArgumentParser(description="加密货币交易套利系统")
     parser.add_argument("--real", action="store_true", help="使用真实API连接")
     parser.add_argument("--auto-start", action="store_true", help="自动开始监控")
@@ -248,8 +238,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # 确定是使用真实API还是模拟模式
-    use_real_api = args.real and not args.simulate
-    use_simulate = args.simulate or not args.real  # 默认使用模拟模式
+    use_real_api = not args.simulate  # 默认使用实盘模式
+    use_simulate = args.simulate  # 只有明确指定--simulate时才使用模拟模式
     
     # 如果没有提供参数，显示使用说明
     if len(sys.argv) == 1:
