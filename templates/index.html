@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>校长的量化系统</title>
+    <!-- 添加favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <!-- 引入Bootstrap CSS（替换为国内CDN） -->
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
@@ -80,7 +82,7 @@
         <nav class="navbar navbar-expand navbar-dark bg-dark">
             <div class="container-fluid">
                 <a class="navbar-brand" href="#">
-                    <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" height="30" class="d-inline-block align-text-top me-2">
+                    <i class="fas fa-chart-line me-2"></i>
                     校长的量化系统
                 </a>
                 <div class="navbar-nav ms-auto">
