@@ -17,6 +17,62 @@
         .table-responsive {
             overflow-x: auto;
         }
+        
+        /* 套利步骤样式 */
+        .step-container {
+            display: flex;
+            justify-content: space-between;
+            margin: 2rem 0;
+        }
+        
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            flex: 1;
+            text-align: center;
+        }
+        
+        .step:not(:last-child):after {
+            content: '';
+            position: absolute;
+            top: 2rem;
+            width: 100%;
+            height: 2px;
+            background-color: #e9ecef;
+            z-index: 0;
+            left: 50%;
+        }
+        
+        .step.active .step-number, .step.complete .step-number {
+            background-color: #0d6efd;
+            color: white;
+        }
+        
+        .step-number {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            background-color: #e9ecef;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .step-content {
+            width: 100%;
+        }
+        
+        .step-status {
+            font-size: 1.5rem;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -106,6 +162,7 @@
                             <div>
                                 <span id="status-indicator" class="badge bg-success">运行中</span>
                                 <span id="mode-indicator" class="badge bg-info ms-2">模拟模式</span>
+                                <span id="arbitrage-count" class="badge bg-secondary ms-2" title="当前套利机会数量">0</span>
                             </div>
                             <div>
                                 <button id="start-btn" class="btn btn-sm btn-success me-2">
