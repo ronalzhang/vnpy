@@ -128,6 +128,47 @@
             font-size: 1.5rem;
             margin-top: 0.5rem;
         }
+
+        /* 策略运行结果模块样式 */
+        .progress {
+            background-color: #e9ecef;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
+        }
+
+        .progress-bar {
+            transition: width .6s ease;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        #strategy-details tr {
+            transition: background-color 0.3s;
+        }
+
+        #strategy-details tr:hover {
+            background-color: rgba(0,0,0,.075);
+        }
+
+        .strategy-status {
+            font-weight: bold;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-failed {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
     </style>
 </head>
 <body>
@@ -222,6 +263,117 @@
                 <div class="card-body">
                     <div class="d-grid">
                         <button id="toggle-btn" class="btn btn-primary" data-running="false">启动运行</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 策略运行结果 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>策略运行结果
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleDetailView()">
+                                <i class="fas fa-exchange-alt me-1"></i>切换视图
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="clearStrategyResults()">
+                                <i class="fas fa-eraser me-1"></i>清空记录
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <!-- 概要视图 -->
+                    <div id="summary-view" class="p-3">
+                        <div class="row g-3">
+                            <!-- 今日统计 -->
+                            <div class="col-md-6">
+                                <div class="card h-100 border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-muted mb-3">今日统计</h6>
+                                        <div class="row g-3">
+                                            <div class="col-6">
+                                                <div class="d-flex justify-content-between">
+                                                    <span>套利次数:</span>
+                                                    <span id="today-trade-count" class="fw-bold">0</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="d-flex justify-content-between">
+                                                    <span>成功率:</span>
+                                                    <span id="today-success-rate" class="fw-bold">0%</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="d-flex justify-content-between">
+                                                    <span>盈利金额:</span>
+                                                    <span id="today-profit" class="fw-bold text-success">0.00 USDT</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="d-flex justify-content-between">
+                                                    <span>平均收益率:</span>
+                                                    <span id="today-avg-return" class="fw-bold text-success">0.00%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 资金转移 -->
+                            <div class="col-md-6">
+                                <div class="card h-100 border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-muted mb-3">资金状态</h6>
+                                        <div class="row g-3">
+                                            <div class="col-12">
+                                                <div class="progress" style="height: 25px;">
+                                                    <div id="binance-balance-bar" class="progress-bar bg-primary" role="progressbar" style="width: 33%;">
+                                                        Binance: 33%
+                                                    </div>
+                                                    <div id="okx-balance-bar" class="progress-bar bg-success" role="progressbar" style="width: 33%;">
+                                                        OKX: 33%
+                                                    </div>
+                                                    <div id="bitget-balance-bar" class="progress-bar bg-info" role="progressbar" style="width: 34%;">
+                                                        BitGet: 34%
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-12">
+                                                <small class="text-muted">上次资金转移: <span id="last-transfer-time">-</span></small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 详细视图 -->
+                    <div id="detail-view" class="d-none">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>交易对</th>
+                                        <th>买入交易所</th>
+                                        <th>卖出交易所</th>
+                                        <th>买入价格</th>
+                                        <th>卖出价格</th>
+                                        <th>数量</th>
+                                        <th>预期收益</th>
+                                        <th>实际收益</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="strategy-details">
+                                    <!-- 策略执行详情将通过JavaScript动态添加 -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -548,6 +700,130 @@
                 logsContainer.removeChild(logs[0]);
             }
         }
+    }
+
+    // 切换详细/概要视图
+    function toggleDetailView() {
+        const summaryView = document.getElementById('summary-view');
+        const detailView = document.getElementById('detail-view');
+        
+        if (summaryView.classList.contains('d-none')) {
+            summaryView.classList.remove('d-none');
+            detailView.classList.add('d-none');
+        } else {
+            summaryView.classList.add('d-none');
+            detailView.classList.remove('d-none');
+        }
+    }
+
+    // 清空策略结果
+    function clearStrategyResults() {
+        // 重置统计数据
+        document.getElementById('today-trade-count').textContent = '0';
+        document.getElementById('today-success-rate').textContent = '0%';
+        document.getElementById('today-profit').textContent = '0.00 USDT';
+        document.getElementById('today-avg-return').textContent = '0.00%';
+        
+        // 清空详细记录
+        document.getElementById('strategy-details').innerHTML = '';
+    }
+
+    // 添加新的策略执行记录
+    function addStrategyRecord(record) {
+        const tbody = document.getElementById('strategy-details');
+        const row = document.createElement('tr');
+        
+        // 格式化时间
+        const time = new Date(record.timestamp).toLocaleTimeString();
+        
+        // 计算实际收益
+        const actualProfit = record.actualProfit ? record.actualProfit.toFixed(2) : '-';
+        const profitClass = record.actualProfit > 0 ? 'text-success' : 
+                           record.actualProfit < 0 ? 'text-danger' : '';
+        
+        // 状态样式
+        const statusClass = record.status === 'success' ? 'status-success' :
+                           record.status === 'pending' ? 'status-pending' :
+                           'status-failed';
+        
+        row.innerHTML = `
+            <td>${time}</td>
+            <td>${record.symbol}</td>
+            <td>${record.buyExchange}</td>
+            <td>${record.sellExchange}</td>
+            <td>${record.buyPrice.toFixed(2)}</td>
+            <td>${record.sellPrice.toFixed(2)}</td>
+            <td>${record.amount}</td>
+            <td>${record.expectedProfit.toFixed(2)} USDT</td>
+            <td class="${profitClass}">${actualProfit} USDT</td>
+            <td><span class="strategy-status ${statusClass}">${record.status}</span></td>
+        `;
+        
+        tbody.insertBefore(row, tbody.firstChild);
+        
+        // 如果记录数超过100条，删除最早的记录
+        if (tbody.children.length > 100) {
+            tbody.removeChild(tbody.lastChild);
+        }
+        
+        // 更新今日统计
+        updateDailyStats();
+    }
+
+    // 更新资金分布进度条
+    function updateBalanceDistribution(balances) {
+        const total = Object.values(balances).reduce((sum, val) => sum + val, 0);
+        
+        for (const [exchange, balance] of Object.entries(balances)) {
+            const percentage = ((balance / total) * 100).toFixed(1);
+            const bar = document.getElementById(`${exchange.toLowerCase()}-balance-bar`);
+            if (bar) {
+                bar.style.width = `${percentage}%`;
+                bar.textContent = `${exchange}: ${percentage}%`;
+            }
+        }
+    }
+
+    // 更新今日统计数据
+    function updateDailyStats() {
+        const tbody = document.getElementById('strategy-details');
+        const records = Array.from(tbody.children);
+        
+        // 只统计今天的记录
+        const today = new Date().toDateString();
+        const todayRecords = records.filter(row => {
+            const time = row.cells[0].textContent;
+            return new Date(time).toDateString() === today;
+        });
+        
+        // 计算统计数据
+        const totalCount = todayRecords.length;
+        const successCount = todayRecords.filter(row => 
+            row.querySelector('.status-success')
+        ).length;
+        
+        const successRate = totalCount ? ((successCount / totalCount) * 100).toFixed(1) : '0.0';
+        
+        const profits = todayRecords.map(row => {
+            const profitText = row.cells[8].textContent;
+            return parseFloat(profitText) || 0;
+        });
+        
+        const totalProfit = profits.reduce((sum, profit) => sum + profit, 0);
+        const avgReturn = totalCount ? ((totalProfit / totalCount) * 100).toFixed(2) : '0.00';
+        
+        // 更新显示
+        document.getElementById('today-trade-count').textContent = totalCount;
+        document.getElementById('today-success-rate').textContent = `${successRate}%`;
+        document.getElementById('today-profit').textContent = `${totalProfit.toFixed(2)} USDT`;
+        document.getElementById('today-avg-return').textContent = `${avgReturn}%`;
+    }
+
+    // 记录资金转移
+    function recordFundTransfer(from, to, amount) {
+        const time = new Date().toLocaleTimeString();
+        document.getElementById('last-transfer-time').textContent = 
+            `${time} | ${from} → ${to}: ${amount.toFixed(2)} USDT`;
     }
     </script>
 </body>
