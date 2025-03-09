@@ -80,3 +80,13 @@ _templates
 
 # Misc
 *.mo
+
+# 临时文件
+*.bak
+*.pkl
+
+# 虚拟环境
+venv/
+
+# 敏感信息
+*config.json*ssh
