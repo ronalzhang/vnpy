@@ -597,8 +597,29 @@
     <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.2.1/chart.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
-    // 添加全局变量记录当前模式
-    let currentMode = localStorage.getItem('tradingMode') || 'real';  // 从本地存储读取模式，默认为实盘模式
+    // 从localStorage读取模式，默认为real
+    let currentMode = localStorage.getItem('tradingMode') || 'real';
+    
+    // 更新UI显示当前模式
+    function updateModeDisplay() {
+        const modeBadge = document.getElementById('mode-badge');
+        if (modeBadge) {
+            modeBadge.textContent = currentMode === 'simulate' ? '模拟' : '实盘';
+            modeBadge.className = 'badge ' + (currentMode === 'simulate' ? 'bg-warning' : 'bg-danger');
+        }
+    }
+    
+    // 在页面加载时更新显示
+    document.addEventListener('DOMContentLoaded', () => {
+        updateModeDisplay();
+    });
+    
+    // 在模式改变时保存到localStorage
+    function setMode(mode) {
+        currentMode = mode;
+        localStorage.setItem('tradingMode', mode);
+        updateModeDisplay();
+    }
 
     // 更新系统状态显示
     function updateStatus(running, mode, arbitrageCount) {

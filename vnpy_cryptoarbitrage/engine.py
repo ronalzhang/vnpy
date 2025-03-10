@@ -407,13 +407,19 @@ class CryptoArbitrageEngine:
         """停止套利监控"""
         if not self.is_active:
             return
-            
+        
+        # 保存当前模式
+        current_simulate_mode = self.simulate_mode
+        
         self.is_active = False
         
         if self.monitor_thread:
             self.monitor_thread.join(timeout=10)
             self.monitor_thread = None
-            
+        
+        # 恢复之前的模式
+        self.simulate_mode = current_simulate_mode
+        
         self.write_log("套利监控已停止", level="INFO", force=True)
         
     def check_balances(self) -> Dict[str, Dict]:

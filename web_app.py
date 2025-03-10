@@ -826,7 +826,15 @@ def stop_monitor():
     """停止监控"""
     global status
     
+    # 保存当前模式
+    current_mode = status["mode"]
+    
+    # 更新状态
     status["running"] = False
+    status["last_update"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # 恢复之前的模式
+    status["mode"] = current_mode
     
     return jsonify({"status": "success", "message": "监控已停止"})
 
