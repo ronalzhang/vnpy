@@ -169,19 +169,52 @@
             background-color: #f8d7da;
             color: #721c24;
         }
+
+        /* 修改账户余额卡片的响应式布局 */
+        @media (min-width: 576px) {
+            #account-balance {
+                /* 在小屏幕也保持较好的显示效果 */
+                width: 100%;
+            }
+        }
+        
+        /* 只在非常窄的屏幕切换为窄屏布局 */
+        @media (max-width: 575.98px) {
+            #account-balance .balance-info .row > div {
+                margin-bottom: 1rem;
+            }
+        }
+        
+        /* 调整底部的响应式行为 */
+        footer {
+            min-height: 80px;
+            padding-top: 0.75rem !important;
+            padding-bottom: 0.75rem !important;
+        }
+        
+        /* 在各种屏幕尺寸上保持原有布局 */
+        @media (max-width: 767.98px) {
+            footer .col-md-6:first-child {
+                margin-bottom: 0.5rem;
+            }
+            
+            footer .col-md-6:last-child {
+                text-align: left !important;
+            }
+        }
     </style>
 </head>
 <body>
     <header>
         <nav class="navbar navbar-expand navbar-dark bg-dark">
             <div class="container-fluid">
-                <a class="navbar-brand" href="#">
+                <a class="navbar-brand" href="http://47.236.39.134:8888">
                     <i class="fas fa-chart-line me-2"></i>
                     校长的量化系统
                 </a>
                 <div class="navbar-nav ms-auto">
                     <a class="nav-link active" href="#market-data">市场数据</a>
-                    <a class="nav-link" href="arbitrage.html">套利分析</a>
+                    <a class="nav-link" href="arbitrage.html">套利系统</a>
                     <a class="nav-link" href="#logs">操作日志</a>
                 </div>
             </div>
@@ -256,296 +289,302 @@
                     <span>系统控制</span>
                     <div class="d-flex gap-2">
                         <span id="status-badge" class="badge bg-secondary">已停止</span>
-                        <span id="mode-badge" class="badge bg-warning">模拟</span>
+                        <span id="arbitrage-running-badge" class="badge bg-secondary">套利已停止</span>
+                        <span id="mode-badge" class="badge bg-danger">实盘</span>
                         <span id="arbitrage-count-badge" class="badge bg-success">套利:0</span>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="d-grid">
-                        <button id="toggle-btn" class="btn btn-primary" data-running="false">启动运行</button>
+                    <div class="d-flex gap-2">
+                        <button id="toggle-btn" class="btn btn-primary flex-grow-1" data-running="false">启动运行</button>
+                        <button id="toggle-arbitrage-btn" class="btn btn-warning flex-grow-1">启动套利</button>
                     </div>
                 </div>
             </div>
 
-            <!-- 策略运行结果 -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>策略运行结果
-                        </h5>
-                        <div>
-                            <button class="btn btn-sm btn-outline-primary" onclick="toggleDetailView()">
-                                <i class="fas fa-exchange-alt me-1"></i>切换视图
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="clearStrategyResults()">
-                                <i class="fas fa-eraser me-1"></i>清空记录
-                            </button>
+            <div class="row">
+                <!-- 策略运行结果 -->
+                <div class="col-12 col-xl-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-line me-2"></i>策略运行结果
+                                </h5>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="toggleDetailView()">
+                                        <i class="fas fa-exchange-alt me-1"></i>切换视图
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary ms-2" onclick="clearStrategyResults()">
+                                        <i class="fas fa-eraser me-1"></i>清空记录
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <!-- 概要视图 -->
+                            <div id="summary-view" class="p-3">
+                                <div class="row g-3">
+                                    <!-- 今日统计 -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100 border-0 bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-muted mb-3">今日统计</h6>
+                                                <div class="row g-3">
+                                                    <div class="col-6">
+                                                        <div class="d-flex justify-content-between">
+                                                            <span>套利次数:</span>
+                                                            <span id="today-trade-count" class="fw-bold">0</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="d-flex justify-content-between">
+                                                            <span>成功率:</span>
+                                                            <span id="today-success-rate" class="fw-bold">0%</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="d-flex justify-content-between">
+                                                            <span>盈利金额:</span>
+                                                            <span id="today-profit" class="fw-bold text-success">0.00 USDT</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="d-flex justify-content-between">
+                                                            <span>平均收益率:</span>
+                                                            <span id="today-avg-return" class="fw-bold text-success">0.00%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 资金转移 -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100 border-0 bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-muted mb-3">资金状态</h6>
+                                                <div class="row g-3">
+                                                    <div class="col-12">
+                                                        <div class="progress" style="height: 25px;">
+                                                            <div id="binance-balance-bar" class="progress-bar bg-primary" role="progressbar" style="width: 33%;">
+                                                                Binance: 33%
+                                                            </div>
+                                                            <div id="okx-balance-bar" class="progress-bar bg-success" role="progressbar" style="width: 33%;">
+                                                                OKX: 33%
+                                                            </div>
+                                                            <div id="bitget-balance-bar" class="progress-bar bg-info" role="progressbar" style="width: 34%;">
+                                                                BitGet: 34%
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <small class="text-muted">上次资金转移: <span id="last-transfer-time">-</span></small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- 资金效率统计 -->
+                                    <div class="col-md-12 mt-3">
+                                        <div class="card h-100 border-0 bg-light">
+                                            <div class="card-body">
+                                                <h6 class="card-title text-muted mb-3">资金效率统计</h6>
+                                                <div class="row g-3">
+                                                    <div class="col-4">
+                                                        <div class="d-flex justify-content-between">
+                                                            <span>总投入:</span>
+                                                            <span id="total-invested" class="fw-bold">0.00 USDT</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <div class="d-flex justify-content-between">
+                                                            <span>总回报:</span>
+                                                            <span id="total-return" class="fw-bold">0.00 USDT</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <div class="d-flex justify-content-between">
+                                                            <span>资金效率:</span>
+                                                            <span id="capital-efficiency" class="fw-bold text-success">0.000%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 详细视图 -->
+                            <div id="detail-view" class="d-none">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>时间</th>
+                                                <th>交易对</th>
+                                                <th>买入所</th>
+                                                <th>卖出所</th>
+                                                <th>买入价</th>
+                                                <th>卖出价</th>
+                                                <th>数量</th>
+                                                <th>投入</th>
+                                                <th>回报</th>
+                                                <th>状态</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="strategy-details">
+                                            <!-- 策略执行详情将通过JavaScript动态添加 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="card-body p-0">
-                    <!-- 概要视图 -->
-                    <div id="summary-view" class="p-3">
-                        <div class="row g-3">
-                            <!-- 今日统计 -->
-                            <div class="col-md-6">
-                                <div class="card h-100 border-0 bg-light">
-                                    <div class="card-body">
-                                        <h6 class="card-title text-muted mb-3">今日统计</h6>
-                                        <div class="row g-3">
-                                            <div class="col-6">
-                                                <div class="d-flex justify-content-between">
-                                                    <span>套利次数:</span>
-                                                    <span id="today-trade-count" class="fw-bold">0</span>
-                                                </div>
-                                            </div>
-                                            <div class="col-6">
-                                                <div class="d-flex justify-content-between">
-                                                    <span>成功率:</span>
-                                                    <span id="today-success-rate" class="fw-bold">0%</span>
-                                                </div>
-                                            </div>
-                                            <div class="col-6">
-                                                <div class="d-flex justify-content-between">
-                                                    <span>盈利金额:</span>
-                                                    <span id="today-profit" class="fw-bold text-success">0.00 USDT</span>
-                                                </div>
-                                            </div>
-                                            <div class="col-6">
-                                                <div class="d-flex justify-content-between">
-                                                    <span>平均收益率:</span>
-                                                    <span id="today-avg-return" class="fw-bold text-success">0.00%</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 资金转移 -->
-                            <div class="col-md-6">
-                                <div class="card h-100 border-0 bg-light">
-                                    <div class="card-body">
-                                        <h6 class="card-title text-muted mb-3">资金状态</h6>
-                                        <div class="row g-3">
-                                            <div class="col-12">
-                                                <div class="progress" style="height: 25px;">
-                                                    <div id="binance-balance-bar" class="progress-bar bg-primary" role="progressbar" style="width: 33%;">
-                                                        Binance: 33%
-                                                    </div>
-                                                    <div id="okx-balance-bar" class="progress-bar bg-success" role="progressbar" style="width: 33%;">
-                                                        OKX: 33%
-                                                    </div>
-                                                    <div id="bitget-balance-bar" class="progress-bar bg-info" role="progressbar" style="width: 34%;">
-                                                        BitGet: 34%
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-12">
-                                                <small class="text-muted">上次资金转移: <span id="last-transfer-time">-</span></small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 资金效率统计 -->
-                            <div class="col-md-12 mt-3">
-                                <div class="card h-100 border-0 bg-light">
-                                    <div class="card-body">
-                                        <h6 class="card-title text-muted mb-3">资金效率统计</h6>
-                                        <div class="row g-3">
-                                            <div class="col-4">
-                                                <div class="d-flex justify-content-between">
-                                                    <span>总投入:</span>
-                                                    <span id="total-invested" class="fw-bold">0.00 USDT</span>
-                                                </div>
-                                            </div>
-                                            <div class="col-4">
-                                                <div class="d-flex justify-content-between">
-                                                    <span>总回报:</span>
-                                                    <span id="total-return" class="fw-bold">0.00 USDT</span>
-                                                </div>
-                                            </div>
-                                            <div class="col-4">
-                                                <div class="d-flex justify-content-between">
-                                                    <span>资金效率:</span>
-                                                    <span id="capital-efficiency" class="fw-bold text-success">0.000%</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                
+                <!-- 账户余额 -->
+                <div class="col-12 col-xl-8 mb-4">
+                    <div id="account-balance" class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>账户余额和持仓</h5>
+                                <button id="toggle-privacy" class="btn btn-outline-light btn-sm" title="切换余额显示">
+                                    <i class="fas fa-eye-slash"></i>
+                                </button>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- 详细视图 -->
-                    <div id="detail-view" class="d-none">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-striped mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>时间</th>
-                                        <th>交易对</th>
-                                        <th>买入所</th>
-                                        <th>卖出所</th>
-                                        <th>买入价</th>
-                                        <th>卖出价</th>
-                                        <th>数量</th>
-                                        <th>投入</th>
-                                        <th>回报</th>
-                                        <th>状态</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="strategy-details">
-                                    <!-- 策略执行详情将通过JavaScript动态添加 -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 账户余额 -->
-            <div class="col-md-8">
-                <div id="account-balance" class="card">
-                    <div class="card-header bg-primary text-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>账户余额和持仓</h5>
-                            <button id="toggle-privacy" class="btn btn-outline-light btn-sm" title="切换余额显示">
-                                <i class="fas fa-eye-slash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <ul class="nav nav-tabs" id="balanceTab" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="binance-tab" data-bs-toggle="tab" data-bs-target="#binance" type="button" role="tab">Binance</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="okx-tab" data-bs-toggle="tab" data-bs-target="#okx" type="button" role="tab">OKX</button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="bitget-tab" data-bs-toggle="tab" data-bs-target="#bitget" type="button" role="tab">Bitget</button>
-                            </li>
-                        </ul>
-                        <div class="tab-content p-3" id="balanceTabContent">
-                            <div class="tab-pane fade show active" id="binance" role="tabpanel">
-                                <div class="balance-info mb-3">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="binance-balance">12,345.67</h4>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="binance-available">12,340.00</h4>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="binance-locked">5.67</h4>
+                        <div class="card-body">
+                            <ul class="nav nav-tabs" id="balanceTab" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="binance-tab" data-bs-toggle="tab" data-bs-target="#binance" type="button" role="tab">Binance</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="okx-tab" data-bs-toggle="tab" data-bs-target="#okx" type="button" role="tab">OKX</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="bitget-tab" data-bs-toggle="tab" data-bs-target="#bitget" type="button" role="tab">Bitget</button>
+                                </li>
+                            </ul>
+                            <div class="tab-content p-3" id="balanceTabContent">
+                                <div class="tab-pane fade show active" id="binance" role="tabpanel">
+                                    <div class="balance-info mb-3">
+                                        <div class="row">
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">总余额 (USDT)</h6>
+                                                <h4 id="binance-balance">12,345.67</h4>
+                                            </div>
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">可用 (USDT)</h6>
+                                                <h4 id="binance-available">12,340.00</h4>
+                                            </div>
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">锁定 (USDT)</h6>
+                                                <h4 id="binance-locked">5.67</h4>
+                                            </div>
                                         </div>
                                     </div>
+                                    <h6>持仓情况</h6>
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>币种</th>
+                                                <th>总数量</th>
+                                                <th>可用</th>
+                                                <th>锁定</th>
+                                                <th>价值 (USDT)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="binance-positions">
+                                            <tr>
+                                                <td>BTC</td>
+                                                <td>0.12345</td>
+                                                <td>0.12345</td>
+                                                <td>0.00000</td>
+                                                <td>7,893.45</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <h6>持仓情况</h6>
-                                <table class="table table-sm table-hover">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>币种</th>
-                                            <th>总数量</th>
-                                            <th>可用</th>
-                                            <th>锁定</th>
-                                            <th>价值 (USDT)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="binance-positions">
-                                        <tr>
-                                            <td>BTC</td>
-                                            <td>0.12345</td>
-                                            <td>0.12345</td>
-                                            <td>0.00000</td>
-                                            <td>7,893.45</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="tab-pane fade" id="okx" role="tabpanel">
-                                <div class="balance-info mb-3">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="okx-balance">9,876.54</h4>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="okx-available">9,800.00</h4>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="okx-locked">76.54</h4>
+                                <div class="tab-pane fade" id="okx" role="tabpanel">
+                                    <div class="balance-info mb-3">
+                                        <div class="row">
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">总余额 (USDT)</h6>
+                                                <h4 id="okx-balance">9,876.54</h4>
+                                            </div>
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">可用 (USDT)</h6>
+                                                <h4 id="okx-available">9,800.00</h4>
+                                            </div>
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">锁定 (USDT)</h6>
+                                                <h4 id="okx-locked">76.54</h4>
+                                            </div>
                                         </div>
                                     </div>
+                                    <h6>持仓情况</h6>
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>币种</th>
+                                                <th>总数量</th>
+                                                <th>可用</th>
+                                                <th>锁定</th>
+                                                <th>价值 (USDT)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="okx-positions">
+                                            <tr>
+                                                <td>BTC</td>
+                                                <td>0.08765</td>
+                                                <td>0.08765</td>
+                                                <td>0.00000</td>
+                                                <td>5,612.34</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <h6>持仓情况</h6>
-                                <table class="table table-sm table-hover">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>币种</th>
-                                            <th>总数量</th>
-                                            <th>可用</th>
-                                            <th>锁定</th>
-                                            <th>价值 (USDT)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="okx-positions">
-                                        <tr>
-                                            <td>BTC</td>
-                                            <td>0.08765</td>
-                                            <td>0.08765</td>
-                                            <td>0.00000</td>
-                                            <td>5,612.34</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div class="tab-pane fade" id="bitget" role="tabpanel">
-                                <div class="balance-info mb-3">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="bitget-balance">7,654.32</h4>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="bitget-available">7,600.00</h4>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="bitget-locked">54.32</h4>
+                                <div class="tab-pane fade" id="bitget" role="tabpanel">
+                                    <div class="balance-info mb-3">
+                                        <div class="row">
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">总余额 (USDT)</h6>
+                                                <h4 id="bitget-balance">7,654.32</h4>
+                                            </div>
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">可用 (USDT)</h6>
+                                                <h4 id="bitget-available">7,600.00</h4>
+                                            </div>
+                                            <div class="col-lg-4 col-md-4 col-sm-4">
+                                                <h6 class="text-muted">锁定 (USDT)</h6>
+                                                <h4 id="bitget-locked">54.32</h4>
+                                            </div>
                                         </div>
                                     </div>
+                                    <h6>持仓情况</h6>
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>币种</th>
+                                                <th>总数量</th>
+                                                <th>可用</th>
+                                                <th>锁定</th>
+                                                <th>价值 (USDT)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="bitget-positions">
+                                            <tr>
+                                                <td>BTC</td>
+                                                <td>0.05432</td>
+                                                <td>0.05432</td>
+                                                <td>0.00000</td>
+                                                <td>3,476.23</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <h6>持仓情况</h6>
-                                <table class="table table-sm table-hover">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>币种</th>
-                                            <th>总数量</th>
-                                            <th>可用</th>
-                                            <th>锁定</th>
-                                            <th>价值 (USDT)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="bitget-positions">
-                                        <tr>
-                                            <td>BTC</td>
-                                            <td>0.05432</td>
-                                            <td>0.05432</td>
-                                            <td>0.00000</td>
-                                            <td>3,476.23</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
                             </div>
                         </div>
                     </div>
@@ -577,16 +616,16 @@
         </div>
     </main>
 
-    <footer class="bg-dark text-white py-4 mt-5">
+    <footer class="bg-dark text-white py-2 mt-4">
         <div class="container-fluid">
-            <div class="row">
+            <div class="row align-items-center">
                 <div class="col-md-6">
-                    <h5>校长的量化系统</h5>
-                    <p class="text-muted">实时监控多个交易所的价格差异，寻找套利机会。</p>
+                    <h5 class="mb-1">校长的量化系统</h5>
+                    <p class="text-muted mb-1" style="font-size: 0.9rem;">实时监控多个交易所的价格差异，寻找套利机会。</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="mb-0">服务器时间: <span id="server-time">2025-03-09 12:34:56</span></p>
-                    <p class="text-muted">版本: 1.0.0</p>
+                    <p class="mb-1">服务器时间: <span id="server-time">2025-03-09 12:34:56</span></p>
+                    <p class="text-muted mb-1" style="font-size: 0.9rem;">版本: 1.0.0</p>
                 </div>
             </div>
         </div>
@@ -622,15 +661,21 @@
     }
 
     // 更新系统状态显示
-    function updateStatus(running, mode, arbitrageCount) {
+    function updateStatus(running, mode, arbitrageCount, arbitrageRunning = false) {
         const statusBadge = document.getElementById('status-badge');
         const modeBadge = document.getElementById('mode-badge');
         const arbitrageCountBadge = document.getElementById('arbitrage-count-badge');
+        const arbitrageRunningBadge = document.getElementById('arbitrage-running-badge');
         const toggleBtn = document.getElementById('toggle-btn');
+        const toggleArbitrageBtn = document.getElementById('toggle-arbitrage-btn');
         
         // 更新运行状态
         statusBadge.textContent = running ? '运行中' : '已停止';
         statusBadge.className = `badge ${running ? 'bg-success' : 'bg-secondary'}`;
+        
+        // 更新套利运行状态
+        arbitrageRunningBadge.textContent = arbitrageRunning ? '套利运行中' : '套利已停止';
+        arbitrageRunningBadge.className = `badge ${arbitrageRunning ? 'bg-success' : 'bg-secondary'}`;
         
         // 更新模式状态（保持当前模式）
         if (mode) {
@@ -638,15 +683,21 @@
             localStorage.setItem('tradingMode', mode);  // 保存到本地存储
         }
         modeBadge.textContent = currentMode === 'real' ? '实盘' : '模拟';
-        modeBadge.className = `badge ${currentMode === 'real' ? 'bg-primary' : 'bg-warning'}`;
+        modeBadge.className = `badge ${currentMode === 'real' ? 'bg-danger' : 'bg-warning'}`;
         
         // 更新套利机会计数
         arbitrageCountBadge.textContent = `套利:${arbitrageCount || 0}`;
         
         // 更新按钮状态
         toggleBtn.textContent = running ? '停止运行' : '启动运行';
-        toggleBtn.className = `btn ${running ? 'btn-danger' : 'btn-primary'}`;
+        toggleBtn.className = `btn ${running ? 'btn-danger' : 'btn-primary'} flex-grow-1`;
         toggleBtn.dataset.running = running;
+        
+        // 更新套利按钮状态
+        toggleArbitrageBtn.textContent = arbitrageRunning ? '停止套利' : '启动套利';
+        toggleArbitrageBtn.className = `btn ${arbitrageRunning ? 'btn-danger' : 'btn-warning'} flex-grow-1`;
+        toggleArbitrageBtn.dataset.running = arbitrageRunning;
+        toggleArbitrageBtn.disabled = !running; // 如果监控没有运行，禁用套利按钮
     }
 
     // 切换系统运行状态
@@ -685,6 +736,61 @@
                     updateStatus(true, currentMode, 0);  // 保持当前模式
                 } else {
                     alert('启动失败: ' + result.message);
+                }
+            }
+        } catch (error) {
+            console.error('操作失败:', error);
+            alert('操作失败: ' + error.message);
+        }
+    }
+
+    // 切换套利系统运行状态
+    async function toggleArbitrageSystem() {
+        const toggleArbitrageBtn = document.getElementById('toggle-arbitrage-btn');
+        const running = toggleArbitrageBtn.dataset.running === 'true';
+        
+        try {
+            if (running) {
+                // 停止套利系统
+                const response = await fetch('/api/arbitrage/stop', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    // 只更新套利状态，保持其他状态不变
+                    const statusBadge = document.getElementById('status-badge');
+                    const running = statusBadge.textContent === '运行中';
+                    const arbitrageCountBadge = document.getElementById('arbitrage-count-badge');
+                    const count = parseInt(arbitrageCountBadge.textContent.split(':')[1]) || 0;
+                    
+                    updateStatus(running, currentMode, count, false);
+                    addLog('系统', '套利系统已停止');
+                } else {
+                    alert('停止套利失败: ' + result.message);
+                }
+            } else {
+                // 启动套利系统
+                const response = await fetch('/api/arbitrage/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    // 只更新套利状态，保持其他状态不变
+                    const statusBadge = document.getElementById('status-badge');
+                    const running = statusBadge.textContent === '运行中';
+                    const arbitrageCountBadge = document.getElementById('arbitrage-count-badge');
+                    const count = parseInt(arbitrageCountBadge.textContent.split(':')[1]) || 0;
+                    
+                    updateStatus(running, currentMode, count, true);
+                    addLog('系统', '套利系统已启动');
+                } else {
+                    alert('启动套利失败: ' + result.message);
                 }
             }
         } catch (error) {
@@ -817,12 +923,24 @@
             const statusResponse = await fetch('/api/status');
             const statusData = await statusResponse.json();
             
+            // 获取套利系统状态
+            let arbitrageRunning = false;
+            try {
+                const arbitrageStatusResponse = await fetch('/api/arbitrage/status');
+                const arbitrageStatusData = await arbitrageStatusResponse.json();
+                if (arbitrageStatusData.status === 'success') {
+                    arbitrageRunning = arbitrageStatusData.data.running;
+                }
+            } catch (error) {
+                console.error('获取套利系统状态失败:', error);
+            }
+            
             // 更新状态显示
             if (statusData.mode) {
                 currentMode = statusData.mode;
                 localStorage.setItem('tradingMode', statusData.mode);
             }
-            updateStatus(statusData.running, currentMode, statusData.arbitrage_count);
+            updateStatus(statusData.running, currentMode, statusData.arbitrage_count, arbitrageRunning);
             
             // 如果系统在运行，获取套利数据并更新统计
             if (statusData.running) {
@@ -843,6 +961,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         // 绑定按钮点击事件
         document.getElementById('toggle-btn').addEventListener('click', toggleSystem);
+        document.getElementById('toggle-arbitrage-btn').addEventListener('click', toggleArbitrageSystem);
         
         // 立即更新一次状态
         updateSystemStatus();
@@ -859,19 +978,24 @@
         }
     }
     
-    // 添加新日志时自动滚动到底部
-    function addLog(logText) {
-        const logsContainer = document.getElementById('operation-logs');
-        const logContainer = document.querySelector('.log-container');
+    // 添加新日志到日志容器
+    function addLog(type, message) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString();
+        const logText = `<span class="text-muted">[${timeStr}]</span> <strong>[${type}]</strong> ${message}`;
         
-        if (logsContainer && logContainer) {
+        const logsContainer = document.getElementById('operation-logs');
+        if (logsContainer) {
             const logItem = document.createElement('li');
             logItem.className = 'list-group-item';
             logItem.innerHTML = logText;
             logsContainer.appendChild(logItem);
             
             // 自动滚动到底部
-            logContainer.scrollTop = logContainer.scrollHeight;
+            const logContainer = document.querySelector('.log-container');
+            if (logContainer) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
             
             // 如果日志条目超过1000条，删除最早的日志
             const maxLogs = 1000;
