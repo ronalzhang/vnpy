@@ -187,20 +187,41 @@
         
         /* 调整底部的响应式行为 */
         footer {
-            min-height: 80px;
-            padding-top: 0.75rem !important;
-            padding-bottom: 0.75rem !important;
+            min-height: 50px !important; /* 进一步减小高度 */
+            padding-top: 0.4rem !important;
+            padding-bottom: 0.4rem !important;
         }
         
-        /* 在各种屏幕尺寸上保持原有布局 */
+        /* 在所有屏幕尺寸上保持原有布局 */
         @media (max-width: 767.98px) {
-            footer .col-md-6:first-child {
-                margin-bottom: 0.5rem;
+            footer .col-sm-6:first-child {
+                margin-bottom: 0;
             }
             
-            footer .col-md-6:last-child {
-                text-align: left !important;
+            footer .col-sm-6:last-child {
+                text-align: right !important;
             }
+        }
+
+        /* 确保所有模块对齐 */
+        .control-container {
+            padding-left: 12px;
+            padding-right: 12px;
+        }
+
+        /* 底部版本和时间始终保持在一行 */
+        footer .row {
+            flex-wrap: nowrap;
+        }
+        
+        footer h5 {
+            white-space: nowrap;
+            margin-right: 10px;
+        }
+        
+        footer p {
+            margin-bottom: 0 !important;
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -284,307 +305,310 @@
         <!-- 中间：系统控制和账户余额 (分两列) -->
         <div class="row mb-4">
             <!-- 系统控制 -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>系统控制</span>
-                    <div class="d-flex gap-2">
-                        <span id="status-badge" class="badge bg-secondary">已停止</span>
-                        <span id="arbitrage-running-badge" class="badge bg-secondary">套利已停止</span>
-                        <span id="mode-badge" class="badge bg-danger">实盘</span>
-                        <span id="arbitrage-count-badge" class="badge bg-success">套利:0</span>
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>系统控制</span>
+                        <div class="d-flex gap-2">
+                            <span id="status-badge" class="badge bg-secondary">已停止</span>
+                            <span id="arbitrage-running-badge" class="badge bg-secondary">套利已停止</span>
+                            <span id="mode-badge" class="badge bg-danger">实盘</span>
+                            <span id="arbitrage-count-badge" class="badge bg-success">套利:0</span>
+                        </div>
                     </div>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex gap-2">
-                        <button id="toggle-btn" class="btn btn-primary flex-grow-1" data-running="false">启动运行</button>
-                        <button id="toggle-arbitrage-btn" class="btn btn-warning flex-grow-1">启动套利</button>
+                    <div class="card-body">
+                        <div class="d-flex gap-2">
+                            <button id="toggle-btn" class="btn btn-primary flex-grow-1" data-running="false">启动运行</button>
+                            <button id="toggle-arbitrage-btn" class="btn btn-warning flex-grow-1">启动套利</button>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="row">
-                <!-- 策略运行结果 -->
-                <div class="col-12 col-xl-4 mb-4">
-                    <div class="card h-100">
-                        <div class="card-header">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">
-                                    <i class="fas fa-chart-line me-2"></i>策略运行结果
-                                </h5>
-                                <div>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="toggleDetailView()">
-                                        <i class="fas fa-exchange-alt me-1"></i>切换视图
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary ms-2" onclick="clearStrategyResults()">
-                                        <i class="fas fa-eraser me-1"></i>清空记录
-                                    </button>
+        <!-- 策略运行结果和账户余额 -->
+        <div class="row mb-4">
+            <!-- 策略运行结果 -->
+            <div class="col-12 col-xl-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-line me-2"></i>策略运行结果
+                            </h5>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="toggleDetailView()">
+                                    <i class="fas fa-exchange-alt me-1"></i>切换视图
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary ms-2" onclick="clearStrategyResults()">
+                                    <i class="fas fa-eraser me-1"></i>清空记录
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <!-- 概要视图 -->
+                        <div id="summary-view" class="p-3">
+                            <div class="row g-3">
+                                <!-- 今日统计 -->
+                                <div class="col-md-6">
+                                    <div class="card h-100 border-0 bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-muted mb-3">今日统计</h6>
+                                            <div class="row g-3">
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>套利次数:</span>
+                                                        <span id="today-trade-count" class="fw-bold">0</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>成功率:</span>
+                                                        <span id="today-success-rate" class="fw-bold">0%</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>盈利金额:</span>
+                                                        <span id="today-profit" class="fw-bold text-success">0.00 USDT</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>平均收益率:</span>
+                                                        <span id="today-avg-return" class="fw-bold text-success">0.00%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 资金转移 -->
+                                <div class="col-md-6">
+                                    <div class="card h-100 border-0 bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-muted mb-3">资金状态</h6>
+                                            <div class="row g-3">
+                                                <div class="col-12">
+                                                    <div class="progress" style="height: 25px;">
+                                                        <div id="binance-balance-bar" class="progress-bar bg-primary" role="progressbar" style="width: 33%;">
+                                                            Binance: 33%
+                                                        </div>
+                                                        <div id="okx-balance-bar" class="progress-bar bg-success" role="progressbar" style="width: 33%;">
+                                                            OKX: 33%
+                                                        </div>
+                                                        <div id="bitget-balance-bar" class="progress-bar bg-info" role="progressbar" style="width: 34%;">
+                                                            BitGet: 34%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-12">
+                                                    <small class="text-muted">上次资金转移: <span id="last-transfer-time">-</span></small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 资金效率统计 -->
+                                <div class="col-md-12 mt-3">
+                                    <div class="card h-100 border-0 bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-muted mb-3">资金效率统计</h6>
+                                            <div class="row g-3">
+                                                <div class="col-4">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>总投入:</span>
+                                                        <span id="total-invested" class="fw-bold">0.00 USDT</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-4">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>总回报:</span>
+                                                        <span id="total-return" class="fw-bold">0.00 USDT</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-4">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>资金效率:</span>
+                                                        <span id="capital-efficiency" class="fw-bold text-success">0.000%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="card-body p-0">
-                            <!-- 概要视图 -->
-                            <div id="summary-view" class="p-3">
-                                <div class="row g-3">
-                                    <!-- 今日统计 -->
-                                    <div class="col-md-6">
-                                        <div class="card h-100 border-0 bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-title text-muted mb-3">今日统计</h6>
-                                                <div class="row g-3">
-                                                    <div class="col-6">
-                                                        <div class="d-flex justify-content-between">
-                                                            <span>套利次数:</span>
-                                                            <span id="today-trade-count" class="fw-bold">0</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <div class="d-flex justify-content-between">
-                                                            <span>成功率:</span>
-                                                            <span id="today-success-rate" class="fw-bold">0%</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <div class="d-flex justify-content-between">
-                                                            <span>盈利金额:</span>
-                                                            <span id="today-profit" class="fw-bold text-success">0.00 USDT</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <div class="d-flex justify-content-between">
-                                                            <span>平均收益率:</span>
-                                                            <span id="today-avg-return" class="fw-bold text-success">0.00%</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- 资金转移 -->
-                                    <div class="col-md-6">
-                                        <div class="card h-100 border-0 bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-title text-muted mb-3">资金状态</h6>
-                                                <div class="row g-3">
-                                                    <div class="col-12">
-                                                        <div class="progress" style="height: 25px;">
-                                                            <div id="binance-balance-bar" class="progress-bar bg-primary" role="progressbar" style="width: 33%;">
-                                                                Binance: 33%
-                                                            </div>
-                                                            <div id="okx-balance-bar" class="progress-bar bg-success" role="progressbar" style="width: 33%;">
-                                                                OKX: 33%
-                                                            </div>
-                                                            <div id="bitget-balance-bar" class="progress-bar bg-info" role="progressbar" style="width: 34%;">
-                                                                BitGet: 34%
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <small class="text-muted">上次资金转移: <span id="last-transfer-time">-</span></small>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- 资金效率统计 -->
-                                    <div class="col-md-12 mt-3">
-                                        <div class="card h-100 border-0 bg-light">
-                                            <div class="card-body">
-                                                <h6 class="card-title text-muted mb-3">资金效率统计</h6>
-                                                <div class="row g-3">
-                                                    <div class="col-4">
-                                                        <div class="d-flex justify-content-between">
-                                                            <span>总投入:</span>
-                                                            <span id="total-invested" class="fw-bold">0.00 USDT</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <div class="d-flex justify-content-between">
-                                                            <span>总回报:</span>
-                                                            <span id="total-return" class="fw-bold">0.00 USDT</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-4">
-                                                        <div class="d-flex justify-content-between">
-                                                            <span>资金效率:</span>
-                                                            <span id="capital-efficiency" class="fw-bold text-success">0.000%</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 详细视图 -->
-                            <div id="detail-view" class="d-none">
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-striped mb-0">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>时间</th>
-                                                <th>交易对</th>
-                                                <th>买入所</th>
-                                                <th>卖出所</th>
-                                                <th>买入价</th>
-                                                <th>卖出价</th>
-                                                <th>数量</th>
-                                                <th>投入</th>
-                                                <th>回报</th>
-                                                <th>状态</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="strategy-details">
-                                            <!-- 策略执行详情将通过JavaScript动态添加 -->
-                                        </tbody>
-                                    </table>
-                                </div>
+                        
+                        <!-- 详细视图 -->
+                        <div id="detail-view" class="d-none">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>时间</th>
+                                            <th>交易对</th>
+                                            <th>买入所</th>
+                                            <th>卖出所</th>
+                                            <th>买入价</th>
+                                            <th>卖出价</th>
+                                            <th>数量</th>
+                                            <th>投入</th>
+                                            <th>回报</th>
+                                            <th>状态</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="strategy-details">
+                                        <!-- 策略执行详情将通过JavaScript动态添加 -->
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- 账户余额 -->
-                <div class="col-12 col-xl-8 mb-4">
-                    <div id="account-balance" class="card h-100">
-                        <div class="card-header bg-primary text-white">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>账户余额和持仓</h5>
-                                <button id="toggle-privacy" class="btn btn-outline-light btn-sm" title="切换余额显示">
-                                    <i class="fas fa-eye-slash"></i>
-                                </button>
-                            </div>
+            </div>
+            
+            <!-- 账户余额 -->
+            <div class="col-12 col-xl-8 mb-4">
+                <div id="account-balance" class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>账户余额和持仓</h5>
+                            <button id="toggle-privacy" class="btn btn-outline-light btn-sm" title="切换余额显示">
+                                <i class="fas fa-eye-slash"></i>
+                            </button>
                         </div>
-                        <div class="card-body">
-                            <ul class="nav nav-tabs" id="balanceTab" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="binance-tab" data-bs-toggle="tab" data-bs-target="#binance" type="button" role="tab">Binance</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="okx-tab" data-bs-toggle="tab" data-bs-target="#okx" type="button" role="tab">OKX</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="bitget-tab" data-bs-toggle="tab" data-bs-target="#bitget" type="button" role="tab">Bitget</button>
-                                </li>
-                            </ul>
-                            <div class="tab-content p-3" id="balanceTabContent">
-                                <div class="tab-pane fade show active" id="binance" role="tabpanel">
-                                    <div class="balance-info mb-3">
-                                        <div class="row">
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">总余额 (USDT)</h6>
-                                                <h4 id="binance-balance">12,345.67</h4>
-                                            </div>
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">可用 (USDT)</h6>
-                                                <h4 id="binance-available">12,340.00</h4>
-                                            </div>
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">锁定 (USDT)</h6>
-                                                <h4 id="binance-locked">5.67</h4>
-                                            </div>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs" id="balanceTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="binance-tab" data-bs-toggle="tab" data-bs-target="#binance" type="button" role="tab">Binance</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="okx-tab" data-bs-toggle="tab" data-bs-target="#okx" type="button" role="tab">OKX</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="bitget-tab" data-bs-toggle="tab" data-bs-target="#bitget" type="button" role="tab">Bitget</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content p-3" id="balanceTabContent">
+                            <div class="tab-pane fade show active" id="binance" role="tabpanel">
+                                <div class="balance-info mb-3">
+                                    <div class="row">
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">总余额 (USDT)</h6>
+                                            <h4 id="binance-balance">12,345.67</h4>
+                                        </div>
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">可用 (USDT)</h6>
+                                            <h4 id="binance-available">12,340.00</h4>
+                                        </div>
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">锁定 (USDT)</h6>
+                                            <h4 id="binance-locked">5.67</h4>
                                         </div>
                                     </div>
-                                    <h6>持仓情况</h6>
-                                    <table class="table table-sm table-hover">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>币种</th>
-                                                <th>总数量</th>
-                                                <th>可用</th>
-                                                <th>锁定</th>
-                                                <th>价值 (USDT)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="binance-positions">
-                                            <tr>
-                                                <td>BTC</td>
-                                                <td>0.12345</td>
-                                                <td>0.12345</td>
-                                                <td>0.00000</td>
-                                                <td>7,893.45</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
                                 </div>
-                                <div class="tab-pane fade" id="okx" role="tabpanel">
-                                    <div class="balance-info mb-3">
-                                        <div class="row">
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">总余额 (USDT)</h6>
-                                                <h4 id="okx-balance">9,876.54</h4>
-                                            </div>
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">可用 (USDT)</h6>
-                                                <h4 id="okx-available">9,800.00</h4>
-                                            </div>
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">锁定 (USDT)</h6>
-                                                <h4 id="okx-locked">76.54</h4>
-                                            </div>
+                                <h6>持仓情况</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>币种</th>
+                                            <th>总数量</th>
+                                            <th>可用</th>
+                                            <th>锁定</th>
+                                            <th>价值 (USDT)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="binance-positions">
+                                        <tr>
+                                            <td>BTC</td>
+                                            <td>0.12345</td>
+                                            <td>0.12345</td>
+                                            <td>0.00000</td>
+                                            <td>7,893.45</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-pane fade" id="okx" role="tabpanel">
+                                <div class="balance-info mb-3">
+                                    <div class="row">
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">总余额 (USDT)</h6>
+                                            <h4 id="okx-balance">9,876.54</h4>
+                                        </div>
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">可用 (USDT)</h6>
+                                            <h4 id="okx-available">9,800.00</h4>
+                                        </div>
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">锁定 (USDT)</h6>
+                                            <h4 id="okx-locked">76.54</h4>
                                         </div>
                                     </div>
-                                    <h6>持仓情况</h6>
-                                    <table class="table table-sm table-hover">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>币种</th>
-                                                <th>总数量</th>
-                                                <th>可用</th>
-                                                <th>锁定</th>
-                                                <th>价值 (USDT)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="okx-positions">
-                                            <tr>
-                                                <td>BTC</td>
-                                                <td>0.08765</td>
-                                                <td>0.08765</td>
-                                                <td>0.00000</td>
-                                                <td>5,612.34</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
                                 </div>
-                                <div class="tab-pane fade" id="bitget" role="tabpanel">
-                                    <div class="balance-info mb-3">
-                                        <div class="row">
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">总余额 (USDT)</h6>
-                                                <h4 id="bitget-balance">7,654.32</h4>
-                                            </div>
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">可用 (USDT)</h6>
-                                                <h4 id="bitget-available">7,600.00</h4>
-                                            </div>
-                                            <div class="col-lg-4 col-md-4 col-sm-4">
-                                                <h6 class="text-muted">锁定 (USDT)</h6>
-                                                <h4 id="bitget-locked">54.32</h4>
-                                            </div>
+                                <h6>持仓情况</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>币种</th>
+                                            <th>总数量</th>
+                                            <th>可用</th>
+                                            <th>锁定</th>
+                                            <th>价值 (USDT)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="okx-positions">
+                                        <tr>
+                                            <td>BTC</td>
+                                            <td>0.08765</td>
+                                            <td>0.08765</td>
+                                            <td>0.00000</td>
+                                            <td>5,612.34</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-pane fade" id="bitget" role="tabpanel">
+                                <div class="balance-info mb-3">
+                                    <div class="row">
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">总余额 (USDT)</h6>
+                                            <h4 id="bitget-balance">7,654.32</h4>
+                                        </div>
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">可用 (USDT)</h6>
+                                            <h4 id="bitget-available">7,600.00</h4>
+                                        </div>
+                                        <div class="col-lg-4 col-md-4 col-sm-4">
+                                            <h6 class="text-muted">锁定 (USDT)</h6>
+                                            <h4 id="bitget-locked">54.32</h4>
                                         </div>
                                     </div>
-                                    <h6>持仓情况</h6>
-                                    <table class="table table-sm table-hover">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>币种</th>
-                                                <th>总数量</th>
-                                                <th>可用</th>
-                                                <th>锁定</th>
-                                                <th>价值 (USDT)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="bitget-positions">
-                                            <tr>
-                                                <td>BTC</td>
-                                                <td>0.05432</td>
-                                                <td>0.05432</td>
-                                                <td>0.00000</td>
-                                                <td>3,476.23</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
                                 </div>
+                                <h6>持仓情况</h6>
+                                <table class="table table-sm table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>币种</th>
+                                            <th>总数量</th>
+                                            <th>可用</th>
+                                            <th>锁定</th>
+                                            <th>价值 (USDT)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bitget-positions">
+                                        <tr>
+                                            <td>BTC</td>
+                                            <td>0.05432</td>
+                                            <td>0.05432</td>
+                                            <td>0.00000</td>
+                                            <td>3,476.23</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -619,13 +643,17 @@
     <footer class="bg-dark text-white py-2 mt-4">
         <div class="container-fluid">
             <div class="row align-items-center">
-                <div class="col-md-6">
-                    <h5 class="mb-1">校长的量化系统</h5>
-                    <p class="text-muted mb-1" style="font-size: 0.9rem;">实时监控多个交易所的价格差异，寻找套利机会。</p>
+                <div class="col-sm-6 col-6">
+                    <div class="d-flex align-items-center">
+                        <h5 class="mb-0 me-2" style="font-size: 1.1rem;">校长的量化系统</h5>
+                        <p class="text-muted mb-0" style="font-size: 0.85rem; white-space: nowrap;">实时监控多个交易所的价格差异，寻找套利机会。</p>
+                    </div>
                 </div>
-                <div class="col-md-6 text-md-end">
-                    <p class="mb-1">服务器时间: <span id="server-time">2025-03-09 12:34:56</span></p>
-                    <p class="text-muted mb-1" style="font-size: 0.9rem;">版本: 1.0.0</p>
+                <div class="col-sm-6 col-6 text-end">
+                    <div class="d-flex justify-content-end">
+                        <p class="mb-0 me-3" style="font-size: 0.9rem;">服务器时间: <span id="server-time">2025-03-09 12:34:56</span></p>
+                        <p class="text-muted mb-0" style="font-size: 0.85rem;">版本: 1.0.0</p>
+                    </div>
                 </div>
             </div>
         </div>
