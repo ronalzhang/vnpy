@@ -1739,5 +1739,350 @@ class QuantitativeService:
         logger.info(f"更新策略成功: {name} (ID: {strategy_id})")
         return True
 
+    def get_strategies(self) -> List[Dict[str, Any]]:
+        """获取所有策略 - 按收益率排序"""
+        strategies = []
+        for strategy in self.strategies.values():
+            # 计算策略收益率
+            strategy_return = self._calculate_strategy_return(strategy.config.id)
+            
+            strategies.append({
+                'id': strategy.config.id,
+                'name': strategy.config.name,
+                'type': strategy.config.strategy_type.value,
+                'symbol': strategy.config.symbol,
+                'enabled': strategy.config.enabled,
+                'running': strategy.is_running,
+                'parameters': strategy.config.parameters,
+                'created_time': strategy.config.created_time.isoformat(),
+                'updated_time': strategy.config.updated_time.isoformat(),
+                'total_return': strategy_return,
+                'daily_return': self._calculate_daily_return(strategy.config.id),
+                'win_rate': self._calculate_win_rate(strategy.config.id),
+                'total_trades': self._count_strategy_trades(strategy.config.id),
+                'last_signal_time': self._get_last_signal_time(strategy.config.id)
+            })
+        
+        # 按收益率排序（收益高的排前面）
+        strategies.sort(key=lambda x: x['total_return'], reverse=True)
+        return strategies
+
+    def _calculate_strategy_return(self, strategy_id: str) -> float:
+        """计算策略总收益率"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT SUM(
+                        CASE 
+                            WHEN signal_type = 'buy' THEN -price * quantity
+                            WHEN signal_type = 'sell' THEN price * quantity
+                            ELSE 0
+                        END
+                    ) as total_pnl,
+                    SUM(
+                        CASE 
+                            WHEN signal_type = 'buy' THEN price * quantity
+                            ELSE 0
+                        END
+                    ) as total_investment
+                    FROM trading_signals 
+                    WHERE strategy_id = ? AND executed = 1
+                """, (strategy_id,))
+                
+                result = cursor.fetchone()
+                if result and result[1] and result[1] > 0:
+                    return result[0] / result[1]
+                return 0.0
+        except Exception as e:
+            logger.error(f"计算策略收益时出错: {e}")
+            return 0.0
+
+    def _calculate_daily_return(self, strategy_id: str) -> float:
+        """计算策略日收益率"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT SUM(
+                        CASE 
+                            WHEN signal_type = 'buy' THEN -price * quantity
+                            WHEN signal_type = 'sell' THEN price * quantity
+                            ELSE 0
+                        END
+                    ) as daily_pnl,
+                    SUM(
+                        CASE 
+                            WHEN signal_type = 'buy' THEN price * quantity
+                            ELSE 0
+                        END
+                    ) as daily_investment
+                    FROM trading_signals 
+                    WHERE strategy_id = ? AND executed = 1 
+                    AND date(timestamp) = date('now')
+                """, (strategy_id,))
+                
+                result = cursor.fetchone()
+                if result and result[1] and result[1] > 0:
+                    return result[0] / result[1]
+                return 0.0
+        except Exception as e:
+            logger.error(f"计算策略日收益时出错: {e}")
+            return 0.0
+
+    def _calculate_win_rate(self, strategy_id: str) -> float:
+        """计算策略胜率"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT 
+                        COUNT(*) as total_trades,
+                        SUM(CASE WHEN (
+                            SELECT SUM(
+                                CASE 
+                                    WHEN s2.signal_type = 'sell' THEN s2.price * s2.quantity
+                                    WHEN s2.signal_type = 'buy' THEN -s2.price * s2.quantity
+                                    ELSE 0
+                                END
+                            ) FROM trading_signals s2 
+                            WHERE s2.strategy_id = s1.strategy_id 
+                            AND s2.timestamp >= s1.timestamp
+                            AND s2.timestamp <= datetime(s1.timestamp, '+1 hour')
+                        ) > 0 THEN 1 ELSE 0 END) as profitable_trades
+                    FROM trading_signals s1
+                    WHERE s1.strategy_id = ? AND s1.executed = 1
+                """, (strategy_id,))
+                
+                result = cursor.fetchone()
+                if result and result[0] > 0:
+                    return result[1] / result[0]
+                return 0.0
+        except Exception as e:
+            logger.error(f"计算策略胜率时出错: {e}")
+            return 0.0
+
+    def _count_strategy_trades(self, strategy_id: str) -> int:
+        """统计策略交易次数"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT COUNT(*) FROM trading_signals 
+                    WHERE strategy_id = ? AND executed = 1
+                """, (strategy_id,))
+                result = cursor.fetchone()
+                return result[0] if result else 0
+        except Exception as e:
+            logger.error(f"统计策略交易次数时出错: {e}")
+            return 0
+
+    def _get_last_signal_time(self, strategy_id: str) -> Optional[str]:
+        """获取策略最后信号时间"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT timestamp FROM trading_signals 
+                    WHERE strategy_id = ? 
+                    ORDER BY timestamp DESC LIMIT 1
+                """, (strategy_id,))
+                result = cursor.fetchone()
+                return result[0] if result else None
+        except Exception as e:
+            logger.error(f"获取策略最后信号时间时出错: {e}")
+            return None
+            
+    def get_signals(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """获取最新信号"""
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM trading_signals 
+                ORDER BY timestamp DESC 
+                LIMIT ?
+            """, (limit,))
+            
+            signals = []
+            for row in cursor.fetchall():
+                signals.append({
+                    'id': row[0],
+                    'strategy_id': row[1],
+                    'symbol': row[2],
+                    'signal_type': row[3],
+                    'price': row[4],
+                    'quantity': row[5],
+                    'confidence': row[6],
+                    'timestamp': row[7],
+                    'executed': bool(row[8])
+                })
+            return signals
+            
+    def get_positions(self) -> List[Dict[str, Any]]:
+        """获取持仓信息"""
+        positions = []
+        for position in self.positions.values():
+            positions.append({
+                'symbol': position.symbol,
+                'quantity': position.quantity,
+                'avg_price': position.avg_price,
+                'current_price': position.current_price,
+                'unrealized_pnl': position.unrealized_pnl,
+                'realized_pnl': position.realized_pnl,
+                'updated_time': position.updated_time.isoformat()
+            })
+        return positions
+        
+    def get_performance(self, days: int = 30) -> Dict[str, Any]:
+        """获取绩效数据"""
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+        
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM performance_metrics 
+                WHERE timestamp >= ? AND timestamp <= ?
+                ORDER BY timestamp ASC
+            """, (start_date, end_date))
+            
+            metrics = []
+            for row in cursor.fetchall():
+                metrics.append({
+                    'total_return': row[1],
+                    'daily_return': row[2],
+                    'max_drawdown': row[3],
+                    'sharpe_ratio': row[4],
+                    'win_rate': row[5],
+                    'total_trades': row[6],
+                    'profitable_trades': row[7],
+                    'timestamp': row[8]
+                })
+                
+        return {
+            'metrics': metrics,
+            'summary': self._calculate_performance_summary(metrics) if metrics else {}
+        }
+        
+    def get_operation_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """获取操作日志"""
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM operation_logs 
+                ORDER BY timestamp DESC 
+                LIMIT ?
+            """, (limit,))
+            
+            logs = []
+            for row in cursor.fetchall():
+                logs.append({
+                    'id': row[0],
+                    'operation_type': row[1],
+                    'operation_detail': row[2],
+                    'user_id': row[3],
+                    'result': row[4],
+                    'timestamp': row[5]
+                })
+            return logs
+            
+    def process_market_data(self, symbol: str, price_data: Dict[str, Any]):
+        """处理市场数据，生成交易信号"""
+        logger.debug(f"处理市场数据: {symbol}, 价格: {price_data.get('price', 'N/A')}")
+        
+        for strategy in self.strategies.values():
+            if strategy.config.symbol == symbol and strategy.is_running:
+                try:
+                    signal = strategy.generate_signal(price_data)
+                    if signal:
+                        self._save_signal_to_db(signal)
+                        logger.info(f"生成交易信号: {signal.signal_type.value} {signal.symbol} @ {signal.price}")
+                except Exception as e:
+                    logger.error(f"策略 {strategy.config.name} 生成信号时出错: {e}")
+        
+        running_strategies = [s for s in self.strategies.values() if s.is_running]
+        if not running_strategies:
+            logger.debug(f"没有运行中的策略处理 {symbol} 的市场数据")
+        else:
+            symbol_strategies = [s for s in running_strategies if s.config.symbol == symbol]
+            if not symbol_strategies:
+                logger.debug(f"没有针对 {symbol} 的运行中策略")
+            else:
+                logger.debug(f"为 {symbol} 找到 {len(symbol_strategies)} 个运行中的策略")
+        
+    def _save_strategy_to_db(self, config: StrategyConfig):
+        """保存策略到数据库"""
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO quant_strategies 
+                (id, name, strategy_type, symbol, enabled, parameters, created_time, updated_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                config.id, config.name, config.strategy_type.value, config.symbol,
+                config.enabled, json.dumps(config.parameters),
+                config.created_time, config.updated_time
+            ))
+            conn.commit()
+            
+    def _update_strategy_in_db(self, config: StrategyConfig):
+        """更新数据库中的策略"""
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE quant_strategies 
+                SET name = ?, symbol = ?, enabled = ?, parameters = ?, updated_time = ?
+                WHERE id = ?
+            """, (
+                config.name, config.symbol, config.enabled, json.dumps(config.parameters),
+                config.updated_time, config.id
+            ))
+            conn.commit()
+            
+    def _save_signal_to_db(self, signal: TradingSignal):
+        """保存信号到数据库"""
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO trading_signals 
+                (id, strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                signal.id, signal.strategy_id, signal.symbol, signal.signal_type.value,
+                signal.price, signal.quantity, signal.confidence, signal.timestamp, signal.executed
+            ))
+            conn.commit()
+            
+    def _log_operation(self, operation_type: str, detail: str, result: str):
+        """记录操作日志"""
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO operation_logs 
+                (operation_type, operation_detail, result, timestamp)
+                VALUES (?, ?, ?, ?)
+            """, (operation_type, detail, result, datetime.now()))
+            conn.commit()
+            
+    def _calculate_performance_summary(self, metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """计算绩效摘要"""
+        if not metrics:
+            return {}
+            
+        latest = metrics[-1]
+        returns = [m['daily_return'] for m in metrics]
+        
+        return {
+            'total_return': latest['total_return'],
+            'avg_daily_return': np.mean(returns),
+            'volatility': np.std(returns),
+            'max_drawdown': latest['max_drawdown'],
+            'sharpe_ratio': latest['sharpe_ratio'],
+            'win_rate': latest['win_rate'],
+            'total_trades': latest['total_trades']
+        }
+
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 
+
+# 在QuantitativeService类末尾添加所有缺失的方法（在创建实例之前）
