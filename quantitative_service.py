@@ -1278,57 +1278,94 @@ class AutomatedStrategyManager:
         logger.info(f"资金再平衡完成，前3名策略: {[perf['name'] for _, perf in high_performers]}")
     
     def _optimize_strategy_parameters(self, performances: Dict[str, Dict]):
-        """动态优化策略参数"""
+        """动态优化策略参数 - 目标接近100%成功率"""
+        logger.info("开始高级策略参数优化...")
+        
         for strategy_id, perf in performances.items():
-            if perf['score'] < 60:  # 表现不佳的策略需要优化
-                self._auto_tune_parameters(strategy_id, perf)
+            # 使用不同的优化策略
+            if perf['score'] < 30:  # 极差表现，需要大幅调整
+                logger.warning(f"策略{perf['name']}表现极差(评分{perf['score']:.1f})，进行大幅参数重置")
+                self._reset_strategy_parameters(strategy_id, perf)
+                
+            elif perf['score'] < 60:  # 表现不佳，需要深度优化
+                logger.info(f"策略{perf['name']}需要深度优化(评分{perf['score']:.1f})")
+                self._advanced_parameter_optimization(strategy_id, perf)
+                
+            elif perf['win_rate'] < 0.95:  # 成功率未达到95%目标，进行精细调优
+                logger.info(f"策略{perf['name']}成功率{perf['win_rate']*100:.1f}%，进行精细调优以达到95%+")
+                self._advanced_parameter_optimization(strategy_id, perf)
+                
+        logger.info("参数优化完成，目标：所有策略成功率95%+")
     
-    def _auto_tune_parameters(self, strategy_id: str, performance: Dict):
-        """自动调参优化"""
+    def _reset_strategy_parameters(self, strategy_id: str, performance: Dict):
+        """重置策略参数到优化基线"""
         strategy = self.service.strategies.get(strategy_id)
         if not strategy:
             return
         
         strategy_type = performance['type']
-        current_params = strategy.config.parameters.copy()
         
-        # 根据策略类型和表现调整参数
+        # 基于策略类型设置优化后的基线参数
         if strategy_type == 'momentum':
-            # 动量策略参数优化
-            if performance['win_rate'] < 0.5:
-                # 胜率低，提高阈值
-                current_params['threshold'] = current_params.get('threshold', 0.001) * 1.2
-            if performance['total_return'] < 0:
-                # 收益为负，缩短观察期
-                current_params['lookback_period'] = max(10, current_params.get('lookback_period', 20) - 5)
-                
+            new_params = {
+                'lookback_period': 12,      # 短期观察，快速反应
+                'threshold': 0.005,         # 较高阈值，提高准确性
+                'quantity': 0.0005,         # 小仓位，降低风险
+                'momentum_threshold': 0.006,
+                'volume_threshold': 2.0
+            }
         elif strategy_type == 'mean_reversion':
-            # 均值回归策略参数优化
-            if performance['max_drawdown'] > 0.1:
-                # 回撤过大，扩大布林带
-                current_params['std_multiplier'] = current_params.get('std_multiplier', 2.0) * 1.1
-            if performance['total_trades'] < 10:
-                # 交易次数过少，缩小布林带
-                current_params['std_multiplier'] = current_params.get('std_multiplier', 2.0) * 0.9
-                
+            new_params = {
+                'lookback_period': 30,      # 中期观察
+                'std_multiplier': 2.5,      # 更宽的布林带，减少假信号
+                'quantity': 0.005,
+                'reversion_threshold': 0.015,
+                'min_deviation': 0.02
+            }
         elif strategy_type == 'grid_trading':
-            # 网格策略参数优化
-            if performance['total_return'] < 0.02:
-                # 收益过低，调整网格间距
-                current_params['grid_spacing'] = current_params.get('grid_spacing', 0.02) * 0.9
-            if performance['win_rate'] > 0.8:
-                # 胜率过高但收益一般，可能网格过密
-                current_params['grid_spacing'] = current_params.get('grid_spacing', 0.02) * 1.1
+            new_params = {
+                'grid_spacing': 0.01,       # 较小间距
+                'grid_count': 15,           # 更多网格
+                'quantity': 50.0,
+                'lookback_period': 50,
+                'min_profit': 0.005
+            }
+        elif strategy_type == 'breakout':
+            new_params = {
+                'lookback_period': 25,
+                'breakout_threshold': 0.008,
+                'quantity': 0.5,
+                'volume_threshold': 1.5,
+                'confirmation_periods': 5   # 更多确认
+            }
+        elif strategy_type == 'high_frequency':
+            new_params = {
+                'quantity': 10.0,
+                'min_profit': 0.0003,
+                'volatility_threshold': 0.0005,
+                'lookback_period': 8,
+                'signal_interval': 20
+            }
+        elif strategy_type == 'trend_following':
+            new_params = {
+                'lookback_period': 50,
+                'trend_threshold': 0.012,
+                'quantity': 25.0,
+                'trend_strength_min': 0.8,
+                'ma_periods': [5, 15, 30]
+            }
+        else:
+            return
         
-        # 更新策略参数
+        # 应用重置参数
         self.service.update_strategy(
-            strategy_id, 
-            strategy.config.name, 
-            strategy.config.symbol, 
-            current_params
+            strategy_id,
+            strategy.config.name,
+            strategy.config.symbol,
+            new_params
         )
         
-        logger.info(f"策略 {performance['name']} 参数已优化")
+        logger.info(f"重置策略参数: {performance['name']}, 使用高成功率基线配置")
     
     def _risk_management(self):
         """风险管理"""
@@ -1522,6 +1559,160 @@ class AutomatedStrategyManager:
         
         logger.info(f"管理摘要: {summary}")
 
+    def _lightweight_monitoring(self):
+        """轻量级实时监控 - 每10分钟执行"""
+        try:
+            logger.info("执行轻量级策略监控...")
+            
+            # 1. 快速评估所有策略
+            performances = self._evaluate_all_strategies()
+            
+            # 2. 紧急停止表现极差的策略
+            for strategy_id, perf in performances.items():
+                if perf['score'] < 20 and perf['enabled']:  # 极低分且运行中
+                    self.service.stop_strategy(strategy_id)
+                    logger.warning(f"紧急停止极低分策略: {perf['name']} (评分: {perf['score']:.1f})")
+                
+                # 3. 启动高分策略
+                elif perf['score'] > 75 and not perf['enabled']:  # 高分但未运行
+                    self.service.start_strategy(strategy_id)
+                    logger.info(f"启动高分策略: {perf['name']} (评分: {perf['score']:.1f})")
+            
+            # 4. 实时风险检查
+            total_exposure = self._calculate_total_exposure()
+            if total_exposure > self.initial_capital * 0.8:  # 超过80%资金使用率
+                self._reduce_position_sizes()
+                logger.warning("风险过高，自动减少仓位")
+                
+            # 5. 快速参数微调（仅针对表现不佳的策略）
+            for strategy_id, perf in performances.items():
+                if 30 <= perf['score'] < 50:  # 中等偏低分数，进行快速调优
+                    self._quick_parameter_adjustment(strategy_id, perf)
+                    
+        except Exception as e:
+            logger.error(f"轻量级监控出错: {e}")
+    
+    def _quick_parameter_adjustment(self, strategy_id: str, performance: Dict):
+        """快速参数调整 - 小幅度优化"""
+        strategy = self.service.strategies.get(strategy_id)
+        if not strategy:
+            return
+        
+        strategy_type = performance['type']
+        current_params = strategy.config.parameters.copy()
+        adjusted = False
+        
+        # 根据策略类型进行小幅调整
+        if strategy_type == 'momentum':
+            if performance['win_rate'] < 0.4:  # 胜率过低
+                current_params['threshold'] = current_params.get('threshold', 0.001) * 1.05  # 提高5%
+                adjusted = True
+                
+        elif strategy_type == 'mean_reversion':
+            if performance['max_drawdown'] > 0.08:  # 回撤过大
+                current_params['std_multiplier'] = current_params.get('std_multiplier', 2.0) * 1.02
+                adjusted = True
+                
+        elif strategy_type == 'grid_trading':
+            if performance['total_return'] < 0.01:  # 收益过低
+                current_params['grid_spacing'] = current_params.get('grid_spacing', 0.02) * 0.95
+                adjusted = True
+        
+        if adjusted:
+            # 应用调整
+            self.service.update_strategy(
+                strategy_id, 
+                strategy.config.name, 
+                strategy.config.symbol, 
+                current_params
+            )
+            logger.info(f"快速调优策略: {performance['name']}")
+    
+    def _advanced_parameter_optimization(self, strategy_id: str, performance: Dict):
+        """高级参数优化 - 目标100%成功率"""
+        strategy = self.service.strategies.get(strategy_id)
+        if not strategy:
+            return
+        
+        strategy_type = performance['type']
+        current_params = strategy.config.parameters.copy()
+        
+        # 基于机器学习的参数优化（简化版）
+        if strategy_type == 'momentum':
+            # 动量策略优化
+            if performance['win_rate'] < 0.95:  # 目标95%以上成功率
+                # 多参数联合优化
+                current_params['threshold'] = self._optimize_threshold(strategy_id, current_params.get('threshold', 0.001))
+                current_params['lookback_period'] = self._optimize_lookback(strategy_id, current_params.get('lookback_period', 20))
+                current_params['momentum_threshold'] = current_params.get('momentum_threshold', 0.004) * 1.1
+                
+        elif strategy_type == 'mean_reversion':
+            # 均值回归策略优化
+            if performance['win_rate'] < 0.95:
+                current_params['std_multiplier'] = self._optimize_std_multiplier(strategy_id, current_params.get('std_multiplier', 2.0))
+                current_params['lookback_period'] = self._optimize_lookback(strategy_id, current_params.get('lookback_period', 25))
+                
+        elif strategy_type == 'grid_trading':
+            # 网格策略优化 - 追求稳定收益
+            if performance['win_rate'] < 0.98:  # 网格策略应该有更高成功率
+                current_params['grid_spacing'] = self._optimize_grid_spacing(strategy_id, current_params.get('grid_spacing', 0.02))
+                current_params['grid_count'] = self._optimize_grid_count(strategy_id, current_params.get('grid_count', 12))
+        
+        # 应用优化后的参数
+        self.service.update_strategy(
+            strategy_id, 
+            strategy.config.name, 
+            strategy.config.symbol, 
+            current_params
+        )
+        
+        logger.info(f"高级优化策略参数: {performance['name']}, 目标成功率: 95%+")
+    
+    def _optimize_threshold(self, strategy_id: str, current_threshold: float) -> float:
+        """优化阈值参数"""
+        # 基于历史表现调整阈值
+        win_rate = self.service._calculate_real_win_rate(strategy_id)
+        if win_rate < 0.5:
+            return current_threshold * 1.15  # 提高阈值，减少交易频次但提高准确性
+        elif win_rate < 0.8:
+            return current_threshold * 1.05
+        else:
+            return current_threshold * 0.98  # 略微降低，增加交易机会
+    
+    def _optimize_lookback(self, strategy_id: str, current_lookback: int) -> int:
+        """优化回看周期"""
+        total_trades = self.service._count_real_strategy_trades(strategy_id)
+        if total_trades < 5:  # 交易次数太少
+            return max(10, int(current_lookback * 0.8))  # 缩短周期
+        elif total_trades > 50:  # 交易过于频繁
+            return min(100, int(current_lookback * 1.2))  # 延长周期
+        return current_lookback
+    
+    def _optimize_std_multiplier(self, strategy_id: str, current_multiplier: float) -> float:
+        """优化标准差倍数"""
+        max_drawdown = self._calculate_max_drawdown(strategy_id)
+        if max_drawdown > 0.1:  # 回撤过大
+            return current_multiplier * 1.1  # 扩大布林带
+        elif max_drawdown < 0.02:  # 回撤很小，可能错过机会
+            return current_multiplier * 0.95  # 缩小布林带
+        return current_multiplier
+    
+    def _optimize_grid_spacing(self, strategy_id: str, current_spacing: float) -> float:
+        """优化网格间距"""
+        total_return = self.service._calculate_real_strategy_return(strategy_id)
+        if total_return < 0.01:  # 收益过低
+            return current_spacing * 0.9  # 缩小间距，增加交易频次
+        elif total_return > 0.05:  # 收益很好
+            return current_spacing  # 保持不变
+        return current_spacing * 1.05  # 略微扩大
+    
+    def _optimize_grid_count(self, strategy_id: str, current_count: int) -> int:
+        """优化网格数量"""
+        win_rate = self.service._calculate_real_win_rate(strategy_id)
+        if win_rate < 0.9:
+            return min(20, current_count + 2)  # 增加网格密度
+        return current_count
+
 class QuantitativeService:
     """量化交易服务"""
     
@@ -1531,7 +1722,7 @@ class QuantitativeService:
         self.running_strategies = set()
         self.lock = threading.Lock()
         self.price_cache = {}
-        self.auto_manager = None
+        self.is_running = False  # 添加运行状态标志
         
         # 集成自动交易引擎
         self.trading_engine = None
@@ -1544,12 +1735,33 @@ class QuantitativeService:
         if not self.strategies:
             self._create_default_strategies()
         
+        # 初始化自动管理器（必须在策略创建后）
+        self.auto_manager = AutomatedStrategyManager(self)
+        
         # 启动自动管理
         self._start_auto_management()
         
         # 初始化交易引擎
         self._init_trading_engine()
         
+        logger.info("量化交易服务初始化完成")
+        
+    # 添加缺失的运行状态管理方法
+    def start_system(self):
+        """启动量化系统"""
+        self.is_running = True
+        logger.info("量化系统已启动")
+        return True
+        
+    def stop_system(self):
+        """停止量化系统"""
+        self.is_running = False
+        # 停止所有策略
+        for strategy_id in list(self.strategies.keys()):
+            self.stop_strategy(strategy_id)
+        logger.info("量化系统已停止")
+        return True
+    
     def _create_default_strategies(self):
         """创建6个默认策略 - 纯净策略，无假数据"""
         default_strategies = [
@@ -1709,15 +1921,26 @@ class QuantitativeService:
             import time
             while True:
                 try:
-                    time.sleep(3600)  # 每小时执行一次
-                    if self.is_running:
-                        self.auto_manager.auto_manage_strategies()
+                    # 每10分钟执行一次轻量级检查，每小时执行一次完整优化
+                    time.sleep(600)  # 10分钟间隔
+                    
+                    if self.is_running and self.auto_manager:
+                        # 轻量级检查：监控策略表现并做实时调整
+                        self.auto_manager._lightweight_monitoring()
+                        
+                        # 每小时执行一次完整的策略优化
+                        current_time = time.time()
+                        if not hasattr(self, '_last_full_optimization') or \
+                           current_time - self._last_full_optimization > 3600:  # 1小时
+                            self.auto_manager.auto_manage_strategies()
+                            self._last_full_optimization = current_time
+                            
                 except Exception as e:
                     logger.error(f"自动管理循环出错: {e}")
         
         auto_thread = threading.Thread(target=auto_management_loop, daemon=True)
         auto_thread.start()
-        logger.info("自动化策略管理已启动，每小时执行一次")
+        logger.info("全自动化策略管理已启动，每10分钟监控，每小时深度优化")
 
     def _load_strategies_from_db(self):
         """从数据库加载策略"""
