@@ -91,20 +91,26 @@
                         </div>
                         
                         <!-- 系统启停控制 -->
-                        <div class="mb-3">
+                        <div class="mb-3" data-system="quantitative">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span>量化系统</span>
-                                <button id="systemToggle" class="btn-toggle" onclick="toggleSystem()">
-                                </button>
+                                <span>
+                                    <span class="status-indicator status-offline"></span>
+                                    <button id="systemToggle" class="btn-toggle" onclick="toggleSystem()">
+                                    </button>
+                                </span>
                             </div>
                         </div>
                         
                         <!-- 自动交易开关 -->
-                        <div class="mb-3">
+                        <div class="mb-3" data-system="auto-trading">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span>自动交易</span>
-                                <button id="autoTradingToggle" class="btn-toggle" onclick="toggleAutoTrading()">
-                                </button>
+                                <span>
+                                    <span class="status-indicator status-offline"></span>
+                                    <button id="autoTradingToggle" class="btn-toggle" onclick="toggleAutoTrading()">
+                                    </button>
+                                </span>
                             </div>
                         </div>
                         

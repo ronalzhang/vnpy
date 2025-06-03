@@ -102,7 +102,7 @@ class QuantitativeSystem {
         
         if (systemRunning) {
             // 系统控制台状态 - 运行中金色闪动
-            systemStatusEl.innerHTML = '<span class="status-indicator status-online"></span>在线';
+            systemStatusEl.innerHTML = '<span class="status-indicator status-running"></span>在线';
             systemToggle.classList.add('active');
             
             // 导航栏状态 - 运行中金色闪动
@@ -119,6 +119,32 @@ class QuantitativeSystem {
             if (statusIndicator) {
                 statusIndicator.className = 'status-indicator status-offline';
                 statusText.textContent = '离线';
+            }
+        }
+        
+        // 更新量化系统状态（在系统控制台中）
+        const quantitativeSystemEl = document.querySelector('[data-system="quantitative"]');
+        if (quantitativeSystemEl) {
+            const indicator = quantitativeSystemEl.querySelector('.status-indicator');
+            if (indicator) {
+                if (systemRunning) {
+                    indicator.className = 'status-indicator status-running';
+                } else {
+                    indicator.className = 'status-indicator status-offline';
+                }
+            }
+        }
+        
+        // 更新自动交易状态（在系统控制台中）
+        const autoTradingEl = document.querySelector('[data-system="auto-trading"]');
+        if (autoTradingEl) {
+            const indicator = autoTradingEl.querySelector('.status-indicator');
+            if (indicator) {
+                if (autoTradingEnabled) {
+                    indicator.className = 'status-indicator status-running';
+                } else {
+                    indicator.className = 'status-indicator status-offline';
+                }
             }
         }
     }
