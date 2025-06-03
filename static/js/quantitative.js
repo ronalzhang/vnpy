@@ -66,6 +66,31 @@ class QuantitativeApp {
             this.updateStrategy();
         });
 
+        // 添加策略名称点击事件委托
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('strategy-name-link')) {
+                e.preventDefault();
+                const strategyId = e.target.getAttribute('data-strategy-id');
+                this.openEditStrategy(strategyId);
+            }
+            
+            // 策略切换按钮事件
+            if (e.target.closest('.toggle-strategy-btn')) {
+                e.preventDefault();
+                const btn = e.target.closest('.toggle-strategy-btn');
+                const strategyId = btn.getAttribute('data-strategy-id');
+                this.toggleStrategy(strategyId);
+            }
+            
+            // 策略删除按钮事件
+            if (e.target.closest('.delete-strategy-btn')) {
+                e.preventDefault();
+                const btn = e.target.closest('.delete-strategy-btn');
+                const strategyId = btn.getAttribute('data-strategy-id');
+                this.deleteStrategy(strategyId);
+            }
+        });
+
         // 自动刷新切换
         const autoRefreshSwitch = document.getElementById('autoRefreshSwitch');
         if (autoRefreshSwitch) {
@@ -204,6 +229,19 @@ class QuantitativeApp {
         } else if (strategyType === 'breakout') {
             const breakoutThreshold = parseFloat(document.getElementById('breakoutThreshold').value) || 0.01;
             params.breakout_threshold = breakoutThreshold;
+        } else if (strategyType === 'grid_trading') {
+            const gridSpacing = parseFloat(document.getElementById('gridSpacing').value) || 0.02;
+            const gridCount = parseInt(document.getElementById('gridCount').value) || 10;
+            params.grid_spacing = gridSpacing;
+            params.grid_count = gridCount;
+        } else if (strategyType === 'high_frequency') {
+            const volatilityThreshold = parseFloat(document.getElementById('volatilityThreshold').value) || 0.001;
+            const minProfit = parseFloat(document.getElementById('minProfit').value) || 0.0005;
+            params.volatility_threshold = volatilityThreshold;
+            params.min_profit = minProfit;
+        } else if (strategyType === 'trend_following') {
+            const trendThreshold = parseFloat(document.getElementById('trendThreshold').value) || 0.02;
+            params.trend_threshold = trendThreshold;
         }
 
         const payload = {
@@ -361,7 +399,7 @@ class QuantitativeApp {
      */
     renderStrategy(strategy) {
         const typeMapping = this.getStrategyTypeMapping();
-        const strategyTypeName = typeMapping[strategy.strategy_type] || strategy.strategy_type;
+        const strategyTypeName = typeMapping[strategy.type] || strategy.type;
         
         return `
             <tr>
@@ -375,7 +413,7 @@ class QuantitativeApp {
                 <td><span class="badge bg-info">${strategyTypeName}</span></td>
                 <td><span class="badge bg-secondary">${strategy.symbol}</span></td>
                 <td>
-                    ${strategy.is_active ? 
+                    ${strategy.enabled ? 
                         '<span class="badge bg-success"><i class="fas fa-play me-1"></i>运行中</span>' : 
                         '<span class="badge bg-secondary"><i class="fas fa-pause me-1"></i>已停止</span>'
                     }
@@ -385,9 +423,9 @@ class QuantitativeApp {
                     <div class="btn-group btn-group-sm">
                         <button class="btn btn-outline-primary btn-sm toggle-strategy-btn" 
                                 data-strategy-id="${strategy.id}" 
-                                data-is-active="${strategy.is_active}"
-                                title="${strategy.is_active ? '停止策略' : '启动策略'}">
-                            <i class="fas ${strategy.is_active ? 'fa-pause' : 'fa-play'}"></i>
+                                data-is-active="${strategy.enabled}"
+                                title="${strategy.enabled ? '停止策略' : '启动策略'}">
+                            <i class="fas ${strategy.enabled ? 'fa-pause' : 'fa-play'}"></i>
                         </button>
                         <button class="btn btn-outline-danger btn-sm delete-strategy-btn" 
                                 data-strategy-id="${strategy.id}"
@@ -758,6 +796,19 @@ class QuantitativeApp {
         } else if (strategyType === 'breakout') {
             const breakoutThreshold = parseFloat(document.getElementById('editBreakoutThreshold').value) || 0.01;
             params.breakout_threshold = breakoutThreshold;
+        } else if (strategyType === 'grid_trading') {
+            const gridSpacing = parseFloat(document.getElementById('editGridSpacing').value) || 0.02;
+            const gridCount = parseInt(document.getElementById('editGridCount').value) || 10;
+            params.grid_spacing = gridSpacing;
+            params.grid_count = gridCount;
+        } else if (strategyType === 'high_frequency') {
+            const volatilityThreshold = parseFloat(document.getElementById('editVolatilityThreshold').value) || 0.001;
+            const minProfit = parseFloat(document.getElementById('editMinProfit').value) || 0.0005;
+            params.volatility_threshold = volatilityThreshold;
+            params.min_profit = minProfit;
+        } else if (strategyType === 'trend_following') {
+            const trendThreshold = parseFloat(document.getElementById('editTrendThreshold').value) || 0.02;
+            params.trend_threshold = trendThreshold;
         }
 
         const payload = {

@@ -1413,13 +1413,29 @@ class QuantitativeService:
             
     def process_market_data(self, symbol: str, price_data: Dict[str, Any]):
         """处理市场数据，生成交易信号"""
+        logger.debug(f"处理市场数据: {symbol}, 价格: {price_data.get('price', 'N/A')}")
+        
         for strategy in self.strategies.values():
             if strategy.config.symbol == symbol and strategy.is_running:
-                signal = strategy.generate_signal(price_data)
-                if signal:
-                    self._save_signal_to_db(signal)
-                    logger.info(f"生成交易信号: {signal.signal_type.value} {signal.symbol} @ {signal.price}")
-                    
+                try:
+                    signal = strategy.generate_signal(price_data)
+                    if signal:
+                        self._save_signal_to_db(signal)
+                        logger.info(f"生成交易信号: {signal.signal_type.value} {signal.symbol} @ {signal.price}")
+                except Exception as e:
+                    logger.error(f"策略 {strategy.config.name} 生成信号时出错: {e}")
+        
+        # 如果没有运行中的策略，记录调试信息
+        running_strategies = [s for s in self.strategies.values() if s.is_running]
+        if not running_strategies:
+            logger.debug(f"没有运行中的策略处理 {symbol} 的市场数据")
+        else:
+            symbol_strategies = [s for s in running_strategies if s.config.symbol == symbol]
+            if not symbol_strategies:
+                logger.debug(f"没有针对 {symbol} 的运行中策略")
+            else:
+                logger.debug(f"为 {symbol} 找到 {len(symbol_strategies)} 个运行中的策略")
+        
     def _save_strategy_to_db(self, config: StrategyConfig):
         """保存策略到数据库"""
         with sqlite3.connect(self.db_manager.db_path) as conn:
