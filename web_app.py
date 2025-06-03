@@ -1538,23 +1538,6 @@ def get_exchange_status():
         logger.error(f"获取交易所状态失败: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/quantitative/performance', methods=['GET'])
-def get_performance_api():
-    """获取绩效数据"""
-    try:
-        if not quantitative_service:
-            return jsonify({'success': True, 'data': {'metrics': [], 'summary': {}}})
-            
-        days = request.args.get('days', 30, type=int)
-        performance = quantitative_service.get_performance(days=days)
-        return jsonify({
-            'success': True,
-            'data': performance
-        })
-    except Exception as e:
-        logger.error(f"获取绩效数据失败: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
 # ========== 添加缺失的量化交易配置API ==========
 
 @app.route('/api/quantitative/config', methods=['GET', 'POST'])
