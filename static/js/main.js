@@ -334,100 +334,117 @@ function renderArbitrageTable(opportunities) {
     }
 }
 
-// 更新账户余额数据
+// 更新余额数据
 function updateBalanceData() {
-    fetch(window.API_BASE_URL + '/api/balances')
+    fetch(window.API_BASE_URL + '/api/account/balances')
         .then(response => response.json())
         .then(data => {
-            if (data) {
-                console.log('API返回的余额数据:', data);  // 添加日志
-                renderBalanceData(data);
+            if (data.status === 'success' && data.data) {
+                renderBalanceData(data.data);
+            } else {
+                // API返回失败，显示"-"
+                renderBalanceData(null);
             }
         })
         .catch(error => {
-            console.error('获取账户余额数据出错:', error);
+            console.error('获取余额数据出错:', error);
+            // 网络错误，显示"-"
+            renderBalanceData(null);
         });
 }
 
-// 渲染账户余额数据
+// 渲染余额数据
 function renderBalanceData(balances) {
-    const isPrivate = document.body.classList.contains('privacy-mode');
-    
-    // 更新各交易所余额
-    for (const exchange of EXCHANGES) {
-        if (balances[exchange]) {
-            // 更新总余额、可用余额和锁定余额
-            const totalBalance = document.getElementById(`${exchange}-balance`);
-            const availableBalance = document.getElementById(`${exchange}-available`);
-            const lockedBalance = document.getElementById(`${exchange}-locked`);
-            
-            if (totalBalance) {
-                totalBalance.dataset.value = balances[exchange].USDT || '-';
-                totalBalance.textContent = totalBalance.dataset.value;
-                totalBalance.classList.toggle('privacy-blur', isPrivate);
-            }
-            if (availableBalance) {
-                availableBalance.dataset.value = balances[exchange].USDT_available || '-';
-                availableBalance.textContent = availableBalance.dataset.value;
-                availableBalance.classList.toggle('privacy-blur', isPrivate);
-            }
-            if (lockedBalance) {
-                lockedBalance.dataset.value = balances[exchange].USDT_locked || '-';
-                lockedBalance.textContent = lockedBalance.dataset.value;
-                lockedBalance.classList.toggle('privacy-blur', isPrivate);
-            }
-            
-            // 更新持仓情况
-            const positionsTable = document.getElementById(`${exchange}-positions`);
-            if (positionsTable) {
-                positionsTable.innerHTML = '';
-                
-                const positions = balances[exchange].positions;
-                if (positions && Object.keys(positions).length > 0) {
-                    for (const [coin, position] of Object.entries(positions)) {
-                        const row = document.createElement('tr');
-                        
-                        // 币种
-                        const coinCell = document.createElement('td');
-                        coinCell.textContent = coin;
-                        row.appendChild(coinCell);
-                        
-                        // 总数量
-                        const totalCell = document.createElement('td');
-                        totalCell.dataset.value = position.amount || '-';
-                        totalCell.textContent = totalCell.dataset.value;
-                        totalCell.classList.toggle('privacy-blur', isPrivate);
-                        row.appendChild(totalCell);
-                        
-                        // 可用
-                        const availableCell = document.createElement('td');
-                        availableCell.dataset.value = position.available || '-';
-                        availableCell.textContent = availableCell.dataset.value;
-                        availableCell.classList.toggle('privacy-blur', isPrivate);
-                        row.appendChild(availableCell);
-                        
-                        // 锁定
-                        const lockedCell = document.createElement('td');
-                        lockedCell.dataset.value = position.locked || '-';
-                        lockedCell.textContent = lockedCell.dataset.value;
-                        lockedCell.classList.toggle('privacy-blur', isPrivate);
-                        row.appendChild(lockedCell);
-                        
-                        // 价值
-                        const valueCell = document.createElement('td');
-                        valueCell.dataset.value = position.value || '-';
-                        valueCell.textContent = valueCell.dataset.value;
-                        valueCell.classList.toggle('privacy-blur', isPrivate);
-                        row.appendChild(valueCell);
-                        
-                        positionsTable.appendChild(row);
-                    }
-                } else {
-                    positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓数据</td></tr>';
-                }
+    // 安全显示数据的辅助函数
+    function safeDisplayBalance(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            if (value !== undefined && value !== null && !isNaN(value)) {
+                element.textContent = parseFloat(value).toFixed(2);
+            } else {
+                element.textContent = '-';
             }
         }
     }
+    
+    // 更新账户余额
+    if (balances) {
+        // Binance余额
+        if (balances.binance) {
+            safeDisplayBalance('binance-balance', balances.binance.total);
+            safeDisplayBalance('binance-available', balances.binance.available);
+            safeDisplayBalance('binance-locked', balances.binance.locked);
+            
+            // 更新Binance持仓
+            updatePositionsTable('binance-positions', balances.binance.positions);
+        } else {
+            // 如果没有Binance数据，设置为"-"
+            safeDisplayBalance('binance-balance', null);
+            safeDisplayBalance('binance-available', null);
+            safeDisplayBalance('binance-locked', null);
+            updatePositionsTable('binance-positions', null);
+        }
+        
+        // OKX余额
+        if (balances.okx) {
+            safeDisplayBalance('okx-balance', balances.okx.total);
+            safeDisplayBalance('okx-available', balances.okx.available);
+            safeDisplayBalance('okx-locked', balances.okx.locked);
+            
+            // 更新OKX持仓
+            updatePositionsTable('okx-positions', balances.okx.positions);
+        } else {
+            safeDisplayBalance('okx-balance', null);
+            safeDisplayBalance('okx-available', null);
+            safeDisplayBalance('okx-locked', null);
+            updatePositionsTable('okx-positions', null);
+        }
+        
+        // Bitget余额
+        if (balances.bitget) {
+            safeDisplayBalance('bitget-balance', balances.bitget.total);
+            safeDisplayBalance('bitget-available', balances.bitget.available);
+            safeDisplayBalance('bitget-locked', balances.bitget.locked);
+            
+            // 更新Bitget持仓
+            updatePositionsTable('bitget-positions', balances.bitget.positions);
+        } else {
+            safeDisplayBalance('bitget-balance', null);
+            safeDisplayBalance('bitget-available', null);
+            safeDisplayBalance('bitget-locked', null);
+            updatePositionsTable('bitget-positions', null);
+        }
+    } else {
+        // 如果没有余额数据，所有都设置为"-"
+        const exchanges = ['binance', 'okx', 'bitget'];
+        exchanges.forEach(exchange => {
+            safeDisplayBalance(`${exchange}-balance`, null);
+            safeDisplayBalance(`${exchange}-available`, null);
+            safeDisplayBalance(`${exchange}-locked`, null);
+            updatePositionsTable(`${exchange}-positions`, null);
+        });
+    }
+}
+
+// 更新持仓表格
+function updatePositionsTable(tableId, positions) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    
+    if (!positions || positions.length === 0) {
+        table.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓</td></tr>';
+        return;
+    }
+    
+    table.innerHTML = positions.map(pos => `
+        <tr>
+            <td>${pos.symbol || '-'}</td>
+            <td>${pos.total !== undefined ? parseFloat(pos.total).toFixed(8) : '-'}</td>
+            <td>${pos.available !== undefined ? parseFloat(pos.available).toFixed(8) : '-'}</td>
+            <td>${pos.locked !== undefined ? parseFloat(pos.locked).toFixed(8) : '-'}</td>
+            <td>${pos.value !== undefined ? parseFloat(pos.value).toFixed(2) : '-'}</td>
+        </tr>
+    `).join('');
 }
 
 // 更新系统状态
@@ -435,43 +452,61 @@ function updateSystemStatus() {
     fetch(window.API_BASE_URL + '/api/status')
         .then(response => response.json())
         .then(data => {
-            // 更新状态标签
+            // 更新主要状态显示
             const statusBadge = document.getElementById('status-badge');
             const modeBadge = document.getElementById('mode-badge');
             const arbitrageCountBadge = document.getElementById('arbitrage-count-badge');
-            
-            if (statusBadge) {
-                statusBadge.textContent = data.running ? '运行中' : '已停止';
-                statusBadge.className = 'badge ' + (data.running ? 'bg-success' : 'bg-secondary');
-            }
-            
-            if (modeBadge) {
-                modeBadge.textContent = data.mode === 'simulate' ? '模拟' : '实盘';
-                modeBadge.className = 'badge ' + (data.mode === 'simulate' ? 'bg-warning' : 'bg-danger');
-            }
-            
-            if (arbitrageCountBadge && data.arbitrage_count !== undefined) {
-                arbitrageCountBadge.textContent = `套利:${data.arbitrage_count}`;
-                arbitrageCountBadge.className = 'badge ' + (data.arbitrage_count > 0 ? 'bg-success' : 'bg-secondary');
-            }
-
-            // 更新按钮状态
             const toggleBtn = document.getElementById('toggle-btn');
-            if (toggleBtn) {
-                toggleBtn.setAttribute('data-running', data.running);
-                if (data.running) {
-                    toggleBtn.textContent = '停止运行';
-                    toggleBtn.classList.remove('btn-primary');
-                    toggleBtn.classList.add('btn-danger');
+            
+            // 更新顶部导航栏的状态指示器
+            const statusIndicator = document.getElementById('system-status-indicator');
+            const statusText = document.getElementById('system-status-text');
+            
+            const isRunning = data.running || false;
+            
+            // 更新导航栏状态指示器
+            if (statusIndicator && statusText) {
+                if (isRunning) {
+                    statusIndicator.className = 'status-indicator status-running';
+                    statusText.textContent = '运行中';
                 } else {
-                    toggleBtn.textContent = '启动运行';
-                    toggleBtn.classList.remove('btn-danger');
-                    toggleBtn.classList.add('btn-primary');
+                    statusIndicator.className = 'status-indicator status-offline';
+                    statusText.textContent = '离线';
                 }
+            }
+            
+            // 更新其他状态显示
+            if (statusBadge) {
+                statusBadge.textContent = isRunning ? '运行中' : '已停止';
+                statusBadge.className = `badge ${isRunning ? 'bg-success' : 'bg-secondary'}`;
+            }
+            
+            if (modeBadge && data.mode) {
+                modeBadge.textContent = data.mode === 'real' ? '实盘' : '模拟';
+                modeBadge.className = `badge ${data.mode === 'real' ? 'bg-danger' : 'bg-warning'}`;
+            }
+            
+            if (arbitrageCountBadge) {
+                const count = data.arbitrage_count || 0;
+                arbitrageCountBadge.textContent = `套利:${count}`;
+            }
+            
+            if (toggleBtn) {
+                toggleBtn.setAttribute('data-running', isRunning);
+                toggleBtn.textContent = isRunning ? '停止运行' : '启动运行';
+                toggleBtn.className = `btn ${isRunning ? 'btn-danger' : 'btn-primary'} flex-grow-1`;
             }
         })
         .catch(error => {
             console.error('获取系统状态出错:', error);
+            
+            // 网络错误时，设置为离线状态
+            const statusIndicator = document.getElementById('system-status-indicator');
+            const statusText = document.getElementById('system-status-text');
+            if (statusIndicator && statusText) {
+                statusIndicator.className = 'status-indicator status-offline';
+                statusText.textContent = '离线';
+            }
         });
 }
 

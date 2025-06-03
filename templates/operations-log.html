@@ -120,8 +120,8 @@
                         校长的量化系统
                     </a>
                     <div class="system-status">
-                        <span class="status-indicator"></span>
-                        <span>运行中</span>
+                        <span class="status-indicator status-offline" id="system-status-indicator"></span>
+                        <span id="system-status-text">离线</span>
                         <span id="current-time">2025/6/4 05:05:27</span>
                     </div>
                 </div>
@@ -688,6 +688,14 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             operationsApp.init();
+            
+            // 确保页面加载时状态指示器显示正确
+            const statusIndicator = document.getElementById('system-status-indicator');
+            const statusText = document.getElementById('system-status-text');
+            if (statusIndicator && statusText) {
+                statusIndicator.className = 'status-indicator status-offline';
+                statusText.textContent = '离线';
+            }
             
             // 更新时间
             setInterval(() => operationsApp.updateTime(), 1000);

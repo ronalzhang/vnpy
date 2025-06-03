@@ -237,8 +237,8 @@
                             校长的量化系统
                         </a>
                         <div class="system-status">
-                            <span class="status-indicator"></span>
-                            <span>运行中</span>
+                            <span class="status-indicator status-offline" id="system-status-indicator"></span>
+                            <span id="system-status-text">离线</span>
                             <span id="current-time">2025/6/4 05:05:27</span>
                         </div>
                     </div>
@@ -535,15 +535,15 @@
                                     <div class="row">
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="binance-balance">12,345.67</h4>
+                                            <h4 id="binance-balance">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="binance-available">12,340.00</h4>
+                                            <h4 id="binance-available">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="binance-locked">5.67</h4>
+                                            <h4 id="binance-locked">-</h4>
                                         </div>
                                     </div>
                                 </div>
@@ -560,11 +560,7 @@
                                     </thead>
                                     <tbody id="binance-positions">
                                         <tr>
-                                            <td>BTC</td>
-                                            <td>0.12345</td>
-                                            <td>0.12345</td>
-                                            <td>0.00000</td>
-                                            <td>7,893.45</td>
+                                            <td colspan="5" class="text-center text-muted">加载中...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -574,15 +570,15 @@
                                     <div class="row">
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="okx-balance">9,876.54</h4>
+                                            <h4 id="okx-balance">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="okx-available">9,800.00</h4>
+                                            <h4 id="okx-available">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="okx-locked">76.54</h4>
+                                            <h4 id="okx-locked">-</h4>
                                         </div>
                                     </div>
                                 </div>
@@ -599,11 +595,7 @@
                                     </thead>
                                     <tbody id="okx-positions">
                                         <tr>
-                                            <td>BTC</td>
-                                            <td>0.08765</td>
-                                            <td>0.08765</td>
-                                            <td>0.00000</td>
-                                            <td>5,612.34</td>
+                                            <td colspan="5" class="text-center text-muted">加载中...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -613,15 +605,15 @@
                                     <div class="row">
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="bitget-balance">7,654.32</h4>
+                                            <h4 id="bitget-balance">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="bitget-available">7,600.00</h4>
+                                            <h4 id="bitget-available">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="bitget-locked">54.32</h4>
+                                            <h4 id="bitget-locked">-</h4>
                                         </div>
                                     </div>
                                 </div>
@@ -638,11 +630,7 @@
                                     </thead>
                                     <tbody id="bitget-positions">
                                         <tr>
-                                            <td>BTC</td>
-                                            <td>0.05432</td>
-                                            <td>0.05432</td>
-                                            <td>0.00000</td>
-                                            <td>3,476.23</td>
+                                            <td colspan="5" class="text-center text-muted">加载中...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -736,6 +724,20 @@
         const toggleBtn = document.getElementById('toggle-btn');
         const toggleArbitrageBtn = document.getElementById('toggle-arbitrage-btn');
         
+        // 更新顶部导航栏的状态指示器
+        const statusIndicator = document.getElementById('system-status-indicator');
+        const statusText = document.getElementById('system-status-text');
+        
+        if (running) {
+            // 系统运行中 - 金色闪动
+            statusIndicator.className = 'status-indicator status-running';
+            statusText.textContent = '运行中';
+        } else {
+            // 系统离线 - 黑色
+            statusIndicator.className = 'status-indicator status-offline';
+            statusText.textContent = '离线';
+        }
+        
         // 更新运行状态
         statusBadge.textContent = running ? '运行中' : '已停止';
         statusBadge.className = `badge ${running ? 'bg-success' : 'bg-secondary'}`;
@@ -765,6 +767,98 @@
         toggleArbitrageBtn.className = `btn ${arbitrageRunning ? 'btn-danger' : 'btn-warning'} flex-grow-1`;
         toggleArbitrageBtn.dataset.running = arbitrageRunning;
         toggleArbitrageBtn.disabled = !running; // 如果监控没有运行，禁用套利按钮
+    }
+
+    // 安全显示数据的辅助函数
+    function safeDisplayData(elementId, value, defaultValue = '-') {
+        const element = document.getElementById(elementId);
+        if (element) {
+            if (value !== undefined && value !== null && !isNaN(value)) {
+                element.textContent = typeof value === 'number' ? value.toFixed(2) : value;
+            } else {
+                element.textContent = defaultValue;
+            }
+        }
+    }
+
+    // 加载真实账户余额数据
+    async function loadAccountBalances() {
+        try {
+            const response = await fetch('/api/account/balances');
+            const data = await response.json();
+            
+            if (data.status === 'success' && data.data) {
+                const balances = data.data;
+                
+                // 更新Binance账户信息
+                if (balances.binance) {
+                    safeDisplayData('binance-balance', balances.binance.total);
+                    safeDisplayData('binance-available', balances.binance.available);
+                    safeDisplayData('binance-locked', balances.binance.locked);
+                    updatePositions('binance-positions', balances.binance.positions);
+                }
+                
+                // 更新OKX账户信息  
+                if (balances.okx) {
+                    safeDisplayData('okx-balance', balances.okx.total);
+                    safeDisplayData('okx-available', balances.okx.available);
+                    safeDisplayData('okx-locked', balances.okx.locked);
+                    updatePositions('okx-positions', balances.okx.positions);
+                }
+                
+                // 更新Bitget账户信息
+                if (balances.bitget) {
+                    safeDisplayData('bitget-balance', balances.bitget.total);
+                    safeDisplayData('bitget-available', balances.bitget.available);
+                    safeDisplayData('bitget-locked', balances.bitget.locked);
+                    updatePositions('bitget-positions', balances.bitget.positions);
+                }
+            } else {
+                // API返回失败，所有数据显示"-"
+                setAllBalancesToDash();
+            }
+        } catch (error) {
+            console.error('加载账户余额失败:', error);
+            // 网络错误，所有数据显示"-"
+            setAllBalancesToDash();
+        }
+    }
+
+    // 设置所有余额为"-"
+    function setAllBalancesToDash() {
+        const exchangeIds = ['binance', 'okx', 'bitget'];
+        exchangeIds.forEach(exchange => {
+            safeDisplayData(`${exchange}-balance`, null);
+            safeDisplayData(`${exchange}-available`, null);
+            safeDisplayData(`${exchange}-locked`, null);
+            
+            // 清空持仓表格
+            const positionsTable = document.getElementById(`${exchange}-positions`);
+            if (positionsTable) {
+                positionsTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">无法获取数据</td></tr>';
+            }
+        });
+    }
+
+    // 更新持仓表格
+    function updatePositions(tableId, positions) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        
+        if (!positions || positions.length === 0) {
+            table.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓</td></tr>';
+            return;
+        }
+        
+        table.innerHTML = positions.map(pos => `
+            <tr>
+                <td>${pos.symbol || '-'}</td>
+                <td>${pos.total !== undefined ? pos.total.toFixed(8) : '-'}</td>
+                <td>${pos.available !== undefined ? pos.available.toFixed(8) : '-'}</td>
+                <td>${pos.locked !== undefined ? pos.locked.toFixed(8) : '-'}</td>
+                <td>${pos.value !== undefined ? pos.value.toFixed(2) : '-'}</td>
+            </tr>
+        `).join('');
     }
 
     // 切换系统运行状态
@@ -1033,8 +1127,14 @@
         // 立即更新一次状态
         updateSystemStatus();
         
+        // 加载账户余额数据
+        loadAccountBalances();
+        
         // 每5秒更新一次状态
         setInterval(updateSystemStatus, 5000);
+        
+        // 每30秒刷新一次账户余额数据
+        setInterval(loadAccountBalances, 30000);
         
         // 更新当前时间
         function updateTime() {

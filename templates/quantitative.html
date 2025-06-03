@@ -26,8 +26,8 @@
                             校长的量化系统
                         </a>
                         <div class="system-status">
-                            <span class="status-indicator"></span>
-                            <span>运行中</span>
+                            <span class="status-indicator status-offline" id="system-status-indicator"></span>
+                            <span id="system-status-text">离线</span>
                             <span id="current-time">2025/6/4 05:05:27</span>
                         </div>
                     </div>
@@ -133,11 +133,11 @@
                         
                         <div class="row text-center">
                             <div class="col-6">
-                                <div class="metric-value" id="totalBalance">¥0</div>
+                                <div class="metric-value" id="totalBalance">-</div>
                                 <div class="metric-label">总资产</div>
                             </div>
                             <div class="col-6">
-                                <div class="metric-value text-success" id="dailyPnl">+¥0</div>
+                                <div class="metric-value text-success" id="dailyPnl">-</div>
                                 <div class="metric-label">今日盈亏</div>
                             </div>
                         </div>
@@ -146,11 +146,11 @@
                         
                         <div class="row text-center">
                             <div class="col-6">
-                                <div class="metric-value" id="dailyReturn">+0.00%</div>
+                                <div class="metric-value" id="dailyReturn">-</div>
                                 <div class="metric-label">今日收益率</div>
                             </div>
                             <div class="col-6">
-                                <div class="metric-value" id="dailyTrades">0</div>
+                                <div class="metric-value" id="dailyTrades">-</div>
                                 <div class="metric-label">今日交易</div>
                             </div>
                         </div>
@@ -314,8 +314,16 @@
             }
         }
 
-        // 页面加载时立即更新时间
+        // 页面加载时立即更新时间和状态
         updateCurrentTime();
+        
+        // 确保页面加载时状态指示器显示正确
+        const statusIndicator = document.getElementById('system-status-indicator');
+        const statusText = document.getElementById('system-status-text');
+        if (statusIndicator && statusText) {
+            statusIndicator.className = 'status-indicator status-offline';
+            statusText.textContent = '离线';
+        }
         
         // 每秒更新时间
         setInterval(updateCurrentTime, 1000);

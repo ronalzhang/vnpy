@@ -95,12 +95,28 @@ class QuantitativeSystem {
         const systemStatusEl = document.getElementById('systemStatus');
         const systemToggle = document.getElementById('systemToggle');
         
+        // 更新顶部导航栏的状态指示器
+        const statusIndicator = document.getElementById('system-status-indicator');
+        const statusText = document.getElementById('system-status-text');
+        
         if (systemRunning) {
             systemStatusEl.innerHTML = '<span class="status-indicator status-online"></span>在线';
             systemToggle.classList.add('active');
+            
+            // 导航栏状态 - 运行中金色闪动
+            if (statusIndicator) {
+                statusIndicator.className = 'status-indicator status-running';
+                statusText.textContent = '运行中';
+            }
         } else {
             systemStatusEl.innerHTML = '<span class="status-indicator status-offline"></span>离线';
             systemToggle.classList.remove('active');
+            
+            // 导航栏状态 - 离线黑色
+            if (statusIndicator) {
+                statusIndicator.className = 'status-indicator status-offline';
+                statusText.textContent = '离线';
+            }
         }
     }
 
@@ -142,34 +158,64 @@ class QuantitativeSystem {
             if (data.success && data.data) {
                 const account = data.data;
                 
-                document.getElementById('totalBalance').textContent = `¥${this.formatNumber(account.balance)}`;
+                // 安全显示数据，确保有效才显示
+                this.safeSetText('totalBalance', account.balance, '¥');
                 
                 const dailyPnl = account.daily_pnl;
                 const dailyPnlEl = document.getElementById('dailyPnl');
-                dailyPnlEl.textContent = `${dailyPnl >= 0 ? '+' : ''}¥${this.formatNumber(dailyPnl)}`;
-                dailyPnlEl.className = `metric-value ${dailyPnl >= 0 ? 'text-success' : 'text-danger'}`;
+                if (dailyPnlEl) {
+                    if (dailyPnl !== undefined && dailyPnl !== null && !isNaN(dailyPnl)) {
+                        dailyPnlEl.textContent = `${dailyPnl >= 0 ? '+' : ''}¥${this.formatNumber(dailyPnl)}`;
+                        dailyPnlEl.className = `metric-value ${dailyPnl >= 0 ? 'text-success' : 'text-danger'}`;
+                    } else {
+                        dailyPnlEl.textContent = '-';
+                        dailyPnlEl.className = 'metric-value';
+                    }
+                }
                 
-                const dailyReturn = account.daily_return * 100;
+                const dailyReturn = account.daily_return;
                 const dailyReturnEl = document.getElementById('dailyReturn');
-                dailyReturnEl.textContent = `${dailyReturn >= 0 ? '+' : ''}${dailyReturn.toFixed(2)}%`;
-                dailyReturnEl.className = `metric-value ${dailyReturn >= 0 ? 'text-success' : 'text-danger'}`;
+                if (dailyReturnEl) {
+                    if (dailyReturn !== undefined && dailyReturn !== null && !isNaN(dailyReturn)) {
+                        const returnPercent = dailyReturn * 100;
+                        dailyReturnEl.textContent = `${returnPercent >= 0 ? '+' : ''}${returnPercent.toFixed(2)}%`;
+                        dailyReturnEl.className = `metric-value ${returnPercent >= 0 ? 'text-success' : 'text-danger'}`;
+                    } else {
+                        dailyReturnEl.textContent = '-';
+                        dailyReturnEl.className = 'metric-value';
+                    }
+                }
                 
-                document.getElementById('dailyTrades').textContent = account.daily_trades;
+                this.safeSetText('dailyTrades', account.daily_trades);
             } else {
-                // API返回失败，显示错误信息
-                document.getElementById('totalBalance').textContent = '数据加载失败';
-                document.getElementById('dailyPnl').textContent = '请检查API配置';
-                document.getElementById('dailyReturn').textContent = '--';
-                document.getElementById('dailyTrades').textContent = '--';
+                // API返回失败，所有数据显示"-"
+                this.setAccountDataToDash();
             }
         } catch (error) {
             console.error('加载账户信息失败:', error);
-            // 网络错误，显示错误提示
-            document.getElementById('totalBalance').textContent = '网络连接错误';
-            document.getElementById('dailyPnl').textContent = '无法获取数据';
-            document.getElementById('dailyReturn').textContent = '--';
-            document.getElementById('dailyTrades').textContent = '--';
+            // 网络错误，所有数据显示"-"
+            this.setAccountDataToDash();
         }
+    }
+
+    // 安全设置文本内容
+    safeSetText(elementId, value, prefix = '') {
+        const element = document.getElementById(elementId);
+        if (element) {
+            if (value !== undefined && value !== null && !isNaN(value)) {
+                element.textContent = prefix + this.formatNumber(value);
+            } else {
+                element.textContent = '-';
+            }
+        }
+    }
+
+    // 设置账户数据为"-"
+    setAccountDataToDash() {
+        this.safeSetText('totalBalance', null);
+        this.safeSetText('dailyPnl', null);
+        this.safeSetText('dailyReturn', null);
+        this.safeSetText('dailyTrades', null);
     }
 
     // 加载策略列表
