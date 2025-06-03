@@ -20,6 +20,7 @@ from loguru import logger
 from auto_trading_engine import get_trading_engine, TradeResult
 import random
 import uuid
+import requests
 
 # 策略类型枚举
 class StrategyType(Enum):
@@ -2488,11 +2489,44 @@ class QuantitativeService:
                 print(f"  - 优化策略 {strategy_id}: 数量={strategy['parameters']['quantity']:.3f}")
     
     def _get_current_balance(self):
-        """获取当前账户余额"""
+        """获取当前真实账户余额"""
         try:
-            # 这里应该连接真实的交易所API获取余额
-            # 暂时返回模拟值，实际应该从self.exchange.get_balance()获取
-            return 9.47  # 从日志中看到的实际余额
+            # 从web_app.py获取真实余额数据
+            try:
+                response = requests.get('http://localhost:8888/api/balances', timeout=5)
+                if response.status_code == 200:
+                    balance_data = response.json()
+                    
+                    # 计算总USDT余额
+                    total_usdt = 0.0
+                    
+                    # Binance余额
+                    binance_usdt = balance_data.get('binance', {}).get('USDT', 0.0)
+                    total_usdt += binance_usdt
+                    
+                    # Bitget余额  
+                    bitget_usdt = balance_data.get('bitget', {}).get('USDT', 0.0)
+                    total_usdt += bitget_usdt
+                    
+                    # OKX余额
+                    okx_usdt = balance_data.get('okx', {}).get('USDT', 0.0)
+                    total_usdt += okx_usdt
+                    
+                    # 计算持仓价值
+                    binance_positions = balance_data.get('binance', {}).get('positions', {})
+                    for coin, pos_data in binance_positions.items():
+                        if isinstance(pos_data, dict) and 'value' in pos_data:
+                            total_usdt += pos_data.get('value', 0.0)
+                    
+                    print(f"✅ 获取真实余额: {total_usdt:.2f} USDT")
+                    return total_usdt
+                    
+            except Exception as e:
+                print(f"获取API余额失败: {e}")
+                
+            # 如果API调用失败，返回保守估计
+            return 1.84  # 基于之前的Bitget余额
+            
         except Exception as e:
             print(f"获取账户余额失败: {e}")
             return 0.0
@@ -3290,16 +3324,47 @@ class QuantitativeService:
             print(f"创建操作日志表失败: {e}")
 
     def _get_current_balance(self):
-        """获取当前真实余额"""
+        """获取当前真实账户余额"""
         try:
-            # 这里应该连接真实的交易所API获取余额
-            # 暂时返回模拟数据
-            import random
-            base_balance = 9.46  # 根据之前的日志
-            return base_balance + random.uniform(-0.5, 0.5)
+            # 从web_app.py获取真实余额数据
+            try:
+                response = requests.get('http://localhost:8888/api/balances', timeout=5)
+                if response.status_code == 200:
+                    balance_data = response.json()
+                    
+                    # 计算总USDT余额
+                    total_usdt = 0.0
+                    
+                    # Binance余额
+                    binance_usdt = balance_data.get('binance', {}).get('USDT', 0.0)
+                    total_usdt += binance_usdt
+                    
+                    # Bitget余额  
+                    bitget_usdt = balance_data.get('bitget', {}).get('USDT', 0.0)
+                    total_usdt += bitget_usdt
+                    
+                    # OKX余额
+                    okx_usdt = balance_data.get('okx', {}).get('USDT', 0.0)
+                    total_usdt += okx_usdt
+                    
+                    # 计算持仓价值
+                    binance_positions = balance_data.get('binance', {}).get('positions', {})
+                    for coin, pos_data in binance_positions.items():
+                        if isinstance(pos_data, dict) and 'value' in pos_data:
+                            total_usdt += pos_data.get('value', 0.0)
+                    
+                    print(f"✅ 获取真实余额: {total_usdt:.2f} USDT")
+                    return total_usdt
+                    
+            except Exception as e:
+                print(f"获取API余额失败: {e}")
+                
+            # 如果API调用失败，返回保守估计
+            return 1.84  # 基于之前的Bitget余额
+            
         except Exception as e:
-            print(f"获取余额失败: {e}")
-            return 9.46
+            print(f"获取账户余额失败: {e}")
+            return 0.0
 
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 
