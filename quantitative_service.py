@@ -2489,7 +2489,7 @@ class QuantitativeService:
                 print(f"  - 优化策略 {strategy_id}: 数量={strategy['parameters']['quantity']:.3f}")
     
     def _get_current_balance(self):
-        """获取当前真实账户余额"""
+        """获取当前真实账户余额 - 只显示币安余额"""
         try:
             # 从web_app.py获取真实余额数据
             try:
@@ -2497,35 +2497,24 @@ class QuantitativeService:
                 if response.status_code == 200:
                     balance_data = response.json()
                     
-                    # 计算总USDT余额
-                    total_usdt = 0.0
-                    
-                    # Binance余额
+                    # 只计算币安USDT余额
                     binance_usdt = balance_data.get('binance', {}).get('USDT', 0.0)
-                    total_usdt += binance_usdt
                     
-                    # Bitget余额  
-                    bitget_usdt = balance_data.get('bitget', {}).get('USDT', 0.0)
-                    total_usdt += bitget_usdt
-                    
-                    # OKX余额
-                    okx_usdt = balance_data.get('okx', {}).get('USDT', 0.0)
-                    total_usdt += okx_usdt
-                    
-                    # 计算持仓价值
+                    # 计算币安持仓价值
+                    total_binance = binance_usdt
                     binance_positions = balance_data.get('binance', {}).get('positions', {})
                     for coin, pos_data in binance_positions.items():
                         if isinstance(pos_data, dict) and 'value' in pos_data:
-                            total_usdt += pos_data.get('value', 0.0)
+                            total_binance += pos_data.get('value', 0.0)
                     
-                    print(f"✅ 获取真实余额: {total_usdt:.2f} USDT")
-                    return total_usdt
+                    print(f"✅ 获取币安余额: {total_binance:.2f} USDT")
+                    return total_binance
                     
             except Exception as e:
                 print(f"获取API余额失败: {e}")
                 
-            # 如果API调用失败，返回保守估计
-            return 1.84  # 基于之前的Bitget余额
+            # 如果API调用失败，返回最小估计
+            return 0.04  # 基于之前的币安余额
             
         except Exception as e:
             print(f"获取账户余额失败: {e}")
@@ -3347,35 +3336,24 @@ class QuantitativeService:
                 if response.status_code == 200:
                     balance_data = response.json()
                     
-                    # 计算总USDT余额
-                    total_usdt = 0.0
-                    
-                    # Binance余额
+                    # 只计算币安USDT余额
                     binance_usdt = balance_data.get('binance', {}).get('USDT', 0.0)
-                    total_usdt += binance_usdt
                     
-                    # Bitget余额  
-                    bitget_usdt = balance_data.get('bitget', {}).get('USDT', 0.0)
-                    total_usdt += bitget_usdt
-                    
-                    # OKX余额
-                    okx_usdt = balance_data.get('okx', {}).get('USDT', 0.0)
-                    total_usdt += okx_usdt
-                    
-                    # 计算持仓价值
+                    # 计算币安持仓价值
+                    total_binance = binance_usdt
                     binance_positions = balance_data.get('binance', {}).get('positions', {})
                     for coin, pos_data in binance_positions.items():
                         if isinstance(pos_data, dict) and 'value' in pos_data:
-                            total_usdt += pos_data.get('value', 0.0)
+                            total_binance += pos_data.get('value', 0.0)
                     
-                    print(f"✅ 获取真实余额: {total_usdt:.2f} USDT")
-                    return total_usdt
+                    print(f"✅ 获取币安余额: {total_binance:.2f} USDT")
+                    return total_binance
                     
             except Exception as e:
                 print(f"获取API余额失败: {e}")
                 
-            # 如果API调用失败，返回保守估计
-            return 1.84  # 基于之前的Bitget余额
+            # 如果API调用失败，返回最小估计
+            return 0.04  # 基于之前的币安余额
             
         except Exception as e:
             print(f"获取账户余额失败: {e}")

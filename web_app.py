@@ -1762,6 +1762,119 @@ def stop_strategy(strategy_id):
             'message': f'停止失败: {str(e)}'
         })
 
+# ========== 操作日志API ==========
+
+@app.route('/api/operations-log', methods=['GET'])
+def get_operations_log():
+    """获取操作日志"""
+    try:
+        if not quantitative_service:
+            return jsonify({
+                'success': False,
+                'message': '量化服务未初始化',
+                'data': []
+            })
+        
+        # 获取查询参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        operation_type = request.args.get('operation_type', '')
+        result_filter = request.args.get('result', '')
+        time_filter = request.args.get('time', '')
+        search = request.args.get('search', '')
+        
+        # 从数据库获取操作日志
+        cursor = quantitative_service.conn.cursor()
+        
+        # 构建查询条件
+        where_conditions = []
+        params = []
+        
+        if operation_type:
+            where_conditions.append("operation_type = ?")
+            params.append(operation_type)
+        
+        if result_filter:
+            where_conditions.append("result = ?")
+            params.append(result_filter)
+        
+        if search:
+            where_conditions.append("(operation_detail LIKE ? OR operation_type LIKE ?)")
+            params.extend([f'%{search}%', f'%{search}%'])
+        
+        if time_filter:
+            time_conditions = {
+                '1h': "timestamp >= datetime('now', '-1 hour')",
+                '24h': "timestamp >= datetime('now', '-1 day')",
+                '7d': "timestamp >= datetime('now', '-7 days')",
+                '30d': "timestamp >= datetime('now', '-30 days')"
+            }
+            if time_filter in time_conditions:
+                where_conditions.append(time_conditions[time_filter])
+        
+        where_clause = ""
+        if where_conditions:
+            where_clause = "WHERE " + " AND ".join(where_conditions)
+        
+        # 计算总数
+        count_query = f"SELECT COUNT(*) FROM operation_logs {where_clause}"
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()[0]
+        
+        # 获取分页数据
+        offset = (page - 1) * per_page
+        query = f"""
+            SELECT operation_type, operation_detail, result, timestamp
+            FROM operation_logs 
+            {where_clause}
+            ORDER BY timestamp DESC 
+            LIMIT ? OFFSET ?
+        """
+        cursor.execute(query, params + [per_page, offset])
+        
+        logs = []
+        for row in cursor.fetchall():
+            logs.append({
+                'operation_type': row[0],
+                'operation_detail': row[1],
+                'result': row[2],
+                'timestamp': row[3],
+                'id': len(logs) + 1  # 简单的ID生成
+            })
+        
+        # 计算统计信息
+        cursor.execute("SELECT COUNT(*) FROM operation_logs WHERE result = 'success'")
+        success_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM operation_logs WHERE result = 'failed'")
+        error_count = cursor.fetchone()[0]
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'logs': logs,
+                'pagination': {
+                    'page': page,
+                    'per_page': per_page,
+                    'total': total_count,
+                    'pages': (total_count + per_page - 1) // per_page
+                },
+                'stats': {
+                    'total': total_count,
+                    'success': success_count,
+                    'error': error_count
+                }
+            }
+        })
+        
+    except Exception as e:
+        print(f"获取操作日志失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'获取失败: {str(e)}',
+            'data': []
+        })
+
 def main():
     """主函数"""
     global status
