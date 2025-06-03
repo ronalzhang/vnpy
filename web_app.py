@@ -1663,6 +1663,42 @@ def quantitative_config():
         logger.error(f"量化交易配置API出错: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/api/quantitative/force_start_all', methods=['POST'])
+def force_start_all_strategies():
+    """强制启动所有策略"""
+    try:
+        if quantitative_service:
+            # 启动系统
+            quantitative_service.start()
+            
+            # 强制启动所有策略
+            result = quantitative_service.force_start_all_strategies()
+            
+            # 启动信号生成
+            quantitative_service.check_and_start_signal_generation()
+            
+            if result:
+                return jsonify({
+                    'success': True,
+                    'message': '所有策略已强制启动，信号生成器已启动'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '启动策略失败'
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '量化服务未初始化'
+            })
+    except Exception as e:
+        print(f"强制启动策略失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'启动失败: {str(e)}'
+        })
+
 def main():
     """主函数"""
     global status
