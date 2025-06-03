@@ -1699,6 +1699,64 @@ def force_start_all_strategies():
             'message': f'启动失败: {str(e)}'
         })
 
+@app.route('/api/quantitative/strategies/<strategy_id>/start', methods=['POST'])
+def start_strategy(strategy_id):
+    """启动单个策略"""
+    try:
+        if quantitative_service:
+            result = quantitative_service.start_strategy(strategy_id)
+            
+            if result:
+                return jsonify({
+                    'success': True,
+                    'message': f'策略 {strategy_id} 已启动'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'启动策略 {strategy_id} 失败'
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '量化服务未初始化'
+            })
+    except Exception as e:
+        print(f"启动策略失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'启动失败: {str(e)}'
+        })
+
+@app.route('/api/quantitative/strategies/<strategy_id>/stop', methods=['POST'])
+def stop_strategy(strategy_id):
+    """停止单个策略"""
+    try:
+        if quantitative_service:
+            result = quantitative_service.stop_strategy(strategy_id)
+            
+            if result:
+                return jsonify({
+                    'success': True,
+                    'message': f'策略 {strategy_id} 已停止'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'停止策略 {strategy_id} 失败'
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '量化服务未初始化'
+            })
+    except Exception as e:
+        print(f"停止策略失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'停止失败: {str(e)}'
+        })
+
 def main():
     """主函数"""
     global status
