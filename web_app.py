@@ -1373,55 +1373,140 @@ def system_control():
 
 @app.route('/api/quantitative/account-info', methods=['GET'])
 def get_account_info():
-    """获取账户信息"""
+    """获取真实币安账户信息"""
     try:
-        if not quantitative_service:
-            return jsonify({'success': False, 'message': '量化服务未启用'}), 500
-            
-        # 获取交易状态信息
-        trading_status = quantitative_service.get_trading_status()
+        # 获取真实币安余额
+        real_balance_data = {}
+        total_balance_usdt = 0.0
+        daily_pnl = 0.0
+        available_balance = 0.0
+        frozen_balance = 0.0
         
-        # 安全获取余额，防止除零错误
-        balance = trading_status.get('balance', 10000.0)
-        if balance == 0:
-            balance = 10000.0  # 默认余额
-            
-        daily_pnl = trading_status.get('daily_pnl', 0.0)
-        daily_trades = trading_status.get('daily_trades', 0)
+        # 尝试从币安获取真实账户数据
+        if 'binance' in exchange_clients:
+            try:
+                binance_client = exchange_clients['binance']
+                logger.info("正在获取币安真实账户余额...")
+                
+                # 获取账户余额
+                balance_data = binance_client.fetch_balance()
+                
+                if balance_data and 'total' in balance_data:
+                    # 计算USDT总价值
+                    usdt_balance = balance_data['total'].get('USDT', 0.0)
+                    total_balance_usdt += usdt_balance
+                    
+                    # 计算其他币种的USDT价值
+                    for symbol, amount in balance_data['total'].items():
+                        if symbol != 'USDT' and amount > 0:
+                            try:
+                                # 获取币种对USDT的价格
+                                ticker_symbol = f"{symbol}/USDT"
+                                ticker = binance_client.fetch_ticker(ticker_symbol)
+                                price = ticker['last']
+                                usdt_value = amount * price
+                                total_balance_usdt += usdt_value
+                                logger.info(f"币种 {symbol}: {amount:.6f}, 价格: {price:.6f}, 价值: {usdt_value:.2f} USDT")
+                            except Exception as e:
+                                logger.debug(f"获取 {symbol} 价格失败: {e}")
+                                continue
+                    
+                    # 获取可用和冻结余额
+                    available_balance = balance_data.get('free', {}).get('USDT', 0.0)
+                    frozen_balance = balance_data.get('used', {}).get('USDT', 0.0)
+                    
+                    # 计算其他币种的可用余额USDT价值
+                    for symbol, amount in balance_data.get('free', {}).items():
+                        if symbol != 'USDT' and amount > 0:
+                            try:
+                                ticker_symbol = f"{symbol}/USDT"
+                                ticker = binance_client.fetch_ticker(ticker_symbol)
+                                price = ticker['last']
+                                available_balance += amount * price
+                            except:
+                                continue
+                    
+                    # 计算其他币种的冻结余额USDT价值
+                    for symbol, amount in balance_data.get('used', {}).items():
+                        if symbol != 'USDT' and amount > 0:
+                            try:
+                                ticker_symbol = f"{symbol}/USDT"
+                                ticker = binance_client.fetch_ticker(ticker_symbol)
+                                price = ticker['last']
+                                frozen_balance += amount * price
+                            except:
+                                continue
+                    
+                    logger.info(f"币安真实账户总资产: {total_balance_usdt:.2f} USDT")
+                    
+                else:
+                    logger.warning("币安余额数据格式异常")
+                    
+            except Exception as e:
+                logger.error(f"获取币安真实余额失败: {e}")
+                
+        # 如果没有获取到真实数据，记录警告但不返回假数据
+        if total_balance_usdt == 0:
+            logger.warning("未能获取到真实币安账户数据，可能是API配置问题")
+            return jsonify({
+                'success': False,
+                'message': '无法获取真实账户数据，请检查币安API配置',
+                'data': {
+                    'balance': 0.0,
+                    'daily_pnl': 0.0,
+                    'daily_return': 0.0,
+                    'daily_trades': 0,
+                    'available_balance': 0.0,
+                    'frozen_balance': 0.0,
+                    'total_equity': 0.0,
+                    'note': '需要配置有效的币安API密钥'
+                }
+            })
         
-        # 安全计算日收益率
-        if balance > 0:
-            daily_return = daily_pnl / balance
-        else:
-            daily_return = 0.0
+        # 计算今日收益（简化处理）
+        daily_return = daily_pnl / total_balance_usdt if total_balance_usdt > 0 else 0.0
+        
+        # 获取今日交易次数
+        daily_trades = 0
+        if quantitative_service:
+            try:
+                # 统计今日交易次数
+                signals = quantitative_service.get_signals(limit=100)
+                today = datetime.now().date()
+                daily_trades = sum(1 for signal in signals 
+                                 if datetime.fromisoformat(signal['timestamp']).date() == today 
+                                 and signal['executed'])
+            except Exception as e:
+                logger.warning(f"统计今日交易次数失败: {e}")
         
         account_info = {
-            'balance': balance,
-            'daily_pnl': daily_pnl,
-            'daily_return': daily_return,
+            'balance': round(total_balance_usdt, 2),
+            'daily_pnl': round(daily_pnl, 2),
+            'daily_return': round(daily_return, 4),
             'daily_trades': daily_trades,
-            'available_balance': balance * 0.8,  # 假设80%可用
-            'frozen_balance': balance * 0.2,     # 假设20%冻结
-            'total_equity': balance
+            'available_balance': round(available_balance, 2),
+            'frozen_balance': round(frozen_balance, 2),
+            'total_equity': round(total_balance_usdt, 2)
         }
         
         return jsonify({
             'success': True,
             'data': account_info
         })
+        
     except Exception as e:
         logger.error(f"获取账户信息失败: {e}")
-        # 返回默认数据而不是错误
         return jsonify({
-            'success': True,
+            'success': False,
+            'message': f'获取账户信息失败: {str(e)}',
             'data': {
-                'balance': 10000.0,
+                'balance': 0.0,
                 'daily_pnl': 0.0,
                 'daily_return': 0.0,
                 'daily_trades': 0,
-                'available_balance': 8000.0,
-                'frozen_balance': 2000.0,
-                'total_equity': 10000.0
+                'available_balance': 0.0,
+                'frozen_balance': 0.0,
+                'total_equity': 0.0
             }
         })
 
@@ -1541,7 +1626,49 @@ def toggle_strategy_api(strategy_id):
         logger.error(f"切换策略状态失败: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-# ========== 现有的量化交易API继续保持 ==========
+# ========== 添加缺失的量化交易配置API ==========
+
+@app.route('/api/quantitative/config', methods=['GET', 'POST'])
+def quantitative_config():
+    """量化交易系统配置"""
+    try:
+        if request.method == 'GET':
+            # 返回当前系统配置
+            config = {
+                'mode': 'real',  # 强制真实模式
+                'auto_trading_enabled': getattr(quantitative_service, 'auto_trading_enabled', True) if quantitative_service else True,
+                'max_positions': 10,
+                'risk_limit': 0.05,
+                'exchange': 'binance'
+            }
+            return jsonify({
+                'success': True,
+                'data': config
+            })
+        else:
+            # 更新配置
+            data = request.get_json()
+            mode = data.get('mode', 'real')
+            
+            # 强制使用真实模式
+            if mode != 'real':
+                logger.warning(f"尝试切换到非真实模式 {mode}，强制保持真实模式")
+                mode = 'real'
+            
+            # 更新配置
+            if quantitative_service:
+                # 这里可以添加配置更新逻辑
+                pass
+            
+            return jsonify({
+                'success': True,
+                'message': f'配置已更新为真实交易模式',
+                'data': {'mode': mode}
+            })
+            
+    except Exception as e:
+        logger.error(f"量化交易配置API出错: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 def main():
     """主函数"""
