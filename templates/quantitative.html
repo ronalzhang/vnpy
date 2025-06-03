@@ -4,10 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>校长的量化系统 - 量化交易</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 添加favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
+    <!-- 替换为更稳定的CDN -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.3.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         .status-indicator {
             width: 12px;
@@ -102,59 +105,109 @@
             opacity: 0.8;
         }
         
-        /* 响应式导航 */
+        /* 响应式导航优化 - 窄屏不合并，简化名称 */
         @media (max-width: 768px) {
-            .nav-link {
+            .navbar-nav .nav-link {
                 padding: 0.5rem 0.75rem;
-                font-size: 0.9rem;
+                font-size: 0.85rem;
+                white-space: nowrap;
+            }
+            
+            /* 简化导航文字但保持所有入口可见 */
+            .navbar-nav {
+                flex-direction: row;
+                flex-wrap: nowrap;
+            }
+            
+            .navbar-nav .nav-item {
+                flex: 1;
+                text-align: center;
+            }
+            
+            .navbar-collapse {
+                flex-grow: 1;
+            }
+            
+            .d-flex.align-items-center {
+                margin-left: auto;
+                font-size: 0.8rem;
+            }
+            
+            .badge {
+                font-size: 0.7rem;
+            }
+        }
+        
+        /* 进一步优化超窄屏幕 */
+        @media (max-width: 480px) {
+            .navbar-nav .nav-link {
+                font-size: 0.75rem;
+                padding: 0.4rem 0.5rem;
+            }
+            
+            .d-flex.align-items-center span {
+                font-size: 0.7rem;
+            }
+            
+            .badge {
+                font-size: 0.6rem;
+                padding: 0.2rem 0.4rem;
             }
         }
     </style>
 </head>
 <body>
-    <!-- 导航栏 - 保持与其他页面一致 -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-chart-line"></i> 校长的量化系统
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">
-                            <i class="fas fa-chart-bar d-lg-none"></i>
-                            <span class="d-none d-lg-inline">市场数据</span>
-                            <span class="d-lg-none">市场</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/quantitative.html">
-                            <i class="fas fa-robot d-lg-none"></i>
-                            <span class="d-none d-lg-inline">量化交易</span>
-                            <span class="d-lg-none">量化</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/arbitrage.html">
-                            <i class="fas fa-balance-scale d-lg-none"></i>
-                            <span class="d-none d-lg-inline">套利系统</span>
-                            <span class="d-lg-none">套利</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/operations-log.html">
-                            <i class="fas fa-list d-lg-none"></i>
-                            <span class="d-none d-lg-inline">操作日志</span>
-                            <span class="d-lg-none">日志</span>
-                        </a>
-                    </li>
-                </ul>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #1677ff 0%, #0066cc 100%);">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-bold" href="/">
+                    <i class="fas fa-chart-line me-2"></i>校长的量化系统
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">
+                                <i class="fas fa-home me-1"></i>
+                                <span class="d-none d-md-inline">市场数据</span>
+                                <span class="d-md-none">市场</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/quantitative.html">
+                                <i class="fas fa-robot me-1"></i>
+                                <span class="d-none d-md-inline">量化交易</span>
+                                <span class="d-md-none">量化</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/arbitrage.html">
+                                <i class="fas fa-exchange-alt me-1"></i>
+                                <span class="d-none d-md-inline">套利系统</span>
+                                <span class="d-md-none">套利</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/operations-log.html">
+                                <i class="fas fa-list-alt me-1"></i>
+                                <span class="d-none d-md-inline">操作日志</span>
+                                <span class="d-md-none">日志</span>
+                            </a>
+                        </li>
+                    </ul>
+                    <div class="d-flex align-items-center text-white">
+                        <span class="badge bg-success me-2" id="system-status">
+                            <i class="fas fa-circle pulse me-1"></i>
+                            <span class="d-none d-sm-inline">系统</span>运行中
+                        </span>
+                        <span id="current-time"></span>
+                    </div>
+                </div>
             </div>
-        </div>
-    </nav>
+        </nav>
+    </header>
 
     <div class="container-fluid mt-4">
         <!-- 顶部控制面板 -->
@@ -382,7 +435,32 @@
     </div>
 
     <!-- JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 更新当前时间
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = timeString;
+            }
+        }
+
+        // 页面加载时立即更新时间
+        updateCurrentTime();
+        
+        // 每秒更新时间
+        setInterval(updateCurrentTime, 1000);
+    </script>
     <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
 </body>
 </html> 
