@@ -158,14 +158,14 @@ class QuantitativeSystem {
             if (data.success && data.data) {
                 const account = data.data;
                 
-                // 安全显示数据，确保有效才显示，使用USDT作为货币单位
-                this.safeSetText('totalBalance', account.balance, '$');
+                // 安全显示数据，确保有效才显示，使用U作为货币单位
+                this.safeSetText('totalBalance', account.balance, 'U');
                 
                 const dailyPnl = account.daily_pnl;
                 const dailyPnlEl = document.getElementById('dailyPnl');
                 if (dailyPnlEl) {
                     if (dailyPnl !== undefined && dailyPnl !== null && !isNaN(dailyPnl)) {
-                        dailyPnlEl.textContent = `${dailyPnl >= 0 ? '+' : ''}$${this.formatNumber(dailyPnl)}`;
+                        dailyPnlEl.textContent = `${dailyPnl >= 0 ? '+' : ''}U${this.formatNumber(dailyPnl)}`;
                         dailyPnlEl.className = `metric-value ${dailyPnl >= 0 ? 'text-success' : 'text-danger'}`;
                     } else {
                         dailyPnlEl.textContent = '-';

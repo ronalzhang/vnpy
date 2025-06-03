@@ -205,6 +205,24 @@ class DatabaseManager:
                 )
             """)
             
+            # 系统状态表 - 新增
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS system_status (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    is_running BOOLEAN NOT NULL DEFAULT 0,
+                    last_start_time TIMESTAMP,
+                    last_stop_time TIMESTAMP,
+                    auto_trading_enabled BOOLEAN NOT NULL DEFAULT 1,
+                    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 初始化系统状态记录（如果不存在）
+            cursor.execute("""
+                INSERT OR IGNORE INTO system_status (id, is_running, updated_time)
+                VALUES (1, 0, CURRENT_TIMESTAMP)
+            """)
+            
             conn.commit()
             logger.info("数据库初始化完成")
 
@@ -1722,11 +1740,13 @@ class QuantitativeService:
         self.running_strategies = set()
         self.lock = threading.Lock()
         self.price_cache = {}
-        self.is_running = False  # 添加运行状态标志
+        
+        # 从数据库读取真实系统状态
+        self.is_running = self._load_system_status()
         
         # 集成自动交易引擎
         self.trading_engine = None
-        self.auto_trading_enabled = True  # 默认启用自动交易
+        self.auto_trading_enabled = self._load_auto_trading_status()
         
         # 加载策略
         self._load_strategies_from_db()
@@ -1744,23 +1764,101 @@ class QuantitativeService:
         # 初始化交易引擎
         self._init_trading_engine()
         
-        logger.info("量化交易服务初始化完成")
+        logger.info(f"量化交易服务初始化完成 - 系统状态: {'运行中' if self.is_running else '已停止'}")
         
-    # 添加缺失的运行状态管理方法
+    def _load_system_status(self) -> bool:
+        """从数据库加载系统运行状态"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT is_running FROM system_status WHERE id = 1")
+                result = cursor.fetchone()
+                return bool(result[0]) if result else False
+        except Exception as e:
+            logger.error(f"加载系统状态失败: {e}")
+            return False
+    
+    def _load_auto_trading_status(self) -> bool:
+        """从数据库加载自动交易状态"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT auto_trading_enabled FROM system_status WHERE id = 1")
+                result = cursor.fetchone()
+                return bool(result[0]) if result else True
+        except Exception as e:
+            logger.error(f"加载自动交易状态失败: {e}")
+            return True
+    
     def start_system(self):
-        """启动量化系统"""
-        self.is_running = True
-        logger.info("量化系统已启动")
-        return True
+        """启动量化系统 - 状态持久化到数据库"""
+        try:
+            self.is_running = True
+            
+            # 持久化状态到数据库
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE system_status 
+                    SET is_running = 1, 
+                        last_start_time = CURRENT_TIMESTAMP,
+                        updated_time = CURRENT_TIMESTAMP
+                    WHERE id = 1
+                """)
+                conn.commit()
+            
+            # 启动所有已启用的策略
+            for strategy in self.strategies.values():
+                if strategy.config.enabled:
+                    strategy.start()
+            
+            self._log_operation(
+                "系统管理", 
+                "量化系统启动 - 状态已同步到所有设备", 
+                "成功"
+            )
+            
+            logger.success(f"量化系统已启动 - 运行策略数: {len([s for s in self.strategies.values() if s.is_running])}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"启动量化系统失败: {e}")
+            return False
         
     def stop_system(self):
-        """停止量化系统"""
-        self.is_running = False
-        # 停止所有策略
-        for strategy_id in list(self.strategies.keys()):
-            self.stop_strategy(strategy_id)
-        logger.info("量化系统已停止")
-        return True
+        """停止量化系统 - 状态持久化到数据库"""
+        try:
+            self.is_running = False
+            
+            # 持久化状态到数据库
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE system_status 
+                    SET is_running = 0, 
+                        last_stop_time = CURRENT_TIMESTAMP,
+                        updated_time = CURRENT_TIMESTAMP
+                    WHERE id = 1
+                """)
+                conn.commit()
+            
+            # 停止所有策略
+            for strategy_id in list(self.strategies.keys()):
+                strategy = self.strategies[strategy_id]
+                strategy.stop()
+            
+            self._log_operation(
+                "系统管理", 
+                "量化系统停止 - 状态已同步到所有设备", 
+                "成功"
+            )
+            
+            logger.info("量化系统已停止 - 所有策略已停止")
+            return True
+            
+        except Exception as e:
+            logger.error(f"停止量化系统失败: {e}")
+            return False
     
     def _create_default_strategies(self):
         """创建6个默认策略 - 纯净策略，无假数据"""
@@ -2558,20 +2656,33 @@ class QuantitativeService:
         return status
     
     def toggle_auto_trading(self, enabled: bool) -> bool:
-        """切换自动交易开关"""
+        """切换自动交易开关 - 状态持久化到数据库"""
         try:
             self.auto_trading_enabled = enabled
+            
+            # 持久化状态到数据库
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE system_status 
+                    SET auto_trading_enabled = ?, 
+                        updated_time = CURRENT_TIMESTAMP
+                    WHERE id = 1
+                """, (enabled,))
+                conn.commit()
             
             if enabled and not self.trading_engine:
                 self._init_trading_engine()
             
             self._log_operation(
                 "系统设置",
-                f"自动交易 {'启用' if enabled else '禁用'}",
+                f"自动交易 {'启用' if enabled else '禁用'} - 状态已同步到所有设备",
                 "成功"
             )
             
+            logger.info(f"自动交易状态已更新: {'启用' if enabled else '禁用'}")
             return True
+            
         except Exception as e:
             logger.error(f"切换自动交易失败: {e}")
             return False

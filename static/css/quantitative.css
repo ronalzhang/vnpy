@@ -479,26 +479,67 @@
 }
 
 /* ==================== 状态指示器 ==================== */
-/* 状态指示器基础样式已移至全站通用样式 styles.css */
+/* 继承全站状态指示器样式，但添加量化交易页面的特定需求 */
 
 .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--gray-400);
+    background: #333; /* 默认黑色 */
+    display: inline-block;
+    margin-right: 8px;
 }
 
+/* 在线状态 - 金色闪动 */
 .status-dot.online {
-    background: var(--success-color);
-    animation: pulse 2s infinite;
+    background-color: #ffd700;
+    animation: golden-pulse 2s infinite;
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
 }
 
+/* 离线状态 - 黑色 */
 .status-dot.offline {
-    background: var(--error-color);
+    background-color: #333;
 }
 
+/* 警告状态 - 橙色 */
 .status-dot.warning {
-    background: var(--warning-color);
+    background-color: #faad14;
+}
+
+/* 确保交易所状态指示器也使用正确样式 */
+.exchange-card .status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.exchange-card .status-indicator.status-online {
+    background-color: #ffd700;
+    animation: golden-pulse 2s infinite;
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
+}
+
+.exchange-card .status-indicator.status-offline {
+    background-color: #333;
+}
+
+/* 金色脉冲动画（与全局一致） */
+@keyframes golden-pulse {
+    0% {
+        opacity: 1;
+        box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
+    }
+    50% {
+        opacity: 0.7;
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+    }
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
+    }
 }
 
 /* ==================== 滚动条样式 ==================== */

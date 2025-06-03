@@ -1350,7 +1350,7 @@ def force_close_position(position_id):
 
 @app.route('/api/quantitative/system-status', methods=['GET'])
 def get_system_status():
-    """获取系统状态"""
+    """获取系统状态 - 从数据库读取真实状态，支持多设备同步"""
     try:
         if not quantitative_service:
             return jsonify({
@@ -1361,55 +1361,92 @@ def get_system_status():
                 'timestamp': datetime.now().isoformat()
             })
             
-        # 检查量化服务状态
-        running = hasattr(quantitative_service, 'auto_trading_enabled')
-        auto_trading_enabled = getattr(quantitative_service, 'auto_trading_enabled', False)
+        # 从数据库读取真实系统状态
+        running = quantitative_service.is_running
+        auto_trading_enabled = quantitative_service.auto_trading_enabled
+        
+        # 获取运行策略数量
+        running_strategies = len([s for s in quantitative_service.strategies.values() if s.is_running])
+        total_strategies = len(quantitative_service.strategies)
+        
+        logger.info(f"系统状态查询: 运行={running}, 自动交易={auto_trading_enabled}, 运行策略={running_strategies}/{total_strategies}")
         
         return jsonify({
             'success': True,
             'running': running,
             'auto_trading_enabled': auto_trading_enabled,
-            'timestamp': datetime.now().isoformat()
+            'running_strategies': running_strategies,
+            'total_strategies': total_strategies,
+            'timestamp': datetime.now().isoformat(),
+            'source': 'database'  # 标记数据来源于数据库
         })
+        
     except Exception as e:
-        logger.warning(f"检查系统状态失败: {e}")
+        logger.error(f"获取系统状态失败: {e}")
         return jsonify({
-            'success': True,
+            'success': False,
             'running': False,
             'auto_trading_enabled': False,
-            'message': str(e),
+            'message': f'获取系统状态失败: {str(e)}',
             'timestamp': datetime.now().isoformat()
         })
 
 @app.route('/api/quantitative/system-control', methods=['POST'])
 def system_control():
-    """系统控制 - 启动/停止"""
+    """系统控制 - 启动/停止，状态持久化到数据库"""
     try:
+        if not quantitative_service:
+            return jsonify({
+                'success': False, 
+                'message': '量化服务未启用'
+            }), 500
+            
         data = request.get_json()
         action = data.get('action', '')
         
         if action == 'start':
-            # 启动系统逻辑
-            logger.info("启动量化交易系统")
-            # 这里可以添加实际的启动逻辑
-            return jsonify({
-                'success': True,
-                'message': '量化交易系统启动成功'
-            })
+            # 启动量化系统
+            success = quantitative_service.start_system()
+            if success:
+                logger.success("量化交易系统启动成功 - 状态已同步到所有设备")
+                return jsonify({
+                    'success': True,
+                    'message': '量化交易系统启动成功，状态已同步到所有设备',
+                    'running': True
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '量化交易系统启动失败'
+                }), 500
+                
         elif action == 'stop':
-            # 停止系统逻辑
-            logger.info("停止量化交易系统")
-            # 这里可以添加实际的停止逻辑
-            return jsonify({
-                'success': True,
-                'message': '量化交易系统已停止'
-            })
+            # 停止量化系统
+            success = quantitative_service.stop_system()
+            if success:
+                logger.info("量化交易系统停止成功 - 状态已同步到所有设备")
+                return jsonify({
+                    'success': True,
+                    'message': '量化交易系统已停止，状态已同步到所有设备',
+                    'running': False
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': '量化交易系统停止失败'
+                }), 500
         else:
-            return jsonify({'success': False, 'message': '无效的操作'}), 400
+            return jsonify({
+                'success': False, 
+                'message': '无效的操作，请使用start或stop'
+            }), 400
             
     except Exception as e:
         logger.error(f"系统控制失败: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({
+            'success': False, 
+            'message': f'系统控制失败: {str(e)}'
+        }), 500
 
 @app.route('/api/quantitative/account-info', methods=['GET'])
 def get_account_info():
