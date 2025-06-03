@@ -100,6 +100,7 @@ class QuantitativeSystem {
         const statusText = document.getElementById('system-status-text');
         
         if (systemRunning) {
+            // 系统控制台状态 - 运行中金色闪动
             systemStatusEl.innerHTML = '<span class="status-indicator status-online"></span>在线';
             systemToggle.classList.add('active');
             
@@ -109,6 +110,7 @@ class QuantitativeSystem {
                 statusText.textContent = '运行中';
             }
         } else {
+            // 系统控制台状态 - 离线黑色
             systemStatusEl.innerHTML = '<span class="status-indicator status-offline"></span>离线';
             systemToggle.classList.remove('active');
             
@@ -158,14 +160,14 @@ class QuantitativeSystem {
             if (data.success && data.data) {
                 const account = data.data;
                 
-                // 安全显示数据，确保有效才显示，使用U作为货币单位
-                this.safeSetText('totalBalance', account.balance, 'U');
+                // 安全显示数据，确保有效才显示，使用U作为货币单位（U放在数字后面）
+                this.safeSetText('totalBalance', account.balance, '', 'U');
                 
                 const dailyPnl = account.daily_pnl;
                 const dailyPnlEl = document.getElementById('dailyPnl');
                 if (dailyPnlEl) {
                     if (dailyPnl !== undefined && dailyPnl !== null && !isNaN(dailyPnl)) {
-                        dailyPnlEl.textContent = `${dailyPnl >= 0 ? '+' : ''}U${this.formatNumber(dailyPnl)}`;
+                        dailyPnlEl.textContent = `${dailyPnl >= 0 ? '+' : ''}${this.formatNumber(dailyPnl)}U`;
                         dailyPnlEl.className = `metric-value ${dailyPnl >= 0 ? 'text-success' : 'text-danger'}`;
                     } else {
                         dailyPnlEl.textContent = '-';
@@ -199,11 +201,11 @@ class QuantitativeSystem {
     }
 
     // 安全设置文本内容
-    safeSetText(elementId, value, prefix = '') {
+    safeSetText(elementId, value, prefix = '', suffix = '') {
         const element = document.getElementById(elementId);
         if (element) {
             if (value !== undefined && value !== null && !isNaN(value)) {
-                element.textContent = prefix + this.formatNumber(value);
+                element.textContent = prefix + this.formatNumber(value) + suffix;
             } else {
                 element.textContent = '-';
             }

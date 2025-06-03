@@ -1625,16 +1625,39 @@ def get_exchange_status():
 
 @app.route('/api/quantitative/config', methods=['GET', 'POST'])
 def quantitative_config():
-    """量化交易系统配置"""
+    """量化交易系统配置 - 支持三种运行模式"""
     try:
         if request.method == 'GET':
-            # 返回当前系统配置
+            # 返回当前系统配置和模式说明
             config = {
-                'mode': 'real',  # 强制真实模式
+                'current_mode': 'auto',  # 当前默认自动模式
                 'auto_trading_enabled': getattr(quantitative_service, 'auto_trading_enabled', True) if quantitative_service else True,
                 'max_positions': 10,
                 'risk_limit': 0.05,
-                'exchange': 'binance'
+                'exchange': 'binance',
+                'modes': {
+                    'manual': {
+                        'name': '手动模式',
+                        'description': '需要手动审核每个交易信号，系统生成信号但不自动执行',
+                        'auto_execute': False,
+                        'risk_level': 'low',
+                        'recommended_for': '新手用户或谨慎投资者'
+                    },
+                    'auto': {
+                        'name': '自动模式',
+                        'description': '系统自动执行高置信度信号，平衡收益与风险',
+                        'auto_execute': True,
+                        'risk_level': 'medium',
+                        'recommended_for': '有经验的用户，追求稳定收益'
+                    },
+                    'aggressive': {
+                        'name': '激进模式',
+                        'description': '更频繁交易，追求最大收益，风险较高',
+                        'auto_execute': True,
+                        'risk_level': 'high',
+                        'recommended_for': '高风险承受能力的投资者'
+                    }
+                }
             }
             return jsonify({
                 'success': True,
@@ -1643,21 +1666,50 @@ def quantitative_config():
         else:
             # 更新配置
             data = request.get_json()
-            mode = data.get('mode', 'real')
+            mode = data.get('mode', 'auto')
             
-            # 强制使用真实模式
-            if mode != 'real':
-                logger.warning(f"尝试切换到非真实模式 {mode}，强制保持真实模式")
-                mode = 'real'
+            # 验证模式
+            valid_modes = ['manual', 'auto', 'aggressive']
+            if mode not in valid_modes:
+                return jsonify({
+                    'success': False,
+                    'message': f'无效的运行模式，支持的模式: {", ".join(valid_modes)}'
+                }), 400
             
-            # 更新配置
+            # 根据模式调整系统参数
             if quantitative_service:
-                # 这里可以添加配置更新逻辑
-                pass
+                try:
+                    # 根据不同模式调整系统参数
+                    if mode == 'manual':
+                        # 手动模式：禁用自动交易
+                        quantitative_service.toggle_auto_trading(False)
+                        logger.info("切换到手动模式，已禁用自动交易")
+                    elif mode == 'auto':
+                        # 自动模式：启用自动交易，使用平衡参数
+                        quantitative_service.toggle_auto_trading(True)
+                        # 这里可以调整策略参数为平衡型
+                        logger.info("切换到自动模式，已启用自动交易")
+                    elif mode == 'aggressive':
+                        # 激进模式：启用自动交易，调整为激进参数
+                        quantitative_service.toggle_auto_trading(True)
+                        # 这里可以调整策略参数为激进型
+                        logger.info("切换到激进模式，追求高收益")
+                except Exception as e:
+                    logger.error(f"切换运行模式失败: {e}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'切换运行模式失败: {str(e)}'
+                    }), 500
+            
+            mode_names = {
+                'manual': '手动模式',
+                'auto': '自动模式', 
+                'aggressive': '激进模式'
+            }
             
             return jsonify({
                 'success': True,
-                'message': f'配置已更新为真实交易模式',
+                'message': f'已切换到{mode_names.get(mode, mode)}',
                 'data': {'mode': mode}
             })
             
