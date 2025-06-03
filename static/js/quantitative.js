@@ -23,6 +23,7 @@ class QuantitativeSystem {
         
         this.bindEvents();
         this.initChart();
+        this.loadSystemStatus(); // 加载真实系统状态
         this.startAutoRefresh();
     }
 
@@ -490,6 +491,7 @@ class QuantitativeSystem {
     async refreshAllData() {
         try {
             await Promise.all([
+                this.loadSystemStatus(),  // 添加系统状态刷新
                 this.loadAccountInfo(),
                 this.loadStrategies(),
                 this.loadPositions(),
@@ -557,6 +559,33 @@ class QuantitativeSystem {
     formatTime(timestamp) {
         return new Date(timestamp).toLocaleTimeString();
     }
+
+    // 加载系统状态
+    async loadSystemStatus() {
+        try {
+            const response = await fetch('/api/quantitative/system-status');
+            const data = await response.json();
+            
+            if (data.success) {
+                // 更新全局状态变量
+                systemRunning = data.running || false;
+                autoTradingEnabled = data.auto_trading_enabled || false;
+                
+                // 更新界面显示
+                this.updateSystemStatus();
+                this.updateAutoTradingStatus();
+                
+                console.log('系统状态加载成功:', {
+                    running: systemRunning,
+                    autoTrading: autoTradingEnabled
+                });
+            } else {
+                console.error('获取系统状态失败:', data.message);
+            }
+        } catch (error) {
+            console.error('加载系统状态失败:', error);
+        }
+    }
 }
 
 // 全局函数
@@ -581,10 +610,6 @@ function refreshStrategies() {
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     app = new QuantitativeSystem();
-    
-    // 初始化系统状态
-    app.updateSystemStatus();
-    app.updateAutoTradingStatus();
     
     console.log('量化交易系统初始化完成');
 }); 

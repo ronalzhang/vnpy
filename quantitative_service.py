@@ -1771,9 +1771,29 @@ class QuantitativeService:
         try:
             with sqlite3.connect(self.db_manager.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT is_running FROM system_status WHERE id = 1")
-                result = cursor.fetchone()
-                return bool(result[0]) if result else False
+                
+                # 确保系统状态记录存在
+                cursor.execute("SELECT COUNT(*) FROM system_status WHERE id = 1")
+                count = cursor.fetchone()[0]
+                
+                if count == 0:
+                    # 如果没有记录，创建默认记录
+                    cursor.execute("""
+                        INSERT INTO system_status 
+                        (id, is_running, auto_trading_enabled, updated_time) 
+                        VALUES (1, 0, 1, CURRENT_TIMESTAMP)
+                    """)
+                    conn.commit()
+                    logger.info("创建了默认系统状态记录")
+                    return False
+                else:
+                    # 读取存在的记录
+                    cursor.execute("SELECT is_running FROM system_status WHERE id = 1")
+                    result = cursor.fetchone()
+                    is_running = bool(result[0]) if result else False
+                    logger.info(f"从数据库加载系统状态: {is_running}")
+                    return is_running
+                    
         except Exception as e:
             logger.error(f"加载系统状态失败: {e}")
             return False
@@ -1783,12 +1803,32 @@ class QuantitativeService:
         try:
             with sqlite3.connect(self.db_manager.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT auto_trading_enabled FROM system_status WHERE id = 1")
-                result = cursor.fetchone()
-                return bool(result[0]) if result else True
+                
+                # 确保系统状态记录存在
+                cursor.execute("SELECT COUNT(*) FROM system_status WHERE id = 1")
+                count = cursor.fetchone()[0]
+                
+                if count == 0:
+                    # 如果没有记录，创建默认记录
+                    cursor.execute("""
+                        INSERT INTO system_status 
+                        (id, is_running, auto_trading_enabled, updated_time) 
+                        VALUES (1, 0, 1, CURRENT_TIMESTAMP)
+                    """)
+                    conn.commit()
+                    logger.info("创建了默认自动交易状态记录")
+                    return True  # 默认启用自动交易
+                else:
+                    # 读取存在的记录
+                    cursor.execute("SELECT auto_trading_enabled FROM system_status WHERE id = 1")
+                    result = cursor.fetchone()
+                    auto_trading = bool(result[0]) if result else True
+                    logger.info(f"从数据库加载自动交易状态: {auto_trading}")
+                    return auto_trading
+                    
         except Exception as e:
             logger.error(f"加载自动交易状态失败: {e}")
-            return True
+            return True  # 默认启用
     
     def start_system(self):
         """启动量化系统 - 状态持久化到数据库"""
