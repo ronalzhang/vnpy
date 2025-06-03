@@ -155,14 +155,20 @@ class QuantitativeSystem {
                 dailyReturnEl.className = `metric-value ${dailyReturn >= 0 ? 'text-success' : 'text-danger'}`;
                 
                 document.getElementById('dailyTrades').textContent = account.daily_trades;
+            } else {
+                // API返回失败，显示错误信息
+                document.getElementById('totalBalance').textContent = '数据加载失败';
+                document.getElementById('dailyPnl').textContent = '请检查API配置';
+                document.getElementById('dailyReturn').textContent = '--';
+                document.getElementById('dailyTrades').textContent = '--';
             }
         } catch (error) {
             console.error('加载账户信息失败:', error);
-            // 设置默认值
-            document.getElementById('totalBalance').textContent = '¥10,000';
-            document.getElementById('dailyPnl').textContent = '+¥0';
-            document.getElementById('dailyReturn').textContent = '+0.00%';
-            document.getElementById('dailyTrades').textContent = '0';
+            // 网络错误，显示错误提示
+            document.getElementById('totalBalance').textContent = '网络连接错误';
+            document.getElementById('dailyPnl').textContent = '无法获取数据';
+            document.getElementById('dailyReturn').textContent = '--';
+            document.getElementById('dailyTrades').textContent = '--';
         }
     }
 
@@ -172,16 +178,16 @@ class QuantitativeSystem {
             const response = await fetch('/api/quantitative/strategies');
             const data = await response.json();
             
-            if (data.success) {
-                this.strategies = data.strategies || [];
+            if (data.status === 'success' && data.data) {
+                this.strategies = data.data || [];
                 this.renderStrategies();
             } else {
-                console.error('加载策略失败:', data.message);
-                this.renderDefaultStrategies();
+                console.error('加载策略失败:', data.message || '未知错误');
+                this.renderEmptyStrategies();
             }
         } catch (error) {
             console.error('加载策略失败:', error);
-            this.renderDefaultStrategies();
+            this.renderEmptyStrategies();
         }
     }
 
@@ -191,7 +197,7 @@ class QuantitativeSystem {
         if (!container) return;
 
         if (this.strategies.length === 0) {
-            this.renderDefaultStrategies();
+            this.renderEmptyStrategies();
             return;
         }
 
@@ -202,25 +208,25 @@ class QuantitativeSystem {
 
         container.innerHTML = sortedStrategies.map(strategy => `
             <div class="col-md-4 mb-3">
-                <div class="card strategy-card ${strategy.running ? 'strategy-running' : 'strategy-stopped'}">
+                <div class="card strategy-card ${strategy.enabled ? 'strategy-running' : 'strategy-stopped'}">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="card-title mb-0">${strategy.name}</h6>
-                            <span class="badge ${strategy.running ? 'bg-success' : 'bg-secondary'}">
-                                ${strategy.running ? '运行中' : '已停止'}
+                            <span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'}">
+                                ${strategy.enabled ? '运行中' : '已停止'}
                             </span>
                         </div>
                         
                         <p class="card-text">
                             <small class="text-muted">${strategy.symbol}</small><br>
-                            <span class="text-success">成功率: ${(strategy.performance?.success_rate || 0).toFixed(1)}%</span><br>
-                            <span class="text-info">收益率: ${(strategy.performance?.return_rate || 0).toFixed(2)}%</span>
+                            <span class="text-success">成功率: ${(strategy.success_rate || 0).toFixed(1)}%</span><br>
+                            <span class="text-info">收益率: ${(strategy.total_return || 0).toFixed(2)}%</span>
                         </p>
                         
                         <div class="d-flex justify-content-between">
-                            <button class="btn btn-sm ${strategy.running ? 'btn-danger' : 'btn-success'}" 
+                            <button class="btn btn-sm ${strategy.enabled ? 'btn-danger' : 'btn-success'}" 
                                     onclick="app.toggleStrategy('${strategy.id}')">
-                                ${strategy.running ? '停止' : '启动'}
+                                ${strategy.enabled ? '停止' : '启动'}
                             </button>
                             <button class="btn btn-sm btn-outline-info" 
                                     onclick="app.viewStrategyDetails('${strategy.id}')">
@@ -233,47 +239,30 @@ class QuantitativeSystem {
         `).join('');
     }
 
-    // 渲染默认策略（当没有策略时）
-    renderDefaultStrategies() {
-        const defaultStrategies = [
-            { name: '动量策略 - BTC高频', symbol: 'BTC/USDT', success_rate: 85.2, return_rate: 12.5, running: false },
-            { name: '均值回归 - ETH稳健', symbol: 'ETH/USDT', success_rate: 78.9, return_rate: 8.3, running: false },
-            { name: '突破策略 - SOL激进', symbol: 'SOL/USDT', success_rate: 72.1, return_rate: 15.8, running: false },
-            { name: '网格交易 - DOGE稳定', symbol: 'DOGE/USDT', success_rate: 91.5, return_rate: 6.2, running: false },
-            { name: '高频交易 - XRP快速', symbol: 'XRP/USDT', success_rate: 68.7, return_rate: 18.9, running: false },
-            { name: '趋势跟踪 - ADA长线', symbol: 'ADA/USDT', success_rate: 76.3, return_rate: 9.7, running: false }
-        ];
-
+    // 渲染空策略提示（没有假数据）
+    renderEmptyStrategies() {
         const container = document.getElementById('strategiesContainer');
         if (!container) return;
 
-        container.innerHTML = defaultStrategies.map((strategy, index) => `
-            <div class="col-md-4 mb-3">
-                <div class="card strategy-card strategy-stopped">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h6 class="card-title mb-0">${strategy.name}</h6>
-                            <span class="badge bg-secondary">已停止</span>
-                        </div>
-                        
-                        <p class="card-text">
-                            <small class="text-muted">${strategy.symbol}</small><br>
-                            <span class="text-success">成功率: ${strategy.success_rate}%</span><br>
-                            <span class="text-info">收益率: ${strategy.return_rate}%</span>
-                        </p>
-                        
-                        <div class="d-flex justify-content-between">
-                            <button class="btn btn-sm btn-success" onclick="app.startStrategy(${index})">
-                                启动
-                            </button>
-                            <button class="btn btn-sm btn-outline-info" onclick="app.viewDefaultStrategyDetails(${index})">
-                                详情
-                            </button>
-                        </div>
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="card border-dashed">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-robot fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">暂无交易策略</h5>
+                        <p class="text-muted mb-4">您还没有创建任何量化交易策略，点击下方按钮开始创建</p>
+                        <button class="btn btn-primary" onclick="app.showCreateStrategyModal()">
+                            <i class="fas fa-plus me-2"></i>创建策略
+                        </button>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+    }
+
+    // 显示创建策略模态框
+    showCreateStrategyModal() {
+        this.showMessage('策略创建功能正在开发中，请联系管理员配置策略', 'info');
     }
 
     // 启动策略
