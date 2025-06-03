@@ -4,11 +4,6 @@ body {
     color: #212529;
 }
 
-/* 标题样式 */
-.navbar-brand {
-    font-weight: 600;
-}
-
 /* 容器样式 - 确保全宽显示 */
 .container-fluid {
     padding-left: 1.5rem;
@@ -43,6 +38,141 @@ body {
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
 }
 
+/* 导航栏样式 */
+.navbar {
+    background: linear-gradient(135deg, #4a90e2, #7b68ee);
+    padding: 0.5rem 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.navbar-brand {
+    font-weight: 700;
+    color: white !important;
+    font-size: 1.5rem;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.navbar-brand:hover {
+    color: #ffd700 !important;
+}
+
+.navbar-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: 1rem;
+}
+
+.navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.system-status {
+    color: white;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 导航菜单样式 */
+.navbar-nav {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    list-style: none;
+    padding: 0;
+}
+
+.navbar-nav .nav-item {
+    margin: 0;
+}
+
+.navbar-nav .nav-link {
+    color: white !important;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link:focus {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffd700 !important;
+    border-color: rgba(255, 215, 0, 0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* 状态指示器 */
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.status-online { 
+    background-color: #52c41a;
+}
+
+.status-offline { 
+    background-color: #333;
+}
+
+.status-warning { 
+    background-color: #faad14;
+}
+
+.status-running {
+    background-color: #ffd700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+    animation: golden-pulse 2s infinite;
+}
+
+@keyframes golden-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(255, 215, 0, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
 /* 价格表格样式 */
 .table th {
     font-weight: 600;
@@ -53,14 +183,12 @@ body {
     padding: 0.5rem;
 }
 
-/* 表格响应式容器 */
 .table-responsive {
     width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
 
-/* 表格固定宽度列 */
 .table th[style*="width"], 
 .table td[style*="width"] {
     width: auto !important;
@@ -80,10 +208,20 @@ body {
     font-weight: 700;
     color: #0d6efd;
     margin-bottom: 0;
+    font-size: 1.2rem;
 }
 
 .balance-info h6 {
     margin-bottom: 0.25rem;
+    font-size: 0.8rem;
+}
+
+.balance-info .col-md-4 {
+    min-width: 33%;
+    flex: 0 0 33%;
+    max-width: 33%;
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
 /* 套利机会表格 */
@@ -126,21 +264,6 @@ body {
     padding: 0.35em 0.65em;
 }
 
-/* 表格响应式调整 */
-@media (max-width: 768px) {
-    .table-responsive {
-        font-size: 0.875rem;
-    }
-    
-    .card-header h5 {
-        font-size: 1rem;
-    }
-    
-    .balance-info h4 {
-        font-size: 1.25rem;
-    }
-}
-
 /* 价格上涨下跌颜色 */
 .price-up {
     color: #198754 !important;
@@ -161,30 +284,6 @@ body {
     animation: spinner-border .75s linear infinite;
 }
 
-/* 工具提示 */
-.tooltip {
-    position: absolute;
-    z-index: 1070;
-    display: block;
-    margin: 0;
-    font-family: var(--bs-font-sans-serif);
-    font-style: normal;
-    font-weight: 400;
-    line-height: 1.5;
-    text-align: left;
-    text-decoration: none;
-    text-shadow: none;
-    text-transform: none;
-    letter-spacing: normal;
-    word-break: normal;
-    word-spacing: normal;
-    white-space: normal;
-    line-break: auto;
-    font-size: 0.875rem;
-    word-wrap: break-word;
-    opacity: 0;
-}
-
 /* 按钮交互效果 */
 .btn:focus {
     box-shadow: none;
@@ -194,30 +293,26 @@ body {
     font-size: 0.8rem;
 }
 
-/* 下拉菜单样式 */
 .form-select-sm {
     padding-top: 0.25rem;
     padding-bottom: 0.25rem;
-    font-size: 0.85rem;
-    min-width: 150px;
 }
 
-/* 市场数据表格 */
+/* 市场数据表格样式 */
 #market-data .table {
     margin-bottom: 0;
 }
 
 #market-data .table th,
 #market-data .table td {
-    text-align: center;
+    padding: 0.75rem;
 }
 
 #market-data .table th[class*="text-"],
 #market-data .table td[class*="text-"] {
-    text-align: inherit;
+    text-align: center !important;
 }
 
-/* 套利机会表格 */
 #logs .card-body {
     padding: 0;
 }
@@ -225,248 +320,7 @@ body {
 #logs .list-group-item {
     border-left: none;
     border-right: none;
-}
-
-/* 确保账户余额在窄屏下一排显示 */
-.balance-info .col-md-4 {
-    min-width: 33%;
-    flex: 0 0 33%;
-    max-width: 33%;
-    padding-left: 10px;
-    padding-right: 10px;
-}
-
-.balance-info h4 {
-    font-size: 1.2rem;
-}
-
-.balance-info h6 {
-    font-size: 0.8rem;
-}
-
-@media (max-width: 768px) {
-    .balance-info .row {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-    }
-}
-
-@keyframes pulse {
-    0% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
-    100% {
-        opacity: 1;
-    }
-}
-
-.pulse {
-    animation: pulse 2s infinite;
-}
-
-/* 统一的状态指示器 */
-.status-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 5px;
-}
-
-/* 在线状态 - 绿色 */
-.status-online { 
-    background-color: #52c41a;
-}
-
-/* 离线状态 - 黑色 */
-.status-offline { 
-    background-color: #333;
-}
-
-/* 警告状态 - 黄色 */
-.status-warning { 
-    background-color: #faad14;
-}
-
-/* 运行中状态 - 金色闪动 */
-.status-running {
-    background-color: #ffd700;
-    animation: golden-pulse 2s infinite;
-    box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
-}
-
-/* 导航栏全新布局设计 */
-.navbar {
-    background: linear-gradient(135deg, #1677ff, #4096ff);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 0.5rem 1rem;
-    min-height: auto;
-}
-
-.navbar-brand {
-    color: #fff !important;
-    font-size: 1.2rem;
-    font-weight: 600;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.navbar-brand:hover {
-    color: #f0f8ff !important;
-}
-
-/* 导航栏内容容器 */
-.navbar-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    flex-wrap: nowrap;
-}
-
-/* 左侧品牌和状态区域 */
-.navbar-left {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-
-/* 系统状态 */
-.system-status {
-    font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.9);
-    margin-top: 0.1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-
-/* 金色脉冲动画 */
-@keyframes golden-pulse {
-    0% {
-        opacity: 1;
-        box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
-    }
-    50% {
-        opacity: 0.7;
-        box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
-    }
-    100% {
-        opacity: 1;
-        box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
-    }
-}
-
-/* 右侧导航菜单 */
-.navbar-nav {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.navbar-nav .nav-item {
-    display: flex;
-}
-
-.navbar-nav .nav-link {
-    color: rgba(255, 255, 255, 0.9) !important;
-    text-decoration: none;
-    padding: 0.5rem 0.8rem;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-    font-size: 0.9rem;
-    font-weight: 500;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-
-.navbar-nav .nav-link:hover,
-.navbar-nav .nav-link.active {
-    background-color: rgba(255, 255, 255, 0.15);
-    color: #fff !important;
-    transform: translateY(-1px);
-}
-
-/* 窄屏响应式设计 */
-@media (max-width: 768px) {
-    .navbar {
-        padding: 0.3rem 0.8rem;
-    }
-    
-    .navbar-brand {
-        font-size: 1rem;
-    }
-    
-    .system-status {
-        font-size: 0.7rem;
-        margin-top: 0.05rem;
-    }
-    
-    .status-indicator {
-        width: 6px;
-        height: 6px;
-    }
-    
-    .navbar-nav {
-        gap: 0.2rem;
-    }
-    
-    .navbar-nav .nav-link {
-        padding: 0.3rem 0.5rem;
-        font-size: 0.8rem;
-    }
-    
-    /* 窄屏时显示简化文本 */
-    .nav-link-desktop-text {
-        display: none !important;
-    }
-    
-    .nav-link-mobile-text {
-        display: inline !important;
-    }
-}
-
-/* 宽屏时显示完整文本 */
-@media (min-width: 769px) {
-    .nav-link-desktop-text {
-        display: inline !important;
-    }
-    
-    .nav-link-mobile-text {
-        display: none !important;
-    }
-}
-
-/* 进一步优化超窄屏幕 */
-@media (max-width: 480px) {
-    .navbar-nav .nav-link {
-        font-size: 0.7rem;
-        padding: 0.4rem 0.2rem;
-    }
-    
-    .navbar-nav .nav-link i {
-        font-size: 0.8rem;
-    }
-    
-    .navbar-nav + .d-flex {
-        font-size: 0.65rem;
-    }
-    
-    .navbar-nav + .d-flex .badge {
-        font-size: 0.55rem;
-        padding: 0.15rem 0.3rem;
-    }
+    padding: 0.75rem 1rem;
 }
 
 /* 资产增长图表样式 */
@@ -480,7 +334,6 @@ body {
     position: relative;
 }
 
-/* 里程碑展示样式 */
 .milestones {
     border-top: 1px solid rgba(0,0,0,0.1);
     padding-top: 1rem;
@@ -501,7 +354,6 @@ body {
     color: #6c757d;
 }
 
-/* 图表按钮样式 */
 .card-header .btn-sm {
     padding: 0.2rem 0.6rem;
     font-size: 0.75rem;
@@ -514,8 +366,67 @@ body {
     color: white;
 }
 
-/* 图表容器响应式 */
+/* 响应式样式 - 统一管理 */
 @media (max-width: 768px) {
+    /* 导航栏响应式 */
+    .navbar {
+        padding: 0.5rem;
+        min-height: 60px;
+    }
+    
+    .navbar-brand {
+        font-size: 1.2rem;
+    }
+    
+    .system-status {
+        font-size: 0.8rem;
+    }
+    
+    .status-indicator {
+        width: 6px;
+        height: 6px;
+    }
+    
+    /* 确保导航菜单横向排列 */
+    .navbar-nav {
+        display: flex !important;
+        flex-direction: row !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 0.3rem !important;
+        width: 100% !important;
+        flex-wrap: nowrap !important;
+    }
+    
+    .navbar-nav .nav-link {
+        padding: 0.4rem 0.6rem !important;
+        font-size: 0.75rem !important;
+        min-width: auto !important;
+        white-space: nowrap !important;
+    }
+    
+    .nav-link-desktop-text {
+        display: none;
+    }
+    
+    .nav-link-mobile-text {
+        display: inline;
+    }
+    
+    /* 其他响应式调整 */
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .card-header h5 {
+        font-size: 1rem;
+    }
+    
+    .balance-info .row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+    
     .balance-chart,
     .performance-chart {
         height: 200px;
@@ -526,12 +437,42 @@ body {
     }
     
     .milestone-label {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
     }
     
     .card-header .btn-sm {
         padding: 0.15rem 0.4rem;
         font-size: 0.7rem;
+    }
+}
+
+@media (min-width: 769px) {
+    .nav-link-desktop-text {
+        display: inline;
+    }
+    
+    .nav-link-mobile-text {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .navbar-nav .nav-link {
+        padding: 0.3rem 0.4rem !important;
+        font-size: 0.7rem !important;
+    }
+    
+    .navbar-nav .nav-link i {
+        font-size: 0.8rem;
+    }
+    
+    .navbar-nav + .d-flex {
+        margin-left: 0.5rem;
+    }
+    
+    .navbar-nav + .d-flex .badge {
+        font-size: 0.55rem;
+        padding: 0.15rem 0.3rem;
     }
 }
 
