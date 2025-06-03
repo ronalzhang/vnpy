@@ -347,15 +347,18 @@ class MomentumStrategy(QuantitativeStrategy):
     def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> float:
         """计算RSI指标"""
         if len(prices) < period + 1:
-            return 50
-            
-        delta = prices.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+            return 50.0  # 默认中性值
         
-        rs = gain / loss
+        deltas = prices.diff()
+        gain = deltas.where(deltas > 0, 0).rolling(window=period).mean()
+        loss = -deltas.where(deltas < 0, 0).rolling(window=period).mean()
+        
+        if loss.iloc[-1] == 0:  # 防止除零错误
+            return 100.0
+            
+        rs = gain.iloc[-1] / loss.iloc[-1]
         rsi = 100 - (100 / (1 + rs))
-        return rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else 50
+        return rsi
     
     def _calculate_macd(self, prices: pd.Series) -> tuple:
         """计算MACD指标"""
@@ -499,11 +502,15 @@ class MeanReversionStrategy(QuantitativeStrategy):
         return signal
     
     def _calculate_volatility(self, prices: pd.Series) -> float:
-        """计算历史波动率"""
+        """计算价格波动率"""
         if len(prices) < 2:
-            return 0
+            return 0.01  # 默认低波动率
+            
         returns = prices.pct_change().dropna()
-        return returns.std() * np.sqrt(252)  # 年化波动率
+        if len(returns) == 0:
+            return 0.01
+            
+        return returns.std() if returns.std() > 0 else 0.01
     
     def _get_volatility_factor(self) -> float:
         """根据波动率历史调整布林带宽度"""
@@ -655,17 +662,26 @@ class BreakoutStrategy(QuantitativeStrategy):
         return signal
     
     def _calculate_momentum(self, prices: pd.Series, period: int = 10) -> float:
-        """计算价格动量"""
+        """计算动量指标"""
         if len(prices) < period + 1:
-            return 0
-        return (prices.iloc[-1] - prices.iloc[-period-1]) / prices.iloc[-period-1]
+            return 0.0
+            
+        start_price = prices.iloc[-period-1]
+        end_price = prices.iloc[-1]
+        
+        if start_price == 0:  # 防止除零错误
+            return 0.0
+            
+        return (end_price - start_price) / start_price
     
     def _calculate_acceleration(self, prices: pd.Series, period: int = 5) -> float:
-        """计算价格加速度"""
+        """计算加速度指标"""
         if len(prices) < period * 2:
-            return 0
+            return 0.0
+            
         recent_momentum = self._calculate_momentum(prices.iloc[-period:], period // 2)
         past_momentum = self._calculate_momentum(prices.iloc[-period*2:-period], period // 2)
+        
         return recent_momentum - past_momentum
     
     def _count_higher_highs(self, highs: pd.Series, period: int = 10) -> int:
@@ -909,17 +925,25 @@ class HighFrequencyStrategy(QuantitativeStrategy):
         return current_vol > avg_vol * 2.0
     
     def _estimate_order_imbalance(self, prices: pd.Series, volumes: pd.Series) -> float:
-        """估算订单簿不平衡（0-1，>0.5买单占优）"""
-        if len(prices) < 3:
-            return 0.5
-        price_change = prices.iloc[-1] - prices.iloc[-2]
-        volume_current = volumes.iloc[-1] if len(volumes) > 0 else 1
+        """估算订单不平衡"""
+        if len(prices) < 2 or len(volumes) < 2:
+            return 0.0
+            
+        price_changes = prices.diff().dropna()
+        volume_changes = volumes.diff().dropna()
         
-        # 简化的不平衡估算：价格上涨+高成交量 = 买单占优
-        if price_change > 0:
-            return min(1.0, 0.6 + price_change * volume_current * 10)
-        else:
-            return max(0.0, 0.4 + price_change * volume_current * 10)
+        if len(price_changes) == 0 or volume_changes.sum() == 0:
+            return 0.0
+            
+        # 简化的订单不平衡估算
+        buy_volume = volume_changes[price_changes > 0].sum()
+        sell_volume = volume_changes[price_changes < 0].sum()
+        
+        total_volume = buy_volume + abs(sell_volume)
+        if total_volume == 0:  # 防止除零错误
+            return 0.0
+            
+        return (buy_volume - abs(sell_volume)) / total_volume
 
 class TrendFollowingStrategy(QuantitativeStrategy):
     """趋势跟踪策略 - 捕获长期趋势获得大幅收益"""
@@ -1051,36 +1075,56 @@ class TrendFollowingStrategy(QuantitativeStrategy):
         return (normalized_slope + 1) / 2  # 转换到0-1范围
     
     def _calculate_adx(self, prices: pd.Series, period: int = 14) -> float:
-        """计算平均方向指数ADX"""
+        """计算ADX指标"""
         if len(prices) < period + 1:
-            return 0
+            return 25.0  # 默认中性值
             
-        # 简化ADX计算
-        price_changes = prices.diff().abs()
-        tr = price_changes.rolling(window=period).mean()
-        dm_plus = prices.diff().where(prices.diff() > 0, 0).rolling(window=period).mean()
-        dm_minus = (-prices.diff()).where(prices.diff() < 0, 0).rolling(window=period).mean()
+        high = prices.rolling(window=2).max()
+        low = prices.rolling(window=2).min()
+        close = prices
         
-        di_plus = dm_plus / tr * 100
-        di_minus = dm_minus / tr * 100
+        # 计算True Range
+        tr1 = high - low
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
         
+        # 计算DM
+        dm_plus = (high - high.shift()).where((high - high.shift()) > (low.shift() - low), 0)
+        dm_minus = (low.shift() - low).where((low.shift() - low) > (high - high.shift()), 0)
+        
+        # 计算DI
+        tr_sum = tr.rolling(window=period).sum()
+        dm_plus_sum = dm_plus.rolling(window=period).sum()
+        dm_minus_sum = dm_minus.rolling(window=period).sum()
+        
+        if tr_sum.iloc[-1] == 0:  # 防止除零错误
+            return 25.0
+            
+        di_plus = dm_plus_sum / tr_sum * 100
+        di_minus = dm_minus_sum / tr_sum * 100
+        
+        if (di_plus.iloc[-1] + di_minus.iloc[-1]) == 0:  # 防止除零错误
+            return 25.0
+            
         dx = abs(di_plus - di_minus) / (di_plus + di_minus) * 100
-        adx = dx.rolling(window=period).mean().iloc[-1]
+        adx = dx.rolling(window=period).mean()
         
-        return adx if not pd.isna(adx) else 0
+        return adx.iloc[-1] if not pd.isna(adx.iloc[-1]) else 25.0
     
     def _calculate_price_position(self, prices: pd.Series, period: int = 50) -> float:
-        """计算价格在周期内的相对位置（0-1）"""
+        """计算价格在区间中的位置"""
         if len(prices) < period:
-            return 0.5
+            return 0.5  # 默认中间位置
             
-        recent_prices = prices.iloc[-period:]
+        recent_prices = prices.tail(period)
+        current = prices.iloc[-1]
         high = recent_prices.max()
         low = recent_prices.min()
-        current = prices.iloc[-1]
         
-        if high == low:
+        if high == low:  # 防止除零错误
             return 0.5
+            
         return (current - low) / (high - low)
 
 class AutomatedStrategyManager:
@@ -1326,71 +1370,52 @@ class AutomatedStrategyManager:
     
     def _calculate_sharpe_ratio(self, strategy_id: str) -> float:
         """计算夏普比率"""
-        # 简化实现
-        try:
-            daily_returns = self._get_strategy_daily_returns(strategy_id)
-            if len(daily_returns) < 7:
-                return 0.0
-            
-            avg_return = np.mean(daily_returns)
-            std_return = np.std(daily_returns)
-            
-            if std_return == 0:
-                return 0.0
-            
-            return avg_return / std_return * np.sqrt(365)  # 年化夏普比率
-        except:
+        returns = self._get_strategy_daily_returns(strategy_id)
+        if not returns or len(returns) < 2:
             return 0.0
+            
+        avg_return = np.mean(returns)
+        std_return = np.std(returns)
+        
+        if std_return == 0:  # 防止除零错误
+            return 0.0
+            
+        return avg_return / std_return * np.sqrt(365)  # 年化夏普比率
     
     def _calculate_max_drawdown(self, strategy_id: str) -> float:
         """计算最大回撤"""
-        try:
-            cumulative_returns = self._get_strategy_cumulative_returns(strategy_id)
-            if len(cumulative_returns) < 2:
-                return 0.0
-            
-            peak = cumulative_returns[0]
-            max_dd = 0.0
-            
-            for value in cumulative_returns:
-                if value > peak:
-                    peak = value
-                drawdown = (peak - value) / peak if peak > 0 else 0
-                max_dd = max(max_dd, drawdown)
-            
-            return max_dd
-        except:
+        returns = self._get_strategy_cumulative_returns(strategy_id)
+        if not returns:
             return 0.0
+            
+        peak = returns[0]
+        max_drawdown = 0.0
+        
+        for value in returns:
+            if value > peak:
+                peak = value
+            if peak > 0:  # 防止除零错误
+                drawdown = (peak - value) / peak
+                max_drawdown = max(max_drawdown, drawdown)
+                
+        return max_drawdown
     
     def _calculate_profit_factor(self, strategy_id: str) -> float:
         """计算盈利因子"""
-        try:
-            with sqlite3.connect(self.service.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT 
-                        SUM(CASE WHEN signal_type = 'sell' AND price > 
-                            (SELECT AVG(price) FROM trading_signals s2 
-                             WHERE s2.strategy_id = s1.strategy_id 
-                             AND s2.signal_type = 'buy' 
-                             AND s2.timestamp < s1.timestamp) 
-                        THEN price * quantity ELSE 0 END) as profits,
-                        SUM(CASE WHEN signal_type = 'sell' AND price < 
-                            (SELECT AVG(price) FROM trading_signals s2 
-                             WHERE s2.strategy_id = s1.strategy_id 
-                             AND s2.signal_type = 'buy' 
-                             AND s2.timestamp < s1.timestamp) 
-                        THEN price * quantity ELSE 0 END) as losses
-                    FROM trading_signals s1
-                    WHERE strategy_id = ? AND executed = 1
-                """, (strategy_id,))
-                
-                result = cursor.fetchone()
-                if result and result[1] and result[1] > 0:
-                    return result[0] / result[1]
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as total_profit,
+                       SUM(CASE WHEN realized_pnl < 0 THEN ABS(realized_pnl) ELSE 0 END) as total_loss
+                FROM trading_orders 
+                WHERE strategy_id = ? AND status = 'executed'
+            """, (strategy_id,))
+            
+            result = cursor.fetchone()
+            if not result or result[1] is None or result[1] == 0:  # 防止除零错误
                 return 1.0
-        except:
-            return 1.0
+                
+        return result[0] / result[1] if result[0] and result[1] else 1.0
     
     def _get_current_allocation(self, strategy_id: str) -> float:
         """获取当前资金分配"""
