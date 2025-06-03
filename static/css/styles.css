@@ -469,3 +469,69 @@ body {
     }
 }
 
+/* 资产增长图表样式 */
+.balance-chart {
+    height: 250px;
+    position: relative;
+}
+
+.performance-chart {
+    height: 250px;
+    position: relative;
+}
+
+/* 里程碑展示样式 */
+.milestones {
+    border-top: 1px solid rgba(0,0,0,0.1);
+    padding-top: 1rem;
+}
+
+.milestone-item {
+    padding: 0.5rem;
+}
+
+.milestone-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.milestone-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* 图表按钮样式 */
+.card-header .btn-sm {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    margin-left: 0.2rem;
+}
+
+.card-header .btn-sm.active {
+    background-color: #1677ff;
+    border-color: #1677ff;
+    color: white;
+}
+
+/* 图表容器响应式 */
+@media (max-width: 768px) {
+    .balance-chart,
+    .performance-chart {
+        height: 200px;
+    }
+    
+    .milestone-value {
+        font-size: 1rem;
+    }
+    
+    .milestone-label {
+        font-size: 0.75rem;
+    }
+    
+    .card-header .btn-sm {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.7rem;
+    }
+}
+

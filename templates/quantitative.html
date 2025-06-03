@@ -276,7 +276,7 @@
         
         <!-- 收益曲线图 -->
         <div class="row">
-            <div class="col-12">
+            <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
                         <h6 class="mb-0">
@@ -286,6 +286,50 @@
                     <div class="card-body">
                         <div class="performance-chart">
                             <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-area"></i> 资产增长历程
+                        </h6>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="app.toggleBalanceChart('30')">30天</button>
+                            <button class="btn btn-sm btn-outline-primary active" onclick="app.toggleBalanceChart('90')">90天</button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="app.toggleBalanceChart('365')">1年</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="balance-chart">
+                            <canvas id="balanceChart"></canvas>
+                        </div>
+                        
+                        <!-- 里程碑展示 -->
+                        <div class="milestones mt-3">
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="milestone-item">
+                                        <div class="milestone-value text-success">10U</div>
+                                        <div class="milestone-label">起始资金</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="milestone-item">
+                                        <div class="milestone-value text-warning" id="currentBalance">9.7U</div>
+                                        <div class="milestone-label">当前资产</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="milestone-item">
+                                        <div class="milestone-value text-primary">100,000U</div>
+                                        <div class="milestone-label">目标资产</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

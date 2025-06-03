@@ -647,6 +647,12 @@ class QuantitativeSystem {
 
     // 初始化收益曲线图
     initChart() {
+        this.initPerformanceChart();
+        this.initBalanceChart();
+    }
+
+    // 初始化收益曲线图
+    initPerformanceChart() {
         const ctx = document.getElementById('performanceChart');
         if (!ctx) return;
 
@@ -688,7 +694,7 @@ class QuantitativeSystem {
                         beginAtZero: false,
                         ticks: {
                             callback: function(value) {
-                                return '¥' + value.toLocaleString();
+                                return value.toLocaleString() + 'U';
                             }
                         }
                     }
@@ -700,6 +706,154 @@ class QuantitativeSystem {
                 }
             }
         });
+    }
+
+    // 初始化资产历史图表
+    initBalanceChart() {
+        const ctx = document.getElementById('balanceChart');
+        if (!ctx) return;
+
+        // 创建资产历史图表（默认90天）
+        this.balanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '总资产',
+                    data: [],
+                    borderColor: '#52c41a',
+                    backgroundColor: 'rgba(82, 196, 26, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: '时间'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: '资产 (U)'
+                        },
+                        type: 'logarithmic', // 使用对数刻度显示从10U到10万U的增长
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString() + 'U';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                return context[0].label;
+                            },
+                            label: function(context) {
+                                const value = context.parsed.y;
+                                return `总资产: ${value.toLocaleString()}U`;
+                            },
+                            afterLabel: function(context) {
+                                const dataIndex = context.dataIndex;
+                                const dataset = context.dataset;
+                                // 显示里程碑信息
+                                if (this.balanceHistory && this.balanceHistory[dataIndex]?.milestone_note) {
+                                    return `🎉 ${this.balanceHistory[dataIndex].milestone_note}`;
+                                }
+                                return '';
+                            }.bind(this)
+                        }
+                    }
+                }
+            }
+        });
+
+        // 加载默认90天数据
+        this.loadBalanceHistory(90);
+    }
+
+    // 加载资产历史数据
+    async loadBalanceHistory(days = 90) {
+        try {
+            const response = await fetch(`/api/quantitative/balance-history?days=${days}`);
+            const data = await response.json();
+            
+            if (data.success && data.data && data.data.length > 0) {
+                this.balanceHistory = data.data;
+                
+                // 更新图表数据
+                const labels = data.data.map(item => {
+                    const date = new Date(item.timestamp);
+                    return date.toLocaleDateString();
+                });
+                
+                const balances = data.data.map(item => item.total_balance);
+                
+                this.balanceChart.data.labels = labels;
+                this.balanceChart.data.datasets[0].data = balances;
+                this.balanceChart.update();
+                
+                // 更新当前资产显示
+                const currentBalance = data.data[data.data.length - 1].total_balance;
+                const currentBalanceEl = document.getElementById('currentBalance');
+                if (currentBalanceEl) {
+                    currentBalanceEl.textContent = `${currentBalance.toLocaleString()}U`;
+                    
+                    // 根据资产量设置颜色
+                    if (currentBalance >= 10000) {
+                        currentBalanceEl.className = 'milestone-value text-success';
+                    } else if (currentBalance >= 1000) {
+                        currentBalanceEl.className = 'milestone-value text-primary';
+                    } else if (currentBalance >= 100) {
+                        currentBalanceEl.className = 'milestone-value text-info';
+                    } else {
+                        currentBalanceEl.className = 'milestone-value text-warning';
+                    }
+                }
+                
+                // 显示里程碑提示
+                const milestones = data.data.filter(item => item.milestone_note);
+                if (milestones.length > 0) {
+                    console.log('🎉 资产里程碑:', milestones.map(m => m.milestone_note).join(', '));
+                }
+                
+            } else {
+                console.warn('未获取到资产历史数据');
+            }
+            
+        } catch (error) {
+            console.error('加载资产历史失败:', error);
+        }
+    }
+
+    // 切换资产图表时间范围
+    toggleBalanceChart(days) {
+        // 更新按钮状态
+        document.querySelectorAll('.card-header .btn-sm').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // 重新加载数据
+        this.loadBalanceHistory(parseInt(days));
     }
 
     // 刷新所有数据

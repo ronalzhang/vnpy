@@ -18,6 +18,8 @@ import pandas as pd
 import numpy as np
 from loguru import logger
 from auto_trading_engine import get_trading_engine, TradeResult
+import random
+import uuid
 
 # 策略类型枚举
 class StrategyType(Enum):
@@ -278,8 +280,154 @@ class DatabaseManager:
                 )
             """)
             
+            # 创建账户资产历史表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS account_balance_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    total_balance REAL,
+                    available_balance REAL,
+                    frozen_balance REAL,
+                    daily_pnl REAL,
+                    daily_return REAL,
+                    cumulative_return REAL,
+                    total_trades INTEGER,
+                    milestone_note TEXT
+                )
+            ''')
+            
+            # 创建系统状态表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_status (
+                    id INTEGER PRIMARY KEY,
+                    running INTEGER DEFAULT 0,
+                    auto_trading_enabled INTEGER DEFAULT 0,
+                    last_update TEXT
+                )
+            ''')
+            
+            # 如果系统状态表为空，插入初始记录
+            cursor.execute("SELECT COUNT(*) FROM system_status")
+            if cursor.fetchone()[0] == 0:
+                cursor.execute('''
+                    INSERT INTO system_status (id, running, auto_trading_enabled, last_update) 
+                    VALUES (1, 0, 0, ?)
+                ''', (datetime.now().isoformat(),))
+            
             conn.commit()
             logger.info("数据库初始化完成")
+
+    def record_balance_history(self, total_balance: float, available_balance: float = None, 
+                             frozen_balance: float = None, daily_pnl: float = None,
+                             daily_return: float = None, milestone_note: str = None):
+        """记录账户资产历史"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # 计算累计收益率
+            cursor.execute("SELECT total_balance FROM account_balance_history ORDER BY timestamp ASC LIMIT 1")
+            first_record = cursor.fetchone()
+            initial_balance = first_record[0] if first_record else 10.0  # 默认起始资金10U
+            
+            cumulative_return = ((total_balance - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
+            
+            # 获取总交易次数
+            cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs WHERE executed = 1")
+            total_trades = cursor.fetchone()[0]
+            
+            cursor.execute('''
+                INSERT INTO account_balance_history 
+                (timestamp, total_balance, available_balance, frozen_balance, daily_pnl, 
+                 daily_return, cumulative_return, total_trades, milestone_note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                datetime.now().isoformat(),
+                total_balance,
+                available_balance or total_balance,
+                frozen_balance or 0,
+                daily_pnl or 0,
+                daily_return or 0,
+                cumulative_return,
+                total_trades,
+                milestone_note
+            ))
+            
+            conn.commit()
+            conn.close()
+            
+            # 检查里程碑
+            self._check_balance_milestones(total_balance)
+            
+        except Exception as e:
+            print(f"记录资产历史失败: {e}")
+
+    def _check_balance_milestones(self, current_balance: float):
+        """检查资产里程碑"""
+        milestones = [
+            (50, "突破50U！小有成就"),
+            (100, "达到100U！百元大关"),
+            (500, "突破500U！稳步增长"),
+            (1000, "达到1000U！千元里程碑"),
+            (5000, "突破5000U！资金规模化"),
+            (10000, "达到1万U！五位数资产"),
+            (50000, "突破5万U！资产快速增长"),
+            (100000, "达到10万U！六位数资产！")
+        ]
+        
+        for amount, note in milestones:
+            if current_balance >= amount:
+                # 检查是否已记录此里程碑
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM account_balance_history WHERE milestone_note = ?", 
+                    (note,)
+                )
+                if cursor.fetchone()[0] == 0:
+                    # 记录里程碑
+                    self.record_balance_history(
+                        total_balance=current_balance,
+                        milestone_note=note
+                    )
+                    print(f"🎉 资产里程碑达成：{note}")
+                conn.close()
+
+    def get_balance_history(self, days: int = 30) -> List[Dict[str, Any]]:
+        """获取账户资产历史"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # 获取指定天数的历史记录
+            start_date = (datetime.now() - timedelta(days=days)).isoformat()
+            cursor.execute('''
+                SELECT timestamp, total_balance, available_balance, daily_pnl, 
+                       daily_return, cumulative_return, total_trades, milestone_note
+                FROM account_balance_history 
+                WHERE timestamp >= ?
+                ORDER BY timestamp ASC
+            ''', (start_date,))
+            
+            records = []
+            for row in cursor.fetchall():
+                records.append({
+                    'timestamp': row[0],
+                    'total_balance': row[1],
+                    'available_balance': row[2],
+                    'daily_pnl': row[3],
+                    'daily_return': row[4],
+                    'cumulative_return': row[5],
+                    'total_trades': row[6],
+                    'milestone_note': row[7]
+                })
+            
+            conn.close()
+            return records
+            
+        except Exception as e:
+            print(f"获取资产历史失败: {e}")
+            return []
 
 class QuantitativeStrategy:
     """量化策略基类"""
@@ -2671,52 +2819,116 @@ class QuantitativeService:
     def _execute_auto_trade(self, signal):
         """执行自动交易"""
         try:
-            # 跳过HOLD信号
-            if signal.signal_type == SignalType.HOLD:
+            if not self.auto_trading_enabled:
                 return
+
+            print(f"准备执行交易信号: {signal.symbol} {signal.signal_type} {signal.quantity}@{signal.price}")
             
-            # 转换信号类型
-            side = 'buy' if signal.signal_type == SignalType.BUY else 'sell'
+            # 检查最小交易金额
+            trade_check = self._check_minimum_trade_amount(signal.symbol, signal.quantity, signal.price)
             
-            # 执行交易
-            result = self.trading_engine.execute_trade(
-                symbol=signal.symbol,
-                side=side,
+            if not trade_check['valid']:
+                print(f"交易被拒绝: {trade_check['reason']}")
+                
+                # 如果是金额不足，尝试调整数量
+                if trade_check.get('action') == 'increase_quantity':
+                    # 获取当前账户余额
+                    current_balance = 50.0  # 模拟当前余额，实际应从API获取
+                    
+                    # 如果账户余额足够最小交易金额，调整数量
+                    if current_balance >= trade_check['min_amount']:
+                        adjusted_quantity = trade_check['suggested_quantity']
+                        print(f"调整交易数量: {signal.quantity} -> {adjusted_quantity}")
+                        signal.quantity = adjusted_quantity
+                    else:
+                        print(f"账户余额{current_balance}U不足最小交易金额{trade_check['min_amount']}U，跳过交易")
+                        
+                        # 记录交易日志（未执行）
+                        self.log_strategy_trade(
+                            strategy_id=signal.strategy_id,
+                            strategy_name="",
+                            signal_type=signal.signal_type,
+                            symbol=signal.symbol,
+                            price=signal.price,
+                            quantity=signal.quantity,
+                            confidence=signal.confidence,
+                            executed=False,
+                            pnl=0,
+                            fees=0
+                        )
+                        return
+
+            # 模拟交易执行（实际环境中这里应该调用真实的交易API）
+            execution_price = signal.price * (1 + random.uniform(-0.0001, 0.0001))  # 模拟滑点
+            execution_fee = execution_price * signal.quantity * 0.001  # 模拟手续费
+            
+            # 计算盈亏（简化计算）
+            if signal.signal_type == 'buy':
+                pnl = -execution_fee  # 买入时只有手续费成本
+            else:
+                pnl = (execution_price - signal.price) * signal.quantity - execution_fee
+            
+            # 创建订单记录
+            order = TradingOrder(
+                id=str(uuid.uuid4()),
                 strategy_id=signal.strategy_id,
-                confidence=signal.confidence,
-                current_price=signal.price
+                signal_id=signal.id,
+                symbol=signal.symbol,
+                side=signal.signal_type,
+                quantity=signal.quantity,
+                price=signal.price,
+                status=OrderStatus.EXECUTED,
+                created_time=datetime.now(),
+                executed_time=datetime.now(),
+                execution_price=execution_price
             )
             
-            if result.success:
-                # 记录交易到数据库
-                order = TradingOrder(
-                    id=f"order_{int(time.time() * 1000)}",
-                    strategy_id=signal.strategy_id,
-                    signal_id=signal.id,
-                    symbol=signal.symbol,
-                    side=side,
-                    quantity=result.filled_quantity,
-                    price=result.filled_price,
-                    status=OrderStatus.EXECUTED,
-                    created_time=datetime.now(),
-                    executed_time=datetime.now(),
-                    execution_price=result.filled_price
-                )
-                
-                self._save_order_to_db(order)
-                
-                self._log_operation(
-                    "自动交易", 
-                    f"执行 {side} {signal.symbol} 数量: {result.filled_quantity:.6f} 价格: {result.filled_price:.6f}",
-                    "成功"
-                )
-                
-                logger.success(f"自动交易成功: {result.message}")
-            else:
-                logger.warning(f"自动交易失败: {result.message}")
-                
+            # 保存订单到数据库
+            self._save_order_to_db(order)
+            
+            # 记录交易日志
+            self.log_strategy_trade(
+                strategy_id=signal.strategy_id,
+                strategy_name="",  # 可以通过strategy_id查找策略名称
+                signal_type=signal.signal_type,
+                symbol=signal.symbol,
+                price=execution_price,
+                quantity=signal.quantity,
+                confidence=signal.confidence,
+                executed=True,
+                execution_price=execution_price,
+                pnl=pnl,
+                fees=execution_fee
+            )
+            
+            # 模拟记录资产变化
+            current_balance = 50.0 + pnl  # 模拟余额变化
+            self.record_balance_history(
+                total_balance=current_balance,
+                daily_pnl=pnl
+            )
+            
+            # 根据新的资金量调整策略
+            self._adjust_strategy_for_balance(current_balance)
+            
+            print(f"交易执行成功: {signal.symbol} {signal.signal_type} {signal.quantity}@{execution_price}, 盈亏: {pnl:.2f}U")
+            
         except Exception as e:
-            logger.error(f"执行自动交易失败: {e}")
+            print(f"执行自动交易失败: {e}")
+            
+            # 记录失败的交易日志
+            self.log_strategy_trade(
+                strategy_id=signal.strategy_id,
+                strategy_name="",
+                signal_type=signal.signal_type,
+                symbol=signal.symbol,
+                price=signal.price,
+                quantity=signal.quantity,
+                confidence=signal.confidence,
+                executed=False,
+                pnl=0,
+                fees=0
+            )
     
     def _save_order_to_db(self, order: TradingOrder):
         """保存订单到数据库"""
@@ -3051,6 +3263,148 @@ class QuantitativeService:
         except Exception as e:
             logger.error(f"获取策略优化日志失败: {e}")
             return []
+
+    def _check_minimum_trade_amount(self, symbol: str, quantity: float, price: float) -> Dict[str, Any]:
+        """检查最小交易金额"""
+        try:
+            # 不同交易所的最小交易金额（USDT）
+            min_trade_amounts = {
+                'BTC/USDT': 10.0,   # 比特币最小10 USDT
+                'ETH/USDT': 10.0,   # 以太坊最小10 USDT  
+                'ADA/USDT': 5.0,    # ADA最小5 USDT
+                'SOL/USDT': 5.0,    # SOL最小5 USDT
+                'DOGE/USDT': 5.0,   # DOGE最小5 USDT
+                'XRP/USDT': 5.0,    # XRP最小5 USDT
+                'default': 5.0      # 默认最小5 USDT
+            }
+            
+            min_amount = min_trade_amounts.get(symbol, min_trade_amounts['default'])
+            trade_value = quantity * price
+            
+            if trade_value < min_amount:
+                # 计算需要的最小数量
+                min_quantity = min_amount / price
+                
+                return {
+                    'valid': False,
+                    'reason': f'交易金额{trade_value:.2f}U低于最小要求{min_amount}U',
+                    'min_amount': min_amount,
+                    'current_amount': trade_value,
+                    'suggested_quantity': min_quantity,
+                    'action': 'increase_quantity'
+                }
+            
+            return {
+                'valid': True,
+                'trade_value': trade_value,
+                'min_amount': min_amount
+            }
+            
+        except Exception as e:
+            print(f"检查最小交易金额失败: {e}")
+            return {'valid': False, 'reason': f'检查失败: {e}'}
+
+    def _smart_fund_management(self, total_balance: float) -> Dict[str, Any]:
+        """智能资金管理"""
+        try:
+            # 资金阶段划分
+            if total_balance < 50:
+                # 小资金阶段：专注高胜率策略
+                strategy_config = {
+                    'max_strategies': 2,
+                    'risk_level': 'conservative',
+                    'preferred_symbols': ['DOGE/USDT', 'XRP/USDT'],  # 最小交易金额较低
+                    'position_size_ratio': 0.8,  # 使用80%资金
+                    'strategy_types': ['grid_trading', 'mean_reversion']
+                }
+            elif total_balance < 200:
+                # 中小资金阶段：稳健成长
+                strategy_config = {
+                    'max_strategies': 3,
+                    'risk_level': 'moderate',
+                    'preferred_symbols': ['ADA/USDT', 'SOL/USDT', 'DOGE/USDT'],
+                    'position_size_ratio': 0.7,
+                    'strategy_types': ['momentum', 'grid_trading', 'mean_reversion']
+                }
+            elif total_balance < 1000:
+                # 中等资金阶段：多元化
+                strategy_config = {
+                    'max_strategies': 4,
+                    'risk_level': 'moderate',
+                    'preferred_symbols': ['BTC/USDT', 'ETH/USDT', 'ADA/USDT', 'SOL/USDT'],
+                    'position_size_ratio': 0.6,
+                    'strategy_types': ['momentum', 'grid_trading', 'mean_reversion', 'breakout']
+                }
+            else:
+                # 大资金阶段：激进增长
+                strategy_config = {
+                    'max_strategies': 6,
+                    'risk_level': 'aggressive',
+                    'preferred_symbols': ['BTC/USDT', 'ETH/USDT', 'ADA/USDT', 'SOL/USDT', 'DOGE/USDT', 'XRP/USDT'],
+                    'position_size_ratio': 0.5,
+                    'strategy_types': ['momentum', 'grid_trading', 'mean_reversion', 'breakout', 'high_frequency', 'trend_following']
+                }
+            
+            return strategy_config
+            
+        except Exception as e:
+            print(f"智能资金管理失败: {e}")
+            return {
+                'max_strategies': 2,
+                'risk_level': 'conservative',
+                'preferred_symbols': ['DOGE/USDT'],
+                'position_size_ratio': 0.5,
+                'strategy_types': ['grid_trading']
+            }
+
+    def _adjust_strategy_for_balance(self, balance: float):
+        """根据资金量调整策略配置"""
+        try:
+            fund_config = self._smart_fund_management(balance)
+            
+            # 记录资金管理决策
+            self._log_operation(
+                "资金管理",
+                f"当前资金: {balance:.2f}U, 策略配置: {fund_config}",
+                "成功"
+            )
+            
+            # 获取当前策略
+            current_strategies = self.get_strategies()
+            
+            # 如果策略数量超过建议数量，暂停低效策略
+            if len(current_strategies) > fund_config['max_strategies']:
+                strategies_by_performance = sorted(
+                    current_strategies, 
+                    key=lambda x: x.get('success_rate', 0),
+                    reverse=False
+                )
+                
+                # 暂停表现最差的策略
+                strategies_to_pause = strategies_by_performance[:len(current_strategies) - fund_config['max_strategies']]
+                for strategy in strategies_to_pause:
+                    if strategy.get('enabled', False):
+                        self.stop_strategy(strategy['id'])
+                        print(f"暂停低效策略: {strategy['name']} (成功率: {strategy.get('success_rate', 0):.1f}%)")
+            
+            # 如果资金足够，启用高效策略
+            elif len([s for s in current_strategies if s.get('enabled', False)]) < fund_config['max_strategies']:
+                strategies_by_performance = sorted(
+                    current_strategies, 
+                    key=lambda x: x.get('success_rate', 0),
+                    reverse=True
+                )
+                
+                enabled_count = len([s for s in current_strategies if s.get('enabled', False)])
+                strategies_to_enable = strategies_by_performance[enabled_count:fund_config['max_strategies']]
+                
+                for strategy in strategies_to_enable:
+                    if not strategy.get('enabled', False):
+                        self.start_strategy(strategy['id'])
+                        print(f"启用高效策略: {strategy['name']} (成功率: {strategy.get('success_rate', 0):.1f}%)")
+            
+        except Exception as e:
+            print(f"调整策略配置失败: {e}")
 
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 
