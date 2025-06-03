@@ -158,14 +158,14 @@ class QuantitativeSystem {
             if (data.success && data.data) {
                 const account = data.data;
                 
-                // 安全显示数据，确保有效才显示
-                this.safeSetText('totalBalance', account.balance, '¥');
+                // 安全显示数据，确保有效才显示，使用USDT作为货币单位
+                this.safeSetText('totalBalance', account.balance, '$');
                 
                 const dailyPnl = account.daily_pnl;
                 const dailyPnlEl = document.getElementById('dailyPnl');
                 if (dailyPnlEl) {
                     if (dailyPnl !== undefined && dailyPnl !== null && !isNaN(dailyPnl)) {
-                        dailyPnlEl.textContent = `${dailyPnl >= 0 ? '+' : ''}¥${this.formatNumber(dailyPnl)}`;
+                        dailyPnlEl.textContent = `${dailyPnl >= 0 ? '+' : ''}$${this.formatNumber(dailyPnl)}`;
                         dailyPnlEl.className = `metric-value ${dailyPnl >= 0 ? 'text-success' : 'text-danger'}`;
                     } else {
                         dailyPnlEl.textContent = '-';
@@ -257,7 +257,11 @@ class QuantitativeSystem {
                 <div class="card strategy-card ${strategy.enabled ? 'strategy-running' : 'strategy-stopped'}">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h6 class="card-title mb-0">${strategy.name}</h6>
+                            <h6 class="card-title mb-0">
+                                <a href="/strategy-config.html?id=${strategy.id}" class="text-decoration-none">
+                                    ${strategy.name}
+                                </a>
+                            </h6>
                             <span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'}">
                                 ${strategy.enabled ? '运行中' : '已停止'}
                             </span>
@@ -308,7 +312,8 @@ class QuantitativeSystem {
 
     // 显示创建策略模态框
     showCreateStrategyModal() {
-        this.showMessage('策略创建功能正在开发中，请联系管理员配置策略', 'info');
+        // 跳转到策略创建页面
+        window.location.href = '/strategy-create.html';
     }
 
     // 启动策略

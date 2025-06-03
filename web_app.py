@@ -705,6 +705,52 @@ def get_balances():
     """获取账户余额数据"""
     return jsonify(balances_data)
 
+@app.route('/api/account/balances', methods=['GET'])
+def get_account_balances():
+    """获取账户余额数据（前端调用的API）"""
+    try:
+        # 获取真实的交易所余额数据
+        raw_balances = get_exchange_balances()
+        
+        # 转换为前端期望的格式
+        balance_data = {}
+        
+        for exchange_id, balance_info in raw_balances.items():
+            # 提取USDT余额和持仓信息
+            total_usdt = balance_info.get("USDT", 0)
+            available_usdt = balance_info.get("USDT_available", 0)
+            locked_usdt = balance_info.get("USDT_locked", 0)
+            positions = balance_info.get("positions", {})
+            
+            # 转换持仓格式
+            formatted_positions = []
+            for symbol, pos_info in positions.items():
+                formatted_positions.append({
+                    "symbol": symbol,
+                    "total": pos_info.get("amount", 0),
+                    "available": pos_info.get("available", 0),
+                    "locked": pos_info.get("locked", 0),
+                    "value": pos_info.get("value", 0)
+                })
+            
+            balance_data[exchange_id] = {
+                "total": total_usdt,
+                "available": available_usdt,
+                "locked": locked_usdt,
+                "positions": formatted_positions
+            }
+        
+        return jsonify({
+            "status": "success",
+            "data": balance_data
+        })
+    except Exception as e:
+        print(f"获取账户余额失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"获取账户余额失败: {str(e)}"
+        }), 500
+
 @app.route('/api/symbols', methods=['GET'])
 def get_symbols():
     """获取交易对列表"""
