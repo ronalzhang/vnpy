@@ -269,18 +269,13 @@ body {
     background-color: #faad14;
 }
 
-/* 导航栏响应式优化 - 全站通用 */
+/* 导航栏响应式优化 - 全站统一 */
 @media (max-width: 768px) {
-    .navbar-nav .nav-link {
-        padding: 0.5rem 0.75rem;
-        font-size: 0.85rem;
-        white-space: nowrap;
-    }
-    
-    /* 简化导航文字但保持所有入口可见 */
+    /* 导航栏基础样式 */
     .navbar-nav {
         flex-direction: row;
         flex-wrap: nowrap;
+        width: 100%;
     }
     
     .navbar-nav .nav-item {
@@ -288,33 +283,72 @@ body {
         text-align: center;
     }
     
+    .navbar-nav .nav-link {
+        padding: 0.5rem 0.3rem;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+    
     .navbar-collapse {
         flex-grow: 1;
     }
     
-    .d-flex.align-items-center {
-        margin-left: auto;
-        font-size: 0.8rem;
+    /* 窄屏时显示简化文本 */
+    .nav-link-mobile-text {
+        display: inline !important;
     }
     
-    .badge {
-        font-size: 0.7rem;
+    .nav-link-desktop-text {
+        display: none !important;
+    }
+    
+    /* 系统状态区域 */
+    .navbar-nav + .d-flex {
+        margin-left: auto;
+        font-size: 0.75rem;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .navbar-nav + .d-flex .status-indicator {
+        width: 10px;
+        height: 10px;
+    }
+    
+    .navbar-nav + .d-flex .badge {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+    }
+}
+
+/* 桌面版时隐藏简化文本 */
+@media (min-width: 769px) {
+    .nav-link-mobile-text {
+        display: none !important;
+    }
+    
+    .nav-link-desktop-text {
+        display: inline !important;
     }
 }
 
 /* 进一步优化超窄屏幕 */
 @media (max-width: 480px) {
     .navbar-nav .nav-link {
-        font-size: 0.75rem;
-        padding: 0.4rem 0.5rem;
-    }
-    
-    .d-flex.align-items-center span {
         font-size: 0.7rem;
+        padding: 0.4rem 0.2rem;
     }
     
-    .badge {
-        font-size: 0.6rem;
-        padding: 0.2rem 0.4rem;
+    .navbar-nav .nav-link i {
+        font-size: 0.8rem;
+    }
+    
+    .navbar-nav + .d-flex {
+        font-size: 0.65rem;
+    }
+    
+    .navbar-nav + .d-flex .badge {
+        font-size: 0.55rem;
+        padding: 0.15rem 0.3rem;
     }
 }

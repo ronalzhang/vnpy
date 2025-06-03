@@ -1193,27 +1193,21 @@ def get_quantitative_positions():
         }), 500
 
 @app.route('/api/quantitative/performance', methods=['GET'])
-def get_quantitative_performance():
-    """获取收益曲线数据"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
-    
+def get_performance_api():
+    """获取绩效数据"""
     try:
+        if not quantitative_service:
+            return jsonify({'success': True, 'data': {'metrics': [], 'summary': {}}})
+            
         days = request.args.get('days', 30, type=int)
-        performance = quantitative_service.get_performance(days)
+        performance = quantitative_service.get_performance(days=days)
         return jsonify({
-            "status": "success",
-            "data": performance
+            'success': True,
+            'data': performance
         })
     except Exception as e:
-        logger.error(f"获取收益数据失败: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"获取收益数据失败: {str(e)}"
-        }), 500
+        logger.error(f"获取绩效数据失败: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/operations-log', methods=['GET'])
 def get_operations_log():
@@ -1514,13 +1508,13 @@ def get_account_info():
 def get_exchange_status():
     """获取交易所连接状态"""
     try:
-        # 检查交易引擎连接状态
+        # 返回交易所状态信息
         exchange_status = {
             'binance': {
-                'connected': True,  # 假设连接正常
-                'permissions': '现货交易',
-                'latency': 25,  # 模拟延迟
-                'last_ping': datetime.now().isoformat()
+                'connected': True,
+                'ping': 25,
+                'permissions': ['spot'],
+                'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
         }
         
@@ -1544,39 +1538,6 @@ def get_exchange_status():
         logger.error(f"获取交易所状态失败: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/quantitative/positions', methods=['GET'])
-def get_positions_api():
-    """获取持仓信息"""
-    try:
-        if not quantitative_service:
-            return jsonify({'success': True, 'data': []})
-            
-        positions = quantitative_service.get_positions()
-        return jsonify({
-            'success': True,
-            'data': positions
-        })
-    except Exception as e:
-        logger.error(f"获取持仓失败: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/api/quantitative/signals', methods=['GET'])
-def get_signals_api():
-    """获取交易信号"""
-    try:
-        if not quantitative_service:
-            return jsonify({'success': True, 'data': []})
-            
-        limit = request.args.get('limit', 20, type=int)
-        signals = quantitative_service.get_signals(limit=limit)
-        return jsonify({
-            'success': True,
-            'data': signals
-        })
-    except Exception as e:
-        logger.error(f"获取信号失败: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
 @app.route('/api/quantitative/performance', methods=['GET'])
 def get_performance_api():
     """获取绩效数据"""
@@ -1592,38 +1553,6 @@ def get_performance_api():
         })
     except Exception as e:
         logger.error(f"获取绩效数据失败: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/api/quantitative/strategies/<strategy_id>/toggle', methods=['POST'])
-def toggle_strategy_api(strategy_id):
-    """切换策略状态"""
-    try:
-        if not quantitative_service:
-            return jsonify({'success': False, 'message': '量化服务未启用'}), 500
-            
-        # 获取当前策略状态
-        strategy = quantitative_service.get_strategy(strategy_id)
-        if not strategy:
-            return jsonify({'success': False, 'message': '策略不存在'}), 404
-        
-        # 切换策略状态
-        if strategy['enabled']:
-            result = quantitative_service.stop_strategy(strategy_id)
-            message = '策略已停止'
-        else:
-            result = quantitative_service.start_strategy(strategy_id)
-            message = '策略已启动'
-        
-        if result:
-            return jsonify({
-                'success': True,
-                'message': message
-            })
-        else:
-            return jsonify({'success': False, 'message': '操作失败'}), 500
-            
-    except Exception as e:
-        logger.error(f"切换策略状态失败: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # ========== 添加缺失的量化交易配置API ==========

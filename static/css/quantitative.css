@@ -1,34 +1,13 @@
 /* 量化交易页面专用样式 */
 
-/* ==================== 全局样式 ==================== */
-:root {
-    --primary-color: #1677ff;
-    --primary-light: #4096ff;
-    --primary-dark: #0066cc;
-    --success-color: #52c41a;
-    --warning-color: #faad14;
-    --error-color: #ff4d4f;
-    --info-color: #13c2c2;
-    --gray-100: #f8f9fa;
-    --gray-200: #e9ecef;
-    --gray-300: #dee2e6;
-    --gray-500: #6c757d;
-    --gray-700: #495057;
-    --gray-900: #212529;
-    --border-radius: 8px;
-    --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    --box-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
-    --transition: all 0.3s ease;
-}
-
 /* ==================== 统计卡片样式 ==================== */
 .stat-card {
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    background: linear-gradient(135deg, #1677ff, #4096ff);
     color: white;
     padding: 1.5rem;
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-    transition: var(--transition);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
     height: 120px;
@@ -46,12 +25,12 @@
     height: 100%;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 50%;
-    transition: var(--transition);
+    transition: all 0.3s ease;
 }
 
 .stat-card:hover {
     transform: translateY(-4px);
-    box-shadow: var(--box-shadow-hover);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .stat-card:hover::before {
@@ -86,19 +65,19 @@
 
 /* 渐变背景变体 */
 .bg-gradient-primary {
-    background: linear-gradient(135deg, var(--primary-color), var(--primary-light)) !important;
+    background: linear-gradient(135deg, #1677ff, #4096ff) !important;
 }
 
 .bg-gradient-success {
-    background: linear-gradient(135deg, var(--success-color), #73d13d) !important;
+    background: linear-gradient(135deg, #52c41a, #73d13d) !important;
 }
 
 .bg-gradient-warning {
-    background: linear-gradient(135deg, var(--warning-color), #ffc53d) !important;
+    background: linear-gradient(135deg, #faad14, #ffc53d) !important;
 }
 
 .bg-gradient-info {
-    background: linear-gradient(135deg, var(--info-color), #36cfc9) !important;
+    background: linear-gradient(135deg, #13c2c2, #36cfc9) !important;
 }
 
 /* ==================== 信号列表样式 ==================== */

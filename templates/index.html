@@ -238,23 +238,38 @@
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link active" href="/"><i class="fas fa-home me-1"></i>市场数据</a>
+                            <a class="nav-link active" href="/">
+                                <i class="fas fa-home me-1"></i>
+                                <span class="nav-link-desktop-text">市场数据</span>
+                                <span class="nav-link-mobile-text">市场</span>
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/quantitative.html"><i class="fas fa-robot me-1"></i>量化交易</a>
+                            <a class="nav-link" href="/quantitative.html">
+                                <i class="fas fa-robot me-1"></i>
+                                <span class="nav-link-desktop-text">量化交易</span>
+                                <span class="nav-link-mobile-text">量化</span>
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/arbitrage.html"><i class="fas fa-exchange-alt me-1"></i>套利系统</a>
+                            <a class="nav-link" href="/arbitrage.html">
+                                <i class="fas fa-exchange-alt me-1"></i>
+                                <span class="nav-link-desktop-text">套利系统</span>
+                                <span class="nav-link-mobile-text">套利</span>
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/operations-log.html"><i class="fas fa-list-alt me-1"></i>操作日志</a>
+                            <a class="nav-link" href="/operations-log.html">
+                                <i class="fas fa-list-alt me-1"></i>
+                                <span class="nav-link-desktop-text">操作日志</span>
+                                <span class="nav-link-mobile-text">日志</span>
+                            </a>
                         </li>
                     </ul>
                     <div class="d-flex align-items-center text-white">
-                        <span class="badge bg-success me-2" id="system-status">
-                            <i class="fas fa-circle pulse me-1"></i>系统运行中
-                        </span>
-                        <span id="current-time"></span>
+                        <span class="status-indicator status-online pulse me-1"></span>
+                        <span class="badge bg-success me-2" id="system-status">系统运行中</span>
+                        <span id="current-time" class="small"></span>
                     </div>
                 </div>
             </div>
