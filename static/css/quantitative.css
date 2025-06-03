@@ -658,4 +658,106 @@
         background: white !important;
         color: black !important;
     }
+}
+
+/* ==================== 系统控制面板样式 ==================== */
+.system-control-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+.account-card {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border: none;
+}
+
+.exchange-card {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    border: none;
+}
+
+/* ==================== 策略卡片样式扩展 ==================== */
+.strategy-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid var(--primary-color);
+}
+
+.strategy-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.strategy-running {
+    border-left-color: var(--success-color);
+    background-color: #f6ffed;
+}
+
+.strategy-stopped {
+    border-left-color: var(--error-color);
+    background-color: #fff2f0;
+}
+
+/* ==================== Toggle按钮样式 ==================== */
+.btn-toggle {
+    position: relative;
+    width: 60px;
+    height: 30px;
+    border-radius: 15px;
+    border: none;
+    background-color: #ccc;
+    transition: background-color 0.3s;
+    cursor: pointer;
+}
+
+.btn-toggle.active {
+    background-color: var(--success-color);
+}
+
+.btn-toggle::after {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: white;
+    top: 3px;
+    left: 3px;
+    transition: left 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.btn-toggle.active::after {
+    left: 33px;
+}
+
+/* ==================== 性能图表样式 ==================== */
+.performance-chart {
+    height: 300px;
+}
+
+/* ==================== 度量值样式 ==================== */
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* ==================== 状态指示器扩展 ==================== */
+.status-online { 
+    background-color: var(--success-color);
+}
+
+.status-offline { 
+    background-color: var(--error-color);
+}
+
+.status-warning { 
+    background-color: var(--warning-color);
 } 
