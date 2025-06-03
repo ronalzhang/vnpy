@@ -970,7 +970,7 @@ def quantitative_strategies():
                 "message": f"创建策略失败: {str(e)}"
             }), 500
 
-@app.route('/api/quantitative/strategies/<int:strategy_id>/toggle', methods=['POST'])
+@app.route('/api/quantitative/strategies/<strategy_id>/toggle', methods=['POST'])
 def toggle_quantitative_strategy(strategy_id):
     """切换策略状态"""
     if not QUANTITATIVE_ENABLED:
@@ -987,7 +987,7 @@ def toggle_quantitative_strategy(strategy_id):
                 "message": "策略不存在"
             }), 404
         
-        if strategy.get('is_active', False):
+        if strategy.get('enabled', False):
             success = quantitative_service.stop_strategy(strategy_id)
             message = "策略停止成功" if success else "策略停止失败"
         else:
@@ -1012,7 +1012,7 @@ def toggle_quantitative_strategy(strategy_id):
             "message": f"切换策略状态失败: {str(e)}"
         }), 500
 
-@app.route('/api/quantitative/strategies/<int:strategy_id>', methods=['DELETE'])
+@app.route('/api/quantitative/strategies/<strategy_id>', methods=['DELETE'])
 def delete_quantitative_strategy(strategy_id):
     """删除策略"""
     if not QUANTITATIVE_ENABLED:

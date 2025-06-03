@@ -485,6 +485,50 @@ class QuantitativeService:
         
         return True
         
+    def get_strategy(self, strategy_id: str) -> Optional[Dict[str, Any]]:
+        """获取单个策略"""
+        if strategy_id not in self.strategies:
+            return None
+            
+        strategy = self.strategies[strategy_id]
+        return {
+            'id': strategy.config.id,
+            'name': strategy.config.name,
+            'type': strategy.config.strategy_type.value,
+            'symbol': strategy.config.symbol,
+            'enabled': strategy.config.enabled,
+            'running': strategy.is_running,
+            'parameters': strategy.config.parameters,
+            'created_time': strategy.config.created_time.isoformat(),
+            'updated_time': strategy.config.updated_time.isoformat()
+        }
+        
+    def delete_strategy(self, strategy_id: str) -> bool:
+        """删除策略"""
+        if strategy_id not in self.strategies:
+            return False
+            
+        strategy = self.strategies[strategy_id]
+        
+        # 如果策略正在运行，先停止
+        if strategy.is_running:
+            strategy.stop()
+            
+        # 从内存中删除
+        del self.strategies[strategy_id]
+        
+        # 从数据库中删除
+        with sqlite3.connect(self.db_manager.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM quant_strategies WHERE id = ?", (strategy_id,))
+            conn.commit()
+        
+        # 记录操作日志
+        self._log_operation("delete_strategy", f"删除策略: {strategy.config.name}", "success")
+        
+        logger.info(f"删除策略成功: {strategy.config.name} (ID: {strategy_id})")
+        return True
+        
     def get_strategies(self) -> List[Dict[str, Any]]:
         """获取所有策略"""
         strategies = []

@@ -255,16 +255,16 @@ class QuantitativeApp {
         tbody.innerHTML = this.strategies.map(strategy => `
             <tr>
                 <td>${strategy.name}</td>
-                <td><span class="badge bg-info">${this.getStrategyTypeName(strategy.strategy_type)}</span></td>
+                <td><span class="badge bg-info">${this.getStrategyTypeName(strategy.type)}</span></td>
                 <td>${strategy.symbol}</td>
-                <td><span class="badge ${strategy.is_active ? 'bg-success' : 'bg-secondary'}">${strategy.is_active ? '运行中' : '已停止'}</span></td>
-                <td>${new Date(strategy.created_at).toLocaleDateString()}</td>
+                <td><span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'}">${strategy.enabled ? '运行中' : '已停止'}</span></td>
+                <td>${new Date(strategy.created_time).toLocaleDateString()}</td>
                 <td>
-                    <button class="btn btn-sm ${strategy.is_active ? 'btn-warning' : 'btn-success'}" 
-                            onclick="app.toggleStrategy(${strategy.id})">
-                        ${strategy.is_active ? '停止' : '启动'}
+                    <button class="btn btn-sm ${strategy.enabled ? 'btn-warning' : 'btn-success'}" 
+                            onclick="app.toggleStrategy('${strategy.id}')">
+                        ${strategy.enabled ? '停止' : '启动'}
                     </button>
-                    <button class="btn btn-sm btn-danger ms-1" onclick="app.deleteStrategy(${strategy.id})">删除</button>
+                    <button class="btn btn-sm btn-danger ms-1" onclick="app.deleteStrategy('${strategy.id}')">删除</button>
                 </td>
             </tr>
         `).join('');
@@ -341,7 +341,7 @@ class QuantitativeApp {
      * 更新统计卡片UI
      */
     updateStatsUI() {
-        const activeStrategies = this.strategies.filter(s => s.is_active).length;
+        const activeStrategies = this.strategies.filter(s => s.enabled).length;
         const totalReturn = this.strategies.reduce((sum, s) => sum + (s.total_return || 0), 0);
         const todaySignals = this.signals.filter(s => {
             const today = new Date().toDateString();
