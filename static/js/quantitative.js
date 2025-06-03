@@ -924,4 +924,257 @@ class QuantitativeApp {
 }
 
 // 全局函数，用于按钮点击事件
-window.QuantitativeApp = QuantitativeApp; 
+window.QuantitativeApp = QuantitativeApp;
+
+// 自动交易控制
+let autoTradingEnabled = false;
+
+// 初始化自动交易功能
+function initAutoTrading() {
+    // 加载交易状态
+    loadTradingStatus();
+    
+    // 绑定自动交易开关
+    document.getElementById('autoTradingSwitch').addEventListener('change', function() {
+        const enabled = this.checked;
+        toggleAutoTrading(enabled);
+    });
+    
+    // 定时更新交易状态
+    setInterval(loadTradingStatus, 10000); // 每10秒更新一次
+    
+    // 定时更新持仓信息
+    setInterval(loadRealPositions, 5000); // 每5秒更新一次
+}
+
+// 加载交易状态
+async function loadTradingStatus() {
+    try {
+        const response = await fetch('/api/quantitative/trading-status');
+        const result = await response.json();
+        
+        if (result.success) {
+            updateTradingStatusUI(result.data);
+        } else {
+            console.error('获取交易状态失败:', result.message);
+            document.getElementById('autoTradingStatus').textContent = '获取状态失败';
+        }
+    } catch (error) {
+        console.error('请求交易状态失败:', error);
+        document.getElementById('autoTradingStatus').textContent = '连接失败';
+    }
+}
+
+// 更新交易状态UI
+function updateTradingStatusUI(data) {
+    const switchElement = document.getElementById('autoTradingSwitch');
+    const statusElement = document.getElementById('autoTradingStatus');
+    
+    autoTradingEnabled = data.auto_trading_enabled || false;
+    switchElement.checked = autoTradingEnabled;
+    statusElement.textContent = autoTradingEnabled ? '已启用' : '已禁用';
+    statusElement.className = autoTradingEnabled ? 'text-success' : 'text-secondary';
+    
+    // 更新数据显示
+    if (data.balance !== undefined) {
+        document.getElementById('accountBalance').textContent = `${data.balance.toFixed(2)} USDT`;
+    }
+    
+    if (data.daily_pnl !== undefined) {
+        const pnlElement = document.getElementById('dailyPnl');
+        pnlElement.textContent = `${data.daily_pnl.toFixed(2)} USDT`;
+        pnlElement.className = `metric-value ${data.daily_pnl >= 0 ? 'text-success' : 'text-danger'}`;
+    }
+    
+    if (data.daily_trades !== undefined) {
+        document.getElementById('dailyTrades').textContent = `${data.daily_trades} 笔`;
+    }
+    
+    if (data.daily_win_rate !== undefined) {
+        const winRateElement = document.getElementById('dailyWinRate');
+        const winRate = (data.daily_win_rate * 100).toFixed(1);
+        winRateElement.textContent = `${winRate}%`;
+        winRateElement.className = `metric-value ${data.daily_win_rate >= 0.6 ? 'text-success' : data.daily_win_rate >= 0.4 ? 'text-warning' : 'text-danger'}`;
+    }
+    
+    if (data.positions_count !== undefined) {
+        document.getElementById('currentPositions').textContent = `${data.positions_count} 个`;
+    }
+    
+    if (data.daily_return !== undefined) {
+        const returnElement = document.getElementById('dailyReturn');
+        const returnPercent = (data.daily_return * 100).toFixed(2);
+        returnElement.textContent = `${returnPercent}%`;
+        returnElement.className = `metric-value ${data.daily_return >= 0 ? 'text-success' : 'text-danger'}`;
+        
+        // 如果接近目标收益，高亮显示
+        if (data.daily_return >= 0.045) { // 接近5%目标时
+            returnElement.className += ' fw-bold';
+        }
+    }
+}
+
+// 切换自动交易
+async function toggleAutoTrading(enabled) {
+    try {
+        const response = await fetch('/api/quantitative/toggle-auto-trading', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ enabled: enabled })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(result.message, 'success');
+            autoTradingEnabled = enabled;
+            
+            // 立即更新状态
+            setTimeout(loadTradingStatus, 1000);
+        } else {
+            showToast(`操作失败: ${result.message}`, 'error');
+            // 恢复开关状态
+            document.getElementById('autoTradingSwitch').checked = autoTradingEnabled;
+        }
+    } catch (error) {
+        console.error('切换自动交易失败:', error);
+        showToast('网络错误，请稍后重试', 'error');
+        // 恢复开关状态
+        document.getElementById('autoTradingSwitch').checked = autoTradingEnabled;
+    }
+}
+
+// 加载实时持仓
+async function loadRealPositions() {
+    try {
+        const response = await fetch('/api/quantitative/positions');
+        const result = await response.json();
+        
+        if (result.success) {
+            updatePositionsUI(result.data);
+        }
+    } catch (error) {
+        console.error('获取持仓失败:', error);
+    }
+}
+
+// 更新持仓UI
+function updatePositionsUI(positions) {
+    const container = document.getElementById('realPositions');
+    
+    if (!positions || positions.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="fas fa-inbox me-2"></i>暂无持仓
+            </div>
+        `;
+        return;
+    }
+    
+    // 分别显示真实持仓和模拟持仓
+    const realPositions = positions.filter(p => p.source === 'real');
+    const simPositions = positions.filter(p => p.source === 'simulation');
+    
+    let html = '';
+    
+    if (realPositions.length > 0) {
+        html += '<div class="mb-3"><h6 class="text-primary mb-2">真实持仓</h6>';
+        realPositions.forEach(position => {
+            const pnlClass = position.unrealized_pnl >= 0 ? 'text-success' : 'text-danger';
+            const pnlIcon = position.unrealized_pnl >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+            
+            html += `
+                <div class="border rounded p-2 mb-2 bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${position.symbol}</strong>
+                            <span class="text-muted ms-2">${position.side.toUpperCase()}</span>
+                        </div>
+                        <div class="text-end">
+                            <div class="${pnlClass}">
+                                <i class="fas ${pnlIcon} me-1"></i>
+                                ${position.unrealized_pnl.toFixed(2)} USDT
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row text-sm text-muted mt-1">
+                        <div class="col-6">数量: ${position.quantity.toFixed(6)}</div>
+                        <div class="col-6">成本: ${position.entry_price.toFixed(6)}</div>
+                    </div>
+                    <div class="mt-2">
+                        <button class="btn btn-outline-danger btn-sm" onclick="forceClosePosition('${position.symbol}')">
+                            <i class="fas fa-times me-1"></i>强制平仓
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+    }
+    
+    if (simPositions.length > 0) {
+        html += '<div><h6 class="text-secondary mb-2">模拟持仓</h6>';
+        simPositions.slice(0, 3).forEach(position => { // 只显示前3个模拟持仓
+            const pnlClass = position.unrealized_pnl >= 0 ? 'text-success' : 'text-danger';
+            
+            html += `
+                <div class="border rounded p-2 mb-2" style="background-color: #f8f9fa;">
+                    <div class="d-flex justify-content-between">
+                        <span>${position.symbol}</span>
+                        <span class="${pnlClass}">${position.unrealized_pnl.toFixed(2)} USDT</span>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+// 强制平仓
+async function forceClosePosition(symbol) {
+    if (!confirm(`确定要强制平仓 ${symbol} 吗？`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/quantitative/force-close/${symbol}`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('平仓指令已发送', 'success');
+            // 立即刷新持仓
+            setTimeout(loadRealPositions, 1000);
+        } else {
+            showToast(`平仓失败: ${result.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('强制平仓失败:', error);
+        showToast('操作失败，请稍后重试', 'error');
+    }
+}
+
+// 修改原有的 initQuantitative 函数
+function initQuantitative() {
+    loadStrategies();
+    loadSignals();
+    loadPositions();
+    loadPerformance();
+    
+    // 初始化自动交易功能
+    initAutoTrading();
+    
+    // 定时刷新（保持原有频率）
+    setInterval(() => {
+        loadStrategies();
+        loadSignals();
+        loadPositions();
+        loadPerformance();
+    }, 30000);
+} 

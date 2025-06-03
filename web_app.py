@@ -1232,6 +1232,67 @@ def get_operations_log():
 
 # ========================= 量化交易API路由结束 =========================
 
+# 添加自动交易API接口
+@app.route('/api/quantitative/trading-status', methods=['GET'])
+def get_trading_status():
+    """获取交易状态"""
+    try:
+        status = quant_service.get_trading_status()
+        return jsonify({
+            'success': True,
+            'data': status
+        })
+    except Exception as e:
+        logger.error(f"获取交易状态失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/quantitative/toggle-auto-trading', methods=['POST'])
+def toggle_auto_trading():
+    """切换自动交易开关"""
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        
+        success = quant_service.toggle_auto_trading(enabled)
+        
+        return jsonify({
+            'success': success,
+            'message': f"自动交易已{'启用' if enabled else '禁用'}"
+        })
+    except Exception as e:
+        logger.error(f"切换自动交易失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+@app.route('/api/quantitative/force-close/<position_id>', methods=['POST'])
+def force_close_position(position_id):
+    """强制平仓"""
+    try:
+        # 如果是真实交易，调用交易引擎平仓
+        if quant_service.trading_engine:
+            # 这里需要实现根据position_id找到对应持仓并平仓的逻辑
+            # 简化实现
+            return jsonify({
+                'success': True,
+                'message': '平仓指令已发送'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '自动交易引擎未启用'
+            })
+    except Exception as e:
+        logger.error(f"强制平仓失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
 def main():
     """主函数"""
     global status

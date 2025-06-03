@@ -17,6 +17,7 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 from loguru import logger
+from auto_trading_engine import get_trading_engine, TradeResult
 
 # 策略类型枚举
 class StrategyType(Enum):
@@ -1497,24 +1498,38 @@ class AutomatedStrategyManager:
         logger.info(f"管理摘要: {summary}")
 
 class QuantitativeService:
-    """量化交易服务主类"""
+    """量化交易服务"""
     
     def __init__(self):
         self.db_manager = DatabaseManager()
-        self.strategies: Dict[str, QuantitativeStrategy] = {}
-        self.positions: Dict[str, Position] = {}
-        self.performance_data = []
-        self.is_running = False
-        self._monitor_thread = None
+        self.strategies = {}
+        self.running_strategies = set()
+        self.lock = threading.Lock()
+        self.price_cache = {}
+        self.auto_manager = None
         
-        # 初始化自动化管理器
-        self.auto_manager = AutomatedStrategyManager(self)
+        # 集成自动交易引擎
+        self.trading_engine = None
+        self.auto_trading_enabled = True  # 默认启用自动交易
         
-        # 从数据库加载已存在的策略
+        # 加载策略
         self._load_strategies_from_db()
         
-        # 启动自动化管理定时器
+        # 启动自动管理
         self._start_auto_management()
+        
+        # 初始化交易引擎
+        self._init_trading_engine()
+        
+    def _init_trading_engine(self):
+        """初始化交易引擎"""
+        try:
+            if self.auto_trading_enabled:
+                self.trading_engine = get_trading_engine()
+                logger.info("自动交易引擎初始化成功")
+        except Exception as e:
+            logger.error(f"初始化交易引擎失败: {e}")
+            self.auto_trading_enabled = False
     
     def _start_auto_management(self):
         """启动自动化管理定时器"""
@@ -1920,18 +1935,43 @@ class QuantitativeService:
             
     def get_positions(self) -> List[Dict[str, Any]]:
         """获取持仓信息"""
-        positions = []
-        for position in self.positions.values():
-            positions.append({
-                'symbol': position.symbol,
-                'quantity': position.quantity,
-                'avg_price': position.avg_price,
-                'current_price': position.current_price,
-                'unrealized_pnl': position.unrealized_pnl,
-                'realized_pnl': position.realized_pnl,
-                'updated_time': position.updated_time.isoformat()
-            })
-        return positions
+        try:
+            positions = []
+            
+            # 从数据库获取模拟持仓
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT symbol, quantity, avg_price, current_price, 
+                           unrealized_pnl, realized_pnl, updated_time
+                    FROM positions
+                    ORDER BY updated_time DESC
+                """)
+                
+                for row in cursor.fetchall():
+                    positions.append({
+                        'symbol': row[0],
+                        'quantity': row[1],
+                        'avg_price': row[2],
+                        'current_price': row[3],
+                        'unrealized_pnl': row[4],
+                        'realized_pnl': row[5],
+                        'updated_time': row[6],
+                        'source': 'simulation'
+                    })
+            
+            # 如果启用自动交易，添加真实持仓
+            if self.trading_engine:
+                real_positions = self.trading_engine.get_status().get('positions', [])
+                for pos in real_positions:
+                    pos['source'] = 'real'
+                    positions.append(pos)
+            
+            return positions
+            
+        except Exception as e:
+            logger.error(f"获取持仓信息失败: {e}")
+            return []
         
     def get_performance(self, days: int = 30) -> Dict[str, Any]:
         """获取绩效数据"""
@@ -1987,29 +2027,139 @@ class QuantitativeService:
             return logs
             
     def process_market_data(self, symbol: str, price_data: Dict[str, Any]):
-        """处理市场数据，生成交易信号"""
-        logger.debug(f"处理市场数据: {symbol}, 价格: {price_data.get('price', 'N/A')}")
-        
-        for strategy in self.strategies.values():
-            if strategy.config.symbol == symbol and strategy.is_running:
-                try:
-                    signal = strategy.generate_signal(price_data)
-                    if signal:
-                        self._save_signal_to_db(signal)
-                        logger.info(f"生成交易信号: {signal.signal_type.value} {signal.symbol} @ {signal.price}")
-                except Exception as e:
-                    logger.error(f"策略 {strategy.config.name} 生成信号时出错: {e}")
-        
-        running_strategies = [s for s in self.strategies.values() if s.is_running]
-        if not running_strategies:
-            logger.debug(f"没有运行中的策略处理 {symbol} 的市场数据")
-        else:
-            symbol_strategies = [s for s in running_strategies if s.config.symbol == symbol]
-            if not symbol_strategies:
-                logger.debug(f"没有针对 {symbol} 的运行中策略")
+        """处理市场数据并生成信号"""
+        try:
+            # 缓存价格数据
+            self.price_cache[symbol] = price_data
+            
+            # 为运行中的策略生成信号
+            for strategy_id in list(self.running_strategies):
+                if strategy_id not in self.strategies:
+                    continue
+                    
+                strategy = self.strategies[strategy_id]
+                
+                # 检查是否为该策略的交易对
+                if strategy.config.symbol != symbol:
+                    continue
+                
+                # 生成交易信号
+                signal = strategy.generate_signal(price_data)
+                
+                if signal:
+                    # 保存信号到数据库
+                    self._save_signal_to_db(signal)
+                    
+                    # 如果启用自动交易，执行交易
+                    if self.auto_trading_enabled and self.trading_engine:
+                        self._execute_auto_trade(signal)
+                    
+                    logger.info(f"策略 {strategy_id} 生成信号: {signal.signal_type} {signal.symbol} @ {signal.price}")
+                    
+        except Exception as e:
+            logger.error(f"处理市场数据失败 {symbol}: {e}")
+    
+    def _execute_auto_trade(self, signal):
+        """执行自动交易"""
+        try:
+            # 跳过HOLD信号
+            if signal.signal_type == SignalType.HOLD:
+                return
+            
+            # 转换信号类型
+            side = 'buy' if signal.signal_type == SignalType.BUY else 'sell'
+            
+            # 执行交易
+            result = self.trading_engine.execute_trade(
+                symbol=signal.symbol,
+                side=side,
+                strategy_id=signal.strategy_id,
+                confidence=signal.confidence,
+                current_price=signal.price
+            )
+            
+            if result.success:
+                # 记录交易到数据库
+                order = TradingOrder(
+                    id=f"order_{int(time.time() * 1000)}",
+                    strategy_id=signal.strategy_id,
+                    signal_id=signal.id,
+                    symbol=signal.symbol,
+                    side=side,
+                    quantity=result.filled_quantity,
+                    price=result.filled_price,
+                    status=OrderStatus.EXECUTED,
+                    created_time=datetime.now(),
+                    executed_time=datetime.now(),
+                    execution_price=result.filled_price
+                )
+                
+                self._save_order_to_db(order)
+                
+                self._log_operation(
+                    "自动交易", 
+                    f"执行 {side} {signal.symbol} 数量: {result.filled_quantity:.6f} 价格: {result.filled_price:.6f}",
+                    "成功"
+                )
+                
+                logger.success(f"自动交易成功: {result.message}")
             else:
-                logger.debug(f"为 {symbol} 找到 {len(symbol_strategies)} 个运行中的策略")
+                logger.warning(f"自动交易失败: {result.message}")
+                
+        except Exception as e:
+            logger.error(f"执行自动交易失败: {e}")
+    
+    def _save_order_to_db(self, order: TradingOrder):
+        """保存订单到数据库"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO trading_orders 
+                    (id, strategy_id, signal_id, symbol, side, quantity, price, status, 
+                     created_time, executed_time, execution_price)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    order.id, order.strategy_id, order.signal_id, order.symbol,
+                    order.side, order.quantity, order.price, order.status.value,
+                    order.created_time, order.executed_time, order.execution_price
+                ))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"保存订单到数据库失败: {e}")
+    
+    def get_trading_status(self) -> Dict[str, Any]:
+        """获取交易状态"""
+        if not self.trading_engine:
+            return {
+                'auto_trading_enabled': False,
+                'message': '自动交易引擎未启用'
+            }
         
+        status = self.trading_engine.get_status()
+        status['auto_trading_enabled'] = self.auto_trading_enabled
+        
+        return status
+    
+    def toggle_auto_trading(self, enabled: bool) -> bool:
+        """切换自动交易开关"""
+        try:
+            self.auto_trading_enabled = enabled
+            
+            if enabled and not self.trading_engine:
+                self._init_trading_engine()
+            
+            self._log_operation(
+                "系统设置",
+                f"自动交易 {'启用' if enabled else '禁用'}",
+                "成功"
+            )
+            
+            return True
+        except Exception as e:
+            logger.error(f"切换自动交易失败: {e}")
+            return False
+    
     def _save_strategy_to_db(self, config: StrategyConfig):
         """保存策略到数据库"""
         with sqlite3.connect(self.db_manager.db_path) as conn:

@@ -12,3 +12,7 @@ pyzmq==25.1.2
 plotly==5.20.0
 importlib-metadata==7.0.2
 tqdm==4.66.2
+ccxt>=4.0.0
+pandas>=1.5.0
+numpy>=1.21.0
+python-decimal
