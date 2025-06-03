@@ -282,24 +282,64 @@ class QuantitativeApp {
     }
 
     /**
-     * 显示消息提示
+     * 显示消息提示 - 改为浮层toast样式
      */
     showAlert(message, type = 'info') {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        // 创建toast容器（如果不存在）
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                max-width: 350px;
+                pointer-events: none;
+            `;
+            document.body.appendChild(toastContainer);
+        }
+
+        // 创建toast元素
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            background: rgba(${type === 'success' ? '40, 167, 69' : type === 'error' ? '220, 53, 69' : '13, 110, 253'}, 0.95);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            font-size: 14px;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         `;
         
-        const container = document.querySelector('.container-fluid');
-        container.insertBefore(alertDiv, container.firstChild);
+        // 添加图标
+        const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+        toast.innerHTML = `<span style="margin-right: 8px; font-weight: bold;">${icon}</span>${message}`;
         
-        // 3秒后自动移除
+        toastContainer.appendChild(toast);
+        
+        // 动画显示
         setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.remove();
-            }
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(0)';
+        }, 10);
+        
+        // 自动隐藏
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 300);
         }, 3000);
     }
 
@@ -401,6 +441,18 @@ class QuantitativeApp {
         const typeMapping = this.getStrategyTypeMapping();
         const strategyTypeName = typeMapping[strategy.type] || strategy.type;
         
+        // 格式化收益率显示
+        const totalReturn = (strategy.total_return * 100).toFixed(2);
+        const dailyReturn = (strategy.daily_return * 100).toFixed(2);
+        const winRate = (strategy.win_rate * 100).toFixed(1);
+        
+        // 收益率颜色
+        const returnColor = strategy.total_return >= 0 ? 'text-success' : 'text-danger';
+        const dailyReturnColor = strategy.daily_return >= 0 ? 'text-success' : 'text-danger';
+        
+        // 排名徽章
+        const rankBadge = strategy.total_return > 0.1 ? 'bg-warning' : strategy.total_return > 0.05 ? 'bg-info' : 'bg-secondary';
+        
         return `
             <tr>
                 <td>
@@ -409,16 +461,28 @@ class QuantitativeApp {
                        title="点击编辑策略配置">
                         ${strategy.name}
                     </a>
+                    <div class="small text-muted">${strategyTypeName}</div>
                 </td>
-                <td><span class="badge bg-info">${strategyTypeName}</span></td>
-                <td><span class="badge bg-secondary">${strategy.symbol}</span></td>
+                <td>
+                    <span class="badge bg-secondary">${strategy.symbol}</span>
+                    <div class="small text-muted">交易${strategy.total_trades}次</div>
+                </td>
+                <td>
+                    <div class="${returnColor} fw-bold">${totalReturn >= 0 ? '+' : ''}${totalReturn}%</div>
+                    <div class="small ${dailyReturnColor}">今日: ${dailyReturn >= 0 ? '+' : ''}${dailyReturn}%</div>
+                </td>
+                <td>
+                    <div class="text-info fw-bold">${winRate}%</div>
+                    <div class="small text-muted">胜率</div>
+                </td>
                 <td>
                     ${strategy.enabled ? 
                         '<span class="badge bg-success"><i class="fas fa-play me-1"></i>运行中</span>' : 
                         '<span class="badge bg-secondary"><i class="fas fa-pause me-1"></i>已停止</span>'
                     }
+                    ${strategy.total_return > 0.1 ? '<div class="small"><span class="badge bg-warning">冠军</span></div>' : 
+                      strategy.total_return > 0.05 ? '<div class="small"><span class="badge bg-info">优秀</span></div>' : ''}
                 </td>
-                <td class="text-muted small">${new Date(strategy.created_time).toLocaleString('zh-CN')}</td>
                 <td>
                     <div class="btn-group btn-group-sm">
                         <button class="btn btn-outline-primary btn-sm toggle-strategy-btn" 

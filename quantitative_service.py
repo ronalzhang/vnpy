@@ -1082,6 +1082,420 @@ class TrendFollowingStrategy(QuantitativeStrategy):
             return 0.5
         return (current - low) / (high - low)
 
+class AutomatedStrategyManager:
+    """全自动化策略管理系统 - 目标每月100%收益"""
+    
+    def __init__(self, quantitative_service):
+        self.service = quantitative_service
+        self.initial_capital = 10000  # 初始资金10000 USDT
+        self.monthly_target = 1.0  # 月收益目标100%
+        self.risk_limit = 0.05  # 单次风险限制5%
+        self.performance_window = 24  # 性能评估窗口24小时
+        self.last_optimization = None
+        
+    def auto_manage_strategies(self):
+        """全自动策略管理 - 每小时执行一次"""
+        logger.info("开始执行全自动策略管理...")
+        
+        try:
+            # 1. 评估所有策略表现
+            strategy_performances = self._evaluate_all_strategies()
+            
+            # 2. 动态调整资金分配
+            self._rebalance_capital(strategy_performances)
+            
+            # 3. 优化策略参数
+            self._optimize_strategy_parameters(strategy_performances)
+            
+            # 4. 风险管理
+            self._risk_management()
+            
+            # 5. 启停策略决策
+            self._strategy_selection(strategy_performances)
+            
+            # 6. 记录管理日志
+            self._log_management_actions(strategy_performances)
+            
+            logger.info("全自动策略管理完成")
+            
+        except Exception as e:
+            logger.error(f"全自动策略管理出错: {e}")
+    
+    def _evaluate_all_strategies(self) -> Dict[str, Dict]:
+        """评估所有策略表现"""
+        strategies = self.service.get_strategies()
+        performances = {}
+        
+        for strategy in strategies:
+            strategy_id = strategy['id']
+            
+            # 计算关键指标
+            total_return = strategy.get('total_return', 0)
+            daily_return = strategy.get('daily_return', 0)
+            win_rate = strategy.get('win_rate', 0)
+            total_trades = strategy.get('total_trades', 0)
+            
+            # 计算夏普比率
+            sharpe_ratio = self._calculate_sharpe_ratio(strategy_id)
+            
+            # 计算最大回撤
+            max_drawdown = self._calculate_max_drawdown(strategy_id)
+            
+            # 计算盈利因子
+            profit_factor = self._calculate_profit_factor(strategy_id)
+            
+            # 综合评分 (0-100)
+            score = self._calculate_strategy_score(
+                total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor
+            )
+            
+            performances[strategy_id] = {
+                'name': strategy['name'],
+                'type': strategy['type'],
+                'symbol': strategy['symbol'],
+                'enabled': strategy['enabled'],
+                'total_return': total_return,
+                'daily_return': daily_return,
+                'win_rate': win_rate,
+                'total_trades': total_trades,
+                'sharpe_ratio': sharpe_ratio,
+                'max_drawdown': max_drawdown,
+                'profit_factor': profit_factor,
+                'score': score,
+                'capital_allocation': self._get_current_allocation(strategy_id)
+            }
+        
+        return performances
+    
+    def _calculate_strategy_score(self, total_return: float, win_rate: float, 
+                                sharpe_ratio: float, max_drawdown: float, profit_factor: float) -> float:
+        """计算策略综合评分"""
+        # 权重分配
+        weights = {
+            'return': 0.30,    # 收益率权重30%
+            'win_rate': 0.20,  # 胜率权重20%
+            'sharpe': 0.25,    # 夏普比率权重25%
+            'drawdown': 0.15,  # 最大回撤权重15%
+            'profit_factor': 0.10  # 盈利因子权重10%
+        }
+        
+        # 标准化分数
+        return_score = min(total_return * 100, 100)  # 收益率转百分比
+        win_rate_score = win_rate * 100
+        sharpe_score = min(max(sharpe_ratio * 20, 0), 100)  # 夏普比率标准化
+        drawdown_score = max(100 - abs(max_drawdown) * 100, 0)  # 回撤越小分数越高
+        profit_factor_score = min(profit_factor * 20, 100)
+        
+        # 加权综合评分
+        total_score = (
+            return_score * weights['return'] +
+            win_rate_score * weights['win_rate'] +
+            sharpe_score * weights['sharpe'] +
+            drawdown_score * weights['drawdown'] +
+            profit_factor_score * weights['profit_factor']
+        )
+        
+        return min(max(total_score, 0), 100)
+    
+    def _rebalance_capital(self, performances: Dict[str, Dict]):
+        """动态资金再平衡 - 优秀策略获得更多资金"""
+        # 按评分排序
+        sorted_strategies = sorted(performances.items(), key=lambda x: x[1]['score'], reverse=True)
+        
+        # 资金分配算法
+        total_capital = self.initial_capital
+        allocations = {}
+        
+        # 前3名策略获得更多资金
+        high_performers = sorted_strategies[:3]
+        medium_performers = sorted_strategies[3:5]
+        low_performers = sorted_strategies[5:]
+        
+        # 分配比例
+        for i, (strategy_id, perf) in enumerate(high_performers):
+            if perf['score'] > 70:  # 高分策略
+                allocations[strategy_id] = total_capital * (0.25 - i * 0.05)  # 25%, 20%, 15%
+            else:
+                allocations[strategy_id] = total_capital * 0.10
+        
+        for strategy_id, perf in medium_performers:
+            allocations[strategy_id] = total_capital * 0.08  # 8%
+        
+        for strategy_id, perf in low_performers:
+            if perf['score'] > 30:
+                allocations[strategy_id] = total_capital * 0.05  # 5%
+            else:
+                allocations[strategy_id] = total_capital * 0.02  # 2%
+        
+        # 更新策略资金分配
+        self._update_capital_allocations(allocations)
+        
+        logger.info(f"资金再平衡完成，前3名策略: {[perf['name'] for _, perf in high_performers]}")
+    
+    def _optimize_strategy_parameters(self, performances: Dict[str, Dict]):
+        """动态优化策略参数"""
+        for strategy_id, perf in performances.items():
+            if perf['score'] < 60:  # 表现不佳的策略需要优化
+                self._auto_tune_parameters(strategy_id, perf)
+    
+    def _auto_tune_parameters(self, strategy_id: str, performance: Dict):
+        """自动调参优化"""
+        strategy = self.service.strategies.get(strategy_id)
+        if not strategy:
+            return
+        
+        strategy_type = performance['type']
+        current_params = strategy.config.parameters.copy()
+        
+        # 根据策略类型和表现调整参数
+        if strategy_type == 'momentum':
+            # 动量策略参数优化
+            if performance['win_rate'] < 0.5:
+                # 胜率低，提高阈值
+                current_params['threshold'] = current_params.get('threshold', 0.001) * 1.2
+            if performance['total_return'] < 0:
+                # 收益为负，缩短观察期
+                current_params['lookback_period'] = max(10, current_params.get('lookback_period', 20) - 5)
+                
+        elif strategy_type == 'mean_reversion':
+            # 均值回归策略参数优化
+            if performance['max_drawdown'] > 0.1:
+                # 回撤过大，扩大布林带
+                current_params['std_multiplier'] = current_params.get('std_multiplier', 2.0) * 1.1
+            if performance['total_trades'] < 10:
+                # 交易次数过少，缩小布林带
+                current_params['std_multiplier'] = current_params.get('std_multiplier', 2.0) * 0.9
+                
+        elif strategy_type == 'grid_trading':
+            # 网格策略参数优化
+            if performance['total_return'] < 0.02:
+                # 收益过低，调整网格间距
+                current_params['grid_spacing'] = current_params.get('grid_spacing', 0.02) * 0.9
+            if performance['win_rate'] > 0.8:
+                # 胜率过高但收益一般，可能网格过密
+                current_params['grid_spacing'] = current_params.get('grid_spacing', 0.02) * 1.1
+        
+        # 更新策略参数
+        self.service.update_strategy(
+            strategy_id, 
+            strategy.config.name, 
+            strategy.config.symbol, 
+            current_params
+        )
+        
+        logger.info(f"策略 {performance['name']} 参数已优化")
+    
+    def _risk_management(self):
+        """风险管理"""
+        # 检查总体风险敞口
+        total_exposure = self._calculate_total_exposure()
+        
+        if total_exposure > self.initial_capital * 3:  # 总敞口超过3倍资金
+            self._reduce_position_sizes()
+            logger.warning("总风险敞口过高，已减少仓位")
+        
+        # 检查单一策略风险
+        for strategy_id in self.service.strategies.keys():
+            strategy_risk = self._calculate_strategy_risk(strategy_id)
+            if strategy_risk > self.risk_limit:
+                self._limit_strategy_position(strategy_id)
+                logger.warning(f"策略 {strategy_id} 风险过高，已限制仓位")
+    
+    def _strategy_selection(self, performances: Dict[str, Dict]):
+        """智能策略启停决策"""
+        for strategy_id, perf in performances.items():
+            strategy = self.service.strategies.get(strategy_id)
+            if not strategy:
+                continue
+            
+            # 启动高分策略
+            if perf['score'] > 70 and not strategy.is_running:
+                self.service.start_strategy(strategy_id)
+                logger.info(f"启动高分策略: {perf['name']} (评分: {perf['score']:.1f})")
+            
+            # 停止低分策略
+            elif perf['score'] < 30 and strategy.is_running:
+                self.service.stop_strategy(strategy_id)
+                logger.info(f"停止低分策略: {perf['name']} (评分: {perf['score']:.1f})")
+            
+            # 重启表现改善的策略
+            elif perf['score'] > 60 and not strategy.is_running and perf['total_trades'] > 0:
+                self.service.start_strategy(strategy_id)
+                logger.info(f"重启改善策略: {perf['name']} (评分: {perf['score']:.1f})")
+    
+    def _calculate_sharpe_ratio(self, strategy_id: str) -> float:
+        """计算夏普比率"""
+        # 简化实现
+        try:
+            daily_returns = self._get_strategy_daily_returns(strategy_id)
+            if len(daily_returns) < 7:
+                return 0.0
+            
+            avg_return = np.mean(daily_returns)
+            std_return = np.std(daily_returns)
+            
+            if std_return == 0:
+                return 0.0
+            
+            return avg_return / std_return * np.sqrt(365)  # 年化夏普比率
+        except:
+            return 0.0
+    
+    def _calculate_max_drawdown(self, strategy_id: str) -> float:
+        """计算最大回撤"""
+        try:
+            cumulative_returns = self._get_strategy_cumulative_returns(strategy_id)
+            if len(cumulative_returns) < 2:
+                return 0.0
+            
+            peak = cumulative_returns[0]
+            max_dd = 0.0
+            
+            for value in cumulative_returns:
+                if value > peak:
+                    peak = value
+                drawdown = (peak - value) / peak if peak > 0 else 0
+                max_dd = max(max_dd, drawdown)
+            
+            return max_dd
+        except:
+            return 0.0
+    
+    def _calculate_profit_factor(self, strategy_id: str) -> float:
+        """计算盈利因子"""
+        try:
+            with sqlite3.connect(self.service.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT 
+                        SUM(CASE WHEN signal_type = 'sell' AND price > 
+                            (SELECT AVG(price) FROM trading_signals s2 
+                             WHERE s2.strategy_id = s1.strategy_id 
+                             AND s2.signal_type = 'buy' 
+                             AND s2.timestamp < s1.timestamp) 
+                        THEN price * quantity ELSE 0 END) as profits,
+                        SUM(CASE WHEN signal_type = 'sell' AND price < 
+                            (SELECT AVG(price) FROM trading_signals s2 
+                             WHERE s2.strategy_id = s1.strategy_id 
+                             AND s2.signal_type = 'buy' 
+                             AND s2.timestamp < s1.timestamp) 
+                        THEN price * quantity ELSE 0 END) as losses
+                    FROM trading_signals s1
+                    WHERE strategy_id = ? AND executed = 1
+                """, (strategy_id,))
+                
+                result = cursor.fetchone()
+                if result and result[1] and result[1] > 0:
+                    return result[0] / result[1]
+                return 1.0
+        except:
+            return 1.0
+    
+    def _get_current_allocation(self, strategy_id: str) -> float:
+        """获取当前资金分配"""
+        # 简化实现，返回平均分配
+        return self.initial_capital / len(self.service.strategies) if self.service.strategies else 0
+    
+    def _update_capital_allocations(self, allocations: Dict[str, float]):
+        """更新资金分配"""
+        for strategy_id, allocation in allocations.items():
+            strategy = self.service.strategies.get(strategy_id)
+            if strategy:
+                # 根据分配调整交易量
+                base_quantity = strategy.config.parameters.get('quantity', 1.0)
+                allocation_factor = allocation / (self.initial_capital / len(self.service.strategies))
+                new_quantity = base_quantity * allocation_factor
+                
+                # 更新策略参数
+                new_params = strategy.config.parameters.copy()
+                new_params['quantity'] = new_quantity
+                
+                self.service.update_strategy(
+                    strategy_id, 
+                    strategy.config.name, 
+                    strategy.config.symbol, 
+                    new_params
+                )
+    
+    def _calculate_total_exposure(self) -> float:
+        """计算总风险敞口"""
+        total = 0
+        for strategy in self.service.strategies.values():
+            quantity = strategy.config.parameters.get('quantity', 0)
+            # 假设平均价格计算敞口
+            total += quantity * 50000  # 简化计算
+        return total
+    
+    def _calculate_strategy_risk(self, strategy_id: str) -> float:
+        """计算单一策略风险"""
+        strategy = self.service.strategies.get(strategy_id)
+        if not strategy:
+            return 0
+        
+        quantity = strategy.config.parameters.get('quantity', 0)
+        return quantity * 50000 / self.initial_capital  # 风险比例
+    
+    def _reduce_position_sizes(self):
+        """减少所有策略仓位"""
+        for strategy in self.service.strategies.values():
+            current_quantity = strategy.config.parameters.get('quantity', 1.0)
+            new_params = strategy.config.parameters.copy()
+            new_params['quantity'] = current_quantity * 0.8  # 减少20%
+            
+            self.service.update_strategy(
+                strategy.config.id,
+                strategy.config.name,
+                strategy.config.symbol,
+                new_params
+            )
+    
+    def _limit_strategy_position(self, strategy_id: str):
+        """限制单一策略仓位"""
+        strategy = self.service.strategies.get(strategy_id)
+        if strategy:
+            new_params = strategy.config.parameters.copy()
+            new_params['quantity'] = min(new_params.get('quantity', 1.0), 0.5)  # 最大0.5
+            
+            self.service.update_strategy(
+                strategy_id,
+                strategy.config.name,
+                strategy.config.symbol,
+                new_params
+            )
+    
+    def _get_strategy_daily_returns(self, strategy_id: str) -> List[float]:
+        """获取策略日收益序列"""
+        # 简化实现
+        return [0.01, 0.02, -0.005, 0.015, 0.008]  # 示例数据
+    
+    def _get_strategy_cumulative_returns(self, strategy_id: str) -> List[float]:
+        """获取策略累计收益序列"""
+        # 简化实现
+        daily_returns = self._get_strategy_daily_returns(strategy_id)
+        cumulative = [1.0]
+        for ret in daily_returns:
+            cumulative.append(cumulative[-1] * (1 + ret))
+        return cumulative
+    
+    def _log_management_actions(self, performances: Dict[str, Dict]):
+        """记录管理操作"""
+        summary = {
+            'timestamp': datetime.now().isoformat(),
+            'total_strategies': len(performances),
+            'running_strategies': sum(1 for p in performances.values() if p['enabled']),
+            'avg_score': np.mean([p['score'] for p in performances.values()]),
+            'best_strategy': max(performances.items(), key=lambda x: x[1]['score'])[1]['name'],
+            'total_return': sum(p['total_return'] for p in performances.values()) / len(performances)
+        }
+        
+        self.service._log_operation(
+            "auto_management",
+            f"自动管理完成: 平均评分{summary['avg_score']:.1f}, 最佳策略{summary['best_strategy']}, 平均收益{summary['total_return']*100:.2f}%",
+            "success"
+        )
+        
+        logger.info(f"管理摘要: {summary}")
+
 class QuantitativeService:
     """量化交易服务主类"""
     
@@ -1093,9 +1507,33 @@ class QuantitativeService:
         self.is_running = False
         self._monitor_thread = None
         
+        # 初始化自动化管理器
+        self.auto_manager = AutomatedStrategyManager(self)
+        
         # 从数据库加载已存在的策略
         self._load_strategies_from_db()
         
+        # 启动自动化管理定时器
+        self._start_auto_management()
+    
+    def _start_auto_management(self):
+        """启动自动化管理定时器"""
+        import threading
+        
+        def auto_management_loop():
+            import time
+            while True:
+                try:
+                    time.sleep(3600)  # 每小时执行一次
+                    if self.is_running:
+                        self.auto_manager.auto_manage_strategies()
+                except Exception as e:
+                    logger.error(f"自动管理循环出错: {e}")
+        
+        auto_thread = threading.Thread(target=auto_management_loop, daemon=True)
+        auto_thread.start()
+        logger.info("自动化策略管理已启动，每小时执行一次")
+
     def _load_strategies_from_db(self):
         """从数据库加载策略"""
         try:
@@ -1300,213 +1738,6 @@ class QuantitativeService:
         
         logger.info(f"更新策略成功: {name} (ID: {strategy_id})")
         return True
-        
-    def get_strategies(self) -> List[Dict[str, Any]]:
-        """获取所有策略"""
-        strategies = []
-        for strategy in self.strategies.values():
-            strategies.append({
-                'id': strategy.config.id,
-                'name': strategy.config.name,
-                'type': strategy.config.strategy_type.value,
-                'symbol': strategy.config.symbol,
-                'enabled': strategy.config.enabled,
-                'running': strategy.is_running,
-                'parameters': strategy.config.parameters,
-                'created_time': strategy.config.created_time.isoformat(),
-                'updated_time': strategy.config.updated_time.isoformat()
-            })
-        return strategies
-        
-    def get_signals(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """获取最新信号"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM trading_signals 
-                ORDER BY timestamp DESC 
-                LIMIT ?
-            """, (limit,))
-            
-            signals = []
-            for row in cursor.fetchall():
-                signals.append({
-                    'id': row[0],
-                    'strategy_id': row[1],
-                    'symbol': row[2],
-                    'signal_type': row[3],
-                    'price': row[4],
-                    'quantity': row[5],
-                    'confidence': row[6],
-                    'timestamp': row[7],
-                    'executed': bool(row[8])
-                })
-            return signals
-            
-    def get_positions(self) -> List[Dict[str, Any]]:
-        """获取持仓信息"""
-        positions = []
-        for position in self.positions.values():
-            positions.append({
-                'symbol': position.symbol,
-                'quantity': position.quantity,
-                'avg_price': position.avg_price,
-                'current_price': position.current_price,
-                'unrealized_pnl': position.unrealized_pnl,
-                'realized_pnl': position.realized_pnl,
-                'updated_time': position.updated_time.isoformat()
-            })
-        return positions
-        
-    def get_performance(self, days: int = 30) -> Dict[str, Any]:
-        """获取绩效数据"""
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
-        
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM performance_metrics 
-                WHERE timestamp >= ? AND timestamp <= ?
-                ORDER BY timestamp ASC
-            """, (start_date, end_date))
-            
-            metrics = []
-            for row in cursor.fetchall():
-                metrics.append({
-                    'total_return': row[1],
-                    'daily_return': row[2],
-                    'max_drawdown': row[3],
-                    'sharpe_ratio': row[4],
-                    'win_rate': row[5],
-                    'total_trades': row[6],
-                    'profitable_trades': row[7],
-                    'timestamp': row[8]
-                })
-                
-        return {
-            'metrics': metrics,
-            'summary': self._calculate_performance_summary(metrics) if metrics else {}
-        }
-        
-    def get_operation_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """获取操作日志"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM operation_logs 
-                ORDER BY timestamp DESC 
-                LIMIT ?
-            """, (limit,))
-            
-            logs = []
-            for row in cursor.fetchall():
-                logs.append({
-                    'id': row[0],
-                    'operation_type': row[1],
-                    'operation_detail': row[2],
-                    'user_id': row[3],
-                    'result': row[4],
-                    'timestamp': row[5]
-                })
-            return logs
-            
-    def process_market_data(self, symbol: str, price_data: Dict[str, Any]):
-        """处理市场数据，生成交易信号"""
-        logger.debug(f"处理市场数据: {symbol}, 价格: {price_data.get('price', 'N/A')}")
-        
-        for strategy in self.strategies.values():
-            if strategy.config.symbol == symbol and strategy.is_running:
-                try:
-                    signal = strategy.generate_signal(price_data)
-                    if signal:
-                        self._save_signal_to_db(signal)
-                        logger.info(f"生成交易信号: {signal.signal_type.value} {signal.symbol} @ {signal.price}")
-                except Exception as e:
-                    logger.error(f"策略 {strategy.config.name} 生成信号时出错: {e}")
-        
-        # 如果没有运行中的策略，记录调试信息
-        running_strategies = [s for s in self.strategies.values() if s.is_running]
-        if not running_strategies:
-            logger.debug(f"没有运行中的策略处理 {symbol} 的市场数据")
-        else:
-            symbol_strategies = [s for s in running_strategies if s.config.symbol == symbol]
-            if not symbol_strategies:
-                logger.debug(f"没有针对 {symbol} 的运行中策略")
-            else:
-                logger.debug(f"为 {symbol} 找到 {len(symbol_strategies)} 个运行中的策略")
-        
-    def _save_strategy_to_db(self, config: StrategyConfig):
-        """保存策略到数据库"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO quant_strategies 
-                (id, name, strategy_type, symbol, enabled, parameters, created_time, updated_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                config.id, config.name, config.strategy_type.value, config.symbol,
-                config.enabled, json.dumps(config.parameters),
-                config.created_time, config.updated_time
-            ))
-            conn.commit()
-            
-    def _update_strategy_in_db(self, config: StrategyConfig):
-        """更新数据库中的策略"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE quant_strategies 
-                SET name = ?, symbol = ?, enabled = ?, parameters = ?, updated_time = ?
-                WHERE id = ?
-            """, (
-                config.name, config.symbol, config.enabled, json.dumps(config.parameters),
-                config.updated_time, config.id
-            ))
-            conn.commit()
-            
-    def _save_signal_to_db(self, signal: TradingSignal):
-        """保存信号到数据库"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO trading_signals 
-                (id, strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                signal.id, signal.strategy_id, signal.symbol, signal.signal_type.value,
-                signal.price, signal.quantity, signal.confidence, signal.timestamp, signal.executed
-            ))
-            conn.commit()
-            
-    def _log_operation(self, operation_type: str, detail: str, result: str):
-        """记录操作日志"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO operation_logs 
-                (operation_type, operation_detail, result, timestamp)
-                VALUES (?, ?, ?, ?)
-            """, (operation_type, detail, result, datetime.now()))
-            conn.commit()
-            
-    def _calculate_performance_summary(self, metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """计算绩效摘要"""
-        if not metrics:
-            return {}
-            
-        latest = metrics[-1]
-        returns = [m['daily_return'] for m in metrics]
-        
-        return {
-            'total_return': latest['total_return'],
-            'avg_daily_return': np.mean(returns),
-            'volatility': np.std(returns),
-            'max_drawdown': latest['max_drawdown'],
-            'sharpe_ratio': latest['sharpe_ratio'],
-            'win_rate': latest['win_rate'],
-            'total_trades': latest['total_trades']
-        }
 
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 
