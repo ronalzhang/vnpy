@@ -933,7 +933,6 @@ def quantitative_strategies():
             name = data.get('name')
             strategy_type = data.get('strategy_type')
             symbol = data.get('symbol')
-            position_size = data.get('position_size', 1000)
             parameters = data.get('parameters', {})
             
             if not all([name, strategy_type, symbol]):
@@ -955,7 +954,6 @@ def quantitative_strategies():
                 name=name,
                 strategy_type=strategy_type_enum,
                 symbol=symbol,
-                position_size=position_size,
                 parameters=parameters
             )
             

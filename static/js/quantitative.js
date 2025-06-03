@@ -94,20 +94,22 @@ class QuantitativeApp {
         if (strategyType === 'momentum') {
             params.lookback_period = parseInt(strategyData.momentum_lookback) || 20;
             params.threshold = parseFloat(strategyData.momentum_threshold) || 0.02;
+            params.quantity = parseFloat(strategyData.position_size) || 1.0;
         } else if (strategyType === 'mean_reversion') {
             params.lookback_period = parseInt(strategyData.mean_lookback) || 20;
             params.entry_threshold = parseFloat(strategyData.mean_entry) || 2.0;
             params.exit_threshold = parseFloat(strategyData.mean_exit) || 0.5;
+            params.quantity = parseFloat(strategyData.position_size) || 1.0;
         } else if (strategyType === 'breakout') {
             params.lookback_period = parseInt(strategyData.breakout_lookback) || 20;
             params.breakout_threshold = parseFloat(strategyData.breakout_threshold) || 0.02;
+            params.quantity = parseFloat(strategyData.position_size) || 1.0;
         }
 
         const payload = {
             name: strategyData.strategy_name,
             strategy_type: strategyType,
             symbol: strategyData.symbol,
-            position_size: parseFloat(strategyData.position_size),
             parameters: params
         };
 
@@ -242,11 +244,11 @@ class QuantitativeApp {
      * 更新策略列表UI
      */
     updateStrategiesUI() {
-        const tbody = document.getElementById('strategiesTableBody');
+        const tbody = document.getElementById('strategies-table');
         if (!tbody) return;
 
         if (this.strategies.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">暂无策略</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="fas fa-inbox me-2"></i>暂无策略</td></tr>';
             return;
         }
 
@@ -255,16 +257,14 @@ class QuantitativeApp {
                 <td>${strategy.name}</td>
                 <td><span class="badge bg-info">${this.getStrategyTypeName(strategy.strategy_type)}</span></td>
                 <td>${strategy.symbol}</td>
-                <td>${strategy.position_size}</td>
                 <td><span class="badge ${strategy.is_active ? 'bg-success' : 'bg-secondary'}">${strategy.is_active ? '运行中' : '已停止'}</span></td>
-                <td class="${strategy.total_return >= 0 ? 'text-success' : 'text-danger'}">${(strategy.total_return * 100).toFixed(2)}%</td>
                 <td>${new Date(strategy.created_at).toLocaleDateString()}</td>
                 <td>
                     <button class="btn btn-sm ${strategy.is_active ? 'btn-warning' : 'btn-success'}" 
                             onclick="app.toggleStrategy(${strategy.id})">
                         ${strategy.is_active ? '停止' : '启动'}
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="app.deleteStrategy(${strategy.id})">删除</button>
+                    <button class="btn btn-sm btn-danger ms-1" onclick="app.deleteStrategy(${strategy.id})">删除</button>
                 </td>
             </tr>
         `).join('');
@@ -274,16 +274,21 @@ class QuantitativeApp {
      * 更新信号列表UI
      */
     updateSignalsUI() {
-        const container = document.getElementById('signalsContainer');
+        const container = document.getElementById('signals-list');
         if (!container) return;
 
+        const signalsCount = document.getElementById('signals-count');
+        if (signalsCount) {
+            signalsCount.textContent = `${this.signals.length} 条信号`;
+        }
+
         if (this.signals.length === 0) {
-            container.innerHTML = '<div class="alert alert-info">暂无交易信号</div>';
+            container.innerHTML = '<div class="list-group-item text-center text-muted py-4"><i class="fas fa-radio me-2"></i>等待交易信号...</div>';
             return;
         }
 
         container.innerHTML = this.signals.slice(0, 10).map(signal => `
-            <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+            <div class="list-group-item d-flex justify-content-between align-items-center">
                 <div>
                     <span class="badge ${signal.signal_type === 'BUY' ? 'bg-success' : 'bg-danger'}">${signal.signal_type}</span>
                     <strong class="ms-2">${signal.symbol}</strong>
@@ -301,26 +306,34 @@ class QuantitativeApp {
      * 更新持仓列表UI
      */
     updatePositionsUI() {
-        const tbody = document.getElementById('positionsTableBody');
-        if (!tbody) return;
+        const container = document.getElementById('positions-list');
+        if (!container) return;
 
         if (this.positions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无持仓</td></tr>';
+            container.innerHTML = '<div class="list-group-item text-center text-muted py-4"><i class="fas fa-inbox me-2"></i>暂无持仓</div>';
             return;
         }
 
-        tbody.innerHTML = this.positions.map(position => `
-            <tr>
-                <td>${position.symbol}</td>
-                <td>${position.strategy_name}</td>
-                <td>${position.quantity}</td>
-                <td>¥${position.entry_price.toFixed(2)}</td>
-                <td>¥${position.current_price.toFixed(2)}</td>
-                <td class="${position.unrealized_pnl >= 0 ? 'text-success' : 'text-danger'}">¥${position.unrealized_pnl.toFixed(2)}</td>
-                <td>
-                    <button class="btn btn-sm btn-warning" onclick="app.closePosition(${position.id})">平仓</button>
-                </td>
-            </tr>
+        container.innerHTML = this.positions.map(position => `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>${position.symbol}</strong>
+                    <span class="badge bg-primary">${position.strategy_name}</span>
+                </div>
+                <div class="row text-sm">
+                    <div class="col-4">
+                        <div>数量: ${position.quantity}</div>
+                        <div>入价: ¥${position.entry_price.toFixed(2)}</div>
+                    </div>
+                    <div class="col-4">
+                        <div>现价: ¥${position.current_price.toFixed(2)}</div>
+                        <div class="${position.unrealized_pnl >= 0 ? 'text-success' : 'text-danger'}">盈亏: ¥${position.unrealized_pnl.toFixed(2)}</div>
+                    </div>
+                    <div class="col-4 text-end">
+                        <button class="btn btn-sm btn-warning" onclick="app.closePosition(${position.id})">平仓</button>
+                    </div>
+                </div>
+            </div>
         `).join('');
     }
 
@@ -329,22 +342,42 @@ class QuantitativeApp {
      */
     updateStatsUI() {
         const activeStrategies = this.strategies.filter(s => s.is_active).length;
-        const totalReturn = this.strategies.reduce((sum, s) => sum + s.total_return, 0);
-        const totalPositions = this.positions.length;
-        const totalPnL = this.positions.reduce((sum, p) => sum + p.unrealized_pnl, 0);
+        const totalReturn = this.strategies.reduce((sum, s) => sum + (s.total_return || 0), 0);
+        const todaySignals = this.signals.filter(s => {
+            const today = new Date().toDateString();
+            return new Date(s.timestamp).toDateString() === today;
+        }).length;
 
-        document.getElementById('activeStrategiesCount').textContent = activeStrategies;
-        document.getElementById('totalStrategiesCount').textContent = this.strategies.length;
-        
-        const returnElement = document.getElementById('totalReturn');
-        returnElement.textContent = (totalReturn * 100).toFixed(2) + '%';
-        returnElement.className = totalReturn >= 0 ? 'text-success' : 'text-danger';
-        
-        document.getElementById('totalPositions').textContent = totalPositions;
-        
-        const pnlElement = document.getElementById('totalPnL');
-        pnlElement.textContent = '¥' + totalPnL.toFixed(2);
-        pnlElement.className = totalPnL >= 0 ? 'text-success' : 'text-danger';
+        // 更新统计卡片
+        const totalStrategiesElement = document.getElementById('total-strategies');
+        if (totalStrategiesElement) {
+            totalStrategiesElement.textContent = this.strategies.length;
+        }
+
+        const runningStrategiesElement = document.getElementById('running-strategies');
+        if (runningStrategiesElement) {
+            runningStrategiesElement.textContent = activeStrategies;
+        }
+
+        const recentSignalsElement = document.getElementById('recent-signals');
+        if (recentSignalsElement) {
+            recentSignalsElement.textContent = todaySignals;
+        }
+
+        const totalReturnElement = document.getElementById('total-return');
+        if (totalReturnElement) {
+            const returnText = (totalReturn * 100).toFixed(2) + '%';
+            totalReturnElement.textContent = totalReturn >= 0 ? '+' + returnText : returnText;
+            totalReturnElement.className = totalReturn >= 0 ? 'text-success' : 'text-danger';
+        }
+
+        // 更新绩效指标
+        const metricTotalReturnElement = document.getElementById('metric-total-return');
+        if (metricTotalReturnElement) {
+            const returnText = (totalReturn * 100).toFixed(2) + '%';
+            metricTotalReturnElement.textContent = totalReturn >= 0 ? '+' + returnText : returnText;
+            metricTotalReturnElement.className = totalReturn >= 0 ? 'metric-value text-success' : 'metric-value text-danger';
+        }
     }
 
     /**
