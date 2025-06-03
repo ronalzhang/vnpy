@@ -21,14 +21,16 @@
                 <div class="navbar-content">
                     <!-- 左侧：品牌名和系统状态 -->
                     <div class="navbar-left">
-                        <a class="navbar-brand" href="/">
-                            <i class="fas fa-chart-line"></i>
-                            校长的量化系统
-                        </a>
-                        <div class="system-status">
-                            <span class="status-indicator status-offline" id="system-status-indicator"></span>
-                            <span id="system-status-text">离线</span>
-                            <span id="current-time">2025/6/4 05:05:27</span>
+                        <div class="navbar-brand-group">
+                            <a class="navbar-brand" href="/">
+                                <i class="fas fa-chart-line"></i>
+                                校长的量化系统
+                            </a>
+                            <div class="system-status">
+                                <span class="status-indicator status-offline" id="system-status-indicator"></span>
+                                <span id="system-status-text">离线</span>
+                                <span id="current-time">2025/6/4 05:05:27</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -94,11 +96,8 @@
                         <div class="mb-3" data-system="quantitative">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span>量化系统</span>
-                                <span>
-                                    <span class="status-indicator status-offline"></span>
-                                    <button id="systemToggle" class="btn-toggle" onclick="toggleSystem()">
-                                    </button>
-                                </span>
+                                <button id="systemToggle" class="btn-toggle" onclick="toggleSystem()">
+                                </button>
                             </div>
                         </div>
                         
@@ -106,11 +105,8 @@
                         <div class="mb-3" data-system="auto-trading">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span>自动交易</span>
-                                <span>
-                                    <span class="status-indicator status-offline"></span>
-                                    <button id="autoTradingToggle" class="btn-toggle" onclick="toggleAutoTrading()">
-                                    </button>
-                                </span>
+                                <button id="autoTradingToggle" class="btn-toggle" onclick="toggleAutoTrading()">
+                                </button>
                             </div>
                         </div>
                         

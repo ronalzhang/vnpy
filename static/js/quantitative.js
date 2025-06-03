@@ -121,32 +121,6 @@ class QuantitativeSystem {
                 statusText.textContent = '离线';
             }
         }
-        
-        // 更新量化系统状态（在系统控制台中）
-        const quantitativeSystemEl = document.querySelector('[data-system="quantitative"]');
-        if (quantitativeSystemEl) {
-            const indicator = quantitativeSystemEl.querySelector('.status-indicator');
-            if (indicator) {
-                if (systemRunning) {
-                    indicator.className = 'status-indicator status-running';
-                } else {
-                    indicator.className = 'status-indicator status-offline';
-                }
-            }
-        }
-        
-        // 更新自动交易状态（在系统控制台中）
-        const autoTradingEl = document.querySelector('[data-system="auto-trading"]');
-        if (autoTradingEl) {
-            const indicator = autoTradingEl.querySelector('.status-indicator');
-            if (indicator) {
-                if (autoTradingEnabled) {
-                    indicator.className = 'status-indicator status-running';
-                } else {
-                    indicator.className = 'status-indicator status-offline';
-                }
-            }
-        }
     }
 
     // 更新自动交易状态显示
