@@ -37,6 +37,11 @@ class QuantitativeApp {
             this.toggleStrategyParams(e.target.value);
         });
 
+        // 编辑策略类型选择事件
+        document.getElementById('editStrategyType').addEventListener('change', (e) => {
+            this.toggleEditStrategyParams(e.target.value);
+        });
+
         // 策略表单提交 - 修复表单ID
         document.getElementById('createStrategyForm').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -47,6 +52,18 @@ class QuantitativeApp {
         document.getElementById('createStrategyBtn').addEventListener('click', (e) => {
             e.preventDefault();
             this.submitStrategy();
+        });
+
+        // 编辑策略表单提交
+        document.getElementById('editStrategyForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.updateStrategy();
+        });
+        
+        // 更新策略按钮点击事件
+        document.getElementById('updateStrategyBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.updateStrategy();
         });
 
         // 自动刷新切换
@@ -74,16 +91,59 @@ class QuantitativeApp {
      * 切换策略参数显示
      */
     toggleStrategyParams(strategyType) {
-        // 隐藏所有参数组
-        this.hideAllStrategyParams();
+        // 隐藏所有参数区域
+        document.querySelectorAll('.strategy-params').forEach(div => {
+            div.style.display = 'none';
+        });
+        
+        // 显示对应的参数区域
+        if (strategyType) {
+            const paramMapping = {
+                'momentum': 'momentumParams',
+                'mean_reversion': 'meanReversionParams',
+                'breakout': 'breakoutParams',
+                'grid_trading': 'gridTradingParams',
+                'high_frequency': 'highFrequencyParams',
+                'trend_following': 'trendFollowingParams'
+            };
+            
+            const paramDivId = paramMapping[strategyType];
+            if (paramDivId) {
+                const paramDiv = document.getElementById(paramDivId);
+                if (paramDiv) {
+                    paramDiv.style.display = 'block';
+                }
+            }
+        }
+    }
 
-        // 显示对应的参数组
-        if (strategyType === 'momentum') {
-            document.getElementById('momentumParams').style.display = 'block';
-        } else if (strategyType === 'mean_reversion') {
-            document.getElementById('meanReversionParams').style.display = 'block';
-        } else if (strategyType === 'breakout') {
-            document.getElementById('breakoutParams').style.display = 'block';
+    /**
+     * 切换编辑策略参数显示
+     */
+    toggleEditStrategyParams(strategyType) {
+        // 隐藏所有编辑参数区域
+        document.querySelectorAll('.edit-strategy-params').forEach(div => {
+            div.style.display = 'none';
+        });
+        
+        // 显示对应的编辑参数区域
+        if (strategyType) {
+            const paramMapping = {
+                'momentum': 'editMomentumParams',
+                'mean_reversion': 'editMeanReversionParams',
+                'breakout': 'editBreakoutParams',
+                'grid_trading': 'editGridTradingParams',
+                'high_frequency': 'editHighFrequencyParams',
+                'trend_following': 'editTrendFollowingParams'
+            };
+            
+            const paramDivId = paramMapping[strategyType];
+            if (paramDivId) {
+                const paramDiv = document.getElementById(paramDivId);
+                if (paramDiv) {
+                    paramDiv.style.display = 'block';
+                }
+            }
         }
     }
     
@@ -92,6 +152,19 @@ class QuantitativeApp {
      */
     hideAllStrategyParams() {
         const paramGroups = ['momentumParams', 'meanReversionParams', 'breakoutParams'];
+        paramGroups.forEach(groupId => {
+            const element = document.getElementById(groupId);
+            if (element) {
+                element.style.display = 'none';
+            }
+        });
+    }
+
+    /**
+     * 隐藏所有编辑策略参数组
+     */
+    hideAllEditStrategyParams() {
+        const paramGroups = ['editMomentumParams', 'editMeanReversionParams', 'editBreakoutParams'];
         paramGroups.forEach(groupId => {
             const element = document.getElementById(groupId);
             if (element) {
@@ -280,22 +353,51 @@ class QuantitativeApp {
             return;
         }
 
-        tbody.innerHTML = this.strategies.map(strategy => `
+        tbody.innerHTML = this.strategies.map(strategy => this.renderStrategy(strategy)).join('');
+    }
+
+    /**
+     * 渲染单个策略
+     */
+    renderStrategy(strategy) {
+        const typeMapping = this.getStrategyTypeMapping();
+        const strategyTypeName = typeMapping[strategy.strategy_type] || strategy.strategy_type;
+        
+        return `
             <tr>
-                <td>${strategy.name}</td>
-                <td><span class="badge bg-info">${this.getStrategyTypeName(strategy.type)}</span></td>
-                <td>${strategy.symbol}</td>
-                <td><span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'}">${strategy.enabled ? '运行中' : '已停止'}</span></td>
-                <td>${new Date(strategy.created_time).toLocaleDateString()}</td>
                 <td>
-                    <button class="btn btn-sm ${strategy.enabled ? 'btn-warning' : 'btn-success'}" 
-                            onclick="app.toggleStrategy('${strategy.id}')">
-                        ${strategy.enabled ? '停止' : '启动'}
-                    </button>
-                    <button class="btn btn-sm btn-danger ms-1" onclick="app.deleteStrategy('${strategy.id}')">删除</button>
+                    <a href="#" class="text-decoration-none fw-bold text-primary strategy-name-link" 
+                       data-strategy-id="${strategy.id}" 
+                       title="点击编辑策略配置">
+                        ${strategy.name}
+                    </a>
+                </td>
+                <td><span class="badge bg-info">${strategyTypeName}</span></td>
+                <td><span class="badge bg-secondary">${strategy.symbol}</span></td>
+                <td>
+                    ${strategy.is_active ? 
+                        '<span class="badge bg-success"><i class="fas fa-play me-1"></i>运行中</span>' : 
+                        '<span class="badge bg-secondary"><i class="fas fa-pause me-1"></i>已停止</span>'
+                    }
+                </td>
+                <td class="text-muted small">${new Date(strategy.created_time).toLocaleString('zh-CN')}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary btn-sm toggle-strategy-btn" 
+                                data-strategy-id="${strategy.id}" 
+                                data-is-active="${strategy.is_active}"
+                                title="${strategy.is_active ? '停止策略' : '启动策略'}">
+                            <i class="fas ${strategy.is_active ? 'fa-pause' : 'fa-play'}"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm delete-strategy-btn" 
+                                data-strategy-id="${strategy.id}"
+                                title="删除策略">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
-        `).join('');
+        `;
     }
 
     /**
@@ -577,6 +679,132 @@ class QuantitativeApp {
             clearInterval(this.refreshInterval);
             this.refreshInterval = null;
         }
+    }
+
+    /**
+     * 打开编辑策略对话框
+     */
+    async openEditStrategy(strategyId) {
+        try {
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}`);
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                const strategy = result.data;
+                
+                // 填充编辑表单
+                document.getElementById('editStrategyId').value = strategy.id;
+                document.getElementById('editStrategyName').value = strategy.name;
+                document.getElementById('editStrategyType').value = strategy.type;
+                document.getElementById('editStrategySymbol').value = strategy.symbol;
+                
+                // 填充基础参数
+                document.getElementById('editLookbackPeriod').value = strategy.parameters.lookback_period || 20;
+                document.getElementById('editQuantity').value = strategy.parameters.quantity || 1.0;
+                
+                // 根据策略类型显示对应参数并填充值
+                this.toggleEditStrategyParams(strategy.type);
+                
+                if (strategy.type === 'momentum') {
+                    document.getElementById('editMomentumThreshold').value = strategy.parameters.momentum_threshold || strategy.parameters.threshold || 0.001;
+                } else if (strategy.type === 'mean_reversion') {
+                    document.getElementById('editStdMultiplier').value = strategy.parameters.std_multiplier || 2.0;
+                } else if (strategy.type === 'breakout') {
+                    document.getElementById('editBreakoutThreshold').value = strategy.parameters.breakout_threshold || 0.01;
+                }
+                
+                // 显示编辑模态框
+                const modal = new bootstrap.Modal(document.getElementById('editStrategyModal'));
+                modal.show();
+                
+            } else {
+                this.showAlert('获取策略信息失败：' + (result.message || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('获取策略信息时出错:', error);
+            this.showAlert('获取策略信息失败：网络错误', 'error');
+        }
+    }
+
+    /**
+     * 更新策略配置
+     */
+    async updateStrategy() {
+        const strategyId = document.getElementById('editStrategyId').value;
+        const strategyName = document.getElementById('editStrategyName').value;
+        const strategyType = document.getElementById('editStrategyType').value;
+        const strategySymbol = document.getElementById('editStrategySymbol').value;
+        const lookbackPeriod = parseInt(document.getElementById('editLookbackPeriod').value) || 20;
+        const quantity = parseFloat(document.getElementById('editQuantity').value) || 1.0;
+
+        if (!strategyName || !strategyType || !strategySymbol) {
+            this.showAlert('请填写完整的策略信息！', 'error');
+            return;
+        }
+
+        // 根据策略类型收集特定参数
+        const params = {
+            lookback_period: lookbackPeriod,
+            quantity: quantity
+        };
+
+        if (strategyType === 'momentum') {
+            const threshold = parseFloat(document.getElementById('editMomentumThreshold').value) || 0.001;
+            params.momentum_threshold = threshold;
+            params.threshold = threshold; // 保持兼容性
+        } else if (strategyType === 'mean_reversion') {
+            const stdMultiplier = parseFloat(document.getElementById('editStdMultiplier').value) || 2.0;
+            params.std_multiplier = stdMultiplier;
+        } else if (strategyType === 'breakout') {
+            const breakoutThreshold = parseFloat(document.getElementById('editBreakoutThreshold').value) || 0.01;
+            params.breakout_threshold = breakoutThreshold;
+        }
+
+        const payload = {
+            name: strategyName,
+            symbol: strategySymbol,
+            parameters: params
+        };
+
+        try {
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.showAlert('策略更新成功！', 'success');
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editStrategyModal'));
+                modal.hide();
+                // 重新加载策略列表
+                this.loadStrategies();
+            } else {
+                this.showAlert('策略更新失败：' + (result.message || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('更新策略时出错:', error);
+            this.showAlert('策略更新失败：网络错误', 'error');
+        }
+    }
+
+    /**
+     * 策略类型映射
+     */
+    getStrategyTypeMapping() {
+        return {
+            'momentum': '动量策略',
+            'mean_reversion': '均值回归策略',
+            'breakout': '突破策略',
+            'grid_trading': '网格交易策略',
+            'high_frequency': '高频交易策略',
+            'trend_following': '趋势跟踪策略'
+        };
     }
 }
 

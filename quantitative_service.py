@@ -23,6 +23,9 @@ class StrategyType(Enum):
     MOMENTUM = "momentum"          # 动量策略
     MEAN_REVERSION = "mean_reversion"  # 均值回归策略
     BREAKOUT = "breakout"         # 突破策略
+    GRID_TRADING = "grid_trading"  # 网格交易策略
+    HIGH_FREQUENCY = "high_frequency"  # 高频交易策略
+    TREND_FOLLOWING = "trend_following"  # 趋势跟踪策略
 
 # 信号类型枚举
 class SignalType(Enum):
@@ -232,42 +235,97 @@ class QuantitativeStrategy:
         self.config.updated_time = datetime.now()
 
 class MomentumStrategy(QuantitativeStrategy):
-    """动量策略"""
+    """动量策略 - 优化版本，追求高收益"""
     
     def __init__(self, config: StrategyConfig):
         super().__init__(config)
         self.price_history = []
+        self.volume_history = []
+        self.rsi_values = []
+        self.macd_values = []
         
     def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
-        """基于动量指标生成信号"""
+        """基于多重技术指标的动量策略 - 优化版"""
         if not self.is_running:
             return None
             
         current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        
         self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
         
         # 保留最近N个价格点
         lookback_period = self.config.parameters.get('lookback_period', 20)
-        if len(self.price_history) > lookback_period:
+        if len(self.price_history) > lookback_period * 3:  # 保留更多历史数据
             self.price_history.pop(0)
+            self.volume_history.pop(0)
             
         if len(self.price_history) < lookback_period:
             return None
             
-        # 计算动量指标
-        returns = pd.Series(self.price_history).pct_change().dropna()
-        momentum = returns.mean()
+        # 计算多重技术指标
+        prices = pd.Series(self.price_history)
+        volumes = pd.Series(self.volume_history)
         
-        threshold = self.config.parameters.get('momentum_threshold', 0.001)
+        # 1. 动量指标
+        returns = prices.pct_change().dropna()
+        momentum = returns.rolling(window=min(10, len(returns))).mean().iloc[-1]
+        
+        # 2. RSI指标
+        rsi = self._calculate_rsi(prices, period=14)
+        
+        # 3. MACD指标
+        macd_line, signal_line = self._calculate_macd(prices)
+        
+        # 4. 成交量确认
+        volume_ma = volumes.rolling(window=min(20, len(volumes))).mean().iloc[-1]
+        volume_ratio = current_volume / volume_ma if volume_ma > 0 else 1
+        
+        # 5. 价格突破
+        high_20 = prices.rolling(window=20).max().iloc[-1]
+        low_20 = prices.rolling(window=20).min().iloc[-1]
+        price_position = (current_price - low_20) / (high_20 - low_20) if high_20 > low_20 else 0.5
+        
+        # 综合信号判断 - 多重确认机制
+        threshold = self.config.parameters.get('momentum_threshold', self.config.parameters.get('threshold', 0.001))
         quantity = self.config.parameters.get('quantity', 1.0)
         
-        # 生成信号
-        if momentum > threshold:
+        # 强烈买入信号条件 (追求高收益)
+        strong_buy_conditions = [
+            momentum > threshold * 2,  # 强劲动量
+            rsi < 30,  # 超卖后反弹
+            macd_line > signal_line,  # MACD金叉
+            volume_ratio > 1.5,  # 成交量放大
+            price_position > 0.8  # 价格接近高点突破
+        ]
+        
+        # 强烈卖出信号条件
+        strong_sell_conditions = [
+            momentum < -threshold * 2,  # 强劲下跌动量
+            rsi > 70,  # 超买后回调
+            macd_line < signal_line,  # MACD死叉
+            volume_ratio > 1.5,  # 成交量放大确认
+            price_position < 0.2  # 价格接近低点破位
+        ]
+        
+        # 计算信号强度和置信度
+        buy_score = sum(strong_buy_conditions)
+        sell_score = sum(strong_sell_conditions)
+        
+        signal_type = None
+        confidence = 0
+        adjusted_quantity = quantity
+        
+        if buy_score >= 3:  # 至少3个指标确认买入
             signal_type = SignalType.BUY
-            confidence = min(abs(momentum) / threshold, 1.0)
-        elif momentum < -threshold:
+            confidence = min(buy_score / 5.0, 1.0)
+            # 高置信度时增加仓位
+            adjusted_quantity = quantity * (1 + confidence)
+        elif sell_score >= 3:  # 至少3个指标确认卖出
             signal_type = SignalType.SELL
-            confidence = min(abs(momentum) / threshold, 1.0)
+            confidence = min(sell_score / 5.0, 1.0)
+            adjusted_quantity = quantity * (1 + confidence)
         else:
             return None
             
@@ -277,57 +335,152 @@ class MomentumStrategy(QuantitativeStrategy):
             symbol=self.config.symbol,
             signal_type=signal_type,
             price=current_price,
-            quantity=quantity,
+            quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=datetime.now(),
             executed=False
         )
         
         return signal
+    
+    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> float:
+        """计算RSI指标"""
+        if len(prices) < period + 1:
+            return 50
+            
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else 50
+    
+    def _calculate_macd(self, prices: pd.Series) -> tuple:
+        """计算MACD指标"""
+        if len(prices) < 26:
+            return 0, 0
+            
+        exp1 = prices.ewm(span=12).mean()
+        exp2 = prices.ewm(span=26).mean()
+        macd_line = exp1 - exp2
+        signal_line = macd_line.ewm(span=9).mean()
+        
+        return macd_line.iloc[-1], signal_line.iloc[-1]
 
 class MeanReversionStrategy(QuantitativeStrategy):
-    """均值回归策略"""
+    """均值回归策略 - 优化版本，动态参数调整"""
     
     def __init__(self, config: StrategyConfig):
         super().__init__(config)
         self.price_history = []
+        self.volume_history = []
+        self.volatility_history = []
         
     def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
-        """基于均值回归生成信号"""
+        """基于动态布林带和波动率的均值回归策略"""
         if not self.is_running:
             return None
             
         current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        
         self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
         
         lookback_period = self.config.parameters.get('lookback_period', 20)
-        if len(self.price_history) > lookback_period:
+        if len(self.price_history) > lookback_period * 2:
             self.price_history.pop(0)
+            self.volume_history.pop(0)
             
         if len(self.price_history) < lookback_period:
             return None
             
-        # 计算布林带
+        # 计算动态技术指标
         prices = pd.Series(self.price_history)
-        sma = prices.mean()
-        std = prices.std()
+        volumes = pd.Series(self.volume_history)
         
-        std_multiplier = self.config.parameters.get('std_multiplier', 2.0)
-        upper_band = sma + std_multiplier * std
-        lower_band = sma - std_multiplier * std
+        # 1. 动态布林带计算
+        volatility = self._calculate_volatility(prices)
+        self.volatility_history.append(volatility)
+        if len(self.volatility_history) > 10:
+            self.volatility_history.pop(0)
+            
+        # 根据市场波动率动态调整布林带宽度
+        base_std_multiplier = self.config.parameters.get('std_multiplier', 2.0)
+        volatility_factor = self._get_volatility_factor()
+        dynamic_std_multiplier = base_std_multiplier * volatility_factor
+        
+        sma = prices.rolling(window=lookback_period).mean().iloc[-1]
+        std = prices.rolling(window=lookback_period).std().iloc[-1]
+        
+        upper_band = sma + dynamic_std_multiplier * std
+        lower_band = sma - dynamic_std_multiplier * std
+        middle_band = sma
+        
+        # 2. 计算均值回归强度
+        distance_from_mean = abs(current_price - middle_band) / std if std > 0 else 0
+        
+        # 3. 成交量分析
+        volume_ma = volumes.rolling(window=min(10, len(volumes))).mean().iloc[-1]
+        volume_ratio = current_volume / volume_ma if volume_ma > 0 else 1
+        
+        # 4. 短期趋势确认
+        short_ma = prices.rolling(window=5).mean().iloc[-1]
+        medium_ma = prices.rolling(window=10).mean().iloc[-1]
+        
+        # 5. 波动率突破确认
+        volatility_breakout = volatility > np.mean(self.volatility_history) * 1.5 if self.volatility_history else False
         
         quantity = self.config.parameters.get('quantity', 1.0)
         
-        # 生成信号
+        # 高置信度信号条件
+        signal_type = None
+        confidence = 0
+        adjusted_quantity = quantity
+        
+        # 强力买入信号 (价格大幅偏离下轨)
         if current_price < lower_band:
-            # 价格低于下轨，买入信号
-            confidence = min((lower_band - current_price) / (upper_band - lower_band), 1.0)
-            signal_type = SignalType.BUY
+            # 计算偏离程度
+            deviation_ratio = (lower_band - current_price) / (upper_band - lower_band)
+            
+            # 确认条件
+            buy_confirmations = [
+                deviation_ratio > 0.1,  # 显著偏离下轨
+                short_ma < medium_ma,  # 短期下跌确认
+                volume_ratio > 1.2,  # 成交量增加
+                distance_from_mean > 1.5,  # 距离均值较远
+                volatility_breakout  # 波动率突破
+            ]
+            
+            confirmation_count = sum(buy_confirmations)
+            if confirmation_count >= 3:
+                signal_type = SignalType.BUY
+                confidence = min(confirmation_count / 5.0 + deviation_ratio, 1.0)
+                # 根据偏离程度和确认强度调整仓位
+                adjusted_quantity = quantity * (1 + deviation_ratio + confidence * 0.5)
+                
+        # 强力卖出信号 (价格大幅偏离上轨)
         elif current_price > upper_band:
-            # 价格高于上轨，卖出信号
-            confidence = min((current_price - upper_band) / (upper_band - lower_band), 1.0)
-            signal_type = SignalType.SELL
-        else:
+            # 计算偏离程度
+            deviation_ratio = (current_price - upper_band) / (upper_band - lower_band)
+            
+            # 确认条件
+            sell_confirmations = [
+                deviation_ratio > 0.1,  # 显著偏离上轨
+                short_ma > medium_ma,  # 短期上涨确认
+                volume_ratio > 1.2,  # 成交量增加
+                distance_from_mean > 1.5,  # 距离均值较远
+                volatility_breakout  # 波动率突破
+            ]
+            
+            confirmation_count = sum(sell_confirmations)
+            if confirmation_count >= 3:
+                signal_type = SignalType.SELL
+                confidence = min(confirmation_count / 5.0 + deviation_ratio, 1.0)
+                adjusted_quantity = quantity * (1 + deviation_ratio + confidence * 0.5)
+        
+        if signal_type is None:
             return None
             
         signal = TradingSignal(
@@ -336,54 +489,154 @@ class MeanReversionStrategy(QuantitativeStrategy):
             symbol=self.config.symbol,
             signal_type=signal_type,
             price=current_price,
-            quantity=quantity,
+            quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=datetime.now(),
             executed=False
         )
         
         return signal
+    
+    def _calculate_volatility(self, prices: pd.Series) -> float:
+        """计算历史波动率"""
+        if len(prices) < 2:
+            return 0
+        returns = prices.pct_change().dropna()
+        return returns.std() * np.sqrt(252)  # 年化波动率
+    
+    def _get_volatility_factor(self) -> float:
+        """根据波动率历史调整布林带宽度"""
+        if not self.volatility_history:
+            return 1.0
+            
+        current_vol = self.volatility_history[-1]
+        avg_vol = np.mean(self.volatility_history)
+        
+        # 高波动时扩大布林带，低波动时缩小布林带
+        if current_vol > avg_vol * 1.5:
+            return 1.3  # 扩大30%
+        elif current_vol < avg_vol * 0.7:
+            return 0.8  # 缩小20%
+        else:
+            return 1.0  # 保持不变
 
 class BreakoutStrategy(QuantitativeStrategy):
-    """突破策略"""
+    """突破策略 - 优化版本，多重确认机制"""
     
     def __init__(self, config: StrategyConfig):
         super().__init__(config)
         self.price_history = []
+        self.volume_history = []
+        self.high_history = []
+        self.low_history = []
         
     def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
-        """基于价格突破生成信号"""
+        """基于多重确认的突破策略"""
         if not self.is_running:
             return None
             
         current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        current_high = price_data.get('high', current_price)
+        current_low = price_data.get('low', current_price)
+        
         self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
+        self.high_history.append(current_high)
+        self.low_history.append(current_low)
         
         lookback_period = self.config.parameters.get('lookback_period', 20)
-        if len(self.price_history) > lookback_period:
+        if len(self.price_history) > lookback_period * 2:
             self.price_history.pop(0)
+            self.volume_history.pop(0)
+            self.high_history.pop(0)
+            self.low_history.pop(0)
             
         if len(self.price_history) < lookback_period:
             return None
             
-        # 计算支撑和阻力位
+        # 计算多重技术指标
         prices = pd.Series(self.price_history)
-        resistance = prices.max()
-        support = prices.min()
+        volumes = pd.Series(self.volume_history)
+        highs = pd.Series(self.high_history)
+        lows = pd.Series(self.low_history)
         
+        # 1. 动态支撑阻力计算
+        resistance_periods = [10, 20, 50]  # 多时间框架
+        support_periods = [10, 20, 50]
+        
+        resistances = [highs.rolling(window=min(p, len(highs))).max().iloc[-1] for p in resistance_periods]
+        supports = [lows.rolling(window=min(p, len(lows))).min().iloc[-1] for p in support_periods]
+        
+        # 取最强阻力和支撑
+        key_resistance = max(resistances)
+        key_support = min(supports)
+        
+        # 2. 成交量突破确认
+        volume_ma_short = volumes.rolling(window=min(10, len(volumes))).mean().iloc[-1]
+        volume_ma_long = volumes.rolling(window=min(20, len(volumes))).mean().iloc[-1]
+        volume_ratio = current_volume / volume_ma_short if volume_ma_short > 0 else 1
+        volume_trend = volume_ma_short / volume_ma_long if volume_ma_long > 0 else 1
+        
+        # 3. 价格动量分析
+        price_momentum = self._calculate_momentum(prices, period=10)
+        price_acceleration = self._calculate_acceleration(prices, period=5)
+        
+        # 4. 突破幅度计算
         breakout_threshold = self.config.parameters.get('breakout_threshold', 0.01)
         quantity = self.config.parameters.get('quantity', 1.0)
         
-        # 生成信号
-        if current_price > resistance * (1 + breakout_threshold):
-            # 向上突破
-            confidence = min((current_price - resistance) / resistance, 1.0)
+        # 5. 市场结构分析
+        higher_highs = self._count_higher_highs(highs, period=10)
+        lower_lows = self._count_lower_lows(lows, period=10)
+        
+        signal_type = None
+        confidence = 0
+        adjusted_quantity = quantity
+        
+        # 向上突破确认
+        upward_breakout_conditions = [
+            current_price > key_resistance * (1 + breakout_threshold),  # 价格突破
+            volume_ratio > 2.0,  # 成交量爆发
+            volume_trend > 1.1,  # 成交量趋势向上
+            price_momentum > 0.005,  # 正向动量
+            price_acceleration > 0,  # 价格加速
+            higher_highs >= 2,  # 形成上升趋势
+            current_price > prices.rolling(window=5).mean().iloc[-1]  # 短期均线确认
+        ]
+        
+        # 向下突破确认
+        downward_breakout_conditions = [
+            current_price < key_support * (1 - breakout_threshold),  # 价格跌破
+            volume_ratio > 2.0,  # 成交量爆发
+            volume_trend > 1.1,  # 成交量趋势向上
+            price_momentum < -0.005,  # 负向动量
+            price_acceleration < 0,  # 价格加速下跌
+            lower_lows >= 2,  # 形成下降趋势
+            current_price < prices.rolling(window=5).mean().iloc[-1]  # 短期均线确认
+        ]
+        
+        upward_score = sum(upward_breakout_conditions)
+        downward_score = sum(downward_breakout_conditions)
+        
+        # 强力突破信号 (至少5个条件确认)
+        if upward_score >= 5:
             signal_type = SignalType.BUY
-        elif current_price < support * (1 - breakout_threshold):
-            # 向下突破
-            confidence = min((support - current_price) / support, 1.0)
+            confidence = min(upward_score / 7.0, 1.0)
+            
+            # 计算突破强度
+            breakout_strength = (current_price - key_resistance) / key_resistance
+            adjusted_quantity = quantity * (1 + confidence + breakout_strength * 2)
+            
+        elif downward_score >= 5:
             signal_type = SignalType.SELL
-        else:
+            confidence = min(downward_score / 7.0, 1.0)
+            
+            # 计算突破强度
+            breakout_strength = (key_support - current_price) / key_support
+            adjusted_quantity = quantity * (1 + confidence + breakout_strength * 2)
+        
+        if signal_type is None:
             return None
             
         signal = TradingSignal(
@@ -392,13 +645,442 @@ class BreakoutStrategy(QuantitativeStrategy):
             symbol=self.config.symbol,
             signal_type=signal_type,
             price=current_price,
-            quantity=quantity,
+            quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=datetime.now(),
             executed=False
         )
         
         return signal
+    
+    def _calculate_momentum(self, prices: pd.Series, period: int = 10) -> float:
+        """计算价格动量"""
+        if len(prices) < period + 1:
+            return 0
+        return (prices.iloc[-1] - prices.iloc[-period-1]) / prices.iloc[-period-1]
+    
+    def _calculate_acceleration(self, prices: pd.Series, period: int = 5) -> float:
+        """计算价格加速度"""
+        if len(prices) < period * 2:
+            return 0
+        recent_momentum = self._calculate_momentum(prices.iloc[-period:], period // 2)
+        past_momentum = self._calculate_momentum(prices.iloc[-period*2:-period], period // 2)
+        return recent_momentum - past_momentum
+    
+    def _count_higher_highs(self, highs: pd.Series, period: int = 10) -> int:
+        """计算近期创新高次数"""
+        if len(highs) < period:
+            return 0
+        recent_highs = highs.iloc[-period:]
+        count = 0
+        for i in range(1, len(recent_highs)):
+            if recent_highs.iloc[i] > recent_highs.iloc[i-1]:
+                count += 1
+        return count
+    
+    def _count_lower_lows(self, lows: pd.Series, period: int = 10) -> int:
+        """计算近期创新低次数"""
+        if len(lows) < period:
+            return 0
+        recent_lows = lows.iloc[-period:]
+        count = 0
+        for i in range(1, len(recent_lows)):
+            if recent_lows.iloc[i] < recent_lows.iloc[i-1]:
+                count += 1
+        return count
+
+class GridTradingStrategy(QuantitativeStrategy):
+    """网格交易策略 - 适合横盘震荡市场，稳定获利"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.grid_levels = []
+        self.last_trade_price = None
+        self.position_count = 0
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """网格交易信号生成"""
+        if not self.is_running:
+            return None
+            
+        current_price = price_data.get('price', 0)
+        self.price_history.append(current_price)
+        
+        # 保持价格历史
+        lookback_period = self.config.parameters.get('lookback_period', 100)
+        if len(self.price_history) > lookback_period:
+            self.price_history.pop(0)
+            
+        if len(self.price_history) < 50:  # 需要足够数据来计算网格
+            return None
+            
+        # 计算网格参数
+        grid_spacing = self.config.parameters.get('grid_spacing', 0.02)  # 2%网格间距
+        grid_count = self.config.parameters.get('grid_count', 10)  # 网格数量
+        quantity = self.config.parameters.get('quantity', 1.0)
+        
+        # 动态计算网格中心价格
+        prices = pd.Series(self.price_history)
+        center_price = prices.median()  # 使用中位数作为中心
+        
+        # 生成网格级别
+        if not self.grid_levels:
+            self._generate_grid_levels(center_price, grid_spacing, grid_count)
+        
+        # 检查价格是否触及网格线
+        signal_type = None
+        confidence = 0.8  # 网格策略置信度固定较高
+        
+        for i, level in enumerate(self.grid_levels):
+            price_diff = abs(current_price - level) / level
+            
+            # 价格接近网格线（0.1%容差）
+            if price_diff < 0.001:
+                # 判断买卖方向
+                if current_price <= center_price and (not self.last_trade_price or current_price < self.last_trade_price * 0.98):
+                    # 在中心价格以下且价格下跌时买入
+                    signal_type = SignalType.BUY
+                    self.last_trade_price = current_price
+                    self.position_count += 1
+                elif current_price >= center_price and (not self.last_trade_price or current_price > self.last_trade_price * 1.02):
+                    # 在中心价格以上且价格上涨时卖出
+                    signal_type = SignalType.SELL
+                    self.last_trade_price = current_price
+                    self.position_count -= 1
+                break
+        
+        if signal_type is None:
+            return None
+            
+        # 根据位置调整交易量
+        adjusted_quantity = quantity * min(1 + abs(self.position_count) * 0.1, 3.0)  # 最多放大3倍
+        
+        signal = TradingSignal(
+            id=f"signal_{int(time.time() * 1000)}",
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=datetime.now(),
+            executed=False
+        )
+        
+        return signal
+    
+    def _generate_grid_levels(self, center_price: float, spacing: float, count: int):
+        """生成网格级别"""
+        self.grid_levels = []
+        for i in range(-count//2, count//2 + 1):
+            level = center_price * (1 + i * spacing)
+            self.grid_levels.append(level)
+        self.grid_levels.sort()
+
+class HighFrequencyStrategy(QuantitativeStrategy):
+    """高频交易策略 - 追求小幅价差快速获利"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.volume_history = []
+        self.last_signal_time = None
+        self.micro_trend_history = []
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """高频交易信号生成"""
+        if not self.is_running:
+            return None
+            
+        current_time = datetime.now()
+        current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        
+        # 高频策略需要限制信号频率
+        if self.last_signal_time and (current_time - self.last_signal_time).total_seconds() < 30:
+            return None
+            
+        self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
+        
+        # 只保留最近的短期数据
+        max_history = 30  # 只看最近30个数据点
+        if len(self.price_history) > max_history:
+            self.price_history.pop(0)
+            self.volume_history.pop(0)
+            
+        if len(self.price_history) < 10:
+            return None
+            
+        # 计算微观市场指标
+        prices = pd.Series(self.price_history)
+        volumes = pd.Series(self.volume_history)
+        
+        # 1. 微趋势识别
+        micro_trend = self._calculate_micro_trend(prices)
+        self.micro_trend_history.append(micro_trend)
+        if len(self.micro_trend_history) > 10:
+            self.micro_trend_history.pop(0)
+        
+        # 2. 短期动量
+        short_momentum = (prices.iloc[-1] - prices.iloc[-3]) / prices.iloc[-3] if len(prices) >= 3 else 0
+        
+        # 3. 成交量激增
+        volume_spike = self._detect_volume_spike(volumes)
+        
+        # 4. 价格微波动
+        price_volatility = prices.rolling(window=5).std().iloc[-1] if len(prices) >= 5 else 0
+        volatility_threshold = self.config.parameters.get('volatility_threshold', 0.001)
+        
+        # 5. 订单簿不平衡模拟（基于价格变化速度）
+        order_imbalance = self._estimate_order_imbalance(prices, volumes)
+        
+        quantity = self.config.parameters.get('quantity', 0.5)  # 高频交易使用较小仓位
+        min_profit_threshold = self.config.parameters.get('min_profit', 0.0005)  # 0.05%最小利润
+        
+        signal_type = None
+        confidence = 0
+        
+        # 高频买入条件
+        hf_buy_conditions = [
+            short_momentum > min_profit_threshold,  # 正向动量
+            volume_spike,  # 成交量激增
+            price_volatility > volatility_threshold,  # 足够波动
+            order_imbalance > 0.6,  # 买单占优
+            micro_trend > 0.5,  # 微趋势向上
+        ]
+        
+        # 高频卖出条件
+        hf_sell_conditions = [
+            short_momentum < -min_profit_threshold,  # 负向动量
+            volume_spike,  # 成交量激增
+            price_volatility > volatility_threshold,  # 足够波动
+            order_imbalance < 0.4,  # 卖单占优
+            micro_trend < 0.5,  # 微趋势向下
+        ]
+        
+        buy_score = sum(hf_buy_conditions)
+        sell_score = sum(hf_sell_conditions)
+        
+        if buy_score >= 4:  # 至少4个条件确认
+            signal_type = SignalType.BUY
+            confidence = min(buy_score / 5.0 + abs(short_momentum) * 100, 1.0)
+        elif sell_score >= 4:
+            signal_type = SignalType.SELL
+            confidence = min(sell_score / 5.0 + abs(short_momentum) * 100, 1.0)
+        
+        if signal_type is None:
+            return None
+            
+        self.last_signal_time = current_time
+        
+        # 高频策略根据信号强度调整仓位
+        adjusted_quantity = quantity * (1 + confidence * 2)
+        
+        signal = TradingSignal(
+            id=f"signal_{int(time.time() * 1000)}",
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=current_time,
+            executed=False
+        )
+        
+        return signal
+    
+    def _calculate_micro_trend(self, prices: pd.Series) -> float:
+        """计算微趋势（0-1，0.5为中性）"""
+        if len(prices) < 5:
+            return 0.5
+        recent_slope = (prices.iloc[-1] - prices.iloc[-5]) / prices.iloc[-5]
+        return max(0, min(1, 0.5 + recent_slope * 100))  # 标准化到0-1
+    
+    def _detect_volume_spike(self, volumes: pd.Series) -> bool:
+        """检测成交量激增"""
+        if len(volumes) < 5:
+            return False
+        current_vol = volumes.iloc[-1]
+        avg_vol = volumes.iloc[-5:-1].mean()
+        return current_vol > avg_vol * 2.0
+    
+    def _estimate_order_imbalance(self, prices: pd.Series, volumes: pd.Series) -> float:
+        """估算订单簿不平衡（0-1，>0.5买单占优）"""
+        if len(prices) < 3:
+            return 0.5
+        price_change = prices.iloc[-1] - prices.iloc[-2]
+        volume_current = volumes.iloc[-1] if len(volumes) > 0 else 1
+        
+        # 简化的不平衡估算：价格上涨+高成交量 = 买单占优
+        if price_change > 0:
+            return min(1.0, 0.6 + price_change * volume_current * 10)
+        else:
+            return max(0.0, 0.4 + price_change * volume_current * 10)
+
+class TrendFollowingStrategy(QuantitativeStrategy):
+    """趋势跟踪策略 - 捕获长期趋势获得大幅收益"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.volume_history = []
+        self.trend_strength_history = []
+        self.position_state = "neutral"  # neutral, long, short
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """趋势跟踪信号生成"""
+        if not self.is_running:
+            return None
+            
+        current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        
+        self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
+        
+        lookback_period = self.config.parameters.get('lookback_period', 50)
+        if len(self.price_history) > lookback_period * 2:
+            self.price_history.pop(0)
+            self.volume_history.pop(0)
+            
+        if len(self.price_history) < lookback_period:
+            return None
+            
+        # 计算多重趋势指标
+        prices = pd.Series(self.price_history)
+        volumes = pd.Series(self.volume_history)
+        
+        # 1. 多重移动平均线
+        ma_short = prices.rolling(window=10).mean().iloc[-1]
+        ma_medium = prices.rolling(window=20).mean().iloc[-1]
+        ma_long = prices.rolling(window=50).mean().iloc[-1]
+        
+        # 2. 趋势强度计算
+        trend_strength = self._calculate_trend_strength(prices)
+        self.trend_strength_history.append(trend_strength)
+        if len(self.trend_strength_history) > 20:
+            self.trend_strength_history.pop(0)
+        
+        # 3. ADX指标计算（趋势强度）
+        adx = self._calculate_adx(prices, period=14)
+        
+        # 4. 成交量确认
+        volume_ma = volumes.rolling(window=20).mean().iloc[-1]
+        volume_ratio = current_volume / volume_ma if volume_ma > 0 else 1
+        
+        # 5. 价格相对位置
+        price_position = self._calculate_price_position(prices, period=50)
+        
+        quantity = self.config.parameters.get('quantity', 2.0)  # 趋势策略使用较大仓位
+        trend_threshold = self.config.parameters.get('trend_threshold', 0.02)  # 2%趋势阈值
+        
+        signal_type = None
+        confidence = 0
+        
+        # 强烈上涨趋势确认
+        uptrend_conditions = [
+            ma_short > ma_medium > ma_long,  # 均线多头排列
+            current_price > ma_short * (1 + trend_threshold),  # 价格远离短期均线
+            trend_strength > 0.7,  # 强趋势
+            adx > 25,  # ADX确认趋势强度
+            volume_ratio > 1.1,  # 成交量确认
+            price_position > 0.7,  # 价格处于高位区域
+            self.position_state != "long"  # 避免重复信号
+        ]
+        
+        # 强烈下跌趋势确认
+        downtrend_conditions = [
+            ma_short < ma_medium < ma_long,  # 均线空头排列
+            current_price < ma_short * (1 - trend_threshold),  # 价格远离短期均线
+            trend_strength < 0.3,  # 弱趋势（下跌）
+            adx > 25,  # ADX确认趋势强度
+            volume_ratio > 1.1,  # 成交量确认
+            price_position < 0.3,  # 价格处于低位区域
+            self.position_state != "short"  # 避免重复信号
+        ]
+        
+        uptrend_score = sum(uptrend_conditions)
+        downtrend_score = sum(downtrend_conditions)
+        
+        if uptrend_score >= 5:  # 强烈上涨趋势
+            signal_type = SignalType.BUY
+            confidence = min(uptrend_score / 7.0, 1.0)
+            self.position_state = "long"
+        elif downtrend_score >= 5:  # 强烈下跌趋势
+            signal_type = SignalType.SELL
+            confidence = min(downtrend_score / 7.0, 1.0)
+            self.position_state = "short"
+        
+        if signal_type is None:
+            return None
+            
+        # 趋势策略根据趋势强度大幅调整仓位
+        trend_multiplier = abs(trend_strength - 0.5) * 4  # 0-2倍数
+        adjusted_quantity = quantity * (1 + trend_multiplier + confidence)
+        
+        signal = TradingSignal(
+            id=f"signal_{int(time.time() * 1000)}",
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=datetime.now(),
+            executed=False
+        )
+        
+        return signal
+    
+    def _calculate_trend_strength(self, prices: pd.Series) -> float:
+        """计算趋势强度（0-1）"""
+        if len(prices) < 20:
+            return 0.5
+        
+        # 计算线性回归斜率
+        x = np.arange(len(prices))
+        y = prices.values
+        slope, _ = np.polyfit(x, y, 1)
+        
+        # 标准化斜率到0-1范围
+        normalized_slope = np.tanh(slope / np.mean(y) * 1000)  # 放大并限制范围
+        return (normalized_slope + 1) / 2  # 转换到0-1范围
+    
+    def _calculate_adx(self, prices: pd.Series, period: int = 14) -> float:
+        """计算平均方向指数ADX"""
+        if len(prices) < period + 1:
+            return 0
+            
+        # 简化ADX计算
+        price_changes = prices.diff().abs()
+        tr = price_changes.rolling(window=period).mean()
+        dm_plus = prices.diff().where(prices.diff() > 0, 0).rolling(window=period).mean()
+        dm_minus = (-prices.diff()).where(prices.diff() < 0, 0).rolling(window=period).mean()
+        
+        di_plus = dm_plus / tr * 100
+        di_minus = dm_minus / tr * 100
+        
+        dx = abs(di_plus - di_minus) / (di_plus + di_minus) * 100
+        adx = dx.rolling(window=period).mean().iloc[-1]
+        
+        return adx if not pd.isna(adx) else 0
+    
+    def _calculate_price_position(self, prices: pd.Series, period: int = 50) -> float:
+        """计算价格在周期内的相对位置（0-1）"""
+        if len(prices) < period:
+            return 0.5
+            
+        recent_prices = prices.iloc[-period:]
+        high = recent_prices.max()
+        low = recent_prices.min()
+        current = prices.iloc[-1]
+        
+        if high == low:
+            return 0.5
+        return (current - low) / (high - low)
 
 class QuantitativeService:
     """量化交易服务主类"""
@@ -450,6 +1132,12 @@ class QuantitativeService:
                         strategy = MeanReversionStrategy(config)
                     elif config.strategy_type == StrategyType.BREAKOUT:
                         strategy = BreakoutStrategy(config)
+                    elif config.strategy_type == StrategyType.GRID_TRADING:
+                        strategy = GridTradingStrategy(config)
+                    elif config.strategy_type == StrategyType.HIGH_FREQUENCY:
+                        strategy = HighFrequencyStrategy(config)
+                    elif config.strategy_type == StrategyType.TREND_FOLLOWING:
+                        strategy = TrendFollowingStrategy(config)
                     else:
                         logger.warning(f"不支持的策略类型: {config.strategy_type}")
                         continue
@@ -488,6 +1176,12 @@ class QuantitativeService:
             strategy = MeanReversionStrategy(config)
         elif strategy_type == StrategyType.BREAKOUT:
             strategy = BreakoutStrategy(config)
+        elif strategy_type == StrategyType.GRID_TRADING:
+            strategy = GridTradingStrategy(config)
+        elif strategy_type == StrategyType.HIGH_FREQUENCY:
+            strategy = HighFrequencyStrategy(config)
+        elif strategy_type == StrategyType.TREND_FOLLOWING:
+            strategy = TrendFollowingStrategy(config)
         else:
             raise ValueError(f"不支持的策略类型: {strategy_type}")
             
@@ -582,6 +1276,29 @@ class QuantitativeService:
         self._log_operation("delete_strategy", f"删除策略: {strategy.config.name}", "success")
         
         logger.info(f"删除策略成功: {strategy.config.name} (ID: {strategy_id})")
+        return True
+        
+    def update_strategy(self, strategy_id: str, name: str, symbol: str, parameters: Dict[str, Any]) -> bool:
+        """更新策略配置"""
+        if strategy_id not in self.strategies:
+            return False
+            
+        strategy = self.strategies[strategy_id]
+        old_name = strategy.config.name
+        
+        # 更新策略配置
+        strategy.config.name = name
+        strategy.config.symbol = symbol
+        strategy.config.parameters.update(parameters)
+        strategy.config.updated_time = datetime.now()
+        
+        # 更新数据库
+        self._update_strategy_in_db(strategy.config)
+        
+        # 记录操作日志
+        self._log_operation("update_strategy", f"更新策略配置: {old_name} -> {name}", "success")
+        
+        logger.info(f"更新策略成功: {name} (ID: {strategy_id})")
         return True
         
     def get_strategies(self) -> List[Dict[str, Any]]:
@@ -724,10 +1441,10 @@ class QuantitativeService:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE quant_strategies 
-                SET enabled = ?, parameters = ?, updated_time = ?
+                SET name = ?, symbol = ?, enabled = ?, parameters = ?, updated_time = ?
                 WHERE id = ?
             """, (
-                config.enabled, json.dumps(config.parameters),
+                config.name, config.symbol, config.enabled, json.dumps(config.parameters),
                 config.updated_time, config.id
             ))
             conn.commit()

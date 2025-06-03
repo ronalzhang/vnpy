@@ -1041,6 +1041,75 @@ def delete_quantitative_strategy(strategy_id):
             "message": f"删除策略失败: {str(e)}"
         }), 500
 
+@app.route('/api/quantitative/strategies/<strategy_id>', methods=['GET'])
+def get_quantitative_strategy(strategy_id):
+    """获取单个策略信息"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        strategy = quantitative_service.get_strategy(strategy_id)
+        if strategy:
+            return jsonify({
+                "status": "success",
+                "data": strategy
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "策略不存在"
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"获取策略信息失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"获取策略信息失败: {str(e)}"
+        }), 500
+
+@app.route('/api/quantitative/strategies/<strategy_id>', methods=['PUT'])
+def update_quantitative_strategy(strategy_id):
+    """更新策略配置"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        symbol = data.get('symbol')
+        parameters = data.get('parameters', {})
+        
+        if not all([name, symbol]):
+            return jsonify({
+                "status": "error",
+                "message": "缺少必要参数"
+            }), 400
+        
+        success = quantitative_service.update_strategy(strategy_id, name, symbol, parameters)
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": "策略更新成功"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "策略更新失败或策略不存在"
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"更新策略失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"更新策略失败: {str(e)}"
+        }), 500
+
 @app.route('/api/quantitative/positions/<int:position_id>/close', methods=['POST'])
 def close_quantitative_position(position_id):
     """平仓"""

@@ -112,8 +112,8 @@
 
                         <!-- 策略列表 -->
                         <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead class="table-dark">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
                                     <tr>
                                         <th>策略名称</th>
                                         <th>类型</th>
@@ -252,6 +252,9 @@
                                     <option value="momentum">动量策略</option>
                                     <option value="mean_reversion">均值回归策略</option>
                                     <option value="breakout">突破策略</option>
+                                    <option value="grid_trading">网格交易策略</option>
+                                    <option value="high_frequency">高频交易策略</option>
+                                    <option value="trend_following">趋势跟踪策略</option>
                                 </select>
                             </div>
                         </div>
@@ -316,6 +319,47 @@
                                         <div class="form-text">价格突破阈值（百分比）</div>
                                     </div>
                                 </div>
+                                
+                                <!-- 网格交易策略参数 -->
+                                <div id="gridTradingParams" class="strategy-params" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="gridSpacing" class="form-label">网格间距</label>
+                                            <input type="number" class="form-control" id="gridSpacing" value="0.02" min="0.001" step="0.001">
+                                            <div class="form-text">网格间距（百分比）</div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="gridCount" class="form-label">网格数量</label>
+                                            <input type="number" class="form-control" id="gridCount" value="10" min="5" max="50">
+                                            <div class="form-text">总网格线数量</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 高频交易策略参数 -->
+                                <div id="highFrequencyParams" class="strategy-params" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="volatilityThreshold" class="form-label">波动率阈值</label>
+                                            <input type="number" class="form-control" id="volatilityThreshold" value="0.001" min="0.0001" step="0.0001">
+                                            <div class="form-text">最小波动率要求</div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="minProfit" class="form-label">最小利润</label>
+                                            <input type="number" class="form-control" id="minProfit" value="0.0005" min="0.0001" step="0.0001">
+                                            <div class="form-text">最小目标利润率</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 趋势跟踪策略参数 -->
+                                <div id="trendFollowingParams" class="strategy-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="trendThreshold" class="form-label">趋势阈值</label>
+                                        <input type="number" class="form-control" id="trendThreshold" value="0.02" min="0.001" step="0.001">
+                                        <div class="form-text">趋势确认阈值（百分比）</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -354,6 +398,150 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-warning" id="updateStrategyBtn">
                         <i class="fas fa-save me-1"></i>保存配置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑策略模态框 -->
+    <div class="modal fade" id="editStrategyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2"></i>编辑策略配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editStrategyForm">
+                        <input type="hidden" id="editStrategyId">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editStrategyName" class="form-label">策略名称</label>
+                                <input type="text" class="form-control" id="editStrategyName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editStrategyType" class="form-label">策略类型</label>
+                                <select class="form-select" id="editStrategyType" disabled>
+                                    <option value="momentum">动量策略</option>
+                                    <option value="mean_reversion">均值回归策略</option>
+                                    <option value="breakout">突破策略</option>
+                                    <option value="grid_trading">网格交易策略</option>
+                                    <option value="high_frequency">高频交易策略</option>
+                                    <option value="trend_following">趋势跟踪策略</option>
+                                </select>
+                                <div class="form-text">策略类型创建后不可修改</div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editStrategySymbol" class="form-label">交易对</label>
+                            <select class="form-select" id="editStrategySymbol" required>
+                                <option value="BTC/USDT">BTC/USDT</option>
+                                <option value="ETH/USDT">ETH/USDT</option>
+                                <option value="SOL/USDT">SOL/USDT</option>
+                                <option value="XRP/USDT">XRP/USDT</option>
+                                <option value="DOGE/USDT">DOGE/USDT</option>
+                                <option value="ADA/USDT">ADA/USDT</option>
+                                <option value="DOT/USDT">DOT/USDT</option>
+                                <option value="AVAX/USDT">AVAX/USDT</option>
+                                <option value="SHIB/USDT">SHIB/USDT</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 编辑策略参数配置 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">策略参数配置</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="editLookbackPeriod" class="form-label">回看周期</label>
+                                        <input type="number" class="form-control" id="editLookbackPeriod" min="5" max="100">
+                                        <div class="form-text">用于计算技术指标的历史数据点数</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="editQuantity" class="form-label">交易数量</label>
+                                        <input type="number" class="form-control" id="editQuantity" min="0.01" step="0.01">
+                                        <div class="form-text">每次交易的数量</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 动量策略参数 -->
+                                <div id="editMomentumParams" class="edit-strategy-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="editMomentumThreshold" class="form-label">动量阈值</label>
+                                        <input type="number" class="form-control" id="editMomentumThreshold" min="0.0001" step="0.0001">
+                                        <div class="form-text">触发交易信号的动量阈值</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 均值回归策略参数 -->
+                                <div id="editMeanReversionParams" class="edit-strategy-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="editStdMultiplier" class="form-label">标准差倍数</label>
+                                        <input type="number" class="form-control" id="editStdMultiplier" min="1.0" step="0.1">
+                                        <div class="form-text">布林带标准差倍数</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 突破策略参数 -->
+                                <div id="editBreakoutParams" class="edit-strategy-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="editBreakoutThreshold" class="form-label">突破阈值</label>
+                                        <input type="number" class="form-control" id="editBreakoutThreshold" min="0.001" step="0.001">
+                                        <div class="form-text">价格突破阈值（百分比）</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 网格交易策略参数 -->
+                                <div id="editGridTradingParams" class="edit-strategy-params" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="editGridSpacing" class="form-label">网格间距</label>
+                                            <input type="number" class="form-control" id="editGridSpacing" min="0.001" step="0.001">
+                                            <div class="form-text">网格间距（百分比）</div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="editGridCount" class="form-label">网格数量</label>
+                                            <input type="number" class="form-control" id="editGridCount" min="5" max="50">
+                                            <div class="form-text">总网格线数量</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 高频交易策略参数 -->
+                                <div id="editHighFrequencyParams" class="edit-strategy-params" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="editVolatilityThreshold" class="form-label">波动率阈值</label>
+                                            <input type="number" class="form-control" id="editVolatilityThreshold" min="0.0001" step="0.0001">
+                                            <div class="form-text">最小波动率要求</div>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="editMinProfit" class="form-label">最小利润</label>
+                                            <input type="number" class="form-control" id="editMinProfit" min="0.0001" step="0.0001">
+                                            <div class="form-text">最小目标利润率</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 趋势跟踪策略参数 -->
+                                <div id="editTrendFollowingParams" class="edit-strategy-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="editTrendThreshold" class="form-label">趋势阈值</label>
+                                        <input type="number" class="form-control" id="editTrendThreshold" min="0.001" step="0.001">
+                                        <div class="form-text">趋势确认阈值（百分比）</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-warning" id="updateStrategyBtn">
+                        <i class="fas fa-save me-1"></i>保存修改
                     </button>
                 </div>
             </div>
