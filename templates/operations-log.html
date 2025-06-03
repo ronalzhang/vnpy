@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>操作日志 - 校长的量化系统</title>
+    <!-- 添加favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- 引入Bootstrap CSS -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入Font Awesome图标 -->
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.3.0/css/all.min.css">
+    <style>
+        .log-entry {
+            border-left: 4px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .log-entry:hover {
+            background-color: #f8f9fa;
+            transform: translateX(2px);
+        }
+        
+        .log-success {
+            border-left-color: #52c41a;
+        }
+        
+        .log-error {
+            border-left-color: #ff4d4f;
+        }
+        
+        .log-warning {
+            border-left-color: #faad14;
+        }
+        
+        .log-info {
+            border-left-color: #1677ff;
+        }
+        
+        .operation-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+        }
+        
+        .timestamp {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+        
+        .log-detail {
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+        
+        .filter-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: none;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #1677ff 0%, #0066cc 100%);
+            color: white;
+            border: none;
+        }
+        
+        .log-search {
+            border-radius: 50px;
+            padding-left: 2.5rem;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+        
+        .log-container {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .log-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .log-container::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        .badge-outline {
+            border: 1px solid currentColor;
+            background: transparent;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #1677ff 0%, #0066cc 100%);">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fas fa-chart-line me-2"></i>校长的量化系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="fas fa-home me-1"></i>市场数据</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/quantitative.html"><i class="fas fa-robot me-1"></i>量化交易</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/arbitrage.html"><i class="fas fa-exchange-alt me-1"></i>套利系统</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/operations-log.html"><i class="fas fa-list-alt me-1"></i>操作日志</a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center text-white">
+                    <span class="badge bg-success me-2" id="system-status">
+                        <i class="fas fa-circle pulse me-1"></i>系统运行中
+                    </span>
+                    <span id="current-time"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <!-- 页面标题和统计 -->
+        <div class="row mb-4">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center mb-3">
+                    <h2 class="mb-0 text-primary">
+                        <i class="fas fa-clipboard-list me-2"></i>系统操作日志
+                    </h2>
+                    <span class="badge bg-secondary ms-3" id="log-count">加载中...</span>
+                </div>
+                <p class="text-muted mb-0">实时监控系统操作记录，追踪所有用户行为和系统事件</p>
+            </div>
+            <div class="col-lg-4">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <div class="row">
+                            <div class="col-4">
+                                <div class="h4 mb-0" id="total-logs">0</div>
+                                <small>总日志数</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="h4 mb-0" id="success-logs">0</div>
+                                <small>成功操作</small>
+                            </div>
+                            <div class="col-4">
+                                <div class="h4 mb-0" id="error-logs">0</div>
+                                <small>失败操作</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 过滤器和搜索 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card filter-card">
+                    <div class="card-body">
+                        <div class="row align-items-end">
+                            <div class="col-lg-4 col-md-6 mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-search me-1"></i>搜索日志
+                                </label>
+                                <div class="position-relative">
+                                    <i class="fas fa-search search-icon"></i>
+                                    <input type="text" class="form-control log-search" id="log-search" placeholder="搜索操作类型、详情或用户...">
+                                </div>
+                            </div>
+                            <div class="col-lg-2 col-md-6 mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-filter me-1"></i>操作类型
+                                </label>
+                                <select class="form-select" id="operation-filter">
+                                    <option value="">全部类型</option>
+                                    <option value="create_strategy">创建策略</option>
+                                    <option value="start_strategy">启动策略</option>
+                                    <option value="stop_strategy">停止策略</option>
+                                    <option value="config_strategy">配置策略</option>
+                                    <option value="system_operation">系统操作</option>
+                                </select>
+                            </div>
+                            <div class="col-lg-2 col-md-6 mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-check-circle me-1"></i>结果状态
+                                </label>
+                                <select class="form-select" id="result-filter">
+                                    <option value="">全部状态</option>
+                                    <option value="success">成功</option>
+                                    <option value="failed">失败</option>
+                                    <option value="warning">警告</option>
+                                </select>
+                            </div>
+                            <div class="col-lg-2 col-md-6 mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-clock me-1"></i>时间范围
+                                </label>
+                                <select class="form-select" id="time-filter">
+                                    <option value="">全部时间</option>
+                                    <option value="1h">1小时内</option>
+                                    <option value="24h">24小时内</option>
+                                    <option value="7d">7天内</option>
+                                    <option value="30d">30天内</option>
+                                </select>
+                            </div>
+                            <div class="col-lg-2 col-md-6 mb-3">
+                                <button class="btn btn-primary w-100" id="refresh-logs">
+                                    <i class="fas fa-sync-alt me-1"></i>刷新
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日志列表 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-dark">
+                            <i class="fas fa-stream me-2"></i>操作记录
+                        </h5>
+                        <div class="d-flex align-items-center">
+                            <div class="form-check form-switch me-3">
+                                <input class="form-check-input" type="checkbox" id="auto-refresh" checked>
+                                <label class="form-check-label" for="auto-refresh">
+                                    自动刷新
+                                </label>
+                            </div>
+                            <button class="btn btn-outline-secondary btn-sm" id="clear-filters">
+                                <i class="fas fa-times me-1"></i>清除过滤
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="log-container" id="logs-container">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                                <p class="text-muted mt-3">正在加载操作日志...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <nav aria-label="日志分页">
+                    <ul class="pagination justify-content-center" id="pagination">
+                        <!-- 分页将通过JavaScript动态生成 -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日志详情模态框 -->
+    <div class="modal fade" id="logDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle me-2"></i>操作日志详情
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">操作类型</label>
+                            <p class="form-control-plaintext" id="detail-operation-type"></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">操作结果</label>
+                            <p class="form-control-plaintext" id="detail-result"></p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">操作用户</label>
+                            <p class="form-control-plaintext" id="detail-user"></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">操作时间</label>
+                            <p class="form-control-plaintext timestamp" id="detail-timestamp"></p>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">操作详情</label>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <p class="mb-0" id="detail-description"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 通知容器 -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="toast" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="fas fa-info-circle text-primary me-2"></i>
+                <strong class="me-auto">系统通知</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-body">
+                <!-- 通知内容 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入Bootstrap JS -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // 操作日志应用
+        class OperationsLogApp {
+            constructor() {
+                this.logs = [];
+                this.filteredLogs = [];
+                this.currentPage = 1;
+                this.pageSize = 20;
+                this.autoRefreshEnabled = true;
+                this.autoRefreshInterval = null;
+            }
+
+            async init() {
+                this.bindEvents();
+                await this.loadLogs();
+                this.startAutoRefresh();
+                this.updateTime();
+            }
+
+            bindEvents() {
+                // 搜索和过滤
+                document.getElementById('log-search').addEventListener('input', () => this.applyFilters());
+                document.getElementById('operation-filter').addEventListener('change', () => this.applyFilters());
+                document.getElementById('result-filter').addEventListener('change', () => this.applyFilters());
+                document.getElementById('time-filter').addEventListener('change', () => this.applyFilters());
+                
+                // 按钮事件
+                document.getElementById('refresh-logs').addEventListener('click', () => this.loadLogs());
+                document.getElementById('clear-filters').addEventListener('click', () => this.clearFilters());
+                
+                // 自动刷新
+                document.getElementById('auto-refresh').addEventListener('change', (e) => {
+                    this.autoRefreshEnabled = e.target.checked;
+                    if (this.autoRefreshEnabled) {
+                        this.startAutoRefresh();
+                    } else {
+                        this.stopAutoRefresh();
+                    }
+                });
+            }
+
+            async loadLogs() {
+                try {
+                    const response = await fetch('/api/operations-log');
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        this.logs = data.data;
+                        this.applyFilters();
+                        this.updateStatistics();
+                    } else {
+                        this.showToast('加载日志失败: ' + data.message, 'error');
+                    }
+                } catch (error) {
+                    console.error('加载日志错误:', error);
+                    this.showToast('加载日志时发生错误', 'error');
+                }
+            }
+
+            applyFilters() {
+                const searchTerm = document.getElementById('log-search').value.toLowerCase();
+                const operationFilter = document.getElementById('operation-filter').value;
+                const resultFilter = document.getElementById('result-filter').value;
+                const timeFilter = document.getElementById('time-filter').value;
+                
+                this.filteredLogs = this.logs.filter(log => {
+                    // 搜索过滤
+                    if (searchTerm && !log.operation_detail.toLowerCase().includes(searchTerm) && 
+                        !log.operation_type.toLowerCase().includes(searchTerm) &&
+                        !log.user_id.toLowerCase().includes(searchTerm)) {
+                        return false;
+                    }
+                    
+                    // 操作类型过滤
+                    if (operationFilter && log.operation_type !== operationFilter) {
+                        return false;
+                    }
+                    
+                    // 结果状态过滤
+                    if (resultFilter && log.result !== resultFilter) {
+                        return false;
+                    }
+                    
+                    // 时间过滤
+                    if (timeFilter) {
+                        const logTime = new Date(log.timestamp);
+                        const now = new Date();
+                        const diff = now - logTime;
+                        
+                        switch (timeFilter) {
+                            case '1h':
+                                if (diff > 3600000) return false;
+                                break;
+                            case '24h':
+                                if (diff > 86400000) return false;
+                                break;
+                            case '7d':
+                                if (diff > 604800000) return false;
+                                break;
+                            case '30d':
+                                if (diff > 2592000000) return false;
+                                break;
+                        }
+                    }
+                    
+                    return true;
+                });
+                
+                this.currentPage = 1;
+                this.renderLogs();
+                this.renderPagination();
+            }
+
+            clearFilters() {
+                document.getElementById('log-search').value = '';
+                document.getElementById('operation-filter').value = '';
+                document.getElementById('result-filter').value = '';
+                document.getElementById('time-filter').value = '';
+                this.applyFilters();
+            }
+
+            renderLogs() {
+                const container = document.getElementById('logs-container');
+                const startIndex = (this.currentPage - 1) * this.pageSize;
+                const endIndex = startIndex + this.pageSize;
+                const pageData = this.filteredLogs.slice(startIndex, endIndex);
+                
+                if (pageData.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-3">暂无符合条件的日志记录</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const html = pageData.map(log => `
+                    <div class="log-entry p-3 border-bottom log-${log.result}" style="cursor: pointer;" onclick="operationsApp.showLogDetail(${log.id})">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="operation-badge badge me-2 ${this.getOperationBadgeClass(log.operation_type)}">
+                                        ${this.getOperationTypeName(log.operation_type)}
+                                    </span>
+                                    <span class="badge ${this.getResultBadgeClass(log.result)}">${this.getResultName(log.result)}</span>
+                                    <span class="ms-auto timestamp">${new Date(log.timestamp).toLocaleString('zh-CN')}</span>
+                                </div>
+                                <div class="log-detail">${log.operation_detail}</div>
+                                <div class="mt-1">
+                                    <small class="text-muted">
+                                        <i class="fas fa-user me-1"></i>操作用户: ${log.user_id}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                container.innerHTML = html;
+                
+                // 更新计数
+                document.getElementById('log-count').textContent = `共 ${this.filteredLogs.length} 条记录`;
+            }
+
+            renderPagination() {
+                const totalPages = Math.ceil(this.filteredLogs.length / this.pageSize);
+                const pagination = document.getElementById('pagination');
+                
+                if (totalPages <= 1) {
+                    pagination.innerHTML = '';
+                    return;
+                }
+                
+                let html = '';
+                
+                // 上一页
+                html += `
+                    <li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="operationsApp.goToPage(${this.currentPage - 1})">上一页</a>
+                    </li>
+                `;
+                
+                // 页码
+                for (let i = 1; i <= totalPages; i++) {
+                    if (i === 1 || i === totalPages || (i >= this.currentPage - 2 && i <= this.currentPage + 2)) {
+                        html += `
+                            <li class="page-item ${i === this.currentPage ? 'active' : ''}">
+                                <a class="page-link" href="#" onclick="operationsApp.goToPage(${i})">${i}</a>
+                            </li>
+                        `;
+                    } else if (i === this.currentPage - 3 || i === this.currentPage + 3) {
+                        html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                    }
+                }
+                
+                // 下一页
+                html += `
+                    <li class="page-item ${this.currentPage === totalPages ? 'disabled' : ''}">
+                        <a class="page-link" href="#" onclick="operationsApp.goToPage(${this.currentPage + 1})">下一页</a>
+                    </li>
+                `;
+                
+                pagination.innerHTML = html;
+            }
+
+            goToPage(page) {
+                const totalPages = Math.ceil(this.filteredLogs.length / this.pageSize);
+                if (page < 1 || page > totalPages) return;
+                
+                this.currentPage = page;
+                this.renderLogs();
+                this.renderPagination();
+            }
+
+            updateStatistics() {
+                const total = this.logs.length;
+                const success = this.logs.filter(log => log.result === 'success').length;
+                const error = this.logs.filter(log => log.result === 'failed').length;
+                
+                document.getElementById('total-logs').textContent = total;
+                document.getElementById('success-logs').textContent = success;
+                document.getElementById('error-logs').textContent = error;
+            }
+
+            showLogDetail(logId) {
+                const log = this.logs.find(l => l.id === logId);
+                if (!log) return;
+                
+                document.getElementById('detail-operation-type').textContent = this.getOperationTypeName(log.operation_type);
+                document.getElementById('detail-result').innerHTML = `<span class="badge ${this.getResultBadgeClass(log.result)}">${this.getResultName(log.result)}</span>`;
+                document.getElementById('detail-user').textContent = log.user_id;
+                document.getElementById('detail-timestamp').textContent = new Date(log.timestamp).toLocaleString('zh-CN');
+                document.getElementById('detail-description').textContent = log.operation_detail;
+                
+                new bootstrap.Modal(document.getElementById('logDetailModal')).show();
+            }
+
+            getOperationTypeName(type) {
+                const names = {
+                    'create_strategy': '创建策略',
+                    'start_strategy': '启动策略',
+                    'stop_strategy': '停止策略',
+                    'config_strategy': '配置策略',
+                    'system_operation': '系统操作'
+                };
+                return names[type] || type;
+            }
+
+            getOperationBadgeClass(type) {
+                const classes = {
+                    'create_strategy': 'bg-primary',
+                    'start_strategy': 'bg-success',
+                    'stop_strategy': 'bg-warning',
+                    'config_strategy': 'bg-info',
+                    'system_operation': 'bg-secondary'
+                };
+                return classes[type] || 'bg-secondary';
+            }
+
+            getResultName(result) {
+                const names = {
+                    'success': '成功',
+                    'failed': '失败',
+                    'warning': '警告'
+                };
+                return names[result] || result;
+            }
+
+            getResultBadgeClass(result) {
+                const classes = {
+                    'success': 'bg-success',
+                    'failed': 'bg-danger',
+                    'warning': 'bg-warning text-dark'
+                };
+                return classes[result] || 'bg-secondary';
+            }
+
+            startAutoRefresh() {
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                }
+                
+                this.autoRefreshInterval = setInterval(() => {
+                    if (this.autoRefreshEnabled) {
+                        this.loadLogs();
+                    }
+                }, 10000); // 每10秒刷新
+            }
+
+            stopAutoRefresh() {
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                    this.autoRefreshInterval = null;
+                }
+            }
+
+            updateTime() {
+                const now = new Date();
+                document.getElementById('current-time').textContent = now.toLocaleString('zh-CN');
+            }
+
+            showToast(message, type = 'info') {
+                const toast = document.getElementById('toast');
+                const toastBody = document.getElementById('toast-body');
+                
+                // 设置图标和样式
+                const toastHeader = toast.querySelector('.toast-header i');
+                toastHeader.className = `fas me-2 ${type === 'error' ? 'fa-exclamation-circle text-danger' : 'fa-info-circle text-primary'}`;
+                
+                toastBody.textContent = message;
+                new bootstrap.Toast(toast).show();
+            }
+        }
+
+        // 创建全局实例
+        const operationsApp = new OperationsLogApp();
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            operationsApp.init();
+            
+            // 更新时间
+            setInterval(() => operationsApp.updateTime(), 1000);
+        });
+    </script>
+</body>
+</html> 

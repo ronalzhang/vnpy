@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量化交易 - 校长的量化系统</title>
+    <!-- 添加favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/quantitative.css') }}">
+    <!-- 引入Bootstrap CSS -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入Font Awesome图标 -->
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.3.0/css/all.min.css">
+    <!-- 引入Chart.js -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #1677ff 0%, #0066cc 100%);">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fas fa-chart-line me-2"></i>校长的量化系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="fas fa-home me-1"></i>市场数据</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/quantitative.html"><i class="fas fa-robot me-1"></i>量化交易</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/arbitrage.html"><i class="fas fa-exchange-alt me-1"></i>套利系统</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/operations-log.html"><i class="fas fa-list-alt me-1"></i>操作日志</a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center text-white">
+                    <span class="badge bg-success me-2" id="system-status">
+                        <i class="fas fa-circle pulse me-1"></i>系统运行中
+                    </span>
+                    <span id="current-time"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <!-- 策略总览卡片 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>策略管理中心</h5>
+                        <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#createStrategyModal">
+                            <i class="fas fa-plus me-1"></i>新建策略
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <!-- 策略统计卡片 -->
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="stat-card bg-gradient-primary">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-layer-group"></i>
+                                    </div>
+                                    <div class="stat-info">
+                                        <h3 id="total-strategies">0</h3>
+                                        <p>总策略数</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="stat-card bg-gradient-success">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-play"></i>
+                                    </div>
+                                    <div class="stat-info">
+                                        <h3 id="running-strategies">0</h3>
+                                        <p>运行中策略</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="stat-card bg-gradient-warning">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-bell"></i>
+                                    </div>
+                                    <div class="stat-info">
+                                        <h3 id="recent-signals">0</h3>
+                                        <p>今日信号</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 mb-3">
+                                <div class="stat-card bg-gradient-info">
+                                    <div class="stat-icon">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                    <div class="stat-info">
+                                        <h3 id="total-return">+0.00%</h3>
+                                        <p>总收益率</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 策略列表 -->
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>策略名称</th>
+                                        <th>类型</th>
+                                        <th>交易对</th>
+                                        <th>状态</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="strategies-table">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">
+                                            <i class="fas fa-spinner fa-spin me-2"></i>加载策略列表...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- 左侧面板 -->
+            <div class="col-lg-8">
+                <!-- 收益曲线图表 -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>收益曲线</h5>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="chartPeriod" id="period7" value="7" checked>
+                            <label class="btn btn-outline-light" for="period7">7天</label>
+                            <input type="radio" class="btn-check" name="chartPeriod" id="period30" value="30">
+                            <label class="btn btn-outline-light" for="period30">30天</label>
+                            <input type="radio" class="btn-check" name="chartPeriod" id="period90" value="90">
+                            <label class="btn btn-outline-light" for="period90">90天</label>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="performanceChart" width="400" height="200"></canvas>
+                    </div>
+                </div>
+
+                <!-- 交易信号面板 -->
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-satellite-dish me-2"></i>实时交易信号</h5>
+                        <span class="badge bg-dark" id="signals-count">0 条信号</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="signals-container" style="max-height: 400px; overflow-y: auto;">
+                            <div id="signals-list" class="list-group list-group-flush">
+                                <div class="list-group-item text-center text-muted py-4">
+                                    <i class="fas fa-radio me-2"></i>等待交易信号...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧面板 -->
+            <div class="col-lg-4">
+                <!-- 持仓监控 -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-wallet me-2"></i>持仓监控</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="positions-list" class="list-group list-group-flush">
+                            <div class="list-group-item text-center text-muted py-4">
+                                <i class="fas fa-inbox me-2"></i>暂无持仓
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 绩效指标 -->
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>绩效指标</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="performance-metrics">
+                            <div class="metric-item d-flex justify-content-between align-items-center mb-2">
+                                <span class="metric-label">总收益率</span>
+                                <span class="metric-value text-success" id="metric-total-return">+0.00%</span>
+                            </div>
+                            <div class="metric-item d-flex justify-content-between align-items-center mb-2">
+                                <span class="metric-label">日均收益</span>
+                                <span class="metric-value" id="metric-daily-return">+0.00%</span>
+                            </div>
+                            <div class="metric-item d-flex justify-content-between align-items-center mb-2">
+                                <span class="metric-label">最大回撤</span>
+                                <span class="metric-value text-danger" id="metric-max-drawdown">-0.00%</span>
+                            </div>
+                            <div class="metric-item d-flex justify-content-between align-items-center mb-2">
+                                <span class="metric-label">夏普比率</span>
+                                <span class="metric-value" id="metric-sharpe-ratio">0.00</span>
+                            </div>
+                            <div class="metric-item d-flex justify-content-between align-items-center mb-2">
+                                <span class="metric-label">胜率</span>
+                                <span class="metric-value" id="metric-win-rate">0.00%</span>
+                            </div>
+                            <div class="metric-item d-flex justify-content-between align-items-center">
+                                <span class="metric-label">总交易次数</span>
+                                <span class="metric-value" id="metric-total-trades">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建策略模态框 -->
+    <div class="modal fade" id="createStrategyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-plus me-2"></i>创建新策略</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createStrategyForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="strategyName" class="form-label">策略名称</label>
+                                <input type="text" class="form-control" id="strategyName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="strategyType" class="form-label">策略类型</label>
+                                <select class="form-select" id="strategyType" required>
+                                    <option value="">请选择策略类型</option>
+                                    <option value="momentum">动量策略</option>
+                                    <option value="mean_reversion">均值回归策略</option>
+                                    <option value="breakout">突破策略</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="strategySymbol" class="form-label">交易对</label>
+                            <select class="form-select" id="strategySymbol" required>
+                                <option value="">请选择交易对</option>
+                                <option value="BTC/USDT">BTC/USDT</option>
+                                <option value="ETH/USDT">ETH/USDT</option>
+                                <option value="SOL/USDT">SOL/USDT</option>
+                                <option value="XRP/USDT">XRP/USDT</option>
+                                <option value="DOGE/USDT">DOGE/USDT</option>
+                                <option value="ADA/USDT">ADA/USDT</option>
+                                <option value="DOT/USDT">DOT/USDT</option>
+                                <option value="AVAX/USDT">AVAX/USDT</option>
+                                <option value="SHIB/USDT">SHIB/USDT</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 策略参数配置 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">策略参数配置</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="lookbackPeriod" class="form-label">回看周期</label>
+                                        <input type="number" class="form-control" id="lookbackPeriod" value="20" min="5" max="100">
+                                        <div class="form-text">用于计算技术指标的历史数据点数</div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="quantity" class="form-label">交易数量</label>
+                                        <input type="number" class="form-control" id="quantity" value="1.0" min="0.01" step="0.01">
+                                        <div class="form-text">每次交易的数量</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 动量策略参数 -->
+                                <div id="momentumParams" class="strategy-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="momentumThreshold" class="form-label">动量阈值</label>
+                                        <input type="number" class="form-control" id="momentumThreshold" value="0.001" min="0.0001" step="0.0001">
+                                        <div class="form-text">触发交易信号的动量阈值</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 均值回归策略参数 -->
+                                <div id="meanReversionParams" class="strategy-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="stdMultiplier" class="form-label">标准差倍数</label>
+                                        <input type="number" class="form-control" id="stdMultiplier" value="2.0" min="1.0" step="0.1">
+                                        <div class="form-text">布林带标准差倍数</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 突破策略参数 -->
+                                <div id="breakoutParams" class="strategy-params" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="breakoutThreshold" class="form-label">突破阈值</label>
+                                        <input type="number" class="form-control" id="breakoutThreshold" value="0.01" min="0.001" step="0.001">
+                                        <div class="form-text">价格突破阈值（百分比）</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="createStrategyBtn">
+                        <i class="fas fa-plus me-1"></i>创建策略
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 策略配置模态框 -->
+    <div class="modal fade" id="configStrategyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="fas fa-cog me-2"></i>策略配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="configStrategyForm">
+                        <input type="hidden" id="configStrategyId">
+                        <div class="mb-3">
+                            <label class="form-label">策略名称</label>
+                            <input type="text" class="form-control" id="configStrategyName" readonly>
+                        </div>
+                        <div id="configParametersContainer">
+                            <!-- 动态生成参数配置项 -->
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-warning" id="updateStrategyBtn">
+                        <i class="fas fa-save me-1"></i>保存配置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 通知容器 -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="toast" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="fas fa-info-circle text-primary me-2"></i>
+                <strong class="me-auto">系统通知</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-body">
+                <!-- 通知内容 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入Bootstrap JS -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
+    <!-- 引入自定义JS -->
+    <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
+    
+    <script>
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化量化交易功能，创建全局app变量
+            window.app = QuantitativeApp.init();
+            
+            // 更新当前时间
+            function updateTime() {
+                const now = new Date();
+                document.getElementById('current-time').textContent = now.toLocaleString('zh-CN');
+            }
+            updateTime();
+            setInterval(updateTime, 1000);
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,523 @@
+/**
+ * 量化交易系统前端交互逻辑
+ * 包含策略管理、信号监控、图表展示、实时数据更新等功能
+ */
+
+class QuantitativeApp {
+    constructor() {
+        this.strategies = [];
+        this.signals = [];
+        this.positions = [];
+        this.performanceChart = null;
+        this.refreshInterval = null;
+        this.refreshRate = 5000; // 5秒刷新一次
+    }
+
+    /**
+     * 初始化应用
+     */
+    static init() {
+        const app = new QuantitativeApp();
+        app.bindEvents();
+        app.loadStrategies();
+        app.loadSignals();
+        app.loadPositions();
+        app.loadPerformance();
+        app.initChart();
+        app.startAutoRefresh();
+        return app;
+    }
+
+    /**
+     * 绑定事件处理器
+     */
+    bindEvents() {
+        // 策略类型选择事件
+        document.getElementById('strategyType').addEventListener('change', (e) => {
+            this.toggleStrategyParams(e.target.value);
+        });
+
+        // 策略表单提交
+        document.getElementById('strategyForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.submitStrategy();
+        });
+
+        // 自动刷新切换
+        const autoRefreshSwitch = document.getElementById('autoRefreshSwitch');
+        if (autoRefreshSwitch) {
+            autoRefreshSwitch.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    this.startAutoRefresh();
+                } else {
+                    this.stopAutoRefresh();
+                }
+            });
+        }
+
+        // 刷新按钮
+        const refreshBtn = document.getElementById('refreshBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.refreshAllData();
+            });
+        }
+    }
+
+    /**
+     * 切换策略参数显示
+     */
+    toggleStrategyParams(strategyType) {
+        // 隐藏所有参数组
+        document.querySelectorAll('.strategy-params').forEach(group => {
+            group.style.display = 'none';
+        });
+
+        // 显示对应的参数组
+        const targetGroup = document.getElementById(`${strategyType}Params`);
+        if (targetGroup) {
+            targetGroup.style.display = 'block';
+        }
+    }
+
+    /**
+     * 提交策略创建
+     */
+    async submitStrategy() {
+        const formData = new FormData(document.getElementById('strategyForm'));
+        const strategyData = Object.fromEntries(formData.entries());
+
+        // 根据策略类型收集特定参数
+        const strategyType = strategyData.strategy_type;
+        const params = {};
+
+        if (strategyType === 'momentum') {
+            params.lookback_period = parseInt(strategyData.momentum_lookback) || 20;
+            params.threshold = parseFloat(strategyData.momentum_threshold) || 0.02;
+        } else if (strategyType === 'mean_reversion') {
+            params.lookback_period = parseInt(strategyData.mean_lookback) || 20;
+            params.entry_threshold = parseFloat(strategyData.mean_entry) || 2.0;
+            params.exit_threshold = parseFloat(strategyData.mean_exit) || 0.5;
+        } else if (strategyType === 'breakout') {
+            params.lookback_period = parseInt(strategyData.breakout_lookback) || 20;
+            params.breakout_threshold = parseFloat(strategyData.breakout_threshold) || 0.02;
+        }
+
+        const payload = {
+            name: strategyData.strategy_name,
+            strategy_type: strategyType,
+            symbol: strategyData.symbol,
+            position_size: parseFloat(strategyData.position_size),
+            parameters: params
+        };
+
+        try {
+            const response = await fetch('/api/quantitative/strategies', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.showAlert('策略创建成功！', 'success');
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('createStrategyModal'));
+                modal.hide();
+                // 重新加载策略列表
+                this.loadStrategies();
+                // 重置表单
+                document.getElementById('strategyForm').reset();
+            } else {
+                this.showAlert('策略创建失败：' + (result.message || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('创建策略时出错:', error);
+            this.showAlert('策略创建失败：网络错误', 'error');
+        }
+    }
+
+    /**
+     * 显示消息提示
+     */
+    showAlert(message, type = 'info') {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        const container = document.querySelector('.container-fluid');
+        container.insertBefore(alertDiv, container.firstChild);
+        
+        // 3秒后自动移除
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 3000);
+    }
+
+    /**
+     * 加载策略列表
+     */
+    async loadStrategies() {
+        try {
+            const response = await fetch('/api/quantitative/strategies');
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.strategies = result.data;
+                this.updateStrategiesUI();
+                this.updateStatsUI();
+            } else {
+                console.error('加载策略失败:', result.message);
+            }
+        } catch (error) {
+            console.error('加载策略时出错:', error);
+        }
+    }
+
+    /**
+     * 加载交易信号
+     */
+    async loadSignals() {
+        try {
+            const response = await fetch('/api/quantitative/signals');
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.signals = result.data;
+                this.updateSignalsUI();
+            } else {
+                console.error('加载信号失败:', result.message);
+            }
+        } catch (error) {
+            console.error('加载信号时出错:', error);
+        }
+    }
+
+    /**
+     * 加载持仓信息
+     */
+    async loadPositions() {
+        try {
+            const response = await fetch('/api/quantitative/positions');
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.positions = result.data;
+                this.updatePositionsUI();
+            } else {
+                console.error('加载持仓失败:', result.message);
+            }
+        } catch (error) {
+            console.error('加载持仓时出错:', error);
+        }
+    }
+
+    /**
+     * 加载绩效数据
+     */
+    async loadPerformance() {
+        try {
+            const response = await fetch('/api/quantitative/performance');
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.updatePerformanceChart(result.data);
+            } else {
+                console.error('加载绩效失败:', result.message);
+            }
+        } catch (error) {
+            console.error('加载绩效时出错:', error);
+        }
+    }
+
+    /**
+     * 更新策略列表UI
+     */
+    updateStrategiesUI() {
+        const tbody = document.getElementById('strategiesTableBody');
+        if (!tbody) return;
+
+        if (this.strategies.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">暂无策略</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = this.strategies.map(strategy => `
+            <tr>
+                <td>${strategy.name}</td>
+                <td><span class="badge bg-info">${this.getStrategyTypeName(strategy.strategy_type)}</span></td>
+                <td>${strategy.symbol}</td>
+                <td>${strategy.position_size}</td>
+                <td><span class="badge ${strategy.is_active ? 'bg-success' : 'bg-secondary'}">${strategy.is_active ? '运行中' : '已停止'}</span></td>
+                <td class="${strategy.total_return >= 0 ? 'text-success' : 'text-danger'}">${(strategy.total_return * 100).toFixed(2)}%</td>
+                <td>${new Date(strategy.created_at).toLocaleDateString()}</td>
+                <td>
+                    <button class="btn btn-sm ${strategy.is_active ? 'btn-warning' : 'btn-success'}" 
+                            onclick="app.toggleStrategy(${strategy.id})">
+                        ${strategy.is_active ? '停止' : '启动'}
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="app.deleteStrategy(${strategy.id})">删除</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    /**
+     * 更新信号列表UI
+     */
+    updateSignalsUI() {
+        const container = document.getElementById('signalsContainer');
+        if (!container) return;
+
+        if (this.signals.length === 0) {
+            container.innerHTML = '<div class="alert alert-info">暂无交易信号</div>';
+            return;
+        }
+
+        container.innerHTML = this.signals.slice(0, 10).map(signal => `
+            <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                <div>
+                    <span class="badge ${signal.signal_type === 'BUY' ? 'bg-success' : 'bg-danger'}">${signal.signal_type}</span>
+                    <strong class="ms-2">${signal.symbol}</strong>
+                    <small class="text-muted ms-2">${signal.strategy_name}</small>
+                </div>
+                <div class="text-end">
+                    <div><strong>¥${signal.price.toFixed(2)}</strong></div>
+                    <small class="text-muted">${new Date(signal.timestamp).toLocaleTimeString()}</small>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    /**
+     * 更新持仓列表UI
+     */
+    updatePositionsUI() {
+        const tbody = document.getElementById('positionsTableBody');
+        if (!tbody) return;
+
+        if (this.positions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无持仓</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = this.positions.map(position => `
+            <tr>
+                <td>${position.symbol}</td>
+                <td>${position.strategy_name}</td>
+                <td>${position.quantity}</td>
+                <td>¥${position.entry_price.toFixed(2)}</td>
+                <td>¥${position.current_price.toFixed(2)}</td>
+                <td class="${position.unrealized_pnl >= 0 ? 'text-success' : 'text-danger'}">¥${position.unrealized_pnl.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-sm btn-warning" onclick="app.closePosition(${position.id})">平仓</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    /**
+     * 更新统计卡片UI
+     */
+    updateStatsUI() {
+        const activeStrategies = this.strategies.filter(s => s.is_active).length;
+        const totalReturn = this.strategies.reduce((sum, s) => sum + s.total_return, 0);
+        const totalPositions = this.positions.length;
+        const totalPnL = this.positions.reduce((sum, p) => sum + p.unrealized_pnl, 0);
+
+        document.getElementById('activeStrategiesCount').textContent = activeStrategies;
+        document.getElementById('totalStrategiesCount').textContent = this.strategies.length;
+        
+        const returnElement = document.getElementById('totalReturn');
+        returnElement.textContent = (totalReturn * 100).toFixed(2) + '%';
+        returnElement.className = totalReturn >= 0 ? 'text-success' : 'text-danger';
+        
+        document.getElementById('totalPositions').textContent = totalPositions;
+        
+        const pnlElement = document.getElementById('totalPnL');
+        pnlElement.textContent = '¥' + totalPnL.toFixed(2);
+        pnlElement.className = totalPnL >= 0 ? 'text-success' : 'text-danger';
+    }
+
+    /**
+     * 初始化图表
+     */
+    initChart() {
+        const ctx = document.getElementById('performanceChart');
+        if (!ctx) return;
+
+        this.performanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '累计收益',
+                    data: [],
+                    borderColor: '#1677ff',
+                    backgroundColor: 'rgba(22, 119, 255, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return (value * 100).toFixed(1) + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * 更新绩效图表
+     */
+    updatePerformanceChart(data) {
+        if (!this.performanceChart || !data || !Array.isArray(data)) return;
+
+        const labels = data.map(item => new Date(item.date).toLocaleDateString());
+        const values = data.map(item => item.cumulative_return);
+
+        this.performanceChart.data.labels = labels;
+        this.performanceChart.data.datasets[0].data = values;
+        this.performanceChart.update();
+    }
+
+    /**
+     * 获取策略类型名称
+     */
+    getStrategyTypeName(type) {
+        const typeNames = {
+            'momentum': '动量策略',
+            'mean_reversion': '均值回归',
+            'breakout': '突破策略'
+        };
+        return typeNames[type] || type;
+    }
+
+    /**
+     * 切换策略状态
+     */
+    async toggleStrategy(strategyId) {
+        try {
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}/toggle`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.showAlert('策略状态更新成功！', 'success');
+                this.loadStrategies();
+            } else {
+                this.showAlert('策略状态更新失败：' + (result.message || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('切换策略状态时出错:', error);
+            this.showAlert('策略状态更新失败：网络错误', 'error');
+        }
+    }
+
+    /**
+     * 删除策略
+     */
+    async deleteStrategy(strategyId) {
+        if (!confirm('确定要删除这个策略吗？')) return;
+
+        try {
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.showAlert('策略删除成功！', 'success');
+                this.loadStrategies();
+            } else {
+                this.showAlert('策略删除失败：' + (result.message || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('删除策略时出错:', error);
+            this.showAlert('策略删除失败：网络错误', 'error');
+        }
+    }
+
+    /**
+     * 平仓
+     */
+    async closePosition(positionId) {
+        if (!confirm('确定要平仓吗？')) return;
+
+        try {
+            const response = await fetch(`/api/quantitative/positions/${positionId}/close`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+            
+            if (response.ok && result.status === 'success') {
+                this.showAlert('平仓成功！', 'success');
+                this.loadPositions();
+            } else {
+                this.showAlert('平仓失败：' + (result.message || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('平仓时出错:', error);
+            this.showAlert('平仓失败：网络错误', 'error');
+        }
+    }
+
+    /**
+     * 刷新所有数据
+     */
+    refreshAllData() {
+        this.loadStrategies();
+        this.loadSignals();
+        this.loadPositions();
+        this.loadPerformance();
+    }
+
+    /**
+     * 开始自动刷新
+     */
+    startAutoRefresh() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+        }
+        this.refreshInterval = setInterval(() => {
+            this.refreshAllData();
+        }, this.refreshRate);
+    }
+
+    /**
+     * 停止自动刷新
+     */
+    stopAutoRefresh() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+        }
+    }
+}
+
+// 全局函数，用于按钮点击事件
+window.QuantitativeApp = QuantitativeApp; 

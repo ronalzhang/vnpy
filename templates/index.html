@@ -227,16 +227,35 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand navbar-dark bg-dark">
+        <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, #1677ff 0%, #0066cc 100%);">
             <div class="container-fluid">
-                <a class="navbar-brand" href="http://47.236.39.134:8888">
-                    <i class="fas fa-chart-line me-2"></i>
-                    校长的量化系统
+                <a class="navbar-brand fw-bold" href="/">
+                    <i class="fas fa-chart-line me-2"></i>校长的量化系统
                 </a>
-                <div class="navbar-nav ms-auto">
-                    <a class="nav-link active" href="#market-data">市场数据</a>
-                    <a class="nav-link" href="arbitrage.html">套利系统</a>
-                    <a class="nav-link" href="#logs">操作日志</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/"><i class="fas fa-home me-1"></i>市场数据</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/quantitative.html"><i class="fas fa-robot me-1"></i>量化交易</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/arbitrage.html"><i class="fas fa-exchange-alt me-1"></i>套利系统</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/operations-log.html"><i class="fas fa-list-alt me-1"></i>操作日志</a>
+                        </li>
+                    </ul>
+                    <div class="d-flex align-items-center text-white">
+                        <span class="badge bg-success me-2" id="system-status">
+                            <i class="fas fa-circle pulse me-1"></i>系统运行中
+                        </span>
+                        <span id="current-time"></span>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -998,6 +1017,14 @@
         
         // 每5秒更新一次状态
         setInterval(updateSystemStatus, 5000);
+        
+        // 更新当前时间
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleString('zh-CN');
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
     });
 
     // 添加清空日志的函数

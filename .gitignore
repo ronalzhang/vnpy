@@ -90,3 +90,5 @@ venv/
 
 # 敏感信息
 *config.json*ssh
+*.pem
+*.key

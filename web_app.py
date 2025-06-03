@@ -28,6 +28,15 @@ except ImportError:
     logger.warning("套利系统模块未找到，套利功能将被禁用")
     ARBITRAGE_ENABLED = False
 
+# 导入量化交易服务模块
+try:
+    from quantitative_service import quantitative_service, StrategyType
+    QUANTITATIVE_ENABLED = True
+    logger.info("量化交易模块加载成功")
+except ImportError as e:
+    logger.warning(f"量化交易模块未找到，量化功能将被禁用: {e}")
+    QUANTITATIVE_ENABLED = False
+
 # 创建Flask应用
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
@@ -763,6 +772,24 @@ def monitor_thread(interval=5):
                               f"{item['sell_exchange']}({item['sell_price']:.2f}) 卖出 - "
                               f"差价: {item['price_diff']:.2f} ({item['price_diff_pct']*100:.2f}%)")
                 
+                # 量化交易数据处理
+                if QUANTITATIVE_ENABLED:
+                    try:
+                        # 为每个交易所的每个交易对处理量化数据
+                        for exchange_name, exchange_prices in prices.items():
+                            for symbol, price_info in exchange_prices.items():
+                                if isinstance(price_info, dict) and 'price' in price_info:
+                                    price_data = {
+                                        'price': price_info['price'],
+                                        'exchange': exchange_name,
+                                        'timestamp': datetime.now()
+                                    }
+                                    
+                                    # 传递给量化服务处理
+                                    quantitative_service.process_market_data(symbol, price_data)
+                    except Exception as e:
+                        logger.error(f"量化交易数据处理错误: {e}")
+                
         except Exception as e:
             print(f"监控线程错误: {e}")
         
@@ -994,6 +1021,279 @@ def execute_arbitrage():
             "status": "error",
             "message": f"执行套利失败: {str(e)}"
         })
+
+# ========================= 量化交易API路由 =========================
+
+@app.route('/quantitative.html')
+def quantitative():
+    """量化交易页面"""
+    return render_template('quantitative.html')
+
+@app.route('/operations-log.html')
+def operations_log():
+    """操作日志页面"""
+    return render_template('operations-log.html')
+
+@app.route('/api/quantitative/strategies', methods=['GET', 'POST'])
+def quantitative_strategies():
+    """获取策略列表或创建新策略"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    if request.method == 'GET':
+        try:
+            strategies = quantitative_service.get_strategies()
+            return jsonify({
+                "status": "success",
+                "data": strategies
+            })
+        except Exception as e:
+            logger.error(f"获取策略列表失败: {e}")
+            return jsonify({
+                "status": "error",
+                "message": f"获取策略列表失败: {str(e)}"
+            }), 500
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            name = data.get('name')
+            strategy_type = data.get('strategy_type')
+            symbol = data.get('symbol')
+            position_size = data.get('position_size', 1000)
+            parameters = data.get('parameters', {})
+            
+            if not all([name, strategy_type, symbol]):
+                return jsonify({
+                    "status": "error",
+                    "message": "缺少必要参数"
+                }), 400
+            
+            # 转换策略类型
+            try:
+                strategy_type_enum = StrategyType(strategy_type)
+            except ValueError:
+                return jsonify({
+                    "status": "error",
+                    "message": f"不支持的策略类型: {strategy_type}"
+                }), 400
+            
+            strategy_id = quantitative_service.create_strategy(
+                name=name,
+                strategy_type=strategy_type_enum,
+                symbol=symbol,
+                position_size=position_size,
+                parameters=parameters
+            )
+            
+            return jsonify({
+                "status": "success",
+                "message": "策略创建成功",
+                "data": {"strategy_id": strategy_id}
+            })
+            
+        except Exception as e:
+            logger.error(f"创建策略失败: {e}")
+            return jsonify({
+                "status": "error",
+                "message": f"创建策略失败: {str(e)}"
+            }), 500
+
+@app.route('/api/quantitative/strategies/<int:strategy_id>/toggle', methods=['POST'])
+def toggle_quantitative_strategy(strategy_id):
+    """切换策略状态"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        strategy = quantitative_service.get_strategy(strategy_id)
+        if not strategy:
+            return jsonify({
+                "status": "error",
+                "message": "策略不存在"
+            }), 404
+        
+        if strategy.get('is_active', False):
+            success = quantitative_service.stop_strategy(strategy_id)
+            message = "策略停止成功" if success else "策略停止失败"
+        else:
+            success = quantitative_service.start_strategy(strategy_id)
+            message = "策略启动成功" if success else "策略启动失败"
+        
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": message
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": message
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"切换策略状态失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"切换策略状态失败: {str(e)}"
+        }), 500
+
+@app.route('/api/quantitative/strategies/<int:strategy_id>', methods=['DELETE'])
+def delete_quantitative_strategy(strategy_id):
+    """删除策略"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        success = quantitative_service.delete_strategy(strategy_id)
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": "策略删除成功"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "策略删除失败或策略不存在"
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"删除策略失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"删除策略失败: {str(e)}"
+        }), 500
+
+@app.route('/api/quantitative/positions/<int:position_id>/close', methods=['POST'])
+def close_quantitative_position(position_id):
+    """平仓"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        success = quantitative_service.close_position(position_id)
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": "平仓成功"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": "平仓失败或持仓不存在"
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"平仓失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"平仓失败: {str(e)}"
+        }), 500
+
+@app.route('/api/quantitative/signals', methods=['GET'])
+def get_quantitative_signals():
+    """获取交易信号"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        signals = quantitative_service.get_signals(limit)
+        return jsonify({
+            "status": "success",
+            "data": signals
+        })
+    except Exception as e:
+        logger.error(f"获取交易信号失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"获取交易信号失败: {str(e)}"
+        }), 500
+
+@app.route('/api/quantitative/positions', methods=['GET'])
+def get_quantitative_positions():
+    """获取持仓信息"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        positions = quantitative_service.get_positions()
+        return jsonify({
+            "status": "success",
+            "data": positions
+        })
+    except Exception as e:
+        logger.error(f"获取持仓信息失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"获取持仓信息失败: {str(e)}"
+        }), 500
+
+@app.route('/api/quantitative/performance', methods=['GET'])
+def get_quantitative_performance():
+    """获取收益曲线数据"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        days = request.args.get('days', 30, type=int)
+        performance = quantitative_service.get_performance(days)
+        return jsonify({
+            "status": "success",
+            "data": performance
+        })
+    except Exception as e:
+        logger.error(f"获取收益数据失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"获取收益数据失败: {str(e)}"
+        }), 500
+
+@app.route('/api/operations-log', methods=['GET'])
+def get_operations_log():
+    """获取操作日志"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化交易模块未启用"
+        }), 500
+    
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        logs = quantitative_service.get_operation_logs(limit)
+        return jsonify({
+            "status": "success",
+            "data": logs
+        })
+    except Exception as e:
+        logger.error(f"获取操作日志失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"获取操作日志失败: {str(e)}"
+        }), 500
+
+# ========================= 量化交易API路由结束 =========================
 
 def main():
     """主函数"""
