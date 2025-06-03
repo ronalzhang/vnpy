@@ -121,13 +121,14 @@ def init_api_clients():
     """初始化交易所API客户端"""
     global exchange_clients, use_simulation, status
     
+    # 强制使用真实数据模式
+    use_simulation = False
+    status["mode"] = "real"
+    
     # 读取配置文件
     try:
         with open(CONFIG_PATH, "r") as f:
             config = json.load(f)
-        
-        # 检查是否所有交易所都缺少有效的API密钥
-        all_missing_api = True
         
         # 初始化交易所API客户端
         for exchange_id in EXCHANGES:
@@ -145,8 +146,9 @@ def init_api_clients():
                     client = exchange_class({
                         'apiKey': api_key,
                         'secret': secret_key,
-                        'password': password,  # 保留原始密码，包括特殊字符
-                        'enableRateLimit': True
+                        'password': password,
+                        'enableRateLimit': True,
+                        'sandbox': False  # 确保使用生产环境
                     })
                     
                     # 设置代理（如果配置）
@@ -159,120 +161,27 @@ def init_api_clients():
                     # 测试API连接
                     try:
                         print(f"测试 {exchange_id} API连接...")
-                        # 确保API密钥有效
-                        if exchange_id == 'okx':
-                            # OKX特殊处理，获取账户信息
-                            client.fetch_balance()
-                        else:
-                            client.fetch_balance()
-                            
-                        print(f"初始化 {exchange_id} API客户端成功")
+                        # 测试获取价格数据（不需要账户权限）
+                        test_ticker = client.fetch_ticker('BTC/USDT')
+                        print(f"初始化 {exchange_id} API客户端成功 - BTC价格: {test_ticker['last']}")
                         exchange_clients[exchange_id] = client
-                        all_missing_api = False
                     except Exception as e:
-                        print(f"API连接测试失败 {exchange_id}: {e}，可能是API密钥无效或限制")
-                        # 仍然添加客户端，但后续会使用模拟数据
+                        print(f"API连接测试失败 {exchange_id}: {e}")
+                        # 即使测试失败也添加客户端，可能是权限问题但价格数据仍可获取
                         exchange_clients[exchange_id] = client
+                        print(f"强制添加 {exchange_id} 客户端用于价格数据获取")
                 except Exception as e:
                     print(f"初始化 {exchange_id} API客户端失败: {e}")
             else:
                 print(f"交易所 {exchange_id} 未配置API密钥")
         
-        # 如果所有交易所都没有有效的API密钥，使用模拟模式
-        if all_missing_api:
-            use_simulation = True
-            status["mode"] = "simulate"
-            print("所有交易所API密钥无效或未配置，启用模拟模式")
-        else:
-            use_simulation = False
-            status["mode"] = "real"
-            print("已配置至少一个有效的API密钥，使用真实API连接")
+        print(f"API客户端初始化完成，强制使用真实数据模式，已配置 {len(exchange_clients)} 个交易所")
+        
     except Exception as e:
         print(f"初始化API客户端出错: {e}")
-        use_simulation = True
-        status["mode"] = "simulate"
-
-def generate_simulated_data():
-    """生成模拟价格数据"""
-    global SYMBOLS, EXCHANGES
-    
-    prices = {}
-    
-    # 基准价格
-    base_prices = {
-        "BTC/USDT": 64000 + random.uniform(-300, 300),
-        "ETH/USDT": 3500 + random.uniform(-30, 30),
-        "SOL/USDT": 140 + random.uniform(-3, 3),
-        "XRP/USDT": 0.50 + random.uniform(-0.01, 0.01),
-    }
-    
-    # 为每个交易所生成价格
-    for exchange in EXCHANGES:
-        prices[exchange] = {}
-        for symbol in SYMBOLS:
-            if symbol in base_prices:
-                # 从基准价格添加一个随机差价
-                base_price = base_prices[symbol]
-                # 生成买卖价格
-                bid_offset = random.uniform(-0.1, 0.1) * base_price / 100
-                ask_offset = random.uniform(0.05, 0.2) * base_price / 100
-                
-                prices[exchange][symbol] = {
-                    "bid": base_price + bid_offset,
-                    "ask": base_price + bid_offset + ask_offset,
-                    "volume": round(random.uniform(1000, 5000), 1),
-                    "depth": {
-                        "bid": round(random.uniform(5, 15), 1),
-                        "ask": round(random.uniform(3, 10), 1)
-                    }
-                }
-    
-    return prices
-
-def generate_simulated_balances():
-    """生成模拟的余额数据"""
-    balances = {}
-    
-    for exchange in EXCHANGES:
-        # 生成随机USDT余额
-        usdt_balance = round(random.uniform(5000, 20000), 2)
-        usdt_available = round(usdt_balance * random.uniform(0.7, 0.9), 2)
-        usdt_locked = round(usdt_balance - usdt_available, 2)
-        
-        balances[exchange] = {
-            "USDT": usdt_balance,
-            "USDT_available": usdt_available,
-            "USDT_locked": usdt_locked,
-            "positions": {}
-        }
-        
-        # 为每个交易对随机生成持仓
-        for symbol in SYMBOLS:
-            coin = symbol.split('/')[0]
-            
-            # 70%概率有持仓
-            if random.random() > 0.3:
-                total_amount = round(random.uniform(0.01, 10) * (1 if coin == "BTC" else (20 if coin == "ETH" else 100)), 5)
-                available_amount = round(total_amount * random.uniform(0.6, 1.0), 5)
-                locked_amount = round(total_amount - available_amount, 5)
-                
-                price = (
-                    random.uniform(60000, 70000) if coin == "BTC" else 
-                    random.uniform(3000, 4000) if coin == "ETH" else
-                    random.uniform(100, 150) if coin == "SOL" else
-                    random.uniform(0.45, 0.55)
-                )
-                
-                value = round(total_amount * price, 2)
-                
-                balances[exchange]["positions"][coin] = {
-                    "amount": total_amount,
-                    "available": available_amount,
-                    "locked": locked_amount,
-                    "value": value
-                }
-    
-    return balances
+        # 即使出错也强制使用真实模式
+        use_simulation = False
+        status["mode"] = "real"
 
 def calculate_price_differences(prices):
     """计算不同交易所间的价格差异"""
@@ -391,19 +300,14 @@ def get_exchange_balances():
     """从交易所API获取余额数据"""
     balances = {}
     
-    # 如果是模拟模式，直接返回模拟数据
-    if status["mode"] == "simulate":
-        return generate_simulated_balances()
-    
     for exchange_id, client in exchange_clients.items():
         try:
             exchange_balances = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
             
             # 检查API密钥是否配置
             if not client or not hasattr(client, 'apiKey') or not client.apiKey:
-                print(f"交易所 {exchange_id} 没有配置API密钥或客户端初始化失败，使用模拟数据")
-                simulated = generate_simulated_balances()
-                balances[exchange_id] = simulated[exchange_id]
+                print(f"交易所 {exchange_id} 没有配置API密钥或客户端初始化失败，跳过余额获取")
+                balances[exchange_id] = exchange_balances
                 continue
                 
             try:
@@ -439,20 +343,7 @@ def get_exchange_balances():
                             value = round(total_amount * price, 2)
                         except Exception as e:
                             print(f"获取 {exchange_id} {symbol} 价格失败: {e}")
-                            # 无法获取价格时使用估算值
-                            price_estimate = {
-                                'BTC': 65000,
-                                'ETH': 3500,
-                                'SOL': 140,
-                                'XRP': 0.5,
-                                'DOGE': 0.15,
-                                'ADA': 0.5,
-                                'DOT': 7,
-                                'AVAX': 35,
-                                'SHIB': 0.00003
-                            }
-                            price = price_estimate.get(coin, 0)
-                            value = round(total_amount * price, 2)
+                            value = 0  # 无法获取价格时设为0
                         
                         exchange_balances["positions"][coin] = {
                             "amount": total_amount,
@@ -474,15 +365,14 @@ def get_exchange_balances():
                     elif exchange_id == 'bitget':
                         balances[exchange_id] = get_bitget_balance(client)
                     else:
-                        raise Exception("不支持的交易所")
+                        print(f"不支持的交易所: {exchange_id}，使用空余额")
+                        balances[exchange_id] = exchange_balances
                 except Exception as e2:
-                    print(f"获取 {exchange_id} 余额的替代方法也失败: {e2}，使用模拟数据")
-                    simulated = generate_simulated_balances()
-                    balances[exchange_id] = simulated[exchange_id]
+                    print(f"获取 {exchange_id} 余额的替代方法也失败: {e2}，使用空余额")
+                    balances[exchange_id] = exchange_balances
         except Exception as e:
-            print(f"获取 {exchange_id} 余额过程中出现异常: {e}，使用模拟数据")
-            simulated = generate_simulated_balances()
-            balances[exchange_id] = simulated[exchange_id]
+            print(f"获取 {exchange_id} 余额过程中出现异常: {e}，使用空余额")
+            balances[exchange_id] = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
     
     return balances
 
@@ -704,7 +594,7 @@ def get_exchange_prices():
                         ticker = client.fetch_ticker(symbol)
                         volume = ticker['quoteVolume'] or 0  # 24小时USDT成交量
                     except:
-                        volume = random.uniform(1000, 5000)
+                        volume = 0  # 使用0而不是随机数，确保没有假数据
                     
                     prices[exchange_id][symbol] = {
                         "buy": bid_price,  # 最高买价
@@ -720,17 +610,6 @@ def get_exchange_prices():
             except Exception as e:
                 print(f"获取 {exchange_id} {symbol} 价格失败: {e}")
     
-    # 检查数据完整性，如果缺少数据则使用模拟数据补充
-    simulated_data = generate_simulated_data()
-    for exchange in EXCHANGES:
-        if not prices[exchange]:
-            prices[exchange] = simulated_data[exchange]
-        else:
-            for symbol in SYMBOLS:
-                if symbol not in prices[exchange]:
-                    if exchange in simulated_data and symbol in simulated_data[exchange]:
-                        prices[exchange][symbol] = simulated_data[exchange][symbol]
-    
     return prices
 
 def monitor_thread(interval=5):
@@ -740,26 +619,16 @@ def monitor_thread(interval=5):
     while True:
         try:
             if status["running"]:
-                # 获取价格数据
-                if status["mode"] == "simulate":
-                    prices = generate_simulated_data()
-                else:
-                    # 使用真实API连接
-                    prices = get_exchange_prices()
-                
+                # 强制使用真实API连接获取价格数据
+                prices = get_exchange_prices()
                 prices_data = prices
                 
                 # 计算价差
                 diff = calculate_price_differences(prices)
                 diff_data = diff
                 
-                # 更新余额数据
-                if status["mode"] == "simulate":
-                    balances = generate_simulated_balances()
-                else:
-                    # 使用真实API连接获取余额
-                    balances = get_exchange_balances()
-                
+                # 强制使用真实API连接获取余额
+                balances = get_exchange_balances()
                 balances_data = balances
                 
                 # 更新时间
@@ -778,9 +647,11 @@ def monitor_thread(interval=5):
                         # 为每个交易所的每个交易对处理量化数据
                         for exchange_name, exchange_prices in prices.items():
                             for symbol, price_info in exchange_prices.items():
-                                if isinstance(price_info, dict) and 'price' in price_info:
+                                if isinstance(price_info, dict) and 'buy' in price_info and 'sell' in price_info:
+                                    # 使用买卖价格的中间价作为市场价格
+                                    mid_price = (price_info['buy'] + price_info['sell']) / 2
                                     price_data = {
-                                        'price': price_info['price'],
+                                        'price': mid_price,
                                         'exchange': exchange_name,
                                         'timestamp': datetime.now()
                                     }
@@ -837,16 +708,15 @@ def start_monitor():
     global status
     
     data = request.get_json() or {}
-    simulate = data.get('simulate', True)
     enable_trading = data.get('enable_trading', False)
     
-    # 更新状态
+    # 强制更新状态为真实模式
     status["running"] = True
-    status["mode"] = "simulate" if simulate else "real"
+    status["mode"] = "real"
     status["trading_enabled"] = enable_trading
     status["last_update"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    return jsonify({"status": "success", "message": "监控已启动"})
+    return jsonify({"status": "success", "message": "监控已启动（真实数据模式）"})
 
 @app.route('/api/stop', methods=['POST'])
 def stop_monitor():
@@ -1302,32 +1172,27 @@ def main():
     # 解析命令行参数
     import argparse
     parser = argparse.ArgumentParser(description='加密货币套利监控Web应用')
-    parser.add_argument('--simulate', action='store_true', help='使用模拟数据')
-    parser.add_argument('--real', action='store_true', help='使用真实API连接')
     parser.add_argument('--trade', action='store_true', help='启用交易功能')
     parser.add_argument('--port', type=int, default=8888, help='Web服务器端口')
     parser.add_argument('--arbitrage', action='store_true', help='启用套利系统')
     args = parser.parse_args()
     
-    # 设置运行模式
-    # 加载历史记录
+    # 强制设置为真实数据模式
     load_arbitrage_history()
-    is_simulate = not args.real
-    status["mode"] = "simulate" if is_simulate else "real"
+    status["mode"] = "real"
     status["trading_enabled"] = args.trade
     status["running"] = True
     
     # 显示启动信息
     print("\n===== 加密货币套利监控Web应用 =====")
-    print(f"运行模式: {'模拟数据' if is_simulate else '真实API连接'}")
+    print(f"运行模式: 真实API连接")
     print(f"交易功能: {'已启用' if args.trade else '未启用（仅监控）'}")
     print(f"套利系统: {'已启用' if args.arbitrage and ARBITRAGE_ENABLED else '未启用'}")
     print(f"Web端口: {args.port}")
     print("======================================\n")
     
-    # 初始化交易所客户端
-    if not is_simulate:
-        init_api_clients()
+    # 强制初始化交易所客户端
+    init_api_clients()
     
     # 启动监控线程
     monitor = threading.Thread(target=monitor_thread, daemon=True)
