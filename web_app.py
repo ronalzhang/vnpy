@@ -1361,13 +1361,15 @@ def get_balance_history():
 
 @app.route('/api/quantitative/system-status', methods=['GET'])
 def get_system_status():
-    """获取系统状态"""
+    """获取量化系统状态"""
     try:
         if quantitative_service:
-            running_strategies = sum(1 for s in quantitative_service.strategies.values() if s.get('enabled', False))
+            running_strategies = 0
             total_strategies = len(quantitative_service.strategies)
             
-            print(f"系统状态查询: 运行={quantitative_service.running}, 自动交易={quantitative_service.auto_trading_enabled}, 运行策略={running_strategies}/{total_strategies}")
+            for strategy in quantitative_service.strategies.values():
+                if strategy.get('enabled', False):
+                    running_strategies += 1
             
             return jsonify({
                 'success': True,
@@ -1375,26 +1377,29 @@ def get_system_status():
                 'auto_trading_enabled': quantitative_service.auto_trading_enabled,
                 'total_strategies': total_strategies,
                 'running_strategies': running_strategies,
-                'system_mode': 'auto',  # 当前运行模式
-                'last_update': datetime.datetime.now().isoformat()
+                'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'system_health': 'healthy' if quantitative_service.running else 'offline'
             })
         else:
             return jsonify({
-                'success': True,
+                'success': False,
                 'running': False,
                 'auto_trading_enabled': False,
                 'total_strategies': 0,
                 'running_strategies': 0,
-                'system_mode': 'manual',
-                'last_update': datetime.datetime.now().isoformat()
+                'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'system_health': 'not_initialized',
+                'message': '量化服务未初始化'
             })
+            
     except Exception as e:
-        print(f"获取系统状态失败: {e}")
         return jsonify({
             'success': False,
-            'message': f'获取失败: {str(e)}',
             'running': False,
-            'auto_trading_enabled': False
+            'auto_trading_enabled': False,
+            'message': f'获取系统状态失败: {str(e)}',
+            'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'system_health': 'error'
         })
 
 @app.route('/api/quantitative/account-info', methods=['GET'])
