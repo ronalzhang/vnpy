@@ -3255,14 +3255,29 @@ class QuantitativeService:
                     strategy['enabled'] = True
                     strategy['running'] = True
                     strategy['status'] = 'running'
-                    started_count += 1
-                    print(f"✅ 强制启动策略: {strategy['name']}")
                     
+                    # 保存到数据库
+                    try:
+                        cursor = self.conn.cursor()
+                        cursor.execute('''
+                            UPDATE strategies 
+                            SET enabled = 1, updated_at = CURRENT_TIMESTAMP 
+                            WHERE id = ?
+                        ''', (strategy_id,))
+                        self.conn.commit()
+                        print(f"✅ 策略 {strategy['name']} 已启动并保存到数据库")
+                        started_count += 1
+                    except Exception as e:
+                        print(f"保存策略状态到数据库失败: {e}")
+                        # 即使数据库保存失败，也继续启动策略
+                        started_count += 1
+                        print(f"✅ 强制启动策略: {strategy['name']} (内存中)")
+                        
             if started_count > 0:
                 print(f"🚀 已强制启动 {started_count} 个策略")
                 return True
             else:
-                print("⚠️ 所有策略已经在运行中")
+                print(f"⚠️ 所有策略已经在运行中 (共{len(self.strategies)}个)")
                 return True
                 
         except Exception as e:
