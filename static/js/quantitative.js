@@ -801,6 +801,72 @@ class QuantitativeSystem {
             console.error('加载系统状态失败:', error);
         }
     }
+
+    // 加载持仓信息
+    async loadPositions() {
+        try {
+            const response = await fetch('/api/quantitative/positions');
+            const data = await response.json();
+            
+            const tbody = document.getElementById('positionsTable');
+            if (!tbody) return;
+            
+            if (data.success && data.data && data.data.length > 0) {
+                tbody.innerHTML = data.data.map(position => `
+                    <tr>
+                        <td>${position.symbol}</td>
+                        <td>${this.formatNumber(position.quantity)}</td>
+                        <td>${this.formatNumber(position.avg_price)}U</td>
+                        <td class="${position.unrealized_pnl >= 0 ? 'text-success' : 'text-danger'}">
+                            ${position.unrealized_pnl >= 0 ? '+' : ''}${this.formatNumber(position.unrealized_pnl)}U
+                        </td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无持仓</td></tr>';
+            }
+        } catch (error) {
+            console.error('加载持仓信息失败:', error);
+            const tbody = document.getElementById('positionsTable');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无持仓</td></tr>';
+            }
+        }
+    }
+
+    // 加载交易信号
+    async loadSignals() {
+        try {
+            const response = await fetch('/api/quantitative/signals');
+            const data = await response.json();
+            
+            const tbody = document.getElementById('signalsTable');
+            if (!tbody) return;
+            
+            if (data.success && data.data && data.data.length > 0) {
+                tbody.innerHTML = data.data.slice(0, 10).map(signal => `
+                    <tr>
+                        <td>${this.formatTime(signal.timestamp)}</td>
+                        <td>${signal.symbol}</td>
+                        <td>
+                            <span class="badge ${signal.signal_type === 'buy' ? 'bg-success' : signal.signal_type === 'sell' ? 'bg-danger' : 'bg-secondary'}">
+                                ${signal.signal_type.toUpperCase()}
+                            </span>
+                        </td>
+                        <td>${(signal.confidence * 100).toFixed(1)}%</td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无信号</td></tr>';
+            }
+        } catch (error) {
+            console.error('加载交易信号失败:', error);
+            const tbody = document.getElementById('signalsTable');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无信号</td></tr>';
+            }
+        }
+    }
 }
 
 // 全局函数

@@ -227,11 +227,30 @@ body {
     border-right: none;
 }
 
-/* 确保账户余额在窄屏下一排显示 */ .balance-info .col-md-4 { min-width: 33%; flex: 0 0 33%; max-width: 33%; padding-left: 10px; padding-right: 10px; } .balance-info h4 { font-size: 1.2rem; } .balance-info h6 { font-size: 0.8rem; } @media (max-width: 768px) { .balance-info .row { flex-wrap: nowrap; overflow-x: auto; } }
+/* 确保账户余额在窄屏下一排显示 */
+.balance-info .col-md-4 {
+    min-width: 33%;
+    flex: 0 0 33%;
+    max-width: 33%;
+    padding-left: 10px;
+    padding-right: 10px;
+}
 
-/* ==================== 全站通用动画和状态样式 ==================== */
+.balance-info h4 {
+    font-size: 1.2rem;
+}
 
-/* 脉冲动画 - 全站通用 */
+.balance-info h6 {
+    font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+    .balance-info .row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+    }
+}
+
 @keyframes pulse {
     0% {
         opacity: 1;
@@ -248,25 +267,35 @@ body {
     animation: pulse 2s infinite;
 }
 
-/* 状态指示器 - 全站通用 */
+/* 统一的状态指示器 */
 .status-indicator {
-    width: 12px;
-    height: 12px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     display: inline-block;
-    margin-right: 8px;
+    margin-right: 5px;
 }
 
+/* 在线状态 - 绿色 */
 .status-online { 
     background-color: #52c41a;
 }
 
+/* 离线状态 - 黑色 */
 .status-offline { 
-    background-color: #ff4d4f;
+    background-color: #333;
 }
 
+/* 警告状态 - 黄色 */
 .status-warning { 
     background-color: #faad14;
+}
+
+/* 运行中状态 - 金色闪动 */
+.status-running {
+    background-color: #ffd700;
+    animation: golden-pulse 2s infinite;
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
 }
 
 /* 导航栏全新布局设计 */
@@ -315,25 +344,6 @@ body {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-}
-
-.status-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: #666;
-}
-
-/* 运行中状态 - 亮金色闪动 */
-.status-indicator.status-running {
-    background-color: #ffd700;
-    animation: golden-pulse 2s infinite;
-    box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
-}
-
-/* 离线/错误状态 - 黑色 */
-.status-indicator.status-offline {
-    background-color: #333;
 }
 
 /* 金色脉冲动画 */
