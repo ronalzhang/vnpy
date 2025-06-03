@@ -293,7 +293,200 @@
         </div>
     </div>
 
-    <!-- JavaScript -->
+    <!-- 策略配置弹窗模态框 -->
+    <div class="modal fade" id="strategyConfigModal" tabindex="-1" aria-labelledby="strategyConfigModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="strategyConfigModalLabel">
+                        <i class="fas fa-cog"></i> 策略配置
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="strategyConfigForm">
+                        <input type="hidden" id="strategyId" name="strategyId">
+                        
+                        <!-- 基本信息 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="strategyName" class="form-label">策略名称</label>
+                                <input type="text" class="form-control" id="strategyName" name="strategyName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="strategySymbol" class="form-label">交易对</label>
+                                <select class="form-select" id="strategySymbol" name="strategySymbol" required>
+                                    <option value="BTC/USDT">BTC/USDT</option>
+                                    <option value="ETH/USDT">ETH/USDT</option>
+                                    <option value="ADA/USDT">ADA/USDT</option>
+                                    <option value="SOL/USDT">SOL/USDT</option>
+                                    <option value="DOGE/USDT">DOGE/USDT</option>
+                                    <option value="XRP/USDT">XRP/USDT</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 策略类型 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="strategyType" class="form-label">策略类型</label>
+                                <select class="form-select" id="strategyType" name="strategyType" disabled>
+                                    <option value="momentum">动量策略</option>
+                                    <option value="mean_reversion">均值回归</option>
+                                    <option value="breakout">突破策略</option>
+                                    <option value="grid_trading">网格交易</option>
+                                    <option value="high_frequency">高频交易</option>
+                                    <option value="trend_following">趋势跟踪</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="strategyEnabled" class="form-label">策略状态</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="strategyEnabled" name="strategyEnabled">
+                                    <label class="form-check-label" for="strategyEnabled">启用策略</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 策略参数 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">策略参数</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="strategyParameters">
+                                    <!-- 动态参数表单将在这里生成 -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 策略统计 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">策略统计</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <div class="h5 mb-1" id="strategyTotalReturn">-</div>
+                                            <small class="text-muted">总收益率</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <div class="h5 mb-1" id="strategyWinRate">-</div>
+                                            <small class="text-muted">成功率</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <div class="h5 mb-1" id="strategyTotalTrades">-</div>
+                                            <small class="text-muted">交易次数</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="text-center">
+                                            <div class="h5 mb-1" id="strategyDailyReturn">-</div>
+                                            <small class="text-muted">日收益率</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveStrategyConfig">保存配置</button>
+                    <button type="button" class="btn btn-warning" id="resetStrategyParams">重置参数</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 策略日志弹窗 -->
+    <div class="modal fade" id="strategyLogsModal" tabindex="-1" aria-labelledby="strategyLogsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="strategyLogsModalLabel">
+                        <i class="fas fa-history"></i> 策略日志
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- 日志类型选择 -->
+                    <ul class="nav nav-tabs mb-3" id="logsTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="trade-logs-tab" data-bs-toggle="tab" data-bs-target="#trade-logs" type="button" role="tab">
+                                <i class="fas fa-exchange-alt"></i> 交易日志
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="optimization-logs-tab" data-bs-toggle="tab" data-bs-target="#optimization-logs" type="button" role="tab">
+                                <i class="fas fa-wrench"></i> 优化记录
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="logsTabContent">
+                        <!-- 交易日志 -->
+                        <div class="tab-pane fade show active" id="trade-logs" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>时间</th>
+                                            <th>信号类型</th>
+                                            <th>价格</th>
+                                            <th>数量</th>
+                                            <th>置信度</th>
+                                            <th>执行状态</th>
+                                            <th>盈亏</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tradeLogsTable">
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted">暂无交易记录</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 优化记录 -->
+                        <div class="tab-pane fade" id="optimization-logs" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>时间</th>
+                                            <th>优化类型</th>
+                                            <th>修改前参数</th>
+                                            <th>修改后参数</th>
+                                            <th>触发原因</th>
+                                            <th>目标成功率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="optimizationLogsTable">
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted">暂无优化记录</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-info" id="exportLogs">导出日志</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
     <script>
         // 更新当前时间

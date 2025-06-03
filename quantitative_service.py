@@ -217,10 +217,65 @@ class DatabaseManager:
                 )
             """)
             
-            # 初始化系统状态记录（如果不存在）
+            # 确保系统状态记录存在
+            cursor.execute("SELECT COUNT(*) FROM system_status WHERE id = 1")
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("""
+                    INSERT INTO system_status (id, is_running, auto_trading_enabled) 
+                    VALUES (1, 0, 1)
+                """)
+            
+            # 策略优化记录表 - 新增
             cursor.execute("""
-                INSERT OR IGNORE INTO system_status (id, is_running, updated_time)
-                VALUES (1, 0, CURRENT_TIMESTAMP)
+                CREATE TABLE IF NOT EXISTS strategy_optimization_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT NOT NULL,
+                    strategy_name TEXT NOT NULL,
+                    optimization_type TEXT NOT NULL,
+                    old_parameters TEXT NOT NULL,
+                    new_parameters TEXT NOT NULL,
+                    trigger_reason TEXT NOT NULL,
+                    old_success_rate REAL,
+                    target_success_rate REAL,
+                    trigger_performance TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 策略交易日志表 - 新增
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS strategy_trade_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT NOT NULL,
+                    strategy_name TEXT NOT NULL,
+                    signal_type TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    price REAL NOT NULL,
+                    quantity REAL NOT NULL,
+                    confidence REAL NOT NULL,
+                    executed BOOLEAN DEFAULT 0,
+                    execution_price REAL,
+                    pnl REAL,
+                    fees REAL,
+                    signal_strength REAL,
+                    market_conditions TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 策略表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS strategies (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    enabled BOOLEAN DEFAULT 1,
+                    parameters TEXT,
+                    performance TEXT,
+                    created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
             """)
             
             conn.commit()
@@ -2884,6 +2939,118 @@ class QuantitativeService:
                 'data_source': 'error',
                 'error': str(e)
             }
+
+    def log_strategy_optimization(self, strategy_id: str, strategy_name: str, 
+                                 optimization_type: str, old_params: dict, 
+                                 new_params: dict, trigger_reason: str,
+                                 old_success_rate: float = None, target_success_rate: float = None,
+                                 trigger_performance: dict = None):
+        """记录策略优化日志"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO strategy_optimization_logs 
+                    (strategy_id, strategy_name, optimization_type, old_parameters, 
+                     new_parameters, trigger_reason, old_success_rate, target_success_rate, 
+                     trigger_performance)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    strategy_id, strategy_name, optimization_type,
+                    json.dumps(old_params), json.dumps(new_params), trigger_reason,
+                    old_success_rate, target_success_rate,
+                    json.dumps(trigger_performance) if trigger_performance else None
+                ))
+                conn.commit()
+                logger.info(f"记录策略优化日志: {strategy_name} - {optimization_type}")
+        except Exception as e:
+            logger.error(f"记录策略优化日志失败: {e}")
+
+    def log_strategy_trade(self, strategy_id: str, strategy_name: str,
+                          signal_type: str, symbol: str, price: float,
+                          quantity: float, confidence: float, executed: bool = False,
+                          execution_price: float = None, pnl: float = None,
+                          fees: float = None, signal_strength: float = None,
+                          market_conditions: dict = None):
+        """记录策略交易日志"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO strategy_trade_logs 
+                    (strategy_id, strategy_name, signal_type, symbol, price, quantity,
+                     confidence, executed, execution_price, pnl, fees, signal_strength,
+                     market_conditions)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    strategy_id, strategy_name, signal_type, symbol, price, quantity,
+                    confidence, executed, execution_price, pnl, fees, signal_strength,
+                    json.dumps(market_conditions) if market_conditions else None
+                ))
+                conn.commit()
+                logger.info(f"记录交易日志: {strategy_name} - {signal_type} {symbol}")
+        except Exception as e:
+            logger.error(f"记录策略交易日志失败: {e}")
+
+    def get_strategy_trade_logs(self, strategy_id: str, limit: int = 100) -> list:
+        """获取策略交易日志"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT * FROM strategy_trade_logs 
+                    WHERE strategy_id = ? 
+                    ORDER BY timestamp DESC 
+                    LIMIT ?
+                """, (strategy_id, limit))
+                
+                columns = [description[0] for description in cursor.description]
+                logs = []
+                for row in cursor.fetchall():
+                    log = dict(zip(columns, row))
+                    # 解析JSON字段
+                    if log.get('market_conditions'):
+                        try:
+                            log['market_conditions'] = json.loads(log['market_conditions'])
+                        except:
+                            log['market_conditions'] = {}
+                    logs.append(log)
+                
+                return logs
+        except Exception as e:
+            logger.error(f"获取策略交易日志失败: {e}")
+            return []
+
+    def get_strategy_optimization_logs(self, strategy_id: str, limit: int = 50) -> list:
+        """获取策略优化日志"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT * FROM strategy_optimization_logs 
+                    WHERE strategy_id = ? 
+                    ORDER BY timestamp DESC 
+                    LIMIT ?
+                """, (strategy_id, limit))
+                
+                columns = [description[0] for description in cursor.description]
+                logs = []
+                for row in cursor.fetchall():
+                    log = dict(zip(columns, row))
+                    # 解析JSON字段
+                    try:
+                        log['old_parameters'] = json.loads(log['old_parameters'])
+                        log['new_parameters'] = json.loads(log['new_parameters'])
+                        if log.get('trigger_performance'):
+                            log['trigger_performance'] = json.loads(log['trigger_performance'])
+                    except:
+                        pass
+                    logs.append(log)
+                
+                return logs
+        except Exception as e:
+            logger.error(f"获取策略优化日志失败: {e}")
+            return []
 
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 

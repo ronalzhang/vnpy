@@ -1095,188 +1095,150 @@ def delete_quantitative_strategy(strategy_id):
             "message": f"删除策略失败: {str(e)}"
         }), 500
 
-@app.route('/api/quantitative/strategies/<strategy_id>', methods=['GET'])
-def get_quantitative_strategy(strategy_id):
-    """获取单个策略信息"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
-    
-    try:
-        strategy = quantitative_service.get_strategy(strategy_id)
-        if strategy:
-            return jsonify({
-                "status": "success",
-                "data": strategy
-            })
-        else:
-            return jsonify({
-                "status": "error",
-                "message": "策略不存在"
-            }), 404
-            
-    except Exception as e:
-        logger.error(f"获取策略信息失败: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"获取策略信息失败: {str(e)}"
-        }), 500
-
-@app.route('/api/quantitative/strategies/<strategy_id>', methods=['PUT'])
-def update_quantitative_strategy(strategy_id):
-    """更新策略配置"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
-    
-    try:
-        data = request.get_json()
-        name = data.get('name')
-        symbol = data.get('symbol')
-        parameters = data.get('parameters', {})
-        
-        if not all([name, symbol]):
-            return jsonify({
-                "status": "error",
-                "message": "缺少必要参数"
-            }), 400
-        
-        success = quantitative_service.update_strategy(strategy_id, name, symbol, parameters)
-        if success:
-            return jsonify({
-                "status": "success",
-                "message": "策略更新成功"
-            })
-        else:
-            return jsonify({
-                "status": "error",
-                "message": "策略更新失败或策略不存在"
-            }), 404
-            
-    except Exception as e:
-        logger.error(f"更新策略失败: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"更新策略失败: {str(e)}"
-        }), 500
-
-@app.route('/api/quantitative/positions/<int:position_id>/close', methods=['POST'])
-def close_quantitative_position(position_id):
-    """平仓"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
-    
-    try:
-        success = quantitative_service.close_position(position_id)
-        if success:
-            return jsonify({
-                "status": "success",
-                "message": "平仓成功"
-            })
-        else:
-            return jsonify({
-                "status": "error",
-                "message": "平仓失败或持仓不存在"
-            }), 404
-            
-    except Exception as e:
-        logger.error(f"平仓失败: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"平仓失败: {str(e)}"
-        }), 500
-
-@app.route('/api/quantitative/signals', methods=['GET'])
-def get_quantitative_signals():
-    """获取交易信号"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
-    
-    try:
-        limit = request.args.get('limit', 50, type=int)
-        signals = quantitative_service.get_signals(limit)
-        return jsonify({
-            "status": "success",
-            "data": signals
-        })
-    except Exception as e:
-        logger.error(f"获取交易信号失败: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"获取交易信号失败: {str(e)}"
-        }), 500
-
-@app.route('/api/quantitative/positions', methods=['GET'])
-def get_quantitative_positions():
-    """获取持仓信息"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
-    
-    try:
-        positions = quantitative_service.get_positions()
-        return jsonify({
-            "status": "success",
-            "data": positions
-        })
-    except Exception as e:
-        logger.error(f"获取持仓信息失败: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"获取持仓信息失败: {str(e)}"
-        }), 500
-
-@app.route('/api/quantitative/performance', methods=['GET'])
-def get_performance_api():
-    """获取绩效数据"""
+@app.route('/api/quantitative/strategies/<strategy_id>', methods=['GET', 'PUT'])
+def strategy_detail(strategy_id):
+    """获取或更新策略详情"""
     try:
         if not quantitative_service:
-            return jsonify({'success': True, 'data': {'metrics': [], 'summary': {}}})
+            return jsonify({'success': False, 'message': '量化服务未启用'})
+        
+        if request.method == 'GET':
+            # 获取策略详情
+            if strategy_id not in quantitative_service.strategies:
+                return jsonify({'success': False, 'message': '策略不存在'})
             
-        days = request.args.get('days', 30, type=int)
-        performance = quantitative_service.get_performance(days=days)
-        return jsonify({
-            'success': True,
-            'data': performance
-        })
+            strategy = quantitative_service.strategies[strategy_id]
+            
+            # 获取策略性能数据
+            performance = strategy.get_performance_metrics()
+            
+            strategy_data = {
+                'id': strategy.id,
+                'name': strategy.name,
+                'type': strategy.type,
+                'symbol': strategy.symbol,
+                'enabled': strategy.config.enabled,
+                'parameters': strategy.config.parameters,
+                'total_return': performance.get('total_return', 0),
+                'win_rate': performance.get('win_rate', 0),
+                'total_trades': performance.get('total_trades', 0),
+                'daily_return': performance.get('daily_return', 0),
+                'sharpe_ratio': performance.get('sharpe_ratio', 0),
+                'max_drawdown': performance.get('max_drawdown', 0)
+            }
+            
+            return jsonify({'success': True, 'data': strategy_data})
+        
+        elif request.method == 'PUT':
+            # 更新策略配置
+            data = request.json
+            
+            if strategy_id not in quantitative_service.strategies:
+                return jsonify({'success': False, 'message': '策略不存在'})
+            
+            strategy = quantitative_service.strategies[strategy_id]
+            
+            # 记录旧参数（用于优化日志）
+            old_params = strategy.config.parameters.copy()
+            
+            # 更新策略配置
+            if 'name' in data:
+                strategy.name = data['name']
+            if 'symbol' in data:
+                strategy.symbol = data['symbol']
+            if 'enabled' in data:
+                strategy.config.enabled = data['enabled']
+            if 'parameters' in data:
+                strategy.config.parameters.update(data['parameters'])
+                
+                # 记录手动参数调整日志
+                quantitative_service.log_strategy_optimization(
+                    strategy_id=strategy.id,
+                    strategy_name=strategy.name,
+                    optimization_type="手动调整",
+                    old_params=old_params,
+                    new_params=strategy.config.parameters,
+                    trigger_reason="用户手动修改参数",
+                    target_success_rate=None
+                )
+            
+            # 保存到数据库
+            quantitative_service._update_strategy_in_db(strategy)
+            
+            return jsonify({'success': True, 'message': '策略配置更新成功'})
+        
     except Exception as e:
-        logger.error(f"获取绩效数据失败: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+        logger.error(f"策略详情API错误: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
-@app.route('/api/operations-log', methods=['GET'])
-def get_operations_log():
-    """获取操作日志"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
-    
+@app.route('/api/quantitative/strategies/<strategy_id>/reset', methods=['POST'])
+def reset_strategy_params(strategy_id):
+    """重置策略参数"""
     try:
-        limit = request.args.get('limit', 100, type=int)
-        logs = quantitative_service.get_operation_logs(limit)
-        return jsonify({
-            "status": "success",
-            "data": logs
-        })
+        if not quantitative_service:
+            return jsonify({'success': False, 'message': '量化服务未启用'})
+        
+        if strategy_id not in quantitative_service.strategies:
+            return jsonify({'success': False, 'message': '策略不存在'})
+        
+        strategy = quantitative_service.strategies[strategy_id]
+        old_params = strategy.config.parameters.copy()
+        
+        # 重置参数到默认值
+        default_params = quantitative_service._get_default_strategy_parameters(strategy.type)
+        strategy.config.parameters = default_params
+        
+        # 记录重置日志
+        quantitative_service.log_strategy_optimization(
+            strategy_id=strategy.id,
+            strategy_name=strategy.name,
+            optimization_type="参数重置",
+            old_params=old_params,
+            new_params=default_params,
+            trigger_reason="用户手动重置参数",
+            target_success_rate=95.0
+        )
+        
+        # 保存到数据库
+        quantitative_service._update_strategy_in_db(strategy)
+        
+        return jsonify({'success': True, 'message': '策略参数已重置为默认值'})
+        
     except Exception as e:
-        logger.error(f"获取操作日志失败: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"获取操作日志失败: {str(e)}"
-        }), 500
+        logger.error(f"重置策略参数错误: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/quantitative/strategies/<strategy_id>/trade-logs', methods=['GET'])
+def get_strategy_trade_logs(strategy_id):
+    """获取策略交易日志"""
+    try:
+        if not quantitative_service:
+            return jsonify({'success': False, 'message': '量化服务未启用'})
+        
+        limit = int(request.args.get('limit', 100))
+        logs = quantitative_service.get_strategy_trade_logs(strategy_id, limit)
+        
+        return jsonify({'success': True, 'logs': logs})
+        
+    except Exception as e:
+        logger.error(f"获取交易日志错误: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/quantitative/strategies/<strategy_id>/optimization-logs', methods=['GET'])
+def get_strategy_optimization_logs(strategy_id):
+    """获取策略优化日志"""
+    try:
+        if not quantitative_service:
+            return jsonify({'success': False, 'message': '量化服务未启用'})
+        
+        limit = int(request.args.get('limit', 50))
+        logs = quantitative_service.get_strategy_optimization_logs(strategy_id, limit)
+        
+        return jsonify({'success': True, 'logs': logs})
+        
+    except Exception as e:
+        logger.error(f"获取优化日志错误: {e}")
+        return jsonify({'success': False, 'message': str(e)})
 
 # ========================= 量化交易API路由结束 =========================
 

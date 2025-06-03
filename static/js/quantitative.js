@@ -261,7 +261,7 @@ class QuantitativeSystem {
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="card-title mb-0">
-                                <a href="/strategy-config.html?id=${strategy.id}" class="text-decoration-none">
+                                <a href="javascript:void(0)" onclick="app.showStrategyConfig('${strategy.id}')" class="text-decoration-none">
                                     ${strategy.name}
                                 </a>
                             </h6>
@@ -282,8 +282,8 @@ class QuantitativeSystem {
                                 ${strategy.enabled ? '停止' : '启动'}
                             </button>
                             <button class="btn btn-sm btn-outline-info" 
-                                    onclick="app.viewStrategyDetails('${strategy.id}')">
-                                详情
+                                    onclick="app.showStrategyLogs('${strategy.id}')">
+                                日志
                             </button>
                         </div>
                     </div>
@@ -350,84 +350,299 @@ class QuantitativeSystem {
         }
     }
 
-    // 查看策略详情
+    // 显示策略配置弹窗
+    async showStrategyConfig(strategyId) {
+        try {
+            // 获取策略详情
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}`);
+            const data = await response.json();
+            
+            if (!data.success) {
+                this.showMessage('获取策略信息失败', 'error');
+                return;
+            }
+            
+            const strategy = data.data;
+            
+            // 填充基本信息
+            document.getElementById('strategyId').value = strategy.id;
+            document.getElementById('strategyName').value = strategy.name;
+            document.getElementById('strategySymbol').value = strategy.symbol;
+            document.getElementById('strategyType').value = strategy.type;
+            document.getElementById('strategyEnabled').checked = strategy.enabled;
+            
+            // 生成参数表单
+            this.generateParameterForm(strategy.type, strategy.parameters);
+            
+            // 填充统计信息
+            document.getElementById('strategyTotalReturn').textContent = `${(strategy.total_return * 100).toFixed(2)}%`;
+            document.getElementById('strategyWinRate').textContent = `${(strategy.win_rate * 100).toFixed(1)}%`;
+            document.getElementById('strategyTotalTrades').textContent = strategy.total_trades || 0;
+            document.getElementById('strategyDailyReturn').textContent = `${(strategy.daily_return * 100).toFixed(2)}%`;
+            
+            // 绑定保存事件
+            this.bindConfigEvents(strategyId);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('strategyConfigModal'));
+            modal.show();
+            
+        } catch (error) {
+            console.error('显示策略配置失败:', error);
+            this.showMessage('显示策略配置失败', 'error');
+        }
+    }
+
+    // 生成参数表单
+    generateParameterForm(strategyType, parameters) {
+        const container = document.getElementById('strategyParameters');
+        let parametersHtml = '';
+        
+        // 根据策略类型生成对应的参数表单
+        const parameterConfigs = {
+            'momentum': [
+                {key: 'lookback_period', label: '观察周期', type: 'number', min: 5, max: 100, step: 1},
+                {key: 'threshold', label: '动量阈值', type: 'number', min: 0.001, max: 0.1, step: 0.001},
+                {key: 'quantity', label: '交易数量', type: 'number', min: 0.001, max: 1000, step: 0.001},
+                {key: 'momentum_threshold', label: '动量确认阈值', type: 'number', min: 0.001, max: 0.1, step: 0.001},
+                {key: 'volume_threshold', label: '成交量倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1}
+            ],
+            'mean_reversion': [
+                {key: 'lookback_period', label: '观察周期', type: 'number', min: 10, max: 100, step: 1},
+                {key: 'std_multiplier', label: '标准差倍数', type: 'number', min: 1.0, max: 4.0, step: 0.1},
+                {key: 'quantity', label: '交易数量', type: 'number', min: 0.001, max: 1000, step: 0.001},
+                {key: 'reversion_threshold', label: '回归阈值', type: 'number', min: 0.005, max: 0.05, step: 0.001},
+                {key: 'min_deviation', label: '最小偏离度', type: 'number', min: 0.01, max: 0.1, step: 0.001}
+            ],
+            'grid_trading': [
+                {key: 'grid_spacing', label: '网格间距(%)', type: 'number', min: 0.5, max: 5.0, step: 0.1},
+                {key: 'grid_count', label: '网格数量', type: 'number', min: 5, max: 30, step: 1},
+                {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 10000, step: 1},
+                {key: 'lookback_period', label: '观察周期', type: 'number', min: 50, max: 200, step: 10},
+                {key: 'min_profit', label: '最小利润(%)', type: 'number', min: 0.1, max: 2.0, step: 0.1}
+            ],
+            'breakout': [
+                {key: 'lookback_period', label: '观察周期', type: 'number', min: 10, max: 100, step: 1},
+                {key: 'breakout_threshold', label: '突破阈值(%)', type: 'number', min: 0.5, max: 3.0, step: 0.1},
+                {key: 'quantity', label: '交易数量', type: 'number', min: 0.1, max: 100, step: 0.1},
+                {key: 'volume_threshold', label: '成交量倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
+                {key: 'confirmation_periods', label: '确认周期', type: 'number', min: 1, max: 10, step: 1}
+            ],
+            'high_frequency': [
+                {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 1000, step: 1},
+                {key: 'min_profit', label: '最小利润(%)', type: 'number', min: 0.01, max: 0.1, step: 0.01},
+                {key: 'volatility_threshold', label: '波动率阈值', type: 'number', min: 0.0001, max: 0.01, step: 0.0001},
+                {key: 'lookback_period', label: '观察周期', type: 'number', min: 5, max: 20, step: 1},
+                {key: 'signal_interval', label: '信号间隔(秒)', type: 'number', min: 10, max: 60, step: 5}
+            ],
+            'trend_following': [
+                {key: 'lookback_period', label: '观察周期', type: 'number', min: 20, max: 100, step: 5},
+                {key: 'trend_threshold', label: '趋势阈值(%)', type: 'number', min: 0.5, max: 3.0, step: 0.1},
+                {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 1000, step: 1},
+                {key: 'trend_strength_min', label: '最小趋势强度', type: 'number', min: 0.1, max: 1.0, step: 0.1}
+            ]
+        };
+        
+        const configs = parameterConfigs[strategyType] || [];
+        
+        configs.forEach(config => {
+            const value = parameters[config.key] || '';
+            parametersHtml += `
+                <div class="row mb-2">
+                    <div class="col-6">
+                        <label class="form-label">${config.label}</label>
+                    </div>
+                    <div class="col-6">
+                        <input type="${config.type}" 
+                               class="form-control form-control-sm" 
+                               name="${config.key}"
+                               value="${value}"
+                               min="${config.min}"
+                               max="${config.max}"
+                               step="${config.step}">
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = parametersHtml;
+    }
+
+    // 绑定配置事件
+    bindConfigEvents(strategyId) {
+        // 保存配置
+        document.getElementById('saveStrategyConfig').onclick = async () => {
+            await this.saveStrategyConfig(strategyId);
+        };
+        
+        // 重置参数
+        document.getElementById('resetStrategyParams').onclick = async () => {
+            await this.resetStrategyParams(strategyId);
+        };
+    }
+
+    // 保存策略配置
+    async saveStrategyConfig(strategyId) {
+        try {
+            const form = document.getElementById('strategyConfigForm');
+            const formData = new FormData(form);
+            
+            // 收集参数
+            const parameters = {};
+            const parameterInputs = form.querySelectorAll('#strategyParameters input');
+            parameterInputs.forEach(input => {
+                parameters[input.name] = parseFloat(input.value) || input.value;
+            });
+            
+            const configData = {
+                name: formData.get('strategyName'),
+                symbol: formData.get('strategySymbol'),
+                enabled: formData.get('strategyEnabled') === 'on',
+                parameters: parameters
+            };
+            
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(configData)
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showMessage('策略配置保存成功', 'success');
+                // 关闭模态框
+                bootstrap.Modal.getInstance(document.getElementById('strategyConfigModal')).hide();
+                // 刷新策略列表
+                this.loadStrategies();
+            } else {
+                this.showMessage(data.message || '保存失败', 'error');
+            }
+            
+        } catch (error) {
+            console.error('保存策略配置失败:', error);
+            this.showMessage('保存策略配置失败', 'error');
+        }
+    }
+
+    // 重置策略参数
+    async resetStrategyParams(strategyId) {
+        try {
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}/reset`, {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showMessage('策略参数已重置', 'success');
+                // 重新加载配置
+                this.showStrategyConfig(strategyId);
+            } else {
+                this.showMessage(data.message || '重置失败', 'error');
+            }
+            
+        } catch (error) {
+            console.error('重置策略参数失败:', error);
+            this.showMessage('重置策略参数失败', 'error');
+        }
+    }
+
+    // 显示策略日志
+    async showStrategyLogs(strategyId) {
+        try {
+            // 设置模态框标题
+            document.getElementById('strategyLogsModalLabel').innerHTML = 
+                `<i class="fas fa-history"></i> 策略日志 - ${this.getStrategyName(strategyId)}`;
+            
+            // 加载交易日志
+            await this.loadTradeLogs(strategyId);
+            
+            // 加载优化记录
+            await this.loadOptimizationLogs(strategyId);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('strategyLogsModal'));
+            modal.show();
+            
+        } catch (error) {
+            console.error('显示策略日志失败:', error);
+            this.showMessage('显示策略日志失败', 'error');
+        }
+    }
+
+    // 加载交易日志
+    async loadTradeLogs(strategyId) {
+        try {
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}/trade-logs`);
+            const data = await response.json();
+            
+            const tbody = document.getElementById('tradeLogsTable');
+            
+            if (data.success && data.logs && data.logs.length > 0) {
+                tbody.innerHTML = data.logs.map(log => `
+                    <tr>
+                        <td>${this.formatTime(log.timestamp)}</td>
+                        <td><span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">${log.signal_type.toUpperCase()}</span></td>
+                        <td>${log.price.toFixed(6)}</td>
+                        <td>${log.quantity.toFixed(6)}</td>
+                        <td>${(log.confidence * 100).toFixed(1)}%</td>
+                        <td>${log.executed ? '<span class="badge bg-success">已执行</span>' : '<span class="badge bg-secondary">未执行</span>'}</td>
+                        <td class="${log.pnl && log.pnl >= 0 ? 'text-success' : 'text-danger'}">
+                            ${log.pnl ? (log.pnl >= 0 ? '+' : '') + log.pnl.toFixed(6) + 'U' : '-'}
+                        </td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无交易记录</td></tr>';
+            }
+            
+        } catch (error) {
+            console.error('加载交易日志失败:', error);
+            document.getElementById('tradeLogsTable').innerHTML = 
+                '<tr><td colspan="7" class="text-center text-danger">加载失败</td></tr>';
+        }
+    }
+
+    // 加载优化记录
+    async loadOptimizationLogs(strategyId) {
+        try {
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}/optimization-logs`);
+            const data = await response.json();
+            
+            const tbody = document.getElementById('optimizationLogsTable');
+            
+            if (data.success && data.logs && data.logs.length > 0) {
+                tbody.innerHTML = data.logs.map(log => `
+                    <tr>
+                        <td>${this.formatTime(log.timestamp)}</td>
+                        <td><span class="badge bg-info">${log.optimization_type}</span></td>
+                        <td><code>${JSON.stringify(log.old_parameters, null, 1)}</code></td>
+                        <td><code>${JSON.stringify(log.new_parameters, null, 1)}</code></td>
+                        <td>${log.trigger_reason}</td>
+                        <td>${log.target_success_rate}%</td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无优化记录</td></tr>';
+            }
+            
+        } catch (error) {
+            console.error('加载优化记录失败:', error);
+            document.getElementById('optimizationLogsTable').innerHTML = 
+                '<tr><td colspan="6" class="text-center text-danger">加载失败</td></tr>';
+        }
+    }
+
+    // 获取策略名称
+    getStrategyName(strategyId) {
+        const strategy = this.strategies.find(s => s.id === strategyId);
+        return strategy ? strategy.name : '未知策略';
+    }
+
+    // 查看策略详情（保留兼容性）
     viewStrategyDetails(strategyId) {
-        this.showMessage('策略详情功能开发中...', 'info');
-    }
-
-    // 查看默认策略详情
-    viewDefaultStrategyDetails(index) {
-        this.showMessage('策略详情功能开发中...', 'info');
-    }
-
-    // 加载持仓信息
-    async loadPositions() {
-        try {
-            const response = await fetch('/api/quantitative/positions');
-            const data = await response.json();
-            
-            if (data.success) {
-                this.renderPositions(data.positions || []);
-            }
-        } catch (error) {
-            console.error('加载持仓失败:', error);
-        }
-    }
-
-    // 渲染持仓列表
-    renderPositions(positions) {
-        const tbody = document.getElementById('positionsTable');
-        if (!tbody) return;
-
-        if (positions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无持仓</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = positions.map(pos => `
-            <tr>
-                <td>${pos.symbol}</td>
-                <td>${this.formatNumber(pos.quantity)}</td>
-                <td>¥${this.formatNumber(pos.avg_price)}</td>
-                <td class="${pos.unrealized_pnl >= 0 ? 'text-success' : 'text-danger'}">
-                    ${pos.unrealized_pnl >= 0 ? '+' : ''}¥${this.formatNumber(pos.unrealized_pnl)}
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    // 加载交易信号
-    async loadSignals() {
-        try {
-            const response = await fetch('/api/quantitative/signals');
-            const data = await response.json();
-            
-            if (data.success) {
-                this.renderSignals(data.signals || []);
-            }
-        } catch (error) {
-            console.error('加载信号失败:', error);
-        }
-    }
-
-    // 渲染信号列表
-    renderSignals(signals) {
-        const tbody = document.getElementById('signalsTable');
-        if (!tbody) return;
-
-        if (signals.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无信号</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = signals.slice(0, 5).map(signal => `
-            <tr>
-                <td>${this.formatTime(signal.timestamp)}</td>
-                <td>${signal.symbol}</td>
-                <td><span class="badge ${signal.signal === 'BUY' ? 'bg-success' : 'bg-danger'}">${signal.signal}</span></td>
-                <td>${(signal.confidence * 100).toFixed(0)}%</td>
-            </tr>
-        `).join('');
+        this.showStrategyConfig(strategyId);
     }
 
     // 初始化收益曲线图
