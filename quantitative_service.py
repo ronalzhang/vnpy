@@ -411,6 +411,61 @@ class QuantitativeService:
         self.is_running = False
         self._monitor_thread = None
         
+        # 从数据库加载已存在的策略
+        self._load_strategies_from_db()
+        
+    def _load_strategies_from_db(self):
+        """从数据库加载策略"""
+        try:
+            with sqlite3.connect(self.db_manager.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM quant_strategies")
+                
+                for row in cursor.fetchall():
+                    strategy_id, name, strategy_type_str, symbol, enabled, parameters_json, created_time_str, updated_time_str = row
+                    
+                    # 解析参数
+                    parameters = json.loads(parameters_json)
+                    
+                    # 解析时间
+                    created_time = datetime.fromisoformat(created_time_str)
+                    updated_time = datetime.fromisoformat(updated_time_str)
+                    
+                    # 创建策略配置
+                    config = StrategyConfig(
+                        id=strategy_id,
+                        name=name,
+                        strategy_type=StrategyType(strategy_type_str),
+                        symbol=symbol,
+                        enabled=bool(enabled),
+                        parameters=parameters,
+                        created_time=created_time,
+                        updated_time=updated_time
+                    )
+                    
+                    # 创建策略实例
+                    if config.strategy_type == StrategyType.MOMENTUM:
+                        strategy = MomentumStrategy(config)
+                    elif config.strategy_type == StrategyType.MEAN_REVERSION:
+                        strategy = MeanReversionStrategy(config)
+                    elif config.strategy_type == StrategyType.BREAKOUT:
+                        strategy = BreakoutStrategy(config)
+                    else:
+                        logger.warning(f"不支持的策略类型: {config.strategy_type}")
+                        continue
+                    
+                    self.strategies[strategy_id] = strategy
+                    
+                    # 如果策略之前是启用状态，重新启动
+                    if config.enabled:
+                        strategy.start()
+                        
+                logger.info(f"从数据库加载了 {len(self.strategies)} 个策略")
+                        
+        except Exception as e:
+            logger.error(f"从数据库加载策略失败: {e}")
+            # 即使加载失败也不要抛出异常，服务仍然可以正常工作
+        
     def create_strategy(self, name: str, strategy_type: StrategyType, symbol: str, parameters: Dict[str, Any]) -> str:
         """创建新策略"""
         strategy_id = f"strategy_{int(time.time() * 1000)}"
