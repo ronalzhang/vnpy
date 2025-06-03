@@ -20,394 +20,362 @@
         .status-offline { background-color: #ff4d4f; }
         .status-warning { background-color: #faad14; }
         
-        .control-panel {
+        .system-control-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border: none;
         }
         
-        .info-card {
-            border-radius: 12px;
+        .account-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
             border: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
         }
-        .info-card:hover {
-            transform: translateY(-2px);
+        
+        .exchange-card {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+        }
+        
+        .strategy-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid #1677ff;
+        }
+        
+        .strategy-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .strategy-running {
+            border-left-color: #52c41a;
+            background-color: #f6ffed;
+        }
+        
+        .strategy-stopped {
+            border-left-color: #ff4d4f;
+            background-color: #fff2f0;
+        }
+        
+        .btn-toggle {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            border-radius: 15px;
+            border: none;
+            background-color: #ccc;
+            transition: background-color 0.3s;
+        }
+        
+        .btn-toggle.active {
+            background-color: #52c41a;
+        }
+        
+        .btn-toggle::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: white;
+            top: 3px;
+            left: 3px;
+            transition: left 0.3s;
+        }
+        
+        .btn-toggle.active::after {
+            left: 33px;
+        }
+        
+        .performance-chart {
+            height: 300px;
         }
         
         .metric-value {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: bold;
-            margin-bottom: 5px;
         }
         
-        .positive { color: #52c41a; }
-        .negative { color: #ff4d4f; }
-        .neutral { color: #1677ff; }
-        
-        .exchange-status {
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
+        .metric-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
         }
         
-        .btn-system-control {
-            padding: 12px 30px;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 1.1rem;
-            border: none;
-            transition: all 0.3s;
-        }
-        
-        .btn-start {
-            background: linear-gradient(45deg, #52c41a, #73d13d);
-            color: white;
-        }
-        .btn-start:hover {
-            background: linear-gradient(45deg, #389e0d, #52c41a);
-            transform: translateY(-2px);
-        }
-        
-        .btn-stop {
-            background: linear-gradient(45deg, #ff4d4f, #ff7875);
-            color: white;
-        }
-        .btn-stop:hover {
-            background: linear-gradient(45deg, #cf1322, #ff4d4f);
-            transform: translateY(-2px);
-        }
-        
-        .strategy-item {
-            border-left: 4px solid transparent;
-            transition: all 0.3s;
-        }
-        .strategy-item.running {
-            border-left-color: #52c41a;
-            background-color: rgba(82, 196, 26, 0.05);
-        }
-        .strategy-item.stopped {
-            border-left-color: #d9d9d9;
-        }
-        
-        .position-item {
-            border-radius: 8px;
-            border: 1px solid #f0f0f0;
-            transition: all 0.3s;
-        }
-        .position-item:hover {
-            border-color: #1677ff;
-        }
-        
-        .signal-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        
-        .signal-buy { background-color: rgba(82, 196, 26, 0.1); color: #52c41a; }
-        .signal-sell { background-color: rgba(255, 77, 79, 0.1); color: #ff4d4f; }
-        
-        .mini-chart {
-            height: 60px;
-            width: 100%;
+        /* 响应式导航 */
+        @media (max-width: 768px) {
+            .nav-link {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.9rem;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- 导航栏 -->
+    <!-- 导航栏 - 保持与其他页面一致 -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#"><i class="fas fa-chart-line me-2"></i>校长的量化系统</a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{{ url_for('home') }}">市场数据</a>
-                <a class="nav-link active" href="{{ url_for('quantitative') }}">量化交易</a>
-                <a class="nav-link" href="{{ url_for('arbitrage') }}">套利系统</a>
-                <a class="nav-link" href="{{ url_for('operations_log') }}">操作日志</a>
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line"></i> 校长的量化系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-chart-bar d-lg-none"></i>
+                            <span class="d-none d-lg-inline">市场数据</span>
+                            <span class="d-lg-none">市场</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/quantitative.html">
+                            <i class="fas fa-robot d-lg-none"></i>
+                            <span class="d-none d-lg-inline">量化交易</span>
+                            <span class="d-lg-none">量化</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/arbitrage.html">
+                            <i class="fas fa-balance-scale d-lg-none"></i>
+                            <span class="d-none d-lg-inline">套利系统</span>
+                            <span class="d-lg-none">套利</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/operations-log.html">
+                            <i class="fas fa-list d-lg-none"></i>
+                            <span class="d-none d-lg-inline">操作日志</span>
+                            <span class="d-lg-none">日志</span>
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
 
-    <div class="container-fluid py-4">
-        <!-- 系统控制台 -->
-        <div class="control-panel">
-            <div class="row align-items-center">
-                <div class="col-md-3">
-                    <h4 class="mb-2"><i class="fas fa-robot me-2"></i>量化交易系统</h4>
-                    <div class="d-flex align-items-center">
-                        <span class="status-indicator" id="systemStatus"></span>
-                        <span id="systemStatusText">系统离线</span>
-                    </div>
-                </div>
-                <div class="col-md-6 text-center">
-                    <button class="btn btn-system-control btn-start me-3" id="startSystemBtn">
-                        <i class="fas fa-play me-2"></i>启动系统
-                    </button>
-                    <button class="btn btn-system-control btn-stop" id="stopSystemBtn">
-                        <i class="fas fa-stop me-2"></i>停止系统
-                    </button>
-                </div>
-                <div class="col-md-3 text-end">
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="autoTradingSwitch">
-                        <label class="form-check-label" for="autoTradingSwitch">
-                            <i class="fas fa-magic me-1"></i>自动交易
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 账户总览 -->
+    <div class="container-fluid mt-4">
+        <!-- 顶部控制面板 -->
         <div class="row mb-4">
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card info-card">
-                    <div class="card-body text-center">
-                        <i class="fas fa-wallet text-primary fs-2 mb-2"></i>
-                        <div class="metric-value neutral" id="totalBalance">¥0.00</div>
-                        <small class="text-muted">总资产</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card info-card">
-                    <div class="card-body text-center">
-                        <i class="fas fa-chart-line text-success fs-2 mb-2"></i>
-                        <div class="metric-value" id="todayPnl">+¥0.00</div>
-                        <small class="text-muted">今日盈亏</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card info-card">
-                    <div class="card-body text-center">
-                        <i class="fas fa-percentage text-info fs-2 mb-2"></i>
-                        <div class="metric-value neutral" id="todayReturn">0.00%</div>
-                        <small class="text-muted">今日收益率</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card info-card">
-                    <div class="card-body text-center">
-                        <i class="fas fa-exchange-alt text-warning fs-2 mb-2"></i>
-                        <div class="metric-value neutral" id="totalTrades">0</div>
-                        <small class="text-muted">今日交易</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 交易所状态 -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card info-card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-server me-2"></i>交易所连接状态</h5>
-                    </div>
+            <!-- 系统控制台 -->
+            <div class="col-md-4 mb-3">
+                <div class="card system-control-card h-100">
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span>币安 (Binance)</span>
-                                    <span class="exchange-status bg-success text-white" id="binanceStatus">
-                                        <i class="fas fa-check me-1"></i>已连接
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <small class="text-muted">API权限: </small>
-                                <span id="binancePermissions">现货交易</span>
-                            </div>
-                            <div class="col-md-4">
-                                <small class="text-muted">延迟: </small>
-                                <span id="binanceLatency">--ms</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 主要内容区域 -->
-        <div class="row">
-            <!-- 策略管理 -->
-            <div class="col-lg-6 mb-4">
-                <div class="card info-card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>策略管理</h5>
-                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newStrategyModal">
-                            <i class="fas fa-plus me-1"></i>新建策略
-                        </button>
-                    </div>
-                    <div class="card-body p-2">
-                        <div id="strategiesList" class="list-group list-group-flush">
-                            <!-- 策略列表 -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 实时监控 -->
-            <div class="col-lg-6 mb-4">
-                <div class="card info-card">
-                    <div class="card-header">
-                        <ul class="nav nav-tabs card-header-tabs" id="monitorTabs">
-                            <li class="nav-item">
-                                <a class="nav-link active" data-bs-toggle="tab" href="#positionsTab">
-                                    <i class="fas fa-chart-pie me-1"></i>持仓 (<span id="positionsCount">0</span>)
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-bs-toggle="tab" href="#signalsTab">
-                                    <i class="fas fa-bell me-1"></i>信号 (<span id="signalsCount">0</span>)
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" data-bs-toggle="tab" href="#ordersTab">
-                                    <i class="fas fa-list me-1"></i>订单
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="card-body p-2">
-                        <div class="tab-content">
-                            <!-- 持仓标签页 -->
-                            <div class="tab-pane fade show active" id="positionsTab">
-                                <div id="positionsList">
-                                    <!-- 持仓列表 -->
-                                </div>
-                            </div>
-                            <!-- 信号标签页 -->
-                            <div class="tab-pane fade" id="signalsTab">
-                                <div id="signalsList">
-                                    <!-- 信号列表 -->
-                                </div>
-                            </div>
-                            <!-- 订单标签页 -->
-                            <div class="tab-pane fade" id="ordersTab">
-                                <div id="ordersList">
-                                    <!-- 订单列表 -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 收益图表 -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card info-card">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>收益曲线</h5>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="performanceChart" height="100"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 新建策略模态框 -->
-    <div class="modal fade" id="newStrategyModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">新建量化策略</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="newStrategyForm">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">策略名称</label>
-                                    <input type="text" class="form-control" id="strategyName" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">策略类型</label>
-                                    <select class="form-select" id="strategyType" required>
-                                        <option value="">请选择策略类型</option>
-                                        <option value="momentum">动量策略</option>
-                                        <option value="mean_reversion">均值回归策略</option>
-                                        <option value="breakout">突破策略</option>
-                                        <option value="grid_trading">网格交易策略</option>
-                                        <option value="high_frequency">高频交易策略</option>
-                                        <option value="trend_following">趋势跟踪策略</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
+                        <h5 class="card-title">
+                            <i class="fas fa-cog"></i> 系统控制台
+                        </h5>
+                        
+                        <!-- 系统状态 -->
                         <div class="mb-3">
-                            <label class="form-label">交易对</label>
-                            <select class="form-select" id="strategySymbol" required>
-                                <option value="BTC/USDT">BTC/USDT</option>
-                                <option value="ETH/USDT">ETH/USDT</option>
-                                <option value="BNB/USDT">BNB/USDT</option>
-                                <option value="ADA/USDT">ADA/USDT</option>
-                                <option value="SOL/USDT">SOL/USDT</option>
-                            </select>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>系统状态</span>
+                                <span id="systemStatus">
+                                    <span class="status-indicator status-offline"></span>
+                                    离线
+                                </span>
+                            </div>
                         </div>
                         
-                        <!-- 策略参数 (动态显示) -->
-                        <div id="strategyParameters">
-                            <!-- 通用参数 -->
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">基础交易量</label>
-                                    <input type="number" class="form-control" id="quantity" value="1.0" step="0.1" min="0.1">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">观察周期</label>
-                                    <input type="number" class="form-control" id="lookback_period" value="20" min="5" max="100">
-                                </div>
+                        <!-- 系统启停控制 -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>量化系统</span>
+                                <button id="systemToggle" class="btn-toggle" onclick="toggleSystem()">
+                                </button>
                             </div>
                         </div>
-                    </form>
+                        
+                        <!-- 自动交易开关 -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>自动交易</span>
+                                <button id="autoTradingToggle" class="btn-toggle" onclick="toggleAutoTrading()">
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- 运行模式 -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>运行模式</span>
+                                <select id="modeSelect" class="form-select form-select-sm" style="width: auto;">
+                                    <option value="manual">手动模式</option>
+                                    <option value="auto" selected>自动模式</option>
+                                    <option value="aggressive">激进模式</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" onclick="submitStrategy()">创建策略</button>
+            </div>
+            
+            <!-- 账户总览 -->
+            <div class="col-md-4 mb-3">
+                <div class="card account-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-wallet"></i> 账户总览
+                        </h5>
+                        
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="metric-value" id="totalBalance">¥0</div>
+                                <div class="metric-label">总资产</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="metric-value text-success" id="dailyPnl">+¥0</div>
+                                <div class="metric-label">今日盈亏</div>
+                            </div>
+                        </div>
+                        
+                        <hr style="border-color: rgba(255,255,255,0.3);">
+                        
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="metric-value" id="dailyReturn">+0.00%</div>
+                                <div class="metric-label">今日收益率</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="metric-value" id="dailyTrades">0</div>
+                                <div class="metric-label">今日交易</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 交易所状态 -->
+            <div class="col-md-4 mb-3">
+                <div class="card exchange-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-link"></i> 交易所状态
+                        </h5>
+                        
+                        <div id="exchangeStatus">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span>
+                                    <span class="status-indicator status-online"></span>
+                                    币安 (Binance)
+                                </span>
+                                <small>25ms</small>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span>API权限</span>
+                                <span class="badge bg-success">现货交易</span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>最后更新</span>
+                                <small id="lastUpdate">刚刚</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- 系统配置模态框 -->
-    <div class="modal fade" id="systemConfigModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">系统配置</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">每日目标收益率 (%)</label>
-                        <input type="number" class="form-control" id="dailyTarget" value="5" step="0.1" min="0.1" max="50">
+        
+        <!-- 策略管理 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-brain"></i> 量化策略管理
+                        </h5>
+                        <button class="btn btn-primary btn-sm" onclick="refreshStrategies()">
+                            <i class="fas fa-sync-alt"></i> 刷新
+                        </button>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">最大日亏损率 (%)</label>
-                        <input type="number" class="form-control" id="maxDailyLoss" value="3" step="0.1" min="0.1" max="20">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">最大持仓数量</label>
-                        <input type="number" class="form-control" id="maxPositions" value="8" min="1" max="20">
+                    <div class="card-body">
+                        <div class="row" id="strategiesContainer">
+                            <!-- 策略卡片将通过JavaScript动态生成 -->
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary">保存配置</button>
+            </div>
+        </div>
+        
+        <!-- 实时监控 -->
+        <div class="row mb-4">
+            <!-- 持仓监控 -->
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-coins"></i> 当前持仓
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>交易对</th>
+                                        <th>数量</th>
+                                        <th>均价</th>
+                                        <th>浮盈</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="positionsTable">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">暂无持仓</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 交易信号 -->
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-signal"></i> 最新信号
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>交易对</th>
+                                        <th>信号</th>
+                                        <th>置信度</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="signalsTable">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">暂无信号</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 收益曲线图 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-line"></i> 收益曲线
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="performance-chart">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -416,15 +384,5 @@
     <!-- JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
-    
-    <script>
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            initQuantitative();
-            loadSystemStatus();
-            loadAccountInfo();
-            loadExchangeStatus();
-        });
-    </script>
 </body>
 </html> 

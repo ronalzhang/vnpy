@@ -1540,12 +1540,102 @@ class QuantitativeService:
         # 加载策略
         self._load_strategies_from_db()
         
+        # 如果没有策略，创建默认策略
+        if not self.strategies:
+            self._create_default_strategies()
+        
         # 启动自动管理
         self._start_auto_management()
         
         # 初始化交易引擎
         self._init_trading_engine()
         
+    def _create_default_strategies(self):
+        """创建6个默认策略"""
+        default_strategies = [
+            {
+                'name': '动量策略 - BTC高频',
+                'type': StrategyType.MOMENTUM,
+                'symbol': 'BTC/USDT',
+                'parameters': {
+                    'lookback_period': 20,
+                    'threshold': 0.002,  # 0.2%阈值
+                    'quantity': 0.001,   # BTC数量
+                    'momentum_threshold': 0.003
+                }
+            },
+            {
+                'name': '均值回归 - ETH稳健',
+                'type': StrategyType.MEAN_REVERSION,
+                'symbol': 'ETH/USDT',
+                'parameters': {
+                    'lookback_period': 30,
+                    'std_multiplier': 2.0,
+                    'quantity': 0.01,    # ETH数量
+                    'reversion_threshold': 0.015
+                }
+            },
+            {
+                'name': '突破策略 - SOL激进',
+                'type': StrategyType.BREAKOUT,
+                'symbol': 'SOL/USDT',
+                'parameters': {
+                    'lookback_period': 25,
+                    'breakout_threshold': 0.008,  # 0.8%突破
+                    'quantity': 1.0,     # SOL数量
+                    'volume_threshold': 1.5
+                }
+            },
+            {
+                'name': '网格交易 - DOGE稳定',
+                'type': StrategyType.GRID_TRADING,
+                'symbol': 'DOGE/USDT',
+                'parameters': {
+                    'grid_spacing': 0.02,  # 2%网格间距
+                    'grid_count': 10,
+                    'quantity': 100.0,   # DOGE数量
+                    'lookback_period': 100
+                }
+            },
+            {
+                'name': '高频交易 - XRP快速',
+                'type': StrategyType.HIGH_FREQUENCY,
+                'symbol': 'XRP/USDT',
+                'parameters': {
+                    'quantity': 10.0,    # XRP数量
+                    'min_profit': 0.0008,  # 0.08%最小利润
+                    'volatility_threshold': 0.001,
+                    'lookback_period': 15
+                }
+            },
+            {
+                'name': '趋势跟踪 - ADA长线',
+                'type': StrategyType.TREND_FOLLOWING,
+                'symbol': 'ADA/USDT',
+                'parameters': {
+                    'lookback_period': 50,
+                    'trend_threshold': 0.015,  # 1.5%趋势阈值
+                    'quantity': 50.0,    # ADA数量
+                    'trend_strength_min': 0.6
+                }
+            }
+        ]
+        
+        logger.info("创建默认量化策略...")
+        for strategy_config in default_strategies:
+            try:
+                strategy_id = self.create_strategy(
+                    name=strategy_config['name'],
+                    strategy_type=strategy_config['type'],
+                    symbol=strategy_config['symbol'],
+                    parameters=strategy_config['parameters']
+                )
+                logger.info(f"创建默认策略成功: {strategy_config['name']} (ID: {strategy_id})")
+            except Exception as e:
+                logger.error(f"创建默认策略失败 {strategy_config['name']}: {e}")
+        
+        logger.info(f"默认策略创建完成，共创建 {len(self.strategies)} 个策略")
+    
     def _init_trading_engine(self):
         """初始化交易引擎"""
         try:
@@ -1974,23 +2064,38 @@ class QuantitativeService:
                 """)
                 
                 for row in cursor.fetchall():
+                    # 安全计算收益率，防止除零错误
+                    avg_price = row[2] if row[2] > 0 else 1.0
+                    current_price = row[3] if row[3] > 0 else avg_price
+                    unrealized_pnl = row[4]
+                    
+                    # 安全计算收益率
+                    if avg_price > 0:
+                        return_pct = (current_price - avg_price) / avg_price
+                    else:
+                        return_pct = 0.0
+                    
                     positions.append({
                         'symbol': row[0],
                         'quantity': row[1],
-                        'avg_price': row[2],
-                        'current_price': row[3],
-                        'unrealized_pnl': row[4],
+                        'avg_price': avg_price,
+                        'current_price': current_price,
+                        'unrealized_pnl': unrealized_pnl,
                         'realized_pnl': row[5],
+                        'return_pct': return_pct,
                         'updated_time': row[6],
                         'source': 'simulation'
                     })
             
             # 如果启用自动交易，添加真实持仓
             if self.trading_engine:
-                real_positions = self.trading_engine.get_status().get('positions', [])
-                for pos in real_positions:
-                    pos['source'] = 'real'
-                    positions.append(pos)
+                try:
+                    real_positions = self.trading_engine.get_status().get('positions', [])
+                    for pos in real_positions:
+                        pos['source'] = 'real'
+                        positions.append(pos)
+                except Exception as e:
+                    logger.warning(f"获取真实持仓失败: {e}")
             
             return positions
             
