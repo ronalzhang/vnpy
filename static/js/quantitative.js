@@ -37,8 +37,14 @@ class QuantitativeApp {
             this.toggleStrategyParams(e.target.value);
         });
 
-        // 策略表单提交
-        document.getElementById('strategyForm').addEventListener('submit', (e) => {
+        // 策略表单提交 - 修复表单ID
+        document.getElementById('createStrategyForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.submitStrategy();
+        });
+        
+        // 创建策略按钮点击事件
+        document.getElementById('createStrategyBtn').addEventListener('click', (e) => {
             e.preventDefault();
             this.submitStrategy();
         });
@@ -69,47 +75,68 @@ class QuantitativeApp {
      */
     toggleStrategyParams(strategyType) {
         // 隐藏所有参数组
-        document.querySelectorAll('.strategy-params').forEach(group => {
-            group.style.display = 'none';
-        });
+        this.hideAllStrategyParams();
 
         // 显示对应的参数组
-        const targetGroup = document.getElementById(`${strategyType}Params`);
-        if (targetGroup) {
-            targetGroup.style.display = 'block';
+        if (strategyType === 'momentum') {
+            document.getElementById('momentumParams').style.display = 'block';
+        } else if (strategyType === 'mean_reversion') {
+            document.getElementById('meanReversionParams').style.display = 'block';
+        } else if (strategyType === 'breakout') {
+            document.getElementById('breakoutParams').style.display = 'block';
         }
+    }
+    
+    /**
+     * 隐藏所有策略参数组
+     */
+    hideAllStrategyParams() {
+        const paramGroups = ['momentumParams', 'meanReversionParams', 'breakoutParams'];
+        paramGroups.forEach(groupId => {
+            const element = document.getElementById(groupId);
+            if (element) {
+                element.style.display = 'none';
+            }
+        });
     }
 
     /**
      * 提交策略创建
      */
     async submitStrategy() {
-        const formData = new FormData(document.getElementById('strategyForm'));
-        const strategyData = Object.fromEntries(formData.entries());
+        // 获取表单数据
+        const strategyName = document.getElementById('strategyName').value;
+        const strategyType = document.getElementById('strategyType').value;
+        const strategySymbol = document.getElementById('strategySymbol').value;
+        const lookbackPeriod = parseInt(document.getElementById('lookbackPeriod').value) || 20;
+        const quantity = parseFloat(document.getElementById('quantity').value) || 1.0;
+
+        if (!strategyName || !strategyType || !strategySymbol) {
+            this.showAlert('请填写完整的策略信息！', 'error');
+            return;
+        }
 
         // 根据策略类型收集特定参数
-        const strategyType = strategyData.strategy_type;
-        const params = {};
+        const params = {
+            lookback_period: lookbackPeriod,
+            quantity: quantity
+        };
 
         if (strategyType === 'momentum') {
-            params.lookback_period = parseInt(strategyData.momentum_lookback) || 20;
-            params.threshold = parseFloat(strategyData.momentum_threshold) || 0.02;
-            params.quantity = parseFloat(strategyData.position_size) || 1.0;
+            const threshold = parseFloat(document.getElementById('momentumThreshold').value) || 0.001;
+            params.threshold = threshold;
         } else if (strategyType === 'mean_reversion') {
-            params.lookback_period = parseInt(strategyData.mean_lookback) || 20;
-            params.entry_threshold = parseFloat(strategyData.mean_entry) || 2.0;
-            params.exit_threshold = parseFloat(strategyData.mean_exit) || 0.5;
-            params.quantity = parseFloat(strategyData.position_size) || 1.0;
+            const stdMultiplier = parseFloat(document.getElementById('stdMultiplier').value) || 2.0;
+            params.std_multiplier = stdMultiplier;
         } else if (strategyType === 'breakout') {
-            params.lookback_period = parseInt(strategyData.breakout_lookback) || 20;
-            params.breakout_threshold = parseFloat(strategyData.breakout_threshold) || 0.02;
-            params.quantity = parseFloat(strategyData.position_size) || 1.0;
+            const breakoutThreshold = parseFloat(document.getElementById('breakoutThreshold').value) || 0.01;
+            params.breakout_threshold = breakoutThreshold;
         }
 
         const payload = {
-            name: strategyData.strategy_name,
+            name: strategyName,
             strategy_type: strategyType,
-            symbol: strategyData.symbol,
+            symbol: strategySymbol,
             parameters: params
         };
 
@@ -132,7 +159,8 @@ class QuantitativeApp {
                 // 重新加载策略列表
                 this.loadStrategies();
                 // 重置表单
-                document.getElementById('strategyForm').reset();
+                document.getElementById('createStrategyForm').reset();
+                this.hideAllStrategyParams();
             } else {
                 this.showAlert('策略创建失败：' + (result.message || '未知错误'), 'error');
             }
