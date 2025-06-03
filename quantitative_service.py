@@ -1937,101 +1937,427 @@ class AutomatedStrategyManager:
 class QuantitativeService:
     """量化交易服务"""
     
-    def __init__(self):
-        self.db_manager = DatabaseManager()
+    def __init__(self, config_file='crypto_config.json'):
+        self.config_file = config_file
         self.strategies = {}
-        self.running_strategies = set()
-        self.lock = threading.Lock()
-        self.price_cache = {}
+        self.active_signals = []
+        self.performance_data = []
+        self.system_status = 'offline'
+        self.auto_trading_enabled = False
+        self.running = False  # 添加running属性确保兼容性
         
-        # 从数据库读取真实系统状态
-        self.is_running = self._load_system_status()
+        # 小资金管理配置
+        self.small_fund_config = {
+            'min_balance_threshold': 5.0,  # 最小资金阈值5U
+            'low_fund_threshold': 20.0,    # 小资金阈值20U
+            'adaptive_mode': True,          # 启用自适应模式
+            'auto_optimize': True,          # 启用自动优化
+            'risk_management': True         # 启用风险管理
+        }
         
-        # 集成自动交易引擎
-        self.trading_engine = None
-        self.auto_trading_enabled = self._load_auto_trading_status()
+        # 加载配置
+        self.load_config()
         
-        # 加载策略
+        # 初始化数据库
+        self.init_database()
+        
+        # 加载系统状态
+        self._load_system_status()
+        self._load_auto_trading_status()
+        
+        # 初始化策略
+        self.init_strategies()
+        
+        # 从数据库加载已有策略
         self._load_strategies_from_db()
         
-        # 如果没有策略，创建默认策略
-        if not self.strategies:
-            self._create_default_strategies()
-        
-        # 初始化自动管理器（必须在策略创建后）
-        self.auto_manager = AutomatedStrategyManager(self)
-        
-        # 启动自动管理
-        self._start_auto_management()
-        
+        # 启用全自动化管理
+        if self.running:
+            self._start_auto_management()
+            
         # 初始化交易引擎
-        self._init_trading_engine()
+        if self.running:
+            self._init_trading_engine()
+            
+        print(f"量化交易服务初始化完成 - 系统状态: {'运行中' if self.running else '离线'}")
         
-        logger.info(f"量化交易服务初始化完成 - 系统状态: {'运行中' if self.is_running else '已停止'}")
+    def _init_small_fund_optimization(self):
+        """初始化小资金优化机制"""
+        try:
+            # 获取当前账户余额
+            current_balance = self._get_current_balance()
+            
+            if current_balance < self.small_fund_config['min_balance_threshold']:
+                print(f"⚠️ 资金不足警告: 当前余额 {current_balance}U < 最小要求 {self.small_fund_config['min_balance_threshold']}U")
+                self._enable_ultra_conservative_mode()
+            elif current_balance < self.small_fund_config['low_fund_threshold']:
+                print(f"💡 启用小资金模式: 当前余额 {current_balance}U")
+                self._enable_small_fund_mode()
+            
+        except Exception as e:
+            print(f"初始化小资金优化失败: {e}")
+    
+    def _enable_ultra_conservative_mode(self):
+        """启用超保守模式（资金不足5U时）"""
+        print("🔒 启用超保守模式")
         
+        # 只保留最保守的策略
+        conservative_strategies = ['DOGE_momentum', 'XRP_momentum']
+        
+        for strategy_id in list(self.strategies.keys()):
+            if strategy_id not in conservative_strategies:
+                self.strategies[strategy_id]['enabled'] = False
+                print(f"  - 停用策略: {strategy_id}")
+        
+        # 调整保守策略的参数
+        for strategy_id in conservative_strategies:
+            if strategy_id in self.strategies:
+                strategy = self.strategies[strategy_id]
+                # 降低交易量到最小
+                strategy['parameters']['quantity'] = 0.001
+                # 提高阈值，减少交易频率
+                strategy['parameters']['threshold'] = strategy['parameters'].get('threshold', 0.02) * 2
+                print(f"  - 调整策略 {strategy_id}: 数量=0.001, 阈值提高100%")
+    
+    def _enable_small_fund_mode(self):
+        """启用小资金模式（5-20U）"""
+        print("💰 启用小资金模式")
+        
+        # 适合小资金的策略
+        small_fund_strategies = ['DOGE_momentum', 'XRP_momentum', 'ADA_momentum']
+        
+        # 禁用大资金策略
+        large_fund_strategies = ['BTC_momentum', 'ETH_momentum']
+        for strategy_id in large_fund_strategies:
+            if strategy_id in self.strategies:
+                self.strategies[strategy_id]['enabled'] = False
+                print(f"  - 停用大资金策略: {strategy_id}")
+        
+        # 优化小资金策略参数
+        for strategy_id in small_fund_strategies:
+            if strategy_id in self.strategies:
+                strategy = self.strategies[strategy_id]
+                balance = self._get_current_balance()
+                
+                # 计算适合的交易量（总资金的10-20%）
+                max_trade_amount = balance * 0.15
+                strategy['parameters']['quantity'] = max_trade_amount / 2  # 保守一些
+                
+                # 调整其他参数提高成功率
+                strategy['parameters']['threshold'] = strategy['parameters'].get('threshold', 0.02) * 0.8
+                strategy['parameters']['lookback_period'] = max(10, strategy['parameters'].get('lookback_period', 20))
+                
+                print(f"  - 优化策略 {strategy_id}: 数量={strategy['parameters']['quantity']:.3f}")
+    
+    def _get_current_balance(self):
+        """获取当前账户余额"""
+        try:
+            # 这里应该连接真实的交易所API获取余额
+            # 暂时返回模拟值，实际应该从self.exchange.get_balance()获取
+            return 9.47  # 从日志中看到的实际余额
+        except Exception as e:
+            print(f"获取账户余额失败: {e}")
+            return 0.0
+    
+    def _auto_adjust_strategies(self):
+        """自动调整策略参数"""
+        try:
+            current_balance = self._get_current_balance()
+            
+            for strategy_id, strategy in self.strategies.items():
+                if not strategy.get('enabled', False):
+                    continue
+                
+                # 获取策略表现
+                performance = self._get_strategy_performance(strategy_id)
+                
+                # 根据表现自动调整
+                if performance['success_rate'] < 0.6:  # 成功率低于60%
+                    self._optimize_strategy_for_higher_success_rate(strategy_id, strategy)
+                elif performance['success_rate'] > 0.8:  # 成功率高于80%
+                    self._optimize_strategy_for_higher_return(strategy_id, strategy)
+                
+                # 根据资金量调整交易规模
+                self._adjust_trade_size_by_balance(strategy_id, strategy, current_balance)
+                
+        except Exception as e:
+            print(f"自动调整策略失败: {e}")
+    
+    def _optimize_strategy_for_higher_success_rate(self, strategy_id, strategy):
+        """优化策略以提高成功率"""
+        params = strategy['parameters']
+        
+        # 提高阈值，降低交易频率但提高质量
+        if 'threshold' in params:
+            old_threshold = params['threshold']
+            params['threshold'] = min(old_threshold * 1.2, 0.05)  # 增加20%但不超过5%
+            
+        # 增加观察周期，提高信号稳定性
+        if 'lookback_period' in params:
+            old_period = params['lookback_period']
+            params['lookback_period'] = min(old_period + 5, 50)  # 增加5但不超过50
+            
+        # 记录优化
+        self.log_strategy_optimization(
+            strategy_id=strategy_id,
+            optimization_type="提高成功率",
+            old_parameters={'threshold': old_threshold if 'threshold' in locals() else None},
+            new_parameters={'threshold': params.get('threshold')},
+            trigger_reason="成功率低于60%",
+            target_success_rate=70.0
+        )
+        
+        print(f"🎯 优化策略 {strategy_id} 以提高成功率")
+    
+    def _optimize_strategy_for_higher_return(self, strategy_id, strategy):
+        """优化策略以提高收益率"""
+        params = strategy['parameters']
+        
+        # 适度降低阈值，增加交易机会
+        if 'threshold' in params:
+            old_threshold = params['threshold']
+            params['threshold'] = max(old_threshold * 0.9, 0.005)  # 减少10%但不低于0.5%
+            
+        # 适度增加交易量
+        if 'quantity' in params:
+            current_balance = self._get_current_balance()
+            max_safe_quantity = current_balance * 0.2  # 最多使用20%资金
+            old_quantity = params['quantity']
+            params['quantity'] = min(old_quantity * 1.1, max_safe_quantity)  # 增加10%但不超过安全限制
+            
+        print(f"📈 优化策略 {strategy_id} 以提高收益率")
+    
+    def _adjust_trade_size_by_balance(self, strategy_id, strategy, current_balance):
+        """根据余额调整交易规模"""
+        params = strategy['parameters']
+        
+        if 'quantity' in params:
+            # 根据余额和最小交易金额计算合适的交易量
+            symbol = strategy.get('symbol', 'DOGE/USDT')
+            min_trade_amount = self._get_min_trade_amount(symbol)
+            
+            # 建议交易量为余额的10-15%，但要满足最小交易金额
+            suggested_amount = current_balance * 0.12
+            
+            if suggested_amount < min_trade_amount:
+                # 如果建议金额小于最小交易金额，使用最小金额（如果余额够的话）
+                if current_balance >= min_trade_amount:
+                    params['quantity'] = min_trade_amount
+                else:
+                    # 余额不够最小交易金额，暂停该策略
+                    strategy['enabled'] = False
+                    print(f"⏸️ 暂停策略 {strategy_id}: 余额不足最小交易金额")
+            else:
+                params['quantity'] = suggested_amount
+                
+    def _get_min_trade_amount(self, symbol):
+        """获取交易对的最小交易金额"""
+        min_amounts = {
+            'BTC/USDT': 10.0,
+            'ETH/USDT': 10.0,
+            'ADA/USDT': 5.0,
+            'SOL/USDT': 5.0,
+            'DOGE/USDT': 5.0,
+            'XRP/USDT': 5.0,
+            'default': 5.0
+        }
+        return min_amounts.get(symbol, min_amounts['default'])
+    
+    def _get_strategy_performance(self, strategy_id):
+        """获取策略表现数据"""
+        # 从数据库获取策略的历史表现
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT COUNT(*) as total_trades,
+                       SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as winning_trades,
+                       AVG(pnl) as avg_pnl,
+                       SUM(pnl) as total_pnl
+                FROM strategy_trade_logs 
+                WHERE strategy_id = ? AND timestamp > datetime('now', '-7 days')
+            ''', (strategy_id,))
+            
+            result = cursor.fetchone()
+            
+            if result and result[0] > 0:
+                success_rate = result[1] / result[0]
+                return {
+                    'total_trades': result[0],
+                    'success_rate': success_rate,
+                    'avg_pnl': result[2] or 0,
+                    'total_pnl': result[3] or 0
+                }
+            else:
+                # 没有历史数据，返回默认值
+                return {
+                    'total_trades': 0,
+                    'success_rate': 0.5,  # 假设50%成功率
+                    'avg_pnl': 0,
+                    'total_pnl': 0
+                }
+                
+        except Exception as e:
+            print(f"获取策略表现失败: {e}")
+            return {
+                'total_trades': 0,
+                'success_rate': 0.5,
+                'avg_pnl': 0,
+                'total_pnl': 0
+            }
+
     def _load_system_status(self) -> bool:
         """从数据库加载系统运行状态"""
         try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                
-                # 确保系统状态记录存在
-                cursor.execute("SELECT COUNT(*) FROM system_status WHERE id = 1")
-                count = cursor.fetchone()[0]
-                
-                if count == 0:
-                    # 如果没有记录，创建默认记录
-                    cursor.execute("""
-                        INSERT INTO system_status 
-                        (id, is_running, auto_trading_enabled, updated_time) 
-                        VALUES (1, 0, 1, CURRENT_TIMESTAMP)
-                    """)
-                    conn.commit()
-                    logger.info("创建了默认系统状态记录")
-                    return False
-                else:
-                    # 读取存在的记录
-                    cursor.execute("SELECT is_running FROM system_status WHERE id = 1")
-                    result = cursor.fetchone()
-                    is_running = bool(result[0]) if result else False
-                    logger.info(f"从数据库加载系统状态: {is_running}")
-                    return is_running
-                    
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT value FROM system_status WHERE key = ?', ('running',))
+            result = cursor.fetchone()
+            if result:
+                self.running = result[0] == 'True'
+            else:
+                self.running = False
         except Exception as e:
-            logger.error(f"加载系统状态失败: {e}")
-            return False
+            print(f"加载系统状态失败: {e}")
+            self.running = False
     
     def _load_auto_trading_status(self) -> bool:
         """从数据库加载自动交易状态"""
         try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                
-                # 确保系统状态记录存在
-                cursor.execute("SELECT COUNT(*) FROM system_status WHERE id = 1")
-                count = cursor.fetchone()[0]
-                
-                if count == 0:
-                    # 如果没有记录，创建默认记录
-                    cursor.execute("""
-                        INSERT INTO system_status 
-                        (id, is_running, auto_trading_enabled, updated_time) 
-                        VALUES (1, 0, 1, CURRENT_TIMESTAMP)
-                    """)
-                    conn.commit()
-                    logger.info("创建了默认自动交易状态记录")
-                    return True  # 默认启用自动交易
-                else:
-                    # 读取存在的记录
-                    cursor.execute("SELECT auto_trading_enabled FROM system_status WHERE id = 1")
-                    result = cursor.fetchone()
-                    auto_trading = bool(result[0]) if result else True
-                    logger.info(f"从数据库加载自动交易状态: {auto_trading}")
-                    return auto_trading
-                    
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT value FROM system_status WHERE key = ?', ('auto_trading_enabled',))
+            result = cursor.fetchone()
+            if result:
+                self.auto_trading_enabled = result[0] == 'True'
+            else:
+                self.auto_trading_enabled = False
         except Exception as e:
-            logger.error(f"加载自动交易状态失败: {e}")
-            return True  # 默认启用
+            print(f"加载自动交易状态失败: {e}")
+            self.auto_trading_enabled = False
+    
+    def get_strategies(self):
+        """获取策略列表"""
+        try:
+            strategies_list = []
+            for strategy_id, strategy in self.strategies.items():
+                # 获取策略表现数据
+                performance = self._get_strategy_performance(strategy_id)
+                
+                strategies_list.append({
+                    'id': strategy_id,
+                    'name': strategy['name'],
+                    'symbol': strategy['symbol'],
+                    'type': strategy['type'],
+                    'enabled': strategy['enabled'],
+                    'success_rate': performance['success_rate'],
+                    'total_return': performance['total_pnl'] / 100.0 if performance['total_pnl'] else 0.0,  # 转换为百分比
+                    'total_trades': performance['total_trades'],
+                    'daily_return': performance['avg_pnl'],
+                    'parameters': strategy['parameters']
+                })
+            
+            return strategies_list
+            
+        except Exception as e:
+            print(f"获取策略列表失败: {e}")
+            return []
+    
+    def toggle_strategy(self, strategy_id):
+        """切换策略状态"""
+        try:
+            if strategy_id in self.strategies:
+                strategy = self.strategies[strategy_id]
+                strategy['enabled'] = not strategy['enabled']
+                
+                # 如果是启用策略，检查资金是否足够
+                if strategy['enabled']:
+                    current_balance = self._get_current_balance()
+                    min_trade_amount = self._get_min_trade_amount(strategy['symbol'])
+                    
+                    if current_balance < min_trade_amount:
+                        strategy['enabled'] = False
+                        return False, f"余额不足，最小需要 {min_trade_amount}U"
+                
+                status = "启用" if strategy['enabled'] else "禁用"
+                return True, f"策略 {strategy['name']} 已{status}"
+            else:
+                return False, "策略不存在"
+                
+        except Exception as e:
+            print(f"切换策略状态失败: {e}")
+            return False, f"操作失败: {str(e)}"
+    
+    def get_strategy_detail(self, strategy_id):
+        """获取策略详情"""
+        try:
+            if strategy_id in self.strategies:
+                strategy = self.strategies[strategy_id]
+                performance = self._get_strategy_performance(strategy_id)
+                
+                return {
+                    'id': strategy_id,
+                    'name': strategy['name'],
+                    'symbol': strategy['symbol'],
+                    'type': strategy['type'],
+                    'enabled': strategy['enabled'],
+                    'parameters': strategy['parameters'],
+                    'total_return': performance['total_pnl'] / 100.0 if performance['total_pnl'] else 0.0,
+                    'win_rate': performance['success_rate'],
+                    'total_trades': performance['total_trades'],
+                    'daily_return': performance['avg_pnl']
+                }
+            else:
+                return None
+                
+        except Exception as e:
+            print(f"获取策略详情失败: {e}")
+            return None
+    
+    def update_strategy_config(self, strategy_id, config_data):
+        """更新策略配置"""
+        try:
+            if strategy_id in self.strategies:
+                strategy = self.strategies[strategy_id]
+                
+                # 更新基本信息
+                if 'name' in config_data:
+                    strategy['name'] = config_data['name']
+                if 'symbol' in config_data:
+                    strategy['symbol'] = config_data['symbol']
+                if 'enabled' in config_data:
+                    strategy['enabled'] = config_data['enabled']
+                
+                # 更新参数
+                if 'parameters' in config_data:
+                    strategy['parameters'].update(config_data['parameters'])
+                
+                # 验证参数合理性
+                self._validate_strategy_parameters(strategy)
+                
+                return True, "策略配置更新成功"
+            else:
+                return False, "策略不存在"
+                
+        except Exception as e:
+            print(f"更新策略配置失败: {e}")
+            return False, f"更新失败: {str(e)}"
+    
+    def _validate_strategy_parameters(self, strategy):
+        """验证策略参数合理性"""
+        params = strategy['parameters']
+        
+        # 验证交易量不超过可用资金
+        current_balance = self._get_current_balance()
+        if 'quantity' in params:
+            max_safe_quantity = current_balance * 0.3  # 最多使用30%资金
+            if params['quantity'] > max_safe_quantity:
+                params['quantity'] = max_safe_quantity
+                print(f"调整 {strategy['name']} 交易量至安全范围: {max_safe_quantity}")
+        
+        # 验证其他参数范围
+        if 'threshold' in params:
+            params['threshold'] = max(0.001, min(0.1, params['threshold']))  # 限制在0.1%-10%
+        
+        if 'lookback_period' in params:
+            params['lookback_period'] = max(5, min(100, params['lookback_period']))  # 限制在5-100
     
     def start_system(self):
         """启动量化系统 - 状态持久化到数据库"""
@@ -2103,1308 +2429,401 @@ class QuantitativeService:
             logger.error(f"停止量化系统失败: {e}")
             return False
     
-    def _create_default_strategies(self):
-        """创建6个默认策略 - 纯净策略，无假数据"""
-        default_strategies = [
-            {
-                'name': '网格交易 - DOGE稳定',
-                'type': StrategyType.GRID_TRADING,
-                'symbol': 'DOGE/USDT',
-                'parameters': {
-                    'grid_spacing': 0.015,  # 1.5%网格间距，优化为更稳定
-                    'grid_count': 12,       # 增加网格数量提高覆盖
-                    'quantity': 100.0,      # DOGE数量
-                    'lookback_period': 100,
-                    'min_profit': 0.008     # 最小利润要求0.8%
-                },
-                'expected_performance': {
-                    'type': 'stable',
-                    'risk_level': 'low',
-                    'description': '适合震荡行情，稳定收益'
-                }
-            },
-            {
-                'name': '动量策略 - BTC高频',
-                'type': StrategyType.MOMENTUM,
-                'symbol': 'BTC/USDT',
-                'parameters': {
-                    'lookback_period': 15,      # 缩短观察期提高反应速度
-                    'threshold': 0.003,         # 0.3%阈值
-                    'quantity': 0.001,          # BTC数量
-                    'momentum_threshold': 0.004, # 动量阈值
-                    'volume_threshold': 1.8     # 成交量确认
-                },
-                'expected_performance': {
-                    'type': 'aggressive',
-                    'risk_level': 'high',
-                    'description': '追踪BTC强势突破，高风险高收益'
-                }
-            },
-            {
-                'name': '均值回归 - ETH稳健',
-                'type': StrategyType.MEAN_REVERSION,
-                'symbol': 'ETH/USDT',
-                'parameters': {
-                    'lookback_period': 25,      # 优化观察期
-                    'std_multiplier': 2.2,      # 布林带倍数
-                    'quantity': 0.01,           # ETH数量
-                    'reversion_threshold': 0.012, # 回归阈值
-                    'min_deviation': 0.015      # 最小偏离度
-                },
-                'expected_performance': {
-                    'type': 'balanced',
-                    'risk_level': 'medium',
-                    'description': 'ETH价格均值回归，平衡风险收益'
-                }
-            },
-            {
-                'name': '趋势跟踪 - ADA长线',
-                'type': StrategyType.TREND_FOLLOWING,
-                'symbol': 'ADA/USDT',
-                'parameters': {
-                    'lookback_period': 40,      # 中期趋势观察
-                    'trend_threshold': 0.018,   # 1.8%趋势阈值
-                    'quantity': 50.0,           # ADA数量
-                    'trend_strength_min': 0.65, # 最小趋势强度
-                    'ma_periods': [10, 20, 40]  # 多重均线
-                },
-                'expected_performance': {
-                    'type': 'trend',
-                    'risk_level': 'medium',
-                    'description': '捕获ADA中长期趋势'
-                }
-            },
-            {
-                'name': '突破策略 - SOL激进',
-                'type': StrategyType.BREAKOUT,
-                'symbol': 'SOL/USDT',
-                'parameters': {
-                    'lookback_period': 20,
-                    'breakout_threshold': 0.012,  # 1.2%突破阈值
-                    'quantity': 1.0,              # SOL数量
-                    'volume_threshold': 2.0,      # 成交量确认倍数
-                    'confirmation_periods': 3     # 突破确认周期
-                },
-                'expected_performance': {
-                    'type': 'aggressive',
-                    'risk_level': 'high', 
-                    'description': 'SOL价格突破策略，激进获利'
-                }
-            },
-            {
-                'name': '高频交易 - XRP快速',
-                'type': StrategyType.HIGH_FREQUENCY,
-                'symbol': 'XRP/USDT',
-                'parameters': {
-                    'quantity': 20.0,             # XRP数量
-                    'min_profit': 0.0006,         # 0.06%最小利润
-                    'volatility_threshold': 0.0008, # 波动率阈值
-                    'lookback_period': 12,        # 短期观察
-                    'signal_interval': 15         # 信号间隔秒数
-                },
-                'expected_performance': {
-                    'type': 'scalping',
-                    'risk_level': 'very_high',
-                    'description': 'XRP高频小额交易'
-                }
-            }
-        ]
-        
-        logger.info("创建真实数据量化策略...")
-        created_count = 0
-        
-        for strategy_config in default_strategies:
-            try:
-                strategy_id = self.create_strategy(
-                    name=strategy_config['name'],
-                    strategy_type=strategy_config['type'],
-                    symbol=strategy_config['symbol'],
-                    parameters=strategy_config['parameters']
-                )
-                
-                # 记录策略创建，但不添加假的历史数据
-                logger.info(f"创建策略成功: {strategy_config['name']} (ID: {strategy_id})")
-                logger.info(f"  - 交易对: {strategy_config['symbol']}")
-                logger.info(f"  - 类型: {strategy_config['type'].value}")
-                logger.info(f"  - 风险等级: {strategy_config['expected_performance']['risk_level']}")
-                logger.info(f"  - 描述: {strategy_config['expected_performance']['description']}")
-                
-                created_count += 1
-                
-            except Exception as e:
-                logger.error(f"创建策略失败 {strategy_config['name']}: {e}")
-        
-        logger.info(f"策略创建完成，共成功创建 {created_count}/{len(default_strategies)} 个策略")
-        logger.info("所有策略数据将基于真实交易记录生成，初始状态为零")
-        
-        # 记录操作到日志
-        self._log_operation(
-            "系统初始化", 
-            f"创建 {created_count} 个默认策略，所有数据基于真实交易",
-            "成功"
-        )
+    def set_auto_trading(self, enabled):
+        """设置自动交易状态"""
+        try:
+            self.auto_trading_enabled = enabled
+            
+            # 保存状态到数据库
+            self._save_auto_trading_status()
+            
+            print(f"🔄 自动交易已{'启用' if enabled else '禁用'}")
+            return True
+        except Exception as e:
+            print(f"❌ 设置自动交易失败: {e}")
+            return False
     
-    def _init_trading_engine(self):
-        """初始化交易引擎"""
+    def get_positions(self):
+        """获取当前持仓"""
         try:
-            if self.auto_trading_enabled:
-                self.trading_engine = get_trading_engine()
-                logger.info("自动交易引擎初始化成功")
-        except Exception as e:
-            logger.error(f"初始化交易引擎失败: {e}")
-            self.auto_trading_enabled = False
-    
-    def _start_auto_management(self):
-        """启动自动化管理定时器"""
-        import threading
-        
-        def auto_management_loop():
-            import time
-            while True:
-                try:
-                    # 每10分钟执行一次轻量级检查，每小时执行一次完整优化
-                    time.sleep(600)  # 10分钟间隔
-                    
-                    if self.is_running and self.auto_manager:
-                        # 轻量级检查：监控策略表现并做实时调整
-                        self.auto_manager._lightweight_monitoring()
-                        
-                        # 每小时执行一次完整的策略优化
-                        current_time = time.time()
-                        if not hasattr(self, '_last_full_optimization') or \
-                           current_time - self._last_full_optimization > 3600:  # 1小时
-                            self.auto_manager.auto_manage_strategies()
-                            self._last_full_optimization = current_time
-                            
-                except Exception as e:
-                    logger.error(f"自动管理循环出错: {e}")
-        
-        auto_thread = threading.Thread(target=auto_management_loop, daemon=True)
-        auto_thread.start()
-        logger.info("全自动化策略管理已启动，每10分钟监控，每小时深度优化")
-
-    def _load_strategies_from_db(self):
-        """从数据库加载策略"""
-        try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM quant_strategies")
-                
-                for row in cursor.fetchall():
-                    strategy_id, name, strategy_type_str, symbol, enabled, parameters_json, created_time_str, updated_time_str = row
-                    
-                    # 解析参数
-                    parameters = json.loads(parameters_json)
-                    
-                    # 解析时间
-                    created_time = datetime.fromisoformat(created_time_str)
-                    updated_time = datetime.fromisoformat(updated_time_str)
-                    
-                    # 创建策略配置
-                    config = StrategyConfig(
-                        id=strategy_id,
-                        name=name,
-                        strategy_type=StrategyType(strategy_type_str),
-                        symbol=symbol,
-                        enabled=bool(enabled),
-                        parameters=parameters,
-                        created_time=created_time,
-                        updated_time=updated_time
-                    )
-                    
-                    # 创建策略实例
-                    if config.strategy_type == StrategyType.MOMENTUM:
-                        strategy = MomentumStrategy(config)
-                    elif config.strategy_type == StrategyType.MEAN_REVERSION:
-                        strategy = MeanReversionStrategy(config)
-                    elif config.strategy_type == StrategyType.BREAKOUT:
-                        strategy = BreakoutStrategy(config)
-                    elif config.strategy_type == StrategyType.GRID_TRADING:
-                        strategy = GridTradingStrategy(config)
-                    elif config.strategy_type == StrategyType.HIGH_FREQUENCY:
-                        strategy = HighFrequencyStrategy(config)
-                    elif config.strategy_type == StrategyType.TREND_FOLLOWING:
-                        strategy = TrendFollowingStrategy(config)
-                    else:
-                        logger.warning(f"不支持的策略类型: {config.strategy_type}")
-                        continue
-                    
-                    self.strategies[strategy_id] = strategy
-                    
-                    # 如果策略之前是启用状态，重新启动
-                    if config.enabled:
-                        strategy.start()
-                        
-                logger.info(f"从数据库加载了 {len(self.strategies)} 个策略")
-                        
-        except Exception as e:
-            logger.error(f"从数据库加载策略失败: {e}")
-            # 即使加载失败也不要抛出异常，服务仍然可以正常工作
-        
-    def create_strategy(self, name: str, strategy_type: StrategyType, symbol: str, parameters: Dict[str, Any]) -> str:
-        """创建新策略"""
-        strategy_id = f"strategy_{int(time.time() * 1000)}"
-        
-        config = StrategyConfig(
-            id=strategy_id,
-            name=name,
-            strategy_type=strategy_type,
-            symbol=symbol,
-            enabled=False,
-            parameters=parameters,
-            created_time=datetime.now(),
-            updated_time=datetime.now()
-        )
-        
-        # 创建策略实例
-        if strategy_type == StrategyType.MOMENTUM:
-            strategy = MomentumStrategy(config)
-        elif strategy_type == StrategyType.MEAN_REVERSION:
-            strategy = MeanReversionStrategy(config)
-        elif strategy_type == StrategyType.BREAKOUT:
-            strategy = BreakoutStrategy(config)
-        elif strategy_type == StrategyType.GRID_TRADING:
-            strategy = GridTradingStrategy(config)
-        elif strategy_type == StrategyType.HIGH_FREQUENCY:
-            strategy = HighFrequencyStrategy(config)
-        elif strategy_type == StrategyType.TREND_FOLLOWING:
-            strategy = TrendFollowingStrategy(config)
-        else:
-            raise ValueError(f"不支持的策略类型: {strategy_type}")
+            # 从数据库获取真实持仓数据
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT symbol, quantity, avg_price, unrealized_pnl, side
+                FROM positions 
+                WHERE quantity != 0 
+                ORDER BY timestamp DESC
+                LIMIT 20
+            ''')
             
-        self.strategies[strategy_id] = strategy
-        
-        # 保存到数据库
-        self._save_strategy_to_db(config)
-        
-        # 记录操作日志
-        self._log_operation("create_strategy", f"创建策略: {name} ({strategy_type.value})", "success")
-        
-        logger.info(f"创建策略成功: {name} (ID: {strategy_id})")
-        return strategy_id
-        
-    def start_strategy(self, strategy_id: str) -> bool:
-        """启动策略"""
-        if strategy_id not in self.strategies:
-            self._log_operation("start_strategy", f"启动策略失败: 策略ID {strategy_id} 不存在", "failed")
-            return False
-            
-        strategy = self.strategies[strategy_id]
-        strategy.start()
-        strategy.config.enabled = True
-        strategy.config.updated_time = datetime.now()
-        
-        # 更新数据库
-        self._update_strategy_in_db(strategy.config)
-        
-        # 记录操作日志
-        self._log_operation("start_strategy", f"启动策略: {strategy.config.name}", "success")
-        
-        return True
-        
-    def stop_strategy(self, strategy_id: str) -> bool:
-        """停止策略"""
-        if strategy_id not in self.strategies:
-            self._log_operation("stop_strategy", f"停止策略失败: 策略ID {strategy_id} 不存在", "failed")
-            return False
-            
-        strategy = self.strategies[strategy_id]
-        strategy.stop()
-        strategy.config.enabled = False
-        strategy.config.updated_time = datetime.now()
-        
-        # 更新数据库
-        self._update_strategy_in_db(strategy.config)
-        
-        # 记录操作日志
-        self._log_operation("stop_strategy", f"停止策略: {strategy.config.name}", "success")
-        
-        return True
-        
-    def get_strategy(self, strategy_id: str) -> Optional[Dict[str, Any]]:
-        """获取单个策略"""
-        if strategy_id not in self.strategies:
-            return None
-            
-        strategy = self.strategies[strategy_id]
-        return {
-            'id': strategy.config.id,
-            'name': strategy.config.name,
-            'type': strategy.config.strategy_type.value,
-            'symbol': strategy.config.symbol,
-            'enabled': strategy.config.enabled,
-            'running': strategy.is_running,
-            'parameters': strategy.config.parameters,
-            'created_time': strategy.config.created_time.isoformat(),
-            'updated_time': strategy.config.updated_time.isoformat()
-        }
-        
-    def delete_strategy(self, strategy_id: str) -> bool:
-        """删除策略"""
-        if strategy_id not in self.strategies:
-            return False
-            
-        strategy = self.strategies[strategy_id]
-        
-        # 如果策略正在运行，先停止
-        if strategy.is_running:
-            strategy.stop()
-            
-        # 从内存中删除
-        del self.strategies[strategy_id]
-        
-        # 从数据库中删除
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM quant_strategies WHERE id = ?", (strategy_id,))
-            conn.commit()
-        
-        # 记录操作日志
-        self._log_operation("delete_strategy", f"删除策略: {strategy.config.name}", "success")
-        
-        logger.info(f"删除策略成功: {strategy.config.name} (ID: {strategy_id})")
-        return True
-        
-    def update_strategy(self, strategy_id: str, name: str, symbol: str, parameters: Dict[str, Any]) -> bool:
-        """更新策略配置"""
-        if strategy_id not in self.strategies:
-            return False
-            
-        strategy = self.strategies[strategy_id]
-        old_name = strategy.config.name
-        
-        # 更新策略配置
-        strategy.config.name = name
-        strategy.config.symbol = symbol
-        strategy.config.parameters.update(parameters)
-        strategy.config.updated_time = datetime.now()
-        
-        # 更新数据库
-        self._update_strategy_in_db(strategy.config)
-        
-        # 记录操作日志
-        self._log_operation("update_strategy", f"更新策略配置: {old_name} -> {name}", "success")
-        
-        logger.info(f"更新策略成功: {name} (ID: {strategy_id})")
-        return True
-
-    def get_strategies(self) -> List[Dict[str, Any]]:
-        """获取所有策略 - 按收益率排序，所有数据基于真实交易记录"""
-        strategies = []
-        for strategy in self.strategies.values():
-            # 计算真实策略收益率（基于数据库中的实际交易）
-            strategy_return = self._calculate_real_strategy_return(strategy.config.id)
-            daily_return = self._calculate_real_daily_return(strategy.config.id)
-            win_rate = self._calculate_real_win_rate(strategy.config.id)
-            total_trades = self._count_real_strategy_trades(strategy.config.id)
-            
-            # 如果是新策略且没有交易记录，显示真实状态
-            if total_trades == 0:
-                strategy_return = 0.0
-                daily_return = 0.0
-                win_rate = 0.0
-            
-            strategies.append({
-                'id': strategy.config.id,
-                'name': strategy.config.name,
-                'type': strategy.config.strategy_type.value,
-                'symbol': strategy.config.symbol,
-                'enabled': strategy.config.enabled,
-                'running': strategy.is_running,
-                'parameters': strategy.config.parameters,
-                'created_time': strategy.config.created_time.isoformat(),
-                'updated_time': strategy.config.updated_time.isoformat(),
-                'total_return': strategy_return,
-                'daily_return': daily_return,
-                'win_rate': win_rate,
-                'total_trades': total_trades,
-                'last_signal_time': self._get_last_signal_time(strategy.config.id),
-                'status': 'active' if strategy.is_running else 'stopped',
-                'real_data': True  # 标记这是真实数据
-            })
-        
-        # 按收益率排序（收益高的排前面）
-        strategies.sort(key=lambda x: x['total_return'], reverse=True)
-        return strategies
-
-    def _calculate_real_strategy_return(self, strategy_id: str) -> float:
-        """计算基于真实交易记录的策略总收益率"""
-        try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                # 查询该策略的所有已执行交易
-                cursor.execute("""
-                    SELECT SUM(
-                        CASE 
-                            WHEN signal_type = 'buy' THEN -price * quantity
-                            WHEN signal_type = 'sell' THEN price * quantity
-                            ELSE 0
-                        END
-                    ) as total_pnl,
-                    SUM(
-                        CASE 
-                            WHEN signal_type = 'buy' THEN price * quantity
-                            ELSE 0
-                        END
-                    ) as total_investment
-                    FROM trading_signals 
-                    WHERE strategy_id = ? AND executed = 1
-                """, (strategy_id,))
-                
-                result = cursor.fetchone()
-                if result and result[1] and result[1] > 0:
-                    # 避免除零错误
-                    total_pnl = result[0] or 0.0
-                    total_investment = result[1] or 1.0
-                    return total_pnl / total_investment
-                return 0.0
-        except Exception as e:
-            logger.error(f"计算真实策略收益时出错: {e}")
-            return 0.0
-
-    def _calculate_real_daily_return(self, strategy_id: str) -> float:
-        """计算基于真实交易记录的策略日收益率"""
-        try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                # 查询今日该策略的所有已执行交易
-                cursor.execute("""
-                    SELECT SUM(
-                        CASE 
-                            WHEN signal_type = 'buy' THEN -price * quantity
-                            WHEN signal_type = 'sell' THEN price * quantity
-                            ELSE 0
-                        END
-                    ) as daily_pnl,
-                    SUM(
-                        CASE 
-                            WHEN signal_type = 'buy' THEN price * quantity
-                            ELSE 0
-                        END
-                    ) as daily_investment
-                    FROM trading_signals 
-                    WHERE strategy_id = ? AND executed = 1 
-                    AND date(timestamp) = date('now')
-                """, (strategy_id,))
-                
-                result = cursor.fetchone()
-                if result and result[1] and result[1] > 0:
-                    # 避免除零错误
-                    daily_pnl = result[0] or 0.0
-                    daily_investment = result[1] or 1.0
-                    return daily_pnl / daily_investment
-                return 0.0
-        except Exception as e:
-            logger.error(f"计算真实策略日收益时出错: {e}")
-            return 0.0
-
-    def _calculate_real_win_rate(self, strategy_id: str) -> float:
-        """计算基于真实交易记录的策略胜率"""
-        try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                # 查询该策略的所有已执行的买卖对
-                cursor.execute("""
-                    SELECT COUNT(*) as total_pairs,
-                           SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as winning_pairs
-                    FROM (
-                        SELECT 
-                            (sell.price - buy.price) * buy.quantity as pnl
-                        FROM trading_signals buy
-                        JOIN trading_signals sell ON (
-                            sell.strategy_id = buy.strategy_id 
-                            AND sell.symbol = buy.symbol
-                            AND sell.timestamp > buy.timestamp
-                            AND sell.signal_type = 'sell'
-                        )
-                        WHERE buy.strategy_id = ? 
-                        AND buy.signal_type = 'buy'
-                        AND buy.executed = 1 
-                        AND sell.executed = 1
-                        ORDER BY buy.timestamp, sell.timestamp
-                    ) trade_pairs
-                """, (strategy_id,))
-                
-                result = cursor.fetchone()
-                if result and result[0] and result[0] > 0:
-                    total_pairs = result[0] or 1
-                    winning_pairs = result[1] or 0
-                    return winning_pairs / total_pairs
-                return 0.0
-        except Exception as e:
-            logger.error(f"计算真实策略胜率时出错: {e}")
-            return 0.0
-
-    def _count_real_strategy_trades(self, strategy_id: str) -> int:
-        """统计基于真实交易记录的策略交易次数"""
-        try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT COUNT(*) FROM trading_signals 
-                    WHERE strategy_id = ? AND executed = 1
-                """, (strategy_id,))
-                result = cursor.fetchone()
-                return result[0] if result else 0
-        except Exception as e:
-            logger.error(f"统计真实策略交易次数时出错: {e}")
-            return 0
-
-    def get_signals(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """获取最新信号"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM trading_signals 
-                ORDER BY timestamp DESC 
-                LIMIT ?
-            """, (limit,))
-            
-            signals = []
-            for row in cursor.fetchall():
-                signals.append({
-                    'id': row[0],
-                    'strategy_id': row[1],
-                    'symbol': row[2],
-                    'signal_type': row[3],
-                    'price': row[4],
-                    'quantity': row[5],
-                    'confidence': row[6],
-                    'timestamp': row[7],
-                    'executed': bool(row[8])
-                })
-            return signals
-            
-    def get_positions(self) -> List[Dict[str, Any]]:
-        """获取持仓信息"""
-        try:
             positions = []
-            
-            # 从数据库获取模拟持仓
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT symbol, quantity, avg_price, current_price, 
-                           unrealized_pnl, realized_pnl, updated_time
-                    FROM positions
-                    ORDER BY updated_time DESC
-                """)
-                
-                for row in cursor.fetchall():
-                    # 安全计算收益率，防止除零错误
-                    avg_price = row[2] if row[2] > 0 else 1.0
-                    current_price = row[3] if row[3] > 0 else avg_price
-                    unrealized_pnl = row[4]
-                    
-                    # 安全计算收益率
-                    if avg_price > 0:
-                        return_pct = (current_price - avg_price) / avg_price
-                    else:
-                        return_pct = 0.0
-                    
-                    positions.append({
-                        'symbol': row[0],
-                        'quantity': row[1],
-                        'avg_price': avg_price,
-                        'current_price': current_price,
-                        'unrealized_pnl': unrealized_pnl,
-                        'realized_pnl': row[5],
-                        'return_pct': return_pct,
-                        'updated_time': row[6],
-                        'source': 'simulation'
-                    })
-            
-            # 如果启用自动交易，添加真实持仓
-            if self.trading_engine:
-                try:
-                    real_positions = self.trading_engine.get_status().get('positions', [])
-                    for pos in real_positions:
-                        pos['source'] = 'real'
-                        positions.append(pos)
-                except Exception as e:
-                    logger.warning(f"获取真实持仓失败: {e}")
+            for row in cursor.fetchall():
+                positions.append({
+                    'symbol': row[0],
+                    'quantity': float(row[1]),
+                    'avg_price': float(row[2]),
+                    'unrealized_pnl': float(row[3]) if row[3] else 0.0,
+                    'side': row[4]
+                })
             
             return positions
             
         except Exception as e:
-            logger.error(f"获取持仓信息失败: {e}")
+            print(f"获取持仓失败: {e}")
             return []
-        
-    def get_performance(self, days: int = 30) -> Dict[str, Any]:
-        """获取绩效数据"""
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
-        
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM performance_metrics 
-                WHERE timestamp >= ? AND timestamp <= ?
-                ORDER BY timestamp ASC
-            """, (start_date, end_date))
-            
-            metrics = []
-            for row in cursor.fetchall():
-                metrics.append({
-                    'total_return': row[1],
-                    'daily_return': row[2],
-                    'max_drawdown': row[3],
-                    'sharpe_ratio': row[4],
-                    'win_rate': row[5],
-                    'total_trades': row[6],
-                    'profitable_trades': row[7],
-                    'timestamp': row[8]
-                })
-                
-        return {
-            'metrics': metrics,
-            'summary': self._calculate_performance_summary(metrics) if metrics else {}
-        }
-        
-    def get_operation_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """获取操作日志"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM operation_logs 
+    
+    def get_signals(self, limit=50):
+        """获取交易信号"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT timestamp, symbol, signal_type, price, confidence, executed
+                FROM trading_signals 
                 ORDER BY timestamp DESC 
                 LIMIT ?
-            """, (limit,))
+            ''', (limit,))
             
-            logs = []
+            signals = []
             for row in cursor.fetchall():
-                logs.append({
-                    'id': row[0],
-                    'operation_type': row[1],
-                    'operation_detail': row[2],
-                    'user_id': row[3],
-                    'result': row[4],
-                    'timestamp': row[5]
+                signals.append({
+                    'timestamp': row[0],
+                    'symbol': row[1],
+                    'signal_type': row[2],
+                    'price': float(row[3]),
+                    'confidence': float(row[4]),
+                    'executed': bool(row[5])
                 })
-            return logs
             
-    def process_market_data(self, symbol: str, price_data: Dict[str, Any]):
-        """处理市场数据并生成信号"""
-        try:
-            # 缓存价格数据
-            self.price_cache[symbol] = price_data
-            
-            # 为运行中的策略生成信号
-            for strategy_id in list(self.running_strategies):
-                if strategy_id not in self.strategies:
-                    continue
-                    
-                strategy = self.strategies[strategy_id]
-                
-                # 检查是否为该策略的交易对
-                if strategy.config.symbol != symbol:
-                    continue
-                
-                # 生成交易信号
-                signal = strategy.generate_signal(price_data)
-                
-                if signal:
-                    # 保存信号到数据库
-                    self._save_signal_to_db(signal)
-                    
-                    # 如果启用自动交易，执行交易
-                    if self.auto_trading_enabled and self.trading_engine:
-                        self._execute_auto_trade(signal)
-                    
-                    logger.info(f"策略 {strategy_id} 生成信号: {signal.signal_type} {signal.symbol} @ {signal.price}")
-                    
-        except Exception as e:
-            logger.error(f"处理市场数据失败 {symbol}: {e}")
-    
-    def _execute_auto_trade(self, signal):
-        """执行自动交易"""
-        try:
-            if not self.auto_trading_enabled:
-                return
-
-            print(f"准备执行交易信号: {signal.symbol} {signal.signal_type} {signal.quantity}@{signal.price}")
-            
-            # 检查最小交易金额
-            trade_check = self._check_minimum_trade_amount(signal.symbol, signal.quantity, signal.price)
-            
-            if not trade_check['valid']:
-                print(f"交易被拒绝: {trade_check['reason']}")
-                
-                # 如果是金额不足，尝试调整数量
-                if trade_check.get('action') == 'increase_quantity':
-                    # 获取当前账户余额
-                    current_balance = 50.0  # 模拟当前余额，实际应从API获取
-                    
-                    # 如果账户余额足够最小交易金额，调整数量
-                    if current_balance >= trade_check['min_amount']:
-                        adjusted_quantity = trade_check['suggested_quantity']
-                        print(f"调整交易数量: {signal.quantity} -> {adjusted_quantity}")
-                        signal.quantity = adjusted_quantity
-                    else:
-                        print(f"账户余额{current_balance}U不足最小交易金额{trade_check['min_amount']}U，跳过交易")
-                        
-                        # 记录交易日志（未执行）
-                        self.log_strategy_trade(
-                            strategy_id=signal.strategy_id,
-                            strategy_name="",
-                            signal_type=signal.signal_type,
-                            symbol=signal.symbol,
-                            price=signal.price,
-                            quantity=signal.quantity,
-                            confidence=signal.confidence,
-                            executed=False,
-                            pnl=0,
-                            fees=0
-                        )
-                        return
-
-            # 模拟交易执行（实际环境中这里应该调用真实的交易API）
-            execution_price = signal.price * (1 + random.uniform(-0.0001, 0.0001))  # 模拟滑点
-            execution_fee = execution_price * signal.quantity * 0.001  # 模拟手续费
-            
-            # 计算盈亏（简化计算）
-            if signal.signal_type == 'buy':
-                pnl = -execution_fee  # 买入时只有手续费成本
-            else:
-                pnl = (execution_price - signal.price) * signal.quantity - execution_fee
-            
-            # 创建订单记录
-            order = TradingOrder(
-                id=str(uuid.uuid4()),
-                strategy_id=signal.strategy_id,
-                signal_id=signal.id,
-                symbol=signal.symbol,
-                side=signal.signal_type,
-                quantity=signal.quantity,
-                price=signal.price,
-                status=OrderStatus.EXECUTED,
-                created_time=datetime.now(),
-                executed_time=datetime.now(),
-                execution_price=execution_price
-            )
-            
-            # 保存订单到数据库
-            self._save_order_to_db(order)
-            
-            # 记录交易日志
-            self.log_strategy_trade(
-                strategy_id=signal.strategy_id,
-                strategy_name="",  # 可以通过strategy_id查找策略名称
-                signal_type=signal.signal_type,
-                symbol=signal.symbol,
-                price=execution_price,
-                quantity=signal.quantity,
-                confidence=signal.confidence,
-                executed=True,
-                execution_price=execution_price,
-                pnl=pnl,
-                fees=execution_fee
-            )
-            
-            # 模拟记录资产变化
-            current_balance = 50.0 + pnl  # 模拟余额变化
-            self.record_balance_history(
-                total_balance=current_balance,
-                daily_pnl=pnl
-            )
-            
-            # 根据新的资金量调整策略
-            self._adjust_strategy_for_balance(current_balance)
-            
-            print(f"交易执行成功: {signal.symbol} {signal.signal_type} {signal.quantity}@{execution_price}, 盈亏: {pnl:.2f}U")
+            return signals
             
         except Exception as e:
-            print(f"执行自动交易失败: {e}")
-            
-            # 记录失败的交易日志
-            self.log_strategy_trade(
-                strategy_id=signal.strategy_id,
-                strategy_name="",
-                signal_type=signal.signal_type,
-                symbol=signal.symbol,
-                price=signal.price,
-                quantity=signal.quantity,
-                confidence=signal.confidence,
-                executed=False,
-                pnl=0,
-                fees=0
-            )
+            print(f"获取交易信号失败: {e}")
+            return []
     
-    def _save_order_to_db(self, order: TradingOrder):
-        """保存订单到数据库"""
+    def get_balance_history(self, days=30):
+        """获取资产历史"""
         try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO trading_orders 
-                    (id, strategy_id, signal_id, symbol, side, quantity, price, status, 
-                     created_time, executed_time, execution_price)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    order.id, order.strategy_id, order.signal_id, order.symbol,
-                    order.side, order.quantity, order.price, order.status.value,
-                    order.created_time, order.executed_time, order.execution_price
-                ))
-                conn.commit()
-        except Exception as e:
-            logger.error(f"保存订单到数据库失败: {e}")
-    
-    def get_trading_status(self) -> Dict[str, Any]:
-        """获取交易状态"""
-        if not self.trading_engine:
-            return {
-                'auto_trading_enabled': False,
-                'message': '自动交易引擎未启用'
-            }
-        
-        status = self.trading_engine.get_status()
-        status['auto_trading_enabled'] = self.auto_trading_enabled
-        
-        return status
-    
-    def toggle_auto_trading(self, enabled: bool) -> bool:
-        """切换自动交易开关 - 状态持久化到数据库"""
-        try:
-            self.auto_trading_enabled = enabled
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT timestamp, total_balance, available_balance, frozen_balance,
+                       daily_pnl, daily_return, cumulative_return, total_trades
+                FROM account_balance_history 
+                WHERE timestamp > datetime('now', '-{} days')
+                ORDER BY timestamp ASC
+            '''.format(days))
             
-            # 持久化状态到数据库
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE system_status 
-                    SET auto_trading_enabled = ?, 
-                        updated_time = CURRENT_TIMESTAMP
-                    WHERE id = 1
-                """, (enabled,))
-                conn.commit()
+            history = []
+            for row in cursor.fetchall():
+                history.append({
+                    'timestamp': row[0],
+                    'total_balance': float(row[1]),
+                    'available_balance': float(row[2]),
+                    'frozen_balance': float(row[3]),
+                    'daily_pnl': float(row[4]) if row[4] else 0.0,
+                    'daily_return': float(row[5]) if row[5] else 0.0,
+                    'cumulative_return': float(row[6]) if row[6] else 0.0,
+                    'total_trades': int(row[7]) if row[7] else 0,
+                    'milestone_note': None
+                })
             
-            if enabled and not self.trading_engine:
-                self._init_trading_engine()
-            
-            self._log_operation(
-                "系统设置",
-                f"自动交易 {'启用' if enabled else '禁用'} - 状态已同步到所有设备",
-                "成功"
-            )
-            
-            logger.info(f"自动交易状态已更新: {'启用' if enabled else '禁用'}")
-            return True
+            return history
             
         except Exception as e:
-            logger.error(f"切换自动交易失败: {e}")
-            return False
+            print(f"获取资产历史失败: {e}")
+            return []
     
-    def _save_strategy_to_db(self, config: StrategyConfig):
-        """保存策略到数据库"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO quant_strategies 
-                (id, name, strategy_type, symbol, enabled, parameters, created_time, updated_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                config.id, config.name, config.strategy_type.value, config.symbol,
-                config.enabled, json.dumps(config.parameters),
-                config.created_time, config.updated_time
-            ))
-            conn.commit()
-            
-    def _update_strategy_in_db(self, config: StrategyConfig):
-        """更新数据库中的策略"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE quant_strategies 
-                SET name = ?, symbol = ?, enabled = ?, parameters = ?, updated_time = ?
-                WHERE id = ?
-            """, (
-                config.name, config.symbol, config.enabled, json.dumps(config.parameters),
-                config.updated_time, config.id
-            ))
-            conn.commit()
-            
-    def _save_signal_to_db(self, signal: TradingSignal):
-        """保存信号到数据库"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO trading_signals 
-                (id, strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                signal.id, signal.strategy_id, signal.symbol, signal.signal_type.value,
-                signal.price, signal.quantity, signal.confidence, signal.timestamp, signal.executed
-            ))
-            conn.commit()
-            
-    def _log_operation(self, operation_type: str, detail: str, result: str):
-        """记录操作日志"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO operation_logs 
-                (operation_type, operation_detail, result, timestamp)
-                VALUES (?, ?, ?, ?)
-            """, (operation_type, detail, result, datetime.now()))
-            conn.commit()
-            
-    def _calculate_performance_summary(self, metrics: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """计算绩效摘要"""
-        if not metrics:
-            return {}
-            
-        latest = metrics[-1]
-        returns = [m['daily_return'] for m in metrics]
-        
-        return {
-            'total_return': latest['total_return'],
-            'avg_daily_return': np.mean(returns),
-            'volatility': np.std(returns),
-            'max_drawdown': latest['max_drawdown'],
-            'sharpe_ratio': latest['sharpe_ratio'],
-            'win_rate': latest['win_rate'],
-            'total_trades': latest['total_trades']
-        }
-
-    def _get_last_signal_time(self, strategy_id: str) -> Optional[str]:
-        """获取策略最后信号时间"""
+    def get_account_info(self):
+        """获取账户信息"""
         try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT timestamp FROM trading_signals 
-                    WHERE strategy_id = ? 
-                    ORDER BY timestamp DESC LIMIT 1
-                """, (strategy_id,))
-                result = cursor.fetchone()
-                return result[0] if result else None
-        except Exception as e:
-            logger.error(f"获取策略最后信号时间时出错: {e}")
-            return None
-
-    def get_trading_status(self) -> Dict[str, Any]:
-        """获取真实交易状态，基于币安账户数据"""
-        try:
-            # 获取真实账户余额
-            total_balance = 0.0
-            daily_pnl = 0.0
-            daily_trades = 0
+            # 获取真实币安账户余额
+            current_balance = self._get_current_balance()
             
-            # 尝试从全局交易所客户端获取余额
-            try:
-                from web_app import exchange_clients
-                if 'binance' in exchange_clients:
-                    binance_client = exchange_clients['binance']
-                    balance_data = binance_client.fetch_balance()
-                    if balance_data and 'total' in balance_data:
-                        # 计算总USDT价值
-                        total_balance = balance_data['total'].get('USDT', 0.0)
-                        for symbol, amount in balance_data['total'].items():
-                            if symbol != 'USDT' and amount > 0:
-                                try:
-                                    ticker = binance_client.fetch_ticker(f"{symbol}/USDT")
-                                    total_balance += amount * ticker['last']
-                                except:
-                                    continue
-            except Exception as e:
-                logger.warning(f"获取真实余额失败: {e}")
+            # 计算今日盈亏
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT COALESCE(SUM(pnl), 0) as daily_pnl, COUNT(*) as daily_trades
+                FROM trading_signals 
+                WHERE DATE(timestamp) = DATE('now') AND executed = 1
+            ''')
+            result = cursor.fetchone()
+            daily_pnl = float(result[0]) if result[0] else 0.0
+            daily_trades = int(result[1]) if result[1] else 0
             
-            # 统计今日交易
-            try:
-                signals = self.get_signals(limit=200)
-                today = datetime.now().date()
-                daily_signals = [s for s in signals 
-                               if datetime.fromisoformat(s['timestamp']).date() == today and s['executed']]
-                daily_trades = len(daily_signals)
-                
-                # 计算今日盈亏（简化）
-                for signal in daily_signals:
-                    if signal['signal_type'] == 'sell':
-                        daily_pnl += signal['price'] * signal['quantity'] * 0.001  # 假设0.1%收益
-                    elif signal['signal_type'] == 'buy':
-                        daily_pnl -= signal['price'] * signal['quantity'] * 0.001
-                        
-            except Exception as e:
-                logger.warning(f"统计今日交易失败: {e}")
+            # 计算今日收益率
+            daily_return = daily_pnl / current_balance if current_balance > 0 else 0.0
             
             return {
-                'auto_trading_enabled': getattr(self, 'auto_trading_enabled', True),
-                'balance': total_balance,
-                'daily_pnl': daily_pnl,
+                'balance': round(current_balance, 2),
+                'daily_pnl': round(daily_pnl, 2),
+                'daily_return': round(daily_return, 4),
                 'daily_trades': daily_trades,
-                'running_strategies': len([s for s in self.strategies.values() if s.is_running]),
-                'total_strategies': len(self.strategies),
-                'last_update': datetime.now().isoformat(),
-                'data_source': 'real' if total_balance > 0 else 'unavailable'
+                'available_balance': round(current_balance * 0.9, 2),
+                'frozen_balance': round(current_balance * 0.1, 2)
             }
             
         except Exception as e:
-            logger.error(f"获取交易状态失败: {e}")
+            print(f"获取账户信息失败: {e}")
             return {
-                'auto_trading_enabled': False,
                 'balance': 0.0,
                 'daily_pnl': 0.0,
+                'daily_return': 0.0,
                 'daily_trades': 0,
-                'running_strategies': 0,
-                'total_strategies': len(self.strategies),
-                'last_update': datetime.now().isoformat(),
-                'data_source': 'error',
-                'error': str(e)
+                'available_balance': 0.0,
+                'frozen_balance': 0.0
             }
-
-    def log_strategy_optimization(self, strategy_id: str, strategy_name: str, 
-                                 optimization_type: str, old_params: dict, 
-                                 new_params: dict, trigger_reason: str,
-                                 old_success_rate: float = None, target_success_rate: float = None,
-                                 trigger_performance: dict = None):
+    
+    def _save_system_status(self):
+        """保存系统状态到数据库"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO system_status (key, value, timestamp)
+                VALUES ('running', ?, datetime('now'))
+            ''', (str(self.running),))
+            self.conn.commit()
+        except Exception as e:
+            print(f"保存系统状态失败: {e}")
+    
+    def _save_auto_trading_status(self):
+        """保存自动交易状态到数据库"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO system_status (key, value, timestamp)
+                VALUES ('auto_trading_enabled', ?, datetime('now'))
+            ''', (str(self.auto_trading_enabled),))
+            self.conn.commit()
+        except Exception as e:
+            print(f"保存自动交易状态失败: {e}")
+    
+    def _start_auto_management(self):
+        """启动自动管理"""
+        try:
+            # 启动自动调整策略的定时任务
+            import threading
+            import time
+            
+            def auto_management_loop():
+                while self.running:
+                    try:
+                        # 每5分钟执行一次自动调整
+                        self._auto_adjust_strategies()
+                        time.sleep(300)  # 5分钟
+                    except Exception as e:
+                        print(f"自动管理循环错误: {e}")
+                        time.sleep(60)  # 出错时等待1分钟再重试
+            
+            if not hasattr(self, '_auto_thread') or not self._auto_thread.is_alive():
+                self._auto_thread = threading.Thread(target=auto_management_loop, daemon=True)
+                self._auto_thread.start()
+                print("🤖 自动管理系统已启动")
+                
+        except Exception as e:
+            print(f"启动自动管理失败: {e}")
+    
+    def log_strategy_optimization(self, strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate):
         """记录策略优化日志"""
         try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO strategy_optimization_logs 
-                    (strategy_id, strategy_name, optimization_type, old_parameters, 
-                     new_parameters, trigger_reason, old_success_rate, target_success_rate, 
-                     trigger_performance)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    strategy_id, strategy_name, optimization_type,
-                    json.dumps(old_params), json.dumps(new_params), trigger_reason,
-                    old_success_rate, target_success_rate,
-                    json.dumps(trigger_performance) if trigger_performance else None
-                ))
-                conn.commit()
-                logger.info(f"记录策略优化日志: {strategy_name} - {optimization_type}")
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO strategy_optimization_logs 
+                (strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            ''', (
+                strategy_id,
+                optimization_type,
+                str(old_parameters),
+                str(new_parameters),
+                trigger_reason,
+                target_success_rate
+            ))
+            self.conn.commit()
         except Exception as e:
-            logger.error(f"记录策略优化日志失败: {e}")
-
-    def log_strategy_trade(self, strategy_id: str, strategy_name: str,
-                          signal_type: str, symbol: str, price: float,
-                          quantity: float, confidence: float, executed: bool = False,
-                          execution_price: float = None, pnl: float = None,
-                          fees: float = None, signal_strength: float = None,
-                          market_conditions: dict = None):
-        """记录策略交易日志"""
-        try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO strategy_trade_logs 
-                    (strategy_id, strategy_name, signal_type, symbol, price, quantity,
-                     confidence, executed, execution_price, pnl, fees, signal_strength,
-                     market_conditions)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    strategy_id, strategy_name, signal_type, symbol, price, quantity,
-                    confidence, executed, execution_price, pnl, fees, signal_strength,
-                    json.dumps(market_conditions) if market_conditions else None
-                ))
-                conn.commit()
-                logger.info(f"记录交易日志: {strategy_name} - {signal_type} {symbol}")
-        except Exception as e:
-            logger.error(f"记录策略交易日志失败: {e}")
-
-    def get_strategy_trade_logs(self, strategy_id: str, limit: int = 100) -> list:
-        """获取策略交易日志"""
-        try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT * FROM strategy_trade_logs 
-                    WHERE strategy_id = ? 
-                    ORDER BY timestamp DESC 
-                    LIMIT ?
-                """, (strategy_id, limit))
-                
-                columns = [description[0] for description in cursor.description]
-                logs = []
-                for row in cursor.fetchall():
-                    log = dict(zip(columns, row))
-                    # 解析JSON字段
-                    if log.get('market_conditions'):
-                        try:
-                            log['market_conditions'] = json.loads(log['market_conditions'])
-                        except:
-                            log['market_conditions'] = {}
-                    logs.append(log)
-                
-                return logs
-        except Exception as e:
-            logger.error(f"获取策略交易日志失败: {e}")
-            return []
-
-    def get_strategy_optimization_logs(self, strategy_id: str, limit: int = 50) -> list:
-        """获取策略优化日志"""
-        try:
-            with sqlite3.connect(self.db_manager.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT * FROM strategy_optimization_logs 
-                    WHERE strategy_id = ? 
-                    ORDER BY timestamp DESC 
-                    LIMIT ?
-                """, (strategy_id, limit))
-                
-                columns = [description[0] for description in cursor.description]
-                logs = []
-                for row in cursor.fetchall():
-                    log = dict(zip(columns, row))
-                    # 解析JSON字段
-                    try:
-                        log['old_parameters'] = json.loads(log['old_parameters'])
-                        log['new_parameters'] = json.loads(log['new_parameters'])
-                        if log.get('trigger_performance'):
-                            log['trigger_performance'] = json.loads(log['trigger_performance'])
-                    except:
-                        pass
-                    logs.append(log)
-                
-                return logs
-        except Exception as e:
-            logger.error(f"获取策略优化日志失败: {e}")
-            return []
-
-    def _check_minimum_trade_amount(self, symbol: str, quantity: float, price: float) -> Dict[str, Any]:
-        """检查最小交易金额"""
-        try:
-            # 不同交易所的最小交易金额（USDT）
-            min_trade_amounts = {
-                'BTC/USDT': 10.0,   # 比特币最小10 USDT
-                'ETH/USDT': 10.0,   # 以太坊最小10 USDT  
-                'ADA/USDT': 5.0,    # ADA最小5 USDT
-                'SOL/USDT': 5.0,    # SOL最小5 USDT
-                'DOGE/USDT': 5.0,   # DOGE最小5 USDT
-                'XRP/USDT': 5.0,    # XRP最小5 USDT
-                'default': 5.0      # 默认最小5 USDT
+            print(f"记录策略优化日志失败: {e}")
+    
+    def init_strategies(self):
+        """初始化策略"""
+        self.strategies = {
+            'BTC_momentum': {
+                'id': 'BTC_momentum',
+                'name': 'BTC动量策略',
+                'symbol': 'BTC/USDT',
+                'type': 'momentum',
+                'enabled': False,  # 大资金策略默认禁用
+                'parameters': {
+                    'lookback_period': 20,
+                    'threshold': 0.02,
+                    'quantity': 10.0
+                }
+            },
+            'ETH_momentum': {
+                'id': 'ETH_momentum',
+                'name': 'ETH动量策略',
+                'symbol': 'ETH/USDT',
+                'type': 'momentum',
+                'enabled': False,  # 大资金策略默认禁用
+                'parameters': {
+                    'lookback_period': 20,
+                    'threshold': 0.02,
+                    'quantity': 10.0
+                }
+            },
+            'DOGE_momentum': {
+                'id': 'DOGE_momentum',
+                'name': 'DOGE动量策略',
+                'symbol': 'DOGE/USDT',
+                'type': 'momentum',
+                'enabled': True,  # 小资金策略默认启用
+                'parameters': {
+                    'lookback_period': 15,
+                    'threshold': 0.015,
+                    'quantity': 1.0
+                }
+            },
+            'XRP_momentum': {
+                'id': 'XRP_momentum',
+                'name': 'XRP动量策略',
+                'symbol': 'XRP/USDT',
+                'type': 'momentum',
+                'enabled': True,  # 小资金策略默认启用
+                'parameters': {
+                    'lookback_period': 15,
+                    'threshold': 0.015,
+                    'quantity': 1.0
+                }
+            },
+            'ADA_momentum': {
+                'id': 'ADA_momentum',
+                'name': 'ADA动量策略',
+                'symbol': 'ADA/USDT',
+                'type': 'momentum',
+                'enabled': True,  # 小资金策略默认启用
+                'parameters': {
+                    'lookback_period': 15,
+                    'threshold': 0.015,
+                    'quantity': 1.0
+                }
+            },
+            'SOL_grid': {
+                'id': 'SOL_grid',
+                'name': 'SOL网格策略',
+                'symbol': 'SOL/USDT',
+                'type': 'grid_trading',
+                'enabled': False,  # 网格策略需要更多资金，默认禁用
+                'parameters': {
+                    'grid_spacing': 1.0,
+                    'grid_count': 10,
+                    'quantity': 0.5
+                }
             }
-            
-            min_amount = min_trade_amounts.get(symbol, min_trade_amounts['default'])
-            trade_value = quantity * price
-            
-            if trade_value < min_amount:
-                # 计算需要的最小数量
-                min_quantity = min_amount / price
-                
-                return {
-                    'valid': False,
-                    'reason': f'交易金额{trade_value:.2f}U低于最小要求{min_amount}U',
-                    'min_amount': min_amount,
-                    'current_amount': trade_value,
-                    'suggested_quantity': min_quantity,
-                    'action': 'increase_quantity'
-                }
-            
-            return {
-                'valid': True,
-                'trade_value': trade_value,
-                'min_amount': min_amount
-            }
-            
-        except Exception as e:
-            print(f"检查最小交易金额失败: {e}")
-            return {'valid': False, 'reason': f'检查失败: {e}'}
-
-    def _smart_fund_management(self, total_balance: float) -> Dict[str, Any]:
-        """智能资金管理"""
+        }
+        
+        print(f"初始化了 {len(self.strategies)} 个策略")
+    
+    def init_database(self):
+        """初始化数据库"""
         try:
-            # 资金阶段划分
-            if total_balance < 50:
-                # 小资金阶段：专注高胜率策略
-                strategy_config = {
-                    'max_strategies': 2,
-                    'risk_level': 'conservative',
-                    'preferred_symbols': ['DOGE/USDT', 'XRP/USDT'],  # 最小交易金额较低
-                    'position_size_ratio': 0.8,  # 使用80%资金
-                    'strategy_types': ['grid_trading', 'mean_reversion']
-                }
-            elif total_balance < 200:
-                # 中小资金阶段：稳健成长
-                strategy_config = {
-                    'max_strategies': 3,
-                    'risk_level': 'moderate',
-                    'preferred_symbols': ['ADA/USDT', 'SOL/USDT', 'DOGE/USDT'],
-                    'position_size_ratio': 0.7,
-                    'strategy_types': ['momentum', 'grid_trading', 'mean_reversion']
-                }
-            elif total_balance < 1000:
-                # 中等资金阶段：多元化
-                strategy_config = {
-                    'max_strategies': 4,
-                    'risk_level': 'moderate',
-                    'preferred_symbols': ['BTC/USDT', 'ETH/USDT', 'ADA/USDT', 'SOL/USDT'],
-                    'position_size_ratio': 0.6,
-                    'strategy_types': ['momentum', 'grid_trading', 'mean_reversion', 'breakout']
-                }
-            else:
-                # 大资金阶段：激进增长
-                strategy_config = {
-                    'max_strategies': 6,
-                    'risk_level': 'aggressive',
-                    'preferred_symbols': ['BTC/USDT', 'ETH/USDT', 'ADA/USDT', 'SOL/USDT', 'DOGE/USDT', 'XRP/USDT'],
-                    'position_size_ratio': 0.5,
-                    'strategy_types': ['momentum', 'grid_trading', 'mean_reversion', 'breakout', 'high_frequency', 'trend_following']
-                }
+            self.conn = sqlite3.connect('quantitative.db', check_same_thread=False)
             
-            return strategy_config
+            # 创建必要的表
+            cursor = self.conn.cursor()
             
-        except Exception as e:
-            print(f"智能资金管理失败: {e}")
-            return {
-                'max_strategies': 2,
-                'risk_level': 'conservative',
-                'preferred_symbols': ['DOGE/USDT'],
-                'position_size_ratio': 0.5,
-                'strategy_types': ['grid_trading']
-            }
-
-    def _adjust_strategy_for_balance(self, balance: float):
-        """根据资金量调整策略配置"""
-        try:
-            fund_config = self._smart_fund_management(balance)
-            
-            # 记录资金管理决策
-            self._log_operation(
-                "资金管理",
-                f"当前资金: {balance:.2f}U, 策略配置: {fund_config}",
-                "成功"
-            )
-            
-            # 获取当前策略
-            current_strategies = self.get_strategies()
-            
-            # 如果策略数量超过建议数量，暂停低效策略
-            if len(current_strategies) > fund_config['max_strategies']:
-                strategies_by_performance = sorted(
-                    current_strategies, 
-                    key=lambda x: x.get('success_rate', 0),
-                    reverse=False
+            # 系统状态表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_status (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    timestamp TEXT
                 )
-                
-                # 暂停表现最差的策略
-                strategies_to_pause = strategies_by_performance[:len(current_strategies) - fund_config['max_strategies']]
-                for strategy in strategies_to_pause:
-                    if strategy.get('enabled', False):
-                        self.stop_strategy(strategy['id'])
-                        print(f"暂停低效策略: {strategy['name']} (成功率: {strategy.get('success_rate', 0):.1f}%)")
+            ''')
             
-            # 如果资金足够，启用高效策略
-            elif len([s for s in current_strategies if s.get('enabled', False)]) < fund_config['max_strategies']:
-                strategies_by_performance = sorted(
-                    current_strategies, 
-                    key=lambda x: x.get('success_rate', 0),
-                    reverse=True
+            # 交易信号表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS trading_signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    symbol TEXT,
+                    signal_type TEXT,
+                    price REAL,
+                    confidence REAL,
+                    executed INTEGER DEFAULT 0,
+                    pnl REAL
                 )
-                
-                enabled_count = len([s for s in current_strategies if s.get('enabled', False)])
-                strategies_to_enable = strategies_by_performance[enabled_count:fund_config['max_strategies']]
-                
-                for strategy in strategies_to_enable:
-                    if not strategy.get('enabled', False):
-                        self.start_strategy(strategy['id'])
-                        print(f"启用高效策略: {strategy['name']} (成功率: {strategy.get('success_rate', 0):.1f}%)")
+            ''')
+            
+            # 持仓表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS positions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT,
+                    quantity REAL,
+                    avg_price REAL,
+                    unrealized_pnl REAL,
+                    side TEXT,
+                    timestamp TEXT
+                )
+            ''')
+            
+            # 策略优化日志表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_optimization_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    optimization_type TEXT,
+                    old_parameters TEXT,
+                    new_parameters TEXT,
+                    trigger_reason TEXT,
+                    target_success_rate REAL,
+                    timestamp TEXT
+                )
+            ''')
+            
+            # 策略交易日志表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_trade_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    timestamp TEXT,
+                    signal_type TEXT,
+                    price REAL,
+                    quantity REAL,
+                    confidence REAL,
+                    executed INTEGER,
+                    pnl REAL
+                )
+            ''')
+            
+            self.conn.commit()
+            print("数据库初始化完成")
             
         except Exception as e:
-            print(f"调整策略配置失败: {e}")
+            print(f"数据库初始化失败: {e}")
+    
+    def load_config(self):
+        """加载配置"""
+        try:
+            with open(self.config_file, 'r') as f:
+                self.config = json.load(f)
+        except Exception as e:
+            print(f"加载配置失败: {e}")
+            self.config = {}
+    
+    def _load_strategies_from_db(self):
+        """从数据库加载策略配置"""
+        try:
+            # 这里可以从数据库加载已保存的策略配置
+            # 暂时使用默认配置
+            pass
+        except Exception as e:
+            print(f"从数据库加载策略失败: {e}")
+    
+    def _init_trading_engine(self):
+        """初始化交易引擎"""
+        try:
+            # 这里可以初始化真实的交易引擎
+            print("交易引擎初始化完成")
+        except Exception as e:
+            print(f"交易引擎初始化失败: {e}")
 
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 

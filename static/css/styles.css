@@ -388,47 +388,74 @@ body {
 @media (max-width: 768px) {
     /* 导航栏响应式 */
     .navbar {
-        padding: 0.5rem;
-        min-height: 60px;
+        padding: 0.3rem 0.5rem;
+        min-height: 50px;
     }
     
     .navbar-brand {
-        font-size: 1.2rem;
+        font-size: 1rem;
+        margin-right: 0.5rem;
     }
     
     /* 窄屏时品牌组垂直布局 */
     .navbar-brand-group {
         flex-direction: column;
         align-items: flex-start;
-        gap: 0.2rem;
+        gap: 0.1rem;
     }
     
     .system-status {
-        font-size: 0.75rem;
-        margin-left: 0.5rem;
+        font-size: 0.65rem;
+        margin-left: 0.2rem;
+        gap: 0.3rem;
+    }
+    
+    .system-status span {
+        white-space: nowrap;
     }
     
     .status-indicator {
-        width: 6px;
-        height: 6px;
+        width: 5px;
+        height: 5px;
     }
     
-    /* 确保导航菜单横向排列 */
+    /* 确保导航菜单横向排列并自适应 */
+    .navbar-content {
+        gap: 0.3rem;
+        width: 100%;
+        min-width: 0;
+    }
+    
+    .navbar-left {
+        flex: 0 0 auto;
+        min-width: 0;
+        gap: 0.3rem;
+    }
+    
     .navbar-nav {
         display: flex !important;
         flex-direction: row !important;
-        justify-content: center !important;
+        justify-content: flex-end !important;
         align-items: center !important;
-        gap: 0.3rem !important;
-        width: 100% !important;
+        gap: 0.2rem !important;
+        flex: 1 1 auto;
+        min-width: 0;
         flex-wrap: nowrap !important;
+        overflow: hidden;
     }
     
     .navbar-nav .nav-link {
-        padding: 0.4rem 0.6rem !important;
-        font-size: 0.75rem !important;
+        padding: 0.25rem 0.4rem !important;
+        font-size: 0.65rem !important;
         min-width: auto !important;
         white-space: nowrap !important;
+        border-radius: 0.25rem !important;
+        flex: 0 0 auto;
+    }
+    
+    .navbar-nav .nav-link i {
+        font-size: 0.7rem;
+        margin-right: 0.2rem;
     }
     
     .nav-link-desktop-text {
@@ -437,6 +464,7 @@ body {
     
     .nav-link-mobile-text {
         display: inline;
+        font-size: 0.6rem;
     }
     
     /* 其他响应式调整 */
@@ -483,22 +511,37 @@ body {
 }
 
 @media (max-width: 480px) {
+    .navbar {
+        padding: 0.2rem 0.3rem;
+        min-height: 45px;
+    }
+    
+    .navbar-brand {
+        font-size: 0.9rem;
+    }
+    
+    .system-status {
+        font-size: 0.6rem;
+        gap: 0.2rem;
+    }
+    
     .navbar-nav .nav-link {
-        padding: 0.3rem 0.4rem !important;
-        font-size: 0.7rem !important;
+        padding: 0.2rem 0.3rem !important;
+        font-size: 0.6rem !important;
     }
     
     .navbar-nav .nav-link i {
-        font-size: 0.8rem;
+        font-size: 0.65rem;
+        margin-right: 0.15rem;
     }
     
-    .navbar-nav + .d-flex {
-        margin-left: 0.5rem;
-    }
-    
-    .navbar-nav + .d-flex .badge {
+    .nav-link-mobile-text {
         font-size: 0.55rem;
-        padding: 0.15rem 0.3rem;
+    }
+    
+    .container-fluid {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
     }
 }
 
