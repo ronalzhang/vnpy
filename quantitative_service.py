@@ -2152,6 +2152,11 @@ class QuantitativeService:
         
         # 加载配置和初始化
         self.load_config()
+        
+        # ⭐ 在init_database之前初始化数据库连接
+        import sqlite3
+        self.conn = sqlite3.connect("quantitative.db", check_same_thread=False)
+        
         self.init_database()
         self.init_strategies()
         

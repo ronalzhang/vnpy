@@ -80,8 +80,7 @@ class QuantitativeBackgroundService:
                 # 更新进化代数
                 current_generation = getattr(self.engine, 'current_generation', 0)
                 self.quantitative_service.update_system_status(
-                    current_generation=current_generation,
-                    last_evolution_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    current_generation=current_generation
                 )
             logger.info("✅ 策略进化完成")
             
