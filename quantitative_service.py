@@ -3106,118 +3106,89 @@ class QuantitativeService:
             self.auto_trading_enabled = False
     
     def get_strategies(self):
-        """获取策略列表 - 包含模拟交易后的最新数据"""
+        """获取所有策略信息，包含最新的模拟结果"""
         try:
             strategies_list = []
+            
             for strategy_id, strategy in self.strategies.items():
-                # 获取策略表现数据
-                performance = self._get_strategy_performance(strategy_id)
+                # 获取最新的模拟结果
+                simulation_result = self._get_latest_simulation_result(strategy_id)
                 
-                # 获取模拟交易结果（如果存在）
-                simulation_score = strategy.get('simulation_score', 60.0)
-                simulation_win_rate = strategy.get('simulation_win_rate', 0.0)
-                qualified_for_trading = strategy.get('qualified_for_trading', False)
-                real_trading_enabled = strategy.get('real_trading_enabled', False)
-                ranking = strategy.get('ranking', None)
+                # 计算实际交易数据
+                win_rate = self._calculate_real_win_rate(strategy_id)
+                total_trades = self._count_real_strategy_trades(strategy_id) 
+                total_return = self._calculate_real_strategy_return(strategy_id)
                 
-                # 如果有模拟结果，使用模拟数据；否则使用实际交易数据
-                if hasattr(strategy, 'simulation_score') or 'simulation_score' in strategy:
+                # 使用模拟数据优先，实际数据作为备用
+                if simulation_result and simulation_result.get('final_score', 0) > 0:
                     # 使用模拟数据
-                    final_score = simulation_score
-                    final_win_rate = strategy.get('combined_win_rate', simulation_win_rate)
+                    final_score = simulation_result['final_score']
+                    final_win_rate = simulation_result.get('combined_win_rate', win_rate)
                     data_source = "模拟交易"
+                    qualified_for_trading = simulation_result.get('qualified_for_live_trading', False)
                 else:
                     # 使用实际交易数据
-                    total_return = performance['total_pnl'] / 100.0 if performance['total_pnl'] else 0.0
-                    win_rate = performance['success_rate']
-                    total_trades = performance['total_trades']
-                    
-                    # 简化的评分计算
-                    if total_trades < 5:
-                        # 新策略给予默认评分
-                        final_score = 60.0
-                        sharpe_ratio = 0.0
-                        max_drawdown = 0.0
-                        profit_factor = 1.0
-                    else:
-                        # 基于实际数据计算评分
-                        sharpe_ratio = max(total_return / max(abs(total_return) * 0.5, 0.01), 0) if total_return != 0 else 0
-                        max_drawdown = min(abs(total_return) * 0.3, 0.15)  # 估算回撤
-                        profit_factor = max(1.0 + total_return, 0.5)  # 估算盈利因子
-                        
-                        # 综合评分
-                        return_score = min(max(total_return * 100, -50), 100)
-                        win_rate_score = win_rate * 100
-                        sharpe_score = min(max(sharpe_ratio * 20, 0), 100)
-                        drawdown_score = max(100 - max_drawdown * 200, 0)
-                        
-                        final_score = (return_score * 0.3 + win_rate_score * 0.4 + 
-                                     sharpe_score * 0.2 + drawdown_score * 0.1)
-                        final_score = max(min(final_score, 100), 0)
-                    
+                    final_score = self._calculate_strategy_score_with_history(
+                        strategy_id, total_return, win_rate, 2.0, 0.05, 2.0, total_trades
+                    )['current_score']
                     final_win_rate = win_rate
                     data_source = "实际交易"
+                    qualified_for_trading = final_score >= self.fund_allocation_config['min_score_for_trading']
                 
-                # 计算评分变化
-                try:
-                    score_info = self._calculate_strategy_score_with_history(
-                        strategy_id, 0, final_win_rate, 0, 0, 0, performance['total_trades']
-                    )
-                    score_change = score_info.get('score_change', 0)
-                    change_direction = score_info.get('change_direction', 'stable')
-                    trend_color = score_info.get('trend_color', '#007bff')
-                except Exception as e:
-                    print(f"计算评分历史失败: {e}")
-                    score_change = 0
-                    change_direction = 'stable'
-                    trend_color = '#007bff'
-                
-                # 构建策略数据
-                strategy_data = {
+                strategy_info = {
                     'id': strategy_id,
-                    'name': strategy['name'],
-                    'symbol': strategy['symbol'],
-                    'type': strategy['type'],
+                    'name': strategy.get('name', 'Unknown'),
+                    'symbol': strategy.get('symbol', 'Unknown'),
+                    'strategy_type': strategy.get('strategy_type', 'unknown'),
                     'enabled': strategy.get('enabled', False),
-                    'running': strategy.get('enabled', False),
+                    'real_trading_enabled': strategy.get('real_trading_enabled', False),
+                    'ranking': strategy.get('ranking'),
+                    'allocated_amount': strategy.get('allocated_amount', 0),
                     
-                    # 性能数据（优先使用模拟数据）
-                    'success_rate': final_win_rate,  # 前端使用的字段名
-                    'win_rate': final_win_rate,     # 备用字段名
-                    'total_trades': performance['total_trades'],
-                    'total_pnl': performance['total_pnl'],
-                    'daily_pnl': performance.get('daily_pnl', 0),
+                    # 核心性能指标
+                    'final_score': round(final_score, 1),
+                    'win_rate': round(final_win_rate * 100, 1),
+                    'total_trades': simulation_result.get('total_trades', total_trades) if simulation_result else total_trades,
+                    'total_return': round((simulation_result.get('combined_return', total_return) if simulation_result else total_return) * 100, 2),
+                    'sharpe_ratio': simulation_result.get('sharpe_ratio', 2.0) if simulation_result else 2.0,
+                    'max_drawdown': round((simulation_result.get('max_drawdown', 0.05) if simulation_result else 0.05) * 100, 2),
+                    'profit_factor': simulation_result.get('profit_factor', 2.0) if simulation_result else 2.0,
                     
-                    # 评分信息
-                    'score': final_score,
-                    'score_change': score_change,
-                    'change_direction': change_direction,
-                    'trend_color': trend_color,
-                    
-                    # 模拟交易状态
-                    'simulation_score': simulation_score,
+                    # 状态信息
                     'qualified_for_trading': qualified_for_trading,
-                    'real_trading_enabled': real_trading_enabled,
-                    'ranking': ranking,
                     'data_source': data_source,
-                    
-                    # 其他信息
-                    'parameters': strategy.get('parameters', {}),
-                    'created_time': strategy.get('created_time', ''),
-                    'updated_time': strategy.get('updated_time', '')
+                    'simulation_date': simulation_result.get('simulation_date') if simulation_result else None,
+                    'last_signal_time': strategy.get('last_signal_time'),
+                    'parameters': strategy.get('parameters', {})
                 }
                 
-                strategies_list.append(strategy_data)
+                strategies_list.append(strategy_info)
             
-            # 按评分排序（模拟评分优先，否则按计算评分）
-            strategies_list.sort(key=lambda x: x['simulation_score'] if x['simulation_score'] > 0 else x['score'], reverse=True)
+            # 按评分排序
+            strategies_list.sort(key=lambda x: x['final_score'], reverse=True)
             
-            print(f"✅ 返回 {len(strategies_list)} 个策略数据")
             return strategies_list
             
         except Exception as e:
             print(f"获取策略列表失败: {e}")
             return []
+
+    def _get_latest_simulation_result(self, strategy_id: str) -> Dict:
+        """获取策略的最新模拟结果"""
+        try:
+            if hasattr(self, 'db_manager') and self.db_manager:
+                result = self.db_manager.execute_query(
+                    "SELECT result_data FROM simulation_results WHERE strategy_id = ? ORDER BY created_at DESC LIMIT 1",
+                    (strategy_id,),
+                    fetch_one=True
+                )
+                if result:
+                    import json
+                    return json.loads(result[0])
+            return None
+        except Exception as e:
+            print(f"获取模拟结果失败: {e}")
+            return None
     
     def toggle_strategy(self, strategy_id):
         """切换策略状态"""
@@ -3641,94 +3612,25 @@ class QuantitativeService:
     def init_database(self):
         """初始化数据库"""
         try:
-            self.conn = sqlite3.connect('quantitative.db', check_same_thread=False)
+            # 创建数据库管理器实例
+            self.db_manager = DatabaseManager()
             
-            # 创建必要的表
-            cursor = self.conn.cursor()
+            # 初始化数据库表
+            self.db_manager.init_database()
             
-            # 系统状态表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS system_status (
-                    key TEXT PRIMARY KEY,
-                    value TEXT,
-                    timestamp TEXT
-                )
-            ''')
-            
-            # 策略表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS strategies (
-                    id TEXT PRIMARY KEY,
-                    name TEXT,
-                    symbol TEXT,
-                    type TEXT,
-                    enabled INTEGER DEFAULT 0,
-                    parameters TEXT,
-                    created_at TEXT,
-                    updated_at TEXT
-                )
-            ''')
-            
-            # 交易信号表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS trading_signals (
-                    id TEXT PRIMARY KEY,
-                    strategy_id TEXT,
-                    symbol TEXT,
-                    signal_type TEXT,
-                    price REAL,
-                    quantity REAL,
-                    confidence REAL,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-                    executed INTEGER DEFAULT 0
-                )
-            ''')
-            
-            # 账户余额历史表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS account_balance_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    total_balance REAL,
-                    available_balance REAL,
-                    frozen_balance REAL,
-                    daily_pnl REAL,
-                    daily_return REAL,
-                    milestone_note TEXT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # 策略评分历史表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS strategy_score_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    strategy_id TEXT,
-                    score REAL,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # 操作日志表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS operation_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    operation_type TEXT,
-                    detail TEXT,
-                    result TEXT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            self.conn.commit()
-            
-            # 检查并添加初始资产历史数据
+            # 确保初始余额历史数据
             self._ensure_initial_balance_history()
             
-            print("数据库初始化完成")
+            # 初始化策略模拟器
+            if not self.simulator:
+                self.simulator = StrategySimulator(self)
             
+            print("数据库初始化完成")
         except Exception as e:
             print(f"数据库初始化失败: {e}")
-            
+            # 创建备用数据库管理器
+            self.db_manager = DatabaseManager()
+    
     def _ensure_initial_balance_history(self):
         """确保有初始的资产历史数据"""
         try:
