@@ -1943,6 +1943,11 @@ class QuantitativeService:
         self.auto_management_thread = None
         self.simulator = None
         
+        # 🧬 初始化进化引擎
+        self.evolution_engine = None
+        self.evolution_enabled = True
+        self.auto_evolution_thread = None
+        
         # 持久化缓存机制
         self.balance_cache = {
             'balance': 0.0,
@@ -1957,57 +1962,104 @@ class QuantitativeService:
             'positions': [],
             'last_update': None,
             'cache_valid': False,
-            'update_triggers': ['trade_executed', 'position_changed', 'manual_refresh']
+            'update_triggers': ['trade_executed', 'position_change', 'manual_refresh']
         }
         
-        # 资金分配配置
+        # 初始化配置
         self.fund_allocation_config = {
             'max_active_strategies': 2,
-            'min_score_for_trading': 60.0,  # 修改为60分
-            'allocation_ratio': [0.6, 0.4],  # 第一名60%，第二名40%
-            'protection_mode': True,  # 策略保护模式
-            'auto_stop_loss': False,  # 不自动停止策略
-            'rebalance_interval': 24,  # 24小时重新平衡一次
-            'fund_fitness_weight': 0.3  # 资金适配性权重30%
+            'min_score_for_trading': 60.0,
+            'fund_allocation_method': 'fitness_based',
+            'risk_management_enabled': True,
+            'auto_rebalancing': True
         }
         
-        # 小资金管理配置
-        self.small_fund_config = {
-            'min_balance_threshold': 5.0,  # 最小资金阈值5U
-            'low_fund_threshold': 20.0,    # 小资金阈值20U
-            'adaptive_mode': True,          # 启用自适应模式
-            'auto_optimize': True,          # 启用自动优化
-            'risk_management': True         # 启用风险管理
-        }
-        
-        # 加载配置
+        # 加载配置和初始化
         self.load_config()
-        
-        # 初始化数据库
         self.init_database()
-        
-        # 初始化策略模拟器
-        self.simulator = StrategySimulator(self)
-        
-        # 加载系统状态
-        self._load_system_status()
-        self._load_auto_trading_status()
-        
-        # 初始化策略
         self.init_strategies()
         
-        # 从数据库加载已有策略
-        self._load_strategies_from_db()
+        # 🧬 启动进化引擎
+        self._init_evolution_engine()
         
-        # 启用全自动化管理
-        if self.running:
-            self._start_auto_management()
+        print("✅ QuantitativeService 初始化完成")
+    
+    def _init_evolution_engine(self):
+        """初始化进化引擎"""
+        try:
+            self.evolution_engine = EvolutionaryStrategyEngine(self)
+            print("🧬 进化引擎已启动")
             
-        # 初始化交易引擎
-        if self.running:
-            self._init_trading_engine()
+            # 启动自动进化线程
+            if self.evolution_enabled:
+                self._start_auto_evolution()
+                
+        except Exception as e:
+            print(f"❌ 进化引擎初始化失败: {e}")
+    
+    def _start_auto_evolution(self):
+        """启动自动进化线程"""
+        if self.auto_evolution_thread and self.auto_evolution_thread.is_alive():
+            return
             
-        print(f"量化交易服务初始化完成 - 系统状态: {'运行中' if self.running else '离线'}")
+        def evolution_loop():
+            while self.evolution_enabled and self.running:
+                try:
+                    if self.evolution_engine.should_run_evolution():
+                        print("🧬 触发自动进化...")
+                        self.evolution_engine.run_evolution_cycle()
+                    
+                    # 每10分钟检查一次
+                    import time
+                    time.sleep(600)
+                    
+                except Exception as e:
+                    print(f"❌ 自动进化失败: {e}")
+                    import time
+                    time.sleep(300)  # 出错后5分钟重试
+        
+        self.auto_evolution_thread = threading.Thread(target=evolution_loop, daemon=True)
+        self.auto_evolution_thread.start()
+        print("🧬 自动进化线程已启动")
+    
+    def manual_evolution(self):
+        """手动触发进化"""
+        if not self.evolution_engine:
+            return {'success': False, 'message': '进化引擎未启动'}
+        
+        try:
+            result = self.evolution_engine.run_evolution_cycle()
+            return {
+                'success': result,
+                'message': '进化完成' if result else '进化失败',
+                'status': self.evolution_engine.get_evolution_status()
+            }
+        except Exception as e:
+            return {'success': False, 'message': f'进化失败: {str(e)}'}
+    
+    def get_evolution_status(self):
+        """获取进化状态"""
+        if not self.evolution_engine:
+            return {'success': False, 'message': '进化引擎未启动'}
+        
+        try:
+            status = self.evolution_engine.get_evolution_status()
+            return {'success': True, 'data': status}
+        except Exception as e:
+            return {'success': False, 'message': f'获取状态失败: {str(e)}'}
+    
+    def toggle_evolution(self, enabled: bool):
+        """开关进化功能"""
+        self.evolution_enabled = enabled
+        
+        if enabled and not self.auto_evolution_thread:
+            self._start_auto_evolution()
+        
+        return {
+            'success': True,
+            'message': f'进化功能已{"启用" if enabled else "禁用"}',
+            'enabled': self.evolution_enabled
+        }
     
     def run_all_strategy_simulations(self):
         """运行所有策略的模拟交易，计算初始评分"""
@@ -4558,6 +4610,576 @@ class StrategySimulator:
             
         except Exception as e:
             print(f"保存模拟结果失败: {e}")
+
+class EvolutionaryStrategyEngine:
+    """自进化策略管理引擎 - AI驱动的策略创建、优化和淘汰系统"""
+    
+    def __init__(self, quantitative_service):
+        self.quantitative_service = quantitative_service
+        self.strategy_templates = {
+            'momentum': {
+                'name_prefix': '动量策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOGE/USDT', 'XRP/USDT', 'ADA/USDT'],
+                'param_ranges': {
+                    'lookback_period': (5, 50),
+                    'threshold': (0.001, 0.05),
+                    'quantity': (1.0, 50.0),
+                    'momentum_threshold': (0.001, 0.03),
+                    'volume_threshold': (1.0, 3.0)
+                }
+            },
+            'mean_reversion': {
+                'name_prefix': '均值回归策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'LTC/USDT', 'BCH/USDT'],
+                'param_ranges': {
+                    'lookback_period': (10, 100),
+                    'std_multiplier': (1.0, 4.0),
+                    'quantity': (1.0, 30.0),
+                    'reversion_threshold': (0.005, 0.03),
+                    'min_deviation': (0.01, 0.05)
+                }
+            },
+            'grid_trading': {
+                'name_prefix': '网格交易策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'],
+                'param_ranges': {
+                    'grid_spacing': (0.5, 3.0),
+                    'grid_count': (5, 20),
+                    'quantity': (1.0, 20.0),
+                    'lookback_period': (50, 200),
+                    'min_profit': (0.1, 1.0)
+                }
+            },
+            'breakout': {
+                'name_prefix': '突破策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'DOGE/USDT'],
+                'param_ranges': {
+                    'lookback_period': (10, 50),
+                    'breakout_threshold': (0.5, 2.0),
+                    'quantity': (1.0, 40.0),
+                    'volume_threshold': (1.0, 4.0),
+                    'confirmation_periods': (1, 5)
+                }
+            },
+            'trend_following': {
+                'name_prefix': '趋势跟踪策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'ADA/USDT', 'XRP/USDT'],
+                'param_ranges': {
+                    'lookback_period': (20, 100),
+                    'trend_threshold': (0.5, 2.0),
+                    'quantity': (1.0, 35.0),
+                    'trend_strength_min': (0.1, 0.8)
+                }
+            },
+            'high_frequency': {
+                'name_prefix': '高频交易策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT'],
+                'param_ranges': {
+                    'quantity': (1.0, 20.0),
+                    'min_profit': (0.01, 0.05),
+                    'volatility_threshold': (0.0001, 0.005),
+                    'lookback_period': (5, 15),
+                    'signal_interval': (10, 30)
+                }
+            }
+        }
+        
+        self.evolution_config = {
+            'target_score': 100.0,
+            'target_success_rate': 1.0,  # 100%
+            'max_strategies': 20,  # 同时运行的最大策略数
+            'min_strategies': 8,   # 保持的最小策略数
+            'evolution_interval': 3600,  # 1小时进化一次
+            'mutation_rate': 0.3,
+            'crossover_rate': 0.7,
+            'elite_ratio': 0.2,  # 保留最好的20%
+            'elimination_threshold': 45.0  # 低于45分的策略将被淘汰
+        }
+        
+        self.generation = 0
+        self.last_evolution_time = None
+        
+    def run_evolution_cycle(self):
+        """运行一轮完整的进化周期"""
+        try:
+            print(f"\n🧬 开始第 {self.generation + 1} 代策略进化...")
+            
+            # 1. 评估当前所有策略
+            current_strategies = self._evaluate_all_strategies()
+            print(f"📊 当前策略数量: {len(current_strategies)}")
+            
+            # 2. 淘汰表现差的策略
+            survivors = self._eliminate_poor_strategies(current_strategies)
+            print(f"✅ 存活策略: {len(survivors)}")
+            
+            # 3. 选择精英策略
+            elites = self._select_elites(survivors)
+            print(f"🏆 精英策略: {len(elites)}")
+            
+            # 4. 生成新策略
+            new_strategies = self._generate_new_strategies(elites, survivors)
+            print(f"🆕 新建策略: {len(new_strategies)}")
+            
+            # 5. 参数进化优化
+            self._evolve_strategy_parameters(elites)
+            
+            # 6. 启动模拟评估
+            self._start_simulation_for_new_strategies(new_strategies)
+            
+            # 7. 更新策略配置
+            self._update_strategy_allocations()
+            
+            self.generation += 1
+            self.last_evolution_time = datetime.now()
+            
+            print(f"🎯 第 {self.generation} 代进化完成！")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 策略进化失败: {e}")
+            return False
+    
+    def _evaluate_all_strategies(self) -> List[Dict]:
+        """评估所有当前策略"""
+        strategies_data = self.quantitative_service.get_strategies()
+        if not strategies_data.get('success'):
+            return []
+        
+        strategies = []
+        for strategy in strategies_data['data']:
+            score = strategy.get('final_score', 0)
+            win_rate = strategy.get('win_rate', 0)
+            total_return = strategy.get('total_return', 0)
+            total_trades = strategy.get('total_trades', 0)
+            age_days = self._calculate_strategy_age(strategy)
+            
+            # 计算综合适应度评分
+            fitness = self._calculate_fitness(score, win_rate, total_return, total_trades, age_days)
+            
+            strategies.append({
+                'id': strategy['id'],
+                'name': strategy['name'],
+                'type': strategy['type'],
+                'symbol': strategy['symbol'],
+                'score': score,
+                'win_rate': win_rate,
+                'total_return': total_return,
+                'total_trades': total_trades,
+                'fitness': fitness,
+                'age_days': age_days,
+                'parameters': strategy.get('parameters', {}),
+                'data_source': strategy.get('data_source', 'unknown')
+            })
+        
+        # 按适应度排序
+        strategies.sort(key=lambda x: x['fitness'], reverse=True)
+        return strategies
+    
+    def _calculate_fitness(self, score: float, win_rate: float, total_return: float, 
+                          total_trades: int, age_days: int) -> float:
+        """计算策略适应度评分"""
+        # 基础评分权重 40%
+        fitness = score * 0.4
+        
+        # 成功率权重 25%
+        fitness += win_rate * 100 * 0.25
+        
+        # 收益率权重 20%
+        fitness += max(0, total_return * 100) * 0.2
+        
+        # 交易频率权重 10%（适度交易更好）
+        if total_trades > 0:
+            trade_frequency = min(total_trades / max(age_days, 1), 10) * 10
+            fitness += trade_frequency * 0.1
+        
+        # 年龄奖励 5%（经验丰富的策略获得奖励）
+        age_bonus = min(age_days / 30, 2) * 5  # 最多+10分
+        fitness += age_bonus * 0.05
+        
+        return min(fitness, 100.0)  # 限制在100分以内
+    
+    def _eliminate_poor_strategies(self, strategies: List[Dict]) -> List[Dict]:
+        """淘汰表现差的策略"""
+        threshold = self.evolution_config['elimination_threshold']
+        
+        survivors = []
+        eliminated = []
+        
+        for strategy in strategies:
+            if (strategy['fitness'] >= threshold or 
+                len(survivors) < self.evolution_config['min_strategies']):
+                survivors.append(strategy)
+            else:
+                eliminated.append(strategy)
+        
+        # 删除淘汰的策略
+        for strategy in eliminated:
+            print(f"🗑️ 淘汰策略: {strategy['name']} (适应度: {strategy['fitness']:.1f})")
+            self._remove_strategy(strategy['id'])
+        
+        return survivors
+    
+    def _select_elites(self, strategies: List[Dict]) -> List[Dict]:
+        """选择精英策略"""
+        elite_count = max(1, int(len(strategies) * self.evolution_config['elite_ratio']))
+        elites = strategies[:elite_count]
+        
+        for elite in elites:
+            print(f"🏆 精英策略: {elite['name']} (适应度: {elite['fitness']:.1f})")
+        
+        return elites
+    
+    def _generate_new_strategies(self, elites: List[Dict], all_strategies: List[Dict]) -> List[Dict]:
+        """生成新策略"""
+        import random
+        
+        new_strategies = []
+        target_count = self.evolution_config['max_strategies']
+        current_count = len(all_strategies)
+        
+        if current_count >= target_count:
+            return new_strategies
+        
+        needed = target_count - current_count
+        
+        for i in range(needed):
+            # 决定创建方式
+            creation_method = random.choice(['mutation', 'crossover', 'random'])
+            
+            if creation_method == 'mutation' and elites:
+                # 基于精英策略变异
+                parent = random.choice(elites)
+                new_strategy = self._mutate_strategy(parent)
+            elif creation_method == 'crossover' and len(elites) >= 2:
+                # 精英策略杂交
+                parent1, parent2 = random.sample(elites, 2)
+                new_strategy = self._crossover_strategies(parent1, parent2)
+            else:
+                # 随机创建全新策略
+                new_strategy = self._create_random_strategy()
+            
+            if new_strategy:
+                new_strategies.append(new_strategy)
+        
+        return new_strategies
+    
+    def _mutate_strategy(self, parent: Dict) -> Dict:
+        """策略变异"""
+        import random
+        
+        strategy_type = parent['type']
+        template = self.strategy_templates.get(strategy_type)
+        if not template:
+            return None
+        
+        # 复制父策略参数
+        new_params = parent['parameters'].copy()
+        
+        # 随机变异部分参数
+        for param_name, (min_val, max_val) in template['param_ranges'].items():
+            if random.random() < self.evolution_config['mutation_rate']:
+                if param_name in new_params:
+                    # 在当前值基础上变异
+                    current_val = new_params[param_name]
+                    mutation_range = (max_val - min_val) * 0.1  # 10%变异幅度
+                    new_val = current_val + random.uniform(-mutation_range, mutation_range)
+                    new_params[param_name] = max(min_val, min(max_val, new_val))
+                else:
+                    # 随机生成新值
+                    new_params[param_name] = random.uniform(min_val, max_val)
+        
+        # 可能变换交易对
+        if random.random() < 0.2:  # 20%概率变换交易对
+            new_symbol = random.choice(template['symbols'])
+        else:
+            new_symbol = parent['symbol']
+        
+        strategy_id = f"{strategy_type}_{new_symbol.replace('/', '_')}_{random.randint(1000, 9999)}"
+        
+        return {
+            'id': strategy_id,
+            'name': f"{template['name_prefix']}-变异代{self.generation+1}",
+            'type': strategy_type,
+            'symbol': new_symbol,
+            'parameters': new_params,
+            'parent_id': parent['id'],
+            'generation': self.generation + 1,
+            'creation_method': 'mutation'
+        }
+    
+    def _crossover_strategies(self, parent1: Dict, parent2: Dict) -> Dict:
+        """策略杂交"""
+        import random
+        
+        # 选择主要类型
+        strategy_type = random.choice([parent1['type'], parent2['type']])
+        template = self.strategy_templates.get(strategy_type)
+        if not template:
+            return None
+        
+        # 参数杂交
+        new_params = {}
+        for param_name, (min_val, max_val) in template['param_ranges'].items():
+            val1 = parent1['parameters'].get(param_name)
+            val2 = parent2['parameters'].get(param_name)
+            
+            if val1 is not None and val2 is not None:
+                # 取平均值或随机选择
+                if random.random() < 0.5:
+                    new_params[param_name] = (val1 + val2) / 2
+                else:
+                    new_params[param_name] = random.choice([val1, val2])
+            elif val1 is not None:
+                new_params[param_name] = val1
+            elif val2 is not None:
+                new_params[param_name] = val2
+            else:
+                new_params[param_name] = random.uniform(min_val, max_val)
+        
+        # 选择交易对
+        symbol = random.choice([parent1['symbol'], parent2['symbol']])
+        
+        strategy_id = f"{strategy_type}_{symbol.replace('/', '_')}_{random.randint(1000, 9999)}"
+        
+        return {
+            'id': strategy_id,
+            'name': f"{template['name_prefix']}-杂交代{self.generation+1}",
+            'type': strategy_type,
+            'symbol': symbol,
+            'parameters': new_params,
+            'parent1_id': parent1['id'],
+            'parent2_id': parent2['id'],
+            'generation': self.generation + 1,
+            'creation_method': 'crossover'
+        }
+    
+    def _create_random_strategy(self) -> Dict:
+        """创建随机新策略"""
+        import random
+        
+        # 随机选择策略类型
+        strategy_type = random.choice(list(self.strategy_templates.keys()))
+        template = self.strategy_templates[strategy_type]
+        
+        # 随机生成参数
+        new_params = {}
+        for param_name, (min_val, max_val) in template['param_ranges'].items():
+            new_params[param_name] = random.uniform(min_val, max_val)
+        
+        # 随机选择交易对
+        symbol = random.choice(template['symbols'])
+        
+        strategy_id = f"{strategy_type}_{symbol.replace('/', '_')}_{random.randint(1000, 9999)}"
+        
+        return {
+            'id': strategy_id,
+            'name': f"{template['name_prefix']}-随机代{self.generation+1}",
+            'type': strategy_type,
+            'symbol': symbol,
+            'parameters': new_params,
+            'generation': self.generation + 1,
+            'creation_method': 'random'
+        }
+    
+    def _evolve_strategy_parameters(self, elites: List[Dict]):
+        """进化精英策略的参数"""
+        for elite in elites:
+            if elite['fitness'] < self.evolution_config['target_score']:
+                # 基于表现调整参数
+                self._optimize_strategy_parameters(elite)
+    
+    def _calculate_strategy_age(self, strategy: Dict) -> int:
+        """计算策略年龄（天数）"""
+        try:
+            created_time = datetime.fromisoformat(strategy.get('created_time', datetime.now().isoformat()))
+            return (datetime.now() - created_time).days
+        except:
+            return 0
+    
+    def should_run_evolution(self) -> bool:
+        """判断是否应该运行进化"""
+        if not self.last_evolution_time:
+            return True
+        
+        time_since_last = (datetime.now() - self.last_evolution_time).total_seconds()
+        return time_since_last >= self.evolution_config['evolution_interval']
+    
+    def get_evolution_status(self) -> Dict:
+        """获取进化状态"""
+        current_strategies = self._evaluate_all_strategies()
+        
+        best_fitness = max([s['fitness'] for s in current_strategies]) if current_strategies else 0
+        avg_fitness = sum([s['fitness'] for s in current_strategies]) / len(current_strategies) if current_strategies else 0
+        
+        perfect_strategies = [s for s in current_strategies if s['fitness'] >= 95.0]
+        
+        return {
+            'generation': self.generation,
+            'total_strategies': len(current_strategies),
+            'best_fitness': best_fitness,
+            'average_fitness': avg_fitness,
+            'perfect_strategies': len(perfect_strategies),
+            'last_evolution': self.last_evolution_time.isoformat() if self.last_evolution_time else None,
+            'next_evolution_in': self._get_next_evolution_time(),
+            'target_achieved': best_fitness >= 95.0 and len(perfect_strategies) > 0
+        }
+
+    def _remove_strategy(self, strategy_id: str):
+        """删除策略"""
+        try:
+            # 从内存中删除
+            if strategy_id in self.quantitative_service.strategies:
+                del self.quantitative_service.strategies[strategy_id]
+            
+            # 从数据库删除
+            self.quantitative_service.db_manager.execute_query(
+                "DELETE FROM strategies WHERE strategy_id = ?", (strategy_id,)
+            )
+            self.quantitative_service.db_manager.execute_query(
+                "DELETE FROM simulation_results WHERE strategy_id = ?", (strategy_id,)
+            )
+            self.quantitative_service.db_manager.execute_query(
+                "DELETE FROM strategy_initialization WHERE strategy_id = ?", (strategy_id,)
+            )
+            
+            print(f"🗑️ 策略 {strategy_id} 已删除")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 删除策略失败 {strategy_id}: {e}")
+            return False
+    
+    def _start_simulation_for_new_strategies(self, new_strategies: List[Dict]):
+        """为新策略启动模拟评估"""
+        for strategy in new_strategies:
+            try:
+                # 创建策略配置
+                self._create_strategy_in_system(strategy)
+                
+                # 运行模拟
+                if not self.quantitative_service.simulator:
+                    self.quantitative_service.simulator = StrategySimulator(self.quantitative_service)
+                
+                result = self.quantitative_service.simulator.run_strategy_simulation(strategy['id'])
+                print(f"🧪 新策略 {strategy['name']} 模拟完成，评分: {result.get('final_score', 0):.1f}")
+                
+            except Exception as e:
+                print(f"❌ 新策略 {strategy['id']} 模拟失败: {e}")
+    
+    def _create_strategy_in_system(self, strategy_config: Dict):
+        """在系统中创建新策略"""
+        try:
+            strategy_id = strategy_config['id']
+            
+            # 添加到内存
+            self.quantitative_service.strategies[strategy_id] = {
+                'id': strategy_id,
+                'name': strategy_config['name'],
+                'type': strategy_config['type'],
+                'symbol': strategy_config['symbol'],
+                'enabled': False,  # 新策略默认不启用，需要模拟评分后才能启用
+                'parameters': strategy_config['parameters'],
+                'created_time': datetime.now().isoformat(),
+                'updated_time': datetime.now().isoformat(),
+                'generation': strategy_config.get('generation', 0),
+                'creation_method': strategy_config.get('creation_method', 'manual'),
+                'parent_id': strategy_config.get('parent_id'),
+                'parent1_id': strategy_config.get('parent1_id'),
+                'parent2_id': strategy_config.get('parent2_id')
+            }
+            
+            # 保存到数据库
+            self.quantitative_service._save_strategies_to_db()
+            
+            print(f"🆕 策略已创建: {strategy_config['name']}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 创建策略失败: {e}")
+            return False
+    
+    def _update_strategy_allocations(self):
+        """更新策略资金分配"""
+        try:
+            # 获取所有策略的最新评分
+            strategies = self._evaluate_all_strategies()
+            
+            # 选择最优策略进行真实交易
+            qualified_strategies = [s for s in strategies if s['fitness'] >= 60.0]
+            
+            if not qualified_strategies:
+                print("⚠️ 没有符合条件的策略")
+                return
+            
+            # 根据适应度分配资金
+            top_strategies = sorted(qualified_strategies, key=lambda x: x['fitness'], reverse=True)[:3]
+            
+            total_fitness = sum(s['fitness'] for s in top_strategies)
+            
+            for i, strategy in enumerate(top_strategies):
+                allocation_ratio = strategy['fitness'] / total_fitness
+                
+                # 更新策略状态
+                self.quantitative_service.strategies[strategy['id']]['enabled'] = True
+                self.quantitative_service.strategies[strategy['id']]['allocation_ratio'] = allocation_ratio
+                
+                print(f"💰 策略 {strategy['name']} 资金分配: {allocation_ratio:.1%}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 更新策略分配失败: {e}")
+            return False
+    
+    def _optimize_strategy_parameters(self, strategy: Dict):
+        """优化策略参数"""
+        try:
+            strategy_type = strategy['type']
+            template = self.strategy_templates.get(strategy_type)
+            if not template:
+                return
+            
+            current_params = strategy['parameters']
+            fitness = strategy['fitness']
+            
+            # 如果适应度较低，进行参数优化
+            if fitness < 80.0:
+                print(f"🔧 优化策略参数: {strategy['name']} (当前适应度: {fitness:.1f})")
+                
+                # 基于表现调整参数
+                for param_name, (min_val, max_val) in template['param_ranges'].items():
+                    if param_name in current_params:
+                        current_val = current_params[param_name]
+                        
+                        # 根据适应度决定调整方向
+                        if fitness < 60:
+                            # 适应度很低，大幅调整
+                            import random
+                            adjustment = random.uniform(-0.3, 0.3) * (max_val - min_val)
+                        else:
+                            # 适应度中等，小幅调整
+                            import random
+                            adjustment = random.uniform(-0.1, 0.1) * (max_val - min_val)
+                        
+                        new_val = current_val + adjustment
+                        current_params[param_name] = max(min_val, min(max_val, new_val))
+                
+                # 更新策略参数
+                self.quantitative_service.strategies[strategy['id']]['parameters'] = current_params
+                self.quantitative_service.strategies[strategy['id']]['updated_time'] = datetime.now().isoformat()
+                
+                print(f"✅ 策略 {strategy['name']} 参数已优化")
+        
+        except Exception as e:
+            print(f"❌ 优化策略参数失败: {e}")
+    
+    def _get_next_evolution_time(self) -> str:
+        """获取下次进化时间"""
+        if not self.last_evolution_time:
+            return "待定"
+        
+        next_time = self.last_evolution_time + timedelta(seconds=self.evolution_config['evolution_interval'])
+        return next_time.strftime("%H:%M:%S")
 
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 

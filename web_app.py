@@ -1965,6 +1965,95 @@ def select_top_strategies():
         logger.error(f"选择策略失败: {e}")
         return jsonify({"status": "error", "message": f"选择策略失败: {str(e)}"})
 
+@app.route('/api/quantitative/evolution/status', methods=['GET'])
+def get_evolution_status():
+    """获取进化状态"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"status": "error", "message": "量化模块未启用"})
+    
+    try:
+        result = quantitative_service.get_evolution_status()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/quantitative/evolution/trigger', methods=['POST'])
+def trigger_evolution():
+    """手动触发进化"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"status": "error", "message": "量化模块未启用"})
+    
+    try:
+        result = quantitative_service.manual_evolution()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/quantitative/evolution/toggle', methods=['POST'])
+def toggle_evolution():
+    """开关进化功能"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"status": "error", "message": "量化模块未启用"})
+    
+    try:
+        data = request.get_json() or {}
+        enabled = data.get('enabled', True)
+        
+        result = quantitative_service.toggle_evolution(enabled)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/quantitative/strategies/create', methods=['POST'])
+def create_strategy():
+    """创建新策略"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"status": "error", "message": "量化模块未启用"})
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"status": "error", "message": "缺少策略数据"})
+        
+        # 基本验证
+        required_fields = ['name', 'type', 'symbol', 'parameters']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"status": "error", "message": f"缺少必要字段: {field}"})
+        
+        # 生成策略ID
+        import random
+        strategy_id = f"{data['type']}_{data['symbol'].replace('/', '_')}_{random.randint(1000, 9999)}"
+        
+        # 创建策略配置
+        strategy_config = {
+            'id': strategy_id,
+            'name': data['name'],
+            'type': data['type'],
+            'symbol': data['symbol'],
+            'parameters': data['parameters'],
+            'generation': 0,
+            'creation_method': 'manual'
+        }
+        
+        # 通过进化引擎创建策略
+        if quantitative_service.evolution_engine:
+            result = quantitative_service.evolution_engine._create_strategy_in_system(strategy_config)
+            if result:
+                return jsonify({
+                    "success": True,
+                    "message": "策略创建成功",
+                    "strategy_id": strategy_id
+                })
+            else:
+                return jsonify({"success": False, "message": "策略创建失败"})
+        else:
+            return jsonify({"success": False, "message": "进化引擎未启动"})
+            
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
 def main():
     """主函数"""
     global status
