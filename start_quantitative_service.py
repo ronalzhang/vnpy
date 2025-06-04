@@ -53,12 +53,12 @@ class QuantitativeBackgroundService:
     def run_quantitative_cycle(self):
         """运行一次量化系统循环"""
         try:
-            # 策略评估和选择
-            self.manager.evaluate_and_select_strategies()
-            logger.info("✅ 策略评估完成")
+            # 自动策略管理
+            self.manager.auto_manage_strategies()
+            logger.info("✅ 策略管理完成")
             
             # 策略进化
-            self.engine.evolve()
+            self.engine.run_evolution_cycle()
             logger.info("✅ 策略进化完成")
             
             return True
