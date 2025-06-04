@@ -23,6 +23,7 @@ import uuid
 import requests
 import traceback
 import ccxt
+import logging
 
 # 策略类型枚举
 class StrategyType(Enum):
@@ -1912,7 +1913,7 @@ class QuantitativeService:
         # 资金分配策略配置
         self.fund_allocation_config = {
             'max_active_strategies': 2,    # 最多2个策略进行真实交易
-            'min_score_for_trading': 70.0, # 最低70分才能真实交易
+            'min_score_for_trading': 60.0, # 最低60分才能真实交易 (从70降至60)
             'simulation_required': True,    # 必须先模拟交易
             'allocation_ratio': [0.6, 0.4] # 第1名60%资金，第2名40%资金
         }
@@ -1987,76 +1988,152 @@ class QuantitativeService:
         return simulation_results
     
     def _select_top_strategies_for_trading(self, simulation_results: Dict):
-        """选择评分最高的前2个策略进行真实交易"""
-        print("\n🏆 正在选择最优策略进行真实交易...")
-        
-        # 筛选合格策略
-        qualified_strategies = []
-        for strategy_id, result in simulation_results.items():
-            if result['qualified_for_live_trading'] and result['final_score'] >= self.fund_allocation_config['min_score_for_trading']:
-                qualified_strategies.append((strategy_id, result))
-        
-        # 按评分排序
-        qualified_strategies.sort(key=lambda x: x[1]['final_score'], reverse=True)
-        
-        # 先禁用所有策略的真实交易
-        for strategy_id in self.strategies:
-            self.strategies[strategy_id]['enabled'] = False
-            self.strategies[strategy_id]['real_trading_enabled'] = False
-        
-        # 选择前2名进行真实交易
-        max_strategies = self.fund_allocation_config['max_active_strategies']
-        selected_strategies = qualified_strategies[:max_strategies]
-        
-        if not selected_strategies:
-            print("⚠️ 没有策略达到真实交易要求，建议优化策略参数")
-            return
-        
-        # 获取当前真实余额
-        current_balance = self._get_current_balance()
-        allocation_ratios = self.fund_allocation_config['allocation_ratio']
-        
-        print(f"💰 总资金: {current_balance:.2f} USDT")
-        
-        for i, (strategy_id, result) in enumerate(selected_strategies):
-            strategy = self.strategies[strategy_id]
+        """选择评分最高的前两名策略进行真实交易，考虑资金适配性"""
+        try:
+            current_balance = self._get_current_balance()
+            logging.info(f"当前可用资金: {current_balance}U")
             
-            # 启用策略
-            strategy['enabled'] = True
-            strategy['real_trading_enabled'] = True
-            strategy['ranking'] = i + 1
+            # 筛选合格策略
+            qualified_strategies = []
+            for strategy_id, result in simulation_results.items():
+                if result.get('qualified_for_live_trading', False):
+                    strategy = self.strategies.get(strategy_id, {})
+                    
+                    # 计算资金适配性评分
+                    fund_fitness = self._calculate_fund_fitness(strategy, current_balance)
+                    
+                    qualified_strategies.append({
+                        'strategy_id': strategy_id,
+                        'strategy_name': strategy.get('name', 'Unknown'),
+                        'score': result['final_score'],
+                        'win_rate': result['combined_win_rate'],
+                        'fund_fitness': fund_fitness,  # 资金适配性评分
+                        'combined_score': result['final_score'] * 0.7 + fund_fitness * 0.3,  # 综合评分
+                        'symbol': strategy.get('symbol', 'Unknown'),
+                        'strategy_type': strategy.get('strategy_type', 'unknown')
+                    })
             
-            # 分配资金
-            if i < len(allocation_ratios):
-                allocation_ratio = allocation_ratios[i]
+            if not qualified_strategies:
+                logging.warning("没有合格的策略进行真实交易")
+                return
+            
+            # 按综合评分排序
+            qualified_strategies.sort(key=lambda x: x['combined_score'], reverse=True)
+            
+            # 选择前两名
+            top_strategies = qualified_strategies[:self.fund_allocation_config['max_active_strategies']]
+            
+            logging.info("策略选择结果:")
+            for i, strategy in enumerate(top_strategies):
+                allocation = self.fund_allocation_config['allocation_ratio'][i]
+                allocated_amount = current_balance * allocation
+                
+                logging.info(f"第{i+1}名: {strategy['strategy_name']} "
+                           f"(评分: {strategy['score']:.1f}, 胜率: {strategy['win_rate']:.1f}%, "
+                           f"资金适配: {strategy['fund_fitness']:.1f}, 综合: {strategy['combined_score']:.1f}) "
+                           f"- 分配资金: {allocated_amount:.2f}U ({allocation*100:.0f}%)")
+            
+            # 更新数据库
+            self._update_strategy_trading_status(top_strategies, current_balance)
+            
+        except Exception as e:
+            logging.error(f"选择策略失败: {e}")
+
+    def _calculate_fund_fitness(self, strategy: Dict, current_balance: float) -> float:
+        """计算策略的资金适配性评分"""
+        try:
+            strategy_type = strategy.get('strategy_type', 'unknown')
+            symbol = strategy.get('symbol', '')
+            
+            # 基础适配性评分
+            base_score = 50.0
+            
+            # 根据策略类型调整
+            if current_balance < 10:  # 小资金
+                if strategy_type in ['grid_trading', 'high_frequency']:
+                    base_score += 30  # 网格和高频更适合小资金
+                elif strategy_type in ['momentum', 'mean_reversion']:
+                    base_score += 20  # 动量和均值回归也不错
+                else:
+                    base_score += 10
+            elif current_balance < 50:  # 中等资金
+                if strategy_type in ['momentum', 'trend_following']:
+                    base_score += 25  # 动量和趋势跟踪适合中等资金
+                elif strategy_type in ['grid_trading', 'mean_reversion']:
+                    base_score += 20
+                else:
+                    base_score += 15
+            else:  # 较大资金
+                if strategy_type in ['trend_following', 'breakout']:
+                    base_score += 30  # 趋势和突破适合大资金
+                elif strategy_type in ['momentum', 'mean_reversion']:
+                    base_score += 25
+                else:
+                    base_score += 20
+            
+            # 根据交易对调整
+            if 'BTC' in symbol.upper():
+                base_score += 10  # BTC相对稳定
+            elif symbol.upper() in ['ETH', 'BNB']:
+                base_score += 8   # 主流币
+            elif symbol.upper() in ['SOL', 'ADA', 'XRP']:
+                base_score += 5   # 二线主流
             else:
-                allocation_ratio = 0.1  # 额外策略分配10%
+                base_score += 2   # 其他币种
             
-            allocated_amount = current_balance * allocation_ratio
+            # 确保评分在合理范围内
+            return min(100.0, max(0.0, base_score))
             
-            # 计算合适的交易量
-            strategy['parameters']['quantity'] = self._calculate_optimal_quantity(
-                strategy_id, allocated_amount, result
-            )
+        except Exception as e:
+            logging.error(f"计算资金适配性失败: {e}")
+            return 50.0  # 默认中等适配性
+
+    def _update_strategy_trading_status(self, top_strategies: List[Dict], current_balance: float):
+        """更新策略的交易状态"""
+        try:
+            # 首先关闭所有策略的真实交易
+            for strategy_id in self.strategies:
+                self.db_manager.execute_query(
+                    "UPDATE strategies SET real_trading_enabled = 0, ranking = NULL WHERE id = ?",
+                    (strategy_id,)
+                )
             
-            # 保存状态
-            self._save_strategy_status(strategy_id, True)
+            # 启用选中的策略
+            for i, strategy in enumerate(top_strategies):
+                strategy_id = strategy['strategy_id']
+                ranking = i + 1
+                allocation = self.fund_allocation_config['allocation_ratio'][i]
+                allocated_amount = current_balance * allocation
+                
+                # 计算最优交易量
+                optimal_quantity = self._calculate_optimal_quantity(
+                    strategy_id, allocated_amount, 
+                    {'final_score': strategy['score'], 'combined_win_rate': strategy['win_rate']}
+                )
+                
+                # 更新数据库
+                self.db_manager.execute_query("""
+                    UPDATE strategies 
+                    SET real_trading_enabled = 1, 
+                        ranking = ?, 
+                        allocated_amount = ?,
+                        optimal_quantity = ?
+                    WHERE id = ?
+                """, (ranking, allocated_amount, optimal_quantity, strategy_id))
+                
+                # 更新内存中的策略状态
+                if strategy_id in self.strategies:
+                    self.strategies[strategy_id].update({
+                        'real_trading_enabled': True,
+                        'ranking': ranking,
+                        'allocated_amount': allocated_amount,
+                        'optimal_quantity': optimal_quantity
+                    })
             
-            print(f"🥇 第{i+1}名: {strategy['name']}")
-            print(f"   评分: {result['final_score']:.1f}")
-            print(f"   胜率: {result['combined_win_rate']*100:.1f}%")
-            print(f"   分配资金: {allocated_amount:.2f} USDT ({allocation_ratio*100:.0f}%)")
-            print(f"   交易量: {strategy['parameters']['quantity']:.4f}")
-        
-        # 显示未选中的策略
-        unselected = qualified_strategies[max_strategies:]
-        if unselected:
-            print(f"\n📊 其他合格策略 (暂不交易):")
-            for i, (strategy_id, result) in enumerate(unselected):
-                strategy_name = self.strategies[strategy_id]['name']
-                print(f"   第{max_strategies+i+1}名: {strategy_name} (评分: {result['final_score']:.1f})")
-        
-        print(f"\n✅ 策略选择完成，{len(selected_strategies)} 个策略开始真实交易")
+            logging.info(f"已更新{len(top_strategies)}个策略的交易状态")
+            
+        except Exception as e:
+            logging.error(f"更新策略交易状态失败: {e}")
     
     def _calculate_optimal_quantity(self, strategy_id: str, allocated_amount: float, simulation_result: Dict) -> float:
         """根据分配资金和模拟结果计算最优交易量"""
@@ -3044,10 +3121,10 @@ class QuantitativeService:
                 ranking = strategy.get('ranking', None)
                 
                 # 如果有模拟结果，使用模拟数据；否则使用实际交易数据
-                if simulation_score > 0 and simulation_win_rate > 0:
+                if hasattr(strategy, 'simulation_score') or 'simulation_score' in strategy:
                     # 使用模拟数据
                     final_score = simulation_score
-                    final_win_rate = simulation_win_rate
+                    final_win_rate = strategy.get('combined_win_rate', simulation_win_rate)
                     data_source = "模拟交易"
                 else:
                     # 使用实际交易数据
@@ -4205,7 +4282,7 @@ class StrategySimulator:
             'max_drawdown': max_drawdown,
             'profit_factor': profit_factor,
             'final_score': final_score,
-            'qualified_for_live_trading': final_score >= 55.0,  # 55分以上才能真实交易 (从70降至55)
+            'qualified_for_live_trading': final_score >= 60.0,  # 60分以上才能真实交易
             'simulation_date': datetime.now().isoformat()
         }
     
