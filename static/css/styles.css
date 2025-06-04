@@ -545,3 +545,76 @@ body {
     }
 }
 
+/* 策略评分样式 */
+.strategy-score {
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.strategy-score i {
+    font-size: 0.8rem;
+}
+
+.strategy-score small {
+    font-weight: 500;
+    margin-left: 0.1rem;
+}
+
+/* 自定义金色样式 - 用于评分上升 */
+.text-gold {
+    color: #ffd700 !important;
+}
+
+/* 重写Bootstrap的warning类为更亮的金色 */
+.strategy-score.text-warning {
+    color: #ffd700 !important;
+    text-shadow: 0 0 3px rgba(255, 215, 0, 0.3);
+}
+
+.strategy-score.text-warning i {
+    color: #ffd700;
+    filter: drop-shadow(0 0 2px rgba(255, 215, 0, 0.5));
+}
+
+/* 评分下降的灰色样式 */
+.strategy-score.text-secondary {
+    color: #868e96 !important;
+}
+
+.strategy-score.text-secondary i {
+    color: #868e96;
+}
+
+/* 评分稳定的蓝色样式 */
+.strategy-score.text-primary {
+    color: #007bff !important;
+}
+
+.strategy-score.text-primary i {
+    color: #007bff;
+}
+
+/* 策略卡片中的评分特殊效果 */
+.strategy-card .strategy-score.text-warning {
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+    border-left: 2px solid #ffd700;
+}
+
+.strategy-card .strategy-score.text-secondary {
+    background: rgba(134, 142, 150, 0.1);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+    border-left: 2px solid #868e96;
+}
+
+.strategy-card .strategy-score.text-primary {
+    background: rgba(0, 123, 255, 0.1);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.25rem;
+    border-left: 2px solid #007bff;
+}
+

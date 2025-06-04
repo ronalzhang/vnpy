@@ -211,6 +211,16 @@ class DatabaseManager:
                 )
             ''')
             
+            # 策略评分历史表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_score_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    score REAL,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             self.conn.commit()
             print("✅ 数据库表初始化完成")
             
@@ -2728,6 +2738,23 @@ class QuantitativeService:
                 # 获取策略表现数据
                 performance = self._get_strategy_performance(strategy_id)
                 
+                # 计算评分和变化趋势
+                from quantitative_service import AutomatedStrategyManager
+                manager = AutomatedStrategyManager(self)
+                
+                # 计算评分相关指标
+                total_return = performance['total_pnl'] / 100.0 if performance['total_pnl'] else 0.0
+                win_rate = performance['success_rate']
+                sharpe_ratio = manager._calculate_sharpe_ratio(strategy_id)
+                max_drawdown = manager._calculate_max_drawdown(strategy_id)
+                profit_factor = manager._calculate_profit_factor(strategy_id)
+                total_trades = performance['total_trades']
+                
+                # 获取评分和变化信息
+                score_info = self._calculate_strategy_score_with_history(
+                    strategy_id, total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor, total_trades
+                )
+                
                 strategies_list.append({
                     'id': strategy_id,
                     'name': strategy['name'],
@@ -2735,10 +2762,16 @@ class QuantitativeService:
                     'type': strategy['type'],
                     'enabled': strategy['enabled'],
                     'success_rate': performance['success_rate'],
-                    'total_return': performance['total_pnl'] / 100.0 if performance['total_pnl'] else 0.0,  # 转换为百分比
+                    'total_return': total_return,
                     'total_trades': performance['total_trades'],
                     'daily_return': performance['avg_pnl'],
-                    'parameters': strategy['parameters']
+                    'parameters': strategy['parameters'],
+                    # 新增评分相关字段
+                    'score': score_info['current_score'],
+                    'score_change': score_info['score_change'],
+                    'change_direction': score_info['change_direction'],
+                    'trend_color': score_info['trend_color'],
+                    'previous_score': score_info['previous_score']
                 })
             
             return strategies_list
@@ -3279,6 +3312,16 @@ class QuantitativeService:
                 )
             ''')
             
+            # 策略评分历史表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_score_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    score REAL,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             self.conn.commit()
             print("数据库初始化完成")
             
@@ -3493,6 +3536,74 @@ class QuantitativeService:
         except Exception as e:
             print(f"获取账户余额失败: {e}")
             return 0.0
+
+    def _calculate_strategy_score_with_history(self, strategy_id, total_return: float, win_rate: float, 
+                                            sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> Dict:
+        """计算策略综合评分并记录历史变化"""
+        
+        # 计算当前评分
+        current_score = self._calculate_strategy_score(total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor, total_trades)
+        
+        # 获取历史评分
+        previous_score = self._get_previous_strategy_score(strategy_id)
+        
+        # 计算评分变化
+        score_change = current_score - previous_score if previous_score > 0 else 0
+        change_direction = "up" if score_change > 0 else "down" if score_change < 0 else "stable"
+        
+        # 保存当前评分到历史
+        self._save_strategy_score_history(strategy_id, current_score)
+        
+        return {
+            'current_score': round(current_score, 1),
+            'previous_score': round(previous_score, 1) if previous_score > 0 else None,
+            'score_change': round(abs(score_change), 1),
+            'change_direction': change_direction,
+            'trend_color': 'gold' if change_direction == 'up' else 'gray' if change_direction == 'down' else 'blue'
+        }
+
+    def _get_previous_strategy_score(self, strategy_id: str) -> float:
+        """获取策略的上一次评分"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT score FROM strategy_score_history 
+                WHERE strategy_id = ? 
+                ORDER BY timestamp DESC 
+                LIMIT 1 OFFSET 1
+            ''', (strategy_id,))
+            
+            result = cursor.fetchone()
+            return float(result[0]) if result else 0.0
+            
+        except Exception as e:
+            print(f"获取历史评分失败: {e}")
+            return 0.0
+
+    def _save_strategy_score_history(self, strategy_id: str, score: float):
+        """保存策略评分历史"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO strategy_score_history (strategy_id, score, timestamp)
+                VALUES (?, ?, datetime('now'))
+            ''', (strategy_id, score))
+            self.conn.commit()
+            
+            # 只保留最近10次评分记录
+            cursor.execute('''
+                DELETE FROM strategy_score_history 
+                WHERE strategy_id = ? AND id NOT IN (
+                    SELECT id FROM strategy_score_history 
+                    WHERE strategy_id = ? 
+                    ORDER BY timestamp DESC 
+                    LIMIT 10
+                )
+            ''', (strategy_id, strategy_id))
+            self.conn.commit()
+            
+        except Exception as e:
+            print(f"保存评分历史失败: {e}")
 
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 

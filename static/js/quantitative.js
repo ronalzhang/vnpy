@@ -255,7 +255,11 @@ class QuantitativeSystem {
             (b.performance?.success_rate || 0) - (a.performance?.success_rate || 0)
         );
 
-        container.innerHTML = sortedStrategies.map(strategy => `
+        container.innerHTML = sortedStrategies.map(strategy => {
+            // 生成评分变化箭头和颜色
+            const scoreDisplay = this.getScoreDisplay(strategy);
+            
+            return `
             <div class="col-md-4 mb-3">
                 <div class="card strategy-card ${strategy.enabled ? 'strategy-running' : 'strategy-stopped'}">
                     <div class="card-body">
@@ -273,7 +277,8 @@ class QuantitativeSystem {
                         <p class="card-text">
                             <small class="text-muted">${strategy.symbol}</small><br>
                             <span class="text-success">成功率: ${(strategy.success_rate || 0).toFixed(1)}%</span><br>
-                            <span class="text-info">收益率: ${(strategy.total_return || 0).toFixed(2)}%</span>
+                            <span class="text-info">收益率: ${(strategy.total_return || 0).toFixed(2)}%</span><br>
+                            ${scoreDisplay}
                         </p>
                         
                         <div class="d-flex justify-content-between">
@@ -289,7 +294,43 @@ class QuantitativeSystem {
                     </div>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
+    }
+
+    // 生成评分显示HTML
+    getScoreDisplay(strategy) {
+        const score = strategy.score || 0;
+        const scoreChange = strategy.score_change || 0;
+        const changeDirection = strategy.change_direction || 'stable';
+        const trendColor = strategy.trend_color || 'blue';
+        
+        let arrowIcon = '';
+        let changeText = '';
+        let colorClass = '';
+        
+        // 设置箭头图标和颜色
+        if (changeDirection === 'up') {
+            arrowIcon = '<i class="fas fa-chart-line-up"></i>';
+            changeText = `+${scoreChange}`;
+            colorClass = 'text-warning'; // 金色用warning类
+        } else if (changeDirection === 'down') {
+            arrowIcon = '<i class="fas fa-chart-line-down"></i>';
+            changeText = `-${scoreChange}`;
+            colorClass = 'text-secondary'; // 灰色用secondary类
+        } else {
+            arrowIcon = '<i class="fas fa-minus"></i>';
+            changeText = '0';
+            colorClass = 'text-primary'; // 稳定用蓝色
+        }
+        
+        return `
+            <span class="strategy-score ${colorClass}">
+                评分: ${score.toFixed(1)} 
+                ${arrowIcon} 
+                <small>(${changeText})</small>
+            </span>
+        `;
     }
 
     // 渲染空策略提示（没有假数据）
