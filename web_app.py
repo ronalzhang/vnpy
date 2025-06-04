@@ -390,6 +390,22 @@ def get_binance_balance(client):
     """获取币安余额的替代方法"""
     try:
         balance = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
+        
+        # 方法1：尝试获取资金账户余额（通常资金在这里）
+        funding_balance = 0
+        try:
+            funding_response = client.sapi_get_asset_get_funding_asset({})
+            if funding_response:
+                for asset in funding_response:
+                    if asset.get('asset') == 'USDT':
+                        funding_balance = float(asset.get('free', 0)) + float(asset.get('locked', 0))
+                        print(f"🏦 币安资金账户USDT: {funding_balance}")
+                        break
+        except Exception as e:
+            print(f"获取币安资金账户失败: {e}")
+        
+        # 方法2：获取现货账户余额
+        spot_balance = 0
         account = client.private_get_account()
         
         for asset in account.get('balances', []):
@@ -399,9 +415,8 @@ def get_binance_balance(client):
             total = free + locked
             
             if symbol == 'USDT':
-                balance["USDT"] = round(total, 2)
-                balance["USDT_available"] = round(free, 2)
-                balance["USDT_locked"] = round(locked, 2)
+                spot_balance = total
+                print(f"💰 币安现货账户USDT: {spot_balance}")
             elif total > 0:
                 price = 0
                 try:
@@ -424,6 +439,18 @@ def get_binance_balance(client):
                         "locked": locked,
                         "value": value
                     }
+        
+        # 使用较大的余额（资金账户通常比现货账户余额多）
+        if funding_balance > spot_balance:
+            balance["USDT"] = round(funding_balance, 2)
+            balance["USDT_available"] = round(funding_balance, 2)  # 简化处理
+            balance["USDT_locked"] = 0
+            print(f"✅ 使用币安资金账户余额: {funding_balance} USDT")
+        else:
+            balance["USDT"] = round(spot_balance, 2)
+            balance["USDT_available"] = round(spot_balance, 2)
+            balance["USDT_locked"] = 0
+            print(f"✅ 使用币安现货账户余额: {spot_balance} USDT")
         
         return balance
     except Exception as e:
