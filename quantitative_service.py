@@ -1344,7 +1344,14 @@ class AutomatedStrategyManager:
     
     def _evaluate_all_strategies(self) -> Dict[str, Dict]:
         """评估所有策略表现"""
-        strategies = self.service.get_strategies()
+        strategies_response = self.service.get_strategies()
+        
+        # ⭐ 修复数据结构问题 - 正确提取策略列表
+        if not strategies_response.get('success', False):
+            print(f"❌ 获取策略失败: {strategies_response.get('error', '未知错误')}")
+            return {}
+        
+        strategies = strategies_response.get('data', [])
         performances = {}
         
         for strategy in strategies:
@@ -1383,7 +1390,10 @@ class AutomatedStrategyManager:
                 'max_drawdown': max_drawdown,
                 'profit_factor': profit_factor,
                 'score': score,
-                'capital_allocation': self._get_current_allocation(strategy_id)
+                'capital_allocation': self._get_current_allocation(strategy_id),
+                # ⭐ 添加策略参数持久化数据
+                'parameters': strategy.get('parameters', {}),
+                'qualified_for_trading': strategy.get('qualified_for_trading', False)
             }
         
         return performances
@@ -1525,94 +1535,102 @@ class AutomatedStrategyManager:
         logger.info(f"资金再平衡完成，前3名策略: {[perf['name'] for _, perf in high_performers]}")
     
     def _optimize_strategy_parameters(self, performances: Dict[str, Dict]):
-        """动态优化策略参数 - 目标接近100%成功率"""
-        logger.info("开始高级策略参数优化...")
-        
-        for strategy_id, perf in performances.items():
-            # 使用不同的优化策略
-            if perf['score'] < 30:  # 极差表现，需要大幅调整
-                logger.warning(f"策略{perf['name']}表现极差(评分{perf['score']:.1f})，进行大幅参数重置")
-                self._reset_strategy_parameters(strategy_id, perf)
-                
-            elif perf['score'] < 60:  # 表现不佳，需要深度优化
-                logger.info(f"策略{perf['name']}需要深度优化(评分{perf['score']:.1f})")
-                self._advanced_parameter_optimization(strategy_id, perf)
-                
-            elif perf['win_rate'] < 0.95:  # 成功率未达到95%目标，进行精细调优
-                logger.info(f"策略{perf['name']}成功率{perf['win_rate']*100:.1f}%，进行精细调优以达到95%+")
-                self._advanced_parameter_optimization(strategy_id, perf)
-                
-        logger.info("参数优化完成，目标：所有策略成功率95%+")
+        """优化策略参数 - 增强持久化机制"""
+        for strategy_id, performance in performances.items():
+            if performance['score'] < 70:  # 只优化低分策略
+                if performance['total_trades'] > 10:  # 有足够的交易数据
+                    # 高级参数优化
+                    self._advanced_parameter_optimization(strategy_id, performance)
+                    
+                    # ⭐ 保存优化后的参数到数据库
+                    self._save_optimized_parameters(strategy_id, performance)
+                else:
+                    # 快速参数调整
+                    self._quick_parameter_adjustment(strategy_id, performance)
+                    
+                    # ⭐ 保存调整后的参数到数据库
+                    self._save_optimized_parameters(strategy_id, performance)
     
-    def _reset_strategy_parameters(self, strategy_id: str, performance: Dict):
-        """重置策略参数到优化基线"""
-        strategy = self.service.strategies.get(strategy_id)
-        if not strategy:
-            return
-        
-        strategy_type = performance['type']
-        
-        # 基于策略类型设置优化后的基线参数
-        if strategy_type == 'momentum':
-            new_params = {
-                'lookback_period': 12,      # 短期观察，快速反应
-                'threshold': 0.005,         # 较高阈值，提高准确性
-                'quantity': 0.0005,         # 小仓位，降低风险
-                'momentum_threshold': 0.006,
-                'volume_threshold': 2.0
-            }
-        elif strategy_type == 'mean_reversion':
-            new_params = {
-                'lookback_period': 30,      # 中期观察
-                'std_multiplier': 2.5,      # 更宽的布林带，减少假信号
-                'quantity': 0.005,
-                'reversion_threshold': 0.015,
-                'min_deviation': 0.02
-            }
-        elif strategy_type == 'grid_trading':
-            new_params = {
-                'grid_spacing': 0.01,       # 较小间距
-                'grid_count': 15,           # 更多网格
-                'quantity': 50.0,
-                'lookback_period': 50,
-                'min_profit': 0.005
-            }
-        elif strategy_type == 'breakout':
-            new_params = {
-                'lookback_period': 25,
-                'breakout_threshold': 0.008,
-                'quantity': 0.5,
-                'volume_threshold': 1.5,
-                'confirmation_periods': 5   # 更多确认
-            }
-        elif strategy_type == 'high_frequency':
-            new_params = {
-                'quantity': 10.0,
-                'min_profit': 0.0003,
-                'volatility_threshold': 0.0005,
-                'lookback_period': 8,
-                'signal_interval': 20
-            }
-        elif strategy_type == 'trend_following':
-            new_params = {
-                'lookback_period': 50,
-                'trend_threshold': 0.012,
-                'quantity': 25.0,
-                'trend_strength_min': 0.8,
-                'ma_periods': [5, 15, 30]
-            }
-        else:
-            return
-        
-        # 应用重置参数
-        self.service.update_strategy(
-            strategy_id,
-            strategy.config.name,
-            strategy.config.symbol,
-            new_params
-        )
-        
-        logger.info(f"重置策略参数: {performance['name']}, 使用高成功率基线配置")
+    def _save_optimized_parameters(self, strategy_id: str, performance: Dict):
+        """⭐ 保存优化后的策略参数到数据库"""
+        try:
+            # 获取当前策略参数
+            current_strategy = self.service.strategies.get(strategy_id, {})
+            parameters = performance.get('parameters', current_strategy.get('parameters', {}))
+            
+            # 更新strategies表中的参数
+            query = """
+            UPDATE strategies 
+            SET parameters = ?, last_parameter_update = ?, optimization_count = optimization_count + 1
+            WHERE id = ?
+            """
+            
+            import json
+            self.service.db_manager.execute_query(query, (
+                json.dumps(parameters),
+                datetime.now().isoformat(),
+                strategy_id
+            ))
+            
+            # 更新内存中的策略参数
+            if strategy_id in self.service.strategies:
+                self.service.strategies[strategy_id]['parameters'] = parameters
+            
+            # 记录参数优化历史
+            self._record_parameter_optimization(strategy_id, parameters, performance['score'])
+            
+            print(f"✅ 策略 {strategy_id} 参数已持久化到数据库")
+            
+        except Exception as e:
+            print(f"❌ 保存策略参数失败 {strategy_id}: {e}")
+    
+    def _record_parameter_optimization(self, strategy_id: str, parameters: Dict, new_score: float):
+        """记录参数优化历史"""
+        try:
+            # 创建参数优化历史表
+            self.service.db_manager.execute_query("""
+                CREATE TABLE IF NOT EXISTS parameter_optimization_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    optimization_time TIMESTAMP,
+                    old_parameters TEXT,
+                    new_parameters TEXT,
+                    old_score REAL,
+                    new_score REAL,
+                    optimization_type TEXT,
+                    improvement REAL
+                )
+            """)
+            
+            # 获取旧参数和评分
+            old_strategy = self.service.strategies.get(strategy_id, {})
+            old_parameters = old_strategy.get('parameters', {})
+            old_score = old_strategy.get('final_score', 0)
+            
+            # 插入优化记录
+            import json
+            query = """
+            INSERT INTO parameter_optimization_history 
+            (strategy_id, optimization_time, old_parameters, new_parameters, 
+             old_score, new_score, optimization_type, improvement)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            improvement = new_score - old_score
+            
+            self.service.db_manager.execute_query(query, (
+                strategy_id,
+                datetime.now().isoformat(),
+                json.dumps(old_parameters),
+                json.dumps(parameters),
+                old_score,
+                new_score,
+                '自动优化',
+                improvement
+            ))
+            
+        except Exception as e:
+            print(f"❌ 记录参数优化历史失败: {e}")
     
     def _risk_management(self):
         """风险管理"""
@@ -2514,14 +2532,14 @@ class QuantitativeService:
         try:
             # 启动系统
             self.running = True
-            self.auto_trading_enabled = True
+            self.auto_trading_enabled = True  # ⭐ 启动时默认开启自动交易
             
-            # ⭐ 更新数据库状态 - 后台服务启动
+            # ⭐ 更新数据库状态 - 包含自动交易状态
             self.update_system_status(
                 quantitative_running=True,
-                auto_trading_enabled=True,
+                auto_trading_enabled=True,  # 明确设置自动交易开启
                 system_health='online',
-                notes='后台量化服务已启动'
+                notes='后台量化服务已启动，自动交易已开启'
             )
             
             print("🚀 量化交易系统启动成功")
@@ -2533,22 +2551,13 @@ class QuantitativeService:
             self._init_evolution_engine()
             
             # 记录操作日志
-            self._log_operation("系统启动", "量化交易系统启动成功", "success")
+            self._log_operation("系统启动", "量化交易系统启动成功，自动交易已开启", "success")
             
-            print("✅ 量化系统启动完成，所有子系统就绪")
+            print("✅ 量化交易系统完全启动")
             return True
             
         except Exception as e:
-            print(f"❌ 启动量化系统失败: {e}")
-            traceback.print_exc()
-            
-            # ⭐ 更新失败状态到数据库
-            self.update_system_status(
-                quantitative_running=False,
-                system_health='error',
-                notes=f'启动失败: {str(e)}'
-            )
-            
+            print(f"启动量化系统失败: {e}")
             self.running = False
             return False
 
@@ -4188,10 +4197,10 @@ class QuantitativeService:
                     generation INTEGER DEFAULT 0,
                     current_score REAL DEFAULT 50.0,
                     last_score_update TEXT,
-                    simulation_score REAL DEFAULT 50.0,
-                    simulation_win_rate REAL DEFAULT 0.5,
-                    qualified_for_trading INTEGER DEFAULT 0,
-                    creation_method TEXT DEFAULT 'manual'
+                    # ⭐ 添加参数优化相关列
+                    last_parameter_update TEXT,
+                    optimization_count INTEGER DEFAULT 0,
+                    qualified_for_trading INTEGER DEFAULT 0
                 )
             ''')
             

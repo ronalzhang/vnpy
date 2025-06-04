@@ -2053,6 +2053,49 @@ def create_strategy():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
 
+@app.route('/api/quantitative/auto-trading', methods=['GET', 'POST'])
+def manage_auto_trading():
+    """管理自动交易开关 - 增强数据库状态同步"""
+    try:
+        if request.method == 'POST':
+            data = request.get_json()
+            enabled = data.get('enabled', False)
+            
+            if quantitative_service:
+                # ⭐ 设置自动交易状态
+                quantitative_service.set_auto_trading(enabled)
+                
+                # ⭐ 同步到数据库状态
+                quantitative_service.update_system_status(
+                    auto_trading_enabled=enabled,
+                    notes=f'自动交易已{"开启" if enabled else "关闭"}'
+                )
+                
+                return jsonify({
+                    'success': True,
+                    'enabled': enabled,
+                    'message': f'自动交易已{"开启" if enabled else "关闭"}'
+                })
+            else:
+                return jsonify({'success': False, 'error': '量化服务未初始化'})
+        
+        else:  # GET
+            if quantitative_service:
+                # ⭐ 从数据库读取自动交易状态
+                db_status = quantitative_service.get_system_status_from_db()
+                auto_trading_enabled = db_status.get('auto_trading_enabled', False)
+                
+                return jsonify({
+                    'success': True,
+                    'enabled': auto_trading_enabled,
+                    'data_source': 'database'
+                })
+            else:
+                return jsonify({'success': False, 'enabled': False, 'error': '量化服务未初始化'})
+                
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'enabled': False})
+
 def main():
     """主函数"""
     global status, quantitative_service
