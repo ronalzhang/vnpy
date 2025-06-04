@@ -2056,7 +2056,7 @@ def create_strategy():
 
 def main():
     """主函数"""
-    global status
+    global status, quantitative_service
     
     # 解析命令行参数
     import argparse
@@ -2077,11 +2077,21 @@ def main():
     print(f"运行模式: 真实API连接")
     print(f"交易功能: {'已启用' if args.trade else '未启用（仅监控）'}")
     print(f"套利系统: {'已启用' if args.arbitrage and ARBITRAGE_ENABLED else '未启用'}")
+    print(f"量化系统: {'已启用' if QUANTITATIVE_ENABLED else '未启用'}")
     print(f"Web端口: {args.port}")
     print("======================================\n")
     
     # 强制初始化交易所客户端
     init_api_clients()
+    
+    # 启动量化服务（如果可用）
+    if QUANTITATIVE_ENABLED and quantitative_service:
+        try:
+            print("🚀 启动量化交易服务...")
+            quantitative_service.start()
+            print("✅ 量化交易服务启动成功")
+        except Exception as e:
+            print(f"❌ 量化交易服务启动失败: {e}")
     
     # 启动监控线程
     monitor = threading.Thread(target=monitor_thread, daemon=True)
