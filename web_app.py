@@ -1854,6 +1854,90 @@ def get_operations_log():
             'data': []
         })
 
+# 策略模拟交易接口
+@app.route('/api/quantitative/run-simulations', methods=['POST'])
+def run_strategy_simulations():
+    """运行所有策略的模拟交易"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"status": "error", "message": "量化模块未启用"})
+    
+    try:
+        # 运行所有策略模拟
+        simulation_results = quantitative_service.run_all_strategy_simulations()
+        
+        return jsonify({
+            "status": "success",
+            "message": "策略模拟交易完成",
+            "data": {
+                "total_simulated": len(simulation_results),
+                "simulation_results": simulation_results
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"运行策略模拟失败: {e}")
+        return jsonify({"status": "error", "message": f"模拟失败: {str(e)}"})
+
+@app.route('/api/quantitative/trading-status', methods=['GET'])
+def get_trading_status():
+    """获取交易状态和资金分配信息"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"status": "error", "message": "量化模块未启用"})
+    
+    try:
+        summary = quantitative_service.get_trading_status_summary()
+        
+        return jsonify({
+            "status": "success",
+            "data": summary
+        })
+        
+    except Exception as e:
+        logger.error(f"获取交易状态失败: {e}")
+        return jsonify({"status": "error", "message": f"获取状态失败: {str(e)}"})
+
+@app.route('/api/quantitative/select-strategies', methods=['POST'])
+def select_top_strategies():
+    """手动选择评分最高的策略进行真实交易"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"status": "error", "message": "量化模块未启用"})
+    
+    try:
+        # 获取请求参数
+        data = request.get_json() or {}
+        max_strategies = data.get('max_strategies', 2)
+        min_score = data.get('min_score', 70.0)
+        
+        # 更新配置
+        quantitative_service.fund_allocation_config['max_active_strategies'] = max_strategies
+        quantitative_service.fund_allocation_config['min_score_for_trading'] = min_score
+        
+        # 获取所有策略的模拟结果
+        simulation_results = {}
+        for strategy_id, strategy in quantitative_service.strategies.items():
+            if strategy.get('simulation_score'):
+                simulation_results[strategy_id] = {
+                    'final_score': strategy['simulation_score'],
+                    'qualified_for_live_trading': strategy.get('qualified_for_trading', False),
+                    'combined_win_rate': strategy.get('simulation_win_rate', 0.6)  # 默认值
+                }
+        
+        # 选择最优策略
+        quantitative_service._select_top_strategies_for_trading(simulation_results)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"已选择评分最高的 {max_strategies} 个策略进行真实交易",
+            "data": {
+                "selected_strategies": max_strategies,
+                "min_score_required": min_score
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"选择策略失败: {e}")
+        return jsonify({"status": "error", "message": f"选择策略失败: {str(e)}"})
+
 def main():
     """主函数"""
     global status
