@@ -47,13 +47,7 @@ try:
 except ImportError as e:
     logger.warning(f"量化交易模块未找到，量化功能将被禁用: {e}")
     QUANTITATIVE_ENABLED = False
-
-# 在现有导入之后添加
-try:
-    from quantitative_service import quantitative_service
-    logger.info("量化交易服务导入成功")
-except ImportError as e:
-    logger.warning(f"量化交易服务导入失败: {e}")
+    quantitative_service = None
     quantitative_service = None
 
 # 创建Flask应用
