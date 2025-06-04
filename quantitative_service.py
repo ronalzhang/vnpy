@@ -4007,27 +4007,67 @@ class QuantitativeService:
     def _save_strategy_score_history(self, strategy_id: str, score: float):
         """保存策略评分历史"""
         try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                INSERT INTO strategy_score_history (strategy_id, score, timestamp)
-                VALUES (?, ?, datetime('now'))
-            ''', (strategy_id, score))
-            self.conn.commit()
-            
-            # 只保留最近10次评分记录
-            cursor.execute('''
-                DELETE FROM strategy_score_history 
-                WHERE strategy_id = ? AND id NOT IN (
-                    SELECT id FROM strategy_score_history 
-                    WHERE strategy_id = ? 
-                    ORDER BY timestamp DESC 
-                    LIMIT 10
+            if hasattr(self, 'db_manager') and self.db_manager:
+                self.db_manager.execute_query(
+                    "INSERT INTO strategy_score_history (strategy_id, score) VALUES (?, ?)",
+                    (strategy_id, score)
                 )
-            ''', (strategy_id, strategy_id))
-            self.conn.commit()
+            else:
+                cursor = self.conn.cursor()
+                cursor.execute(
+                    "INSERT INTO strategy_score_history (strategy_id, score, timestamp) VALUES (?, ?, ?)",
+                    (strategy_id, score, datetime.now().isoformat())
+                )
+                self.conn.commit()
+        except Exception as e:
+            print(f"保存策略评分历史失败: {e}")
+
+    def _calculate_strategy_score(self, total_return: float, win_rate: float, 
+                                sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> float:
+        """计算策略评分 (0-100分)"""
+        try:
+            # 基础评分权重
+            return_weight = 0.3      # 收益率权重
+            win_rate_weight = 0.4    # 胜率权重  
+            sharpe_weight = 0.15     # 夏普比率权重
+            drawdown_weight = 0.1    # 回撤权重
+            factor_weight = 0.05     # 盈利因子权重
+            
+            # 收益率评分 (0-100)
+            return_score = min(max(total_return * 100, -50), 100)
+            
+            # 胜率评分 (0-100)
+            win_rate_score = win_rate * 100
+            
+            # 夏普比率评分 (0-100)
+            sharpe_score = min(max(sharpe_ratio * 20, 0), 100)
+            
+            # 回撤评分 (0-100，回撤越小评分越高)
+            drawdown_score = max(100 - max_drawdown * 200, 0)
+            
+            # 盈利因子评分 (0-100)
+            factor_score = min(max((profit_factor - 1) * 50, 0), 100)
+            
+            # 综合评分
+            final_score = (
+                return_score * return_weight +
+                win_rate_score * win_rate_weight +
+                sharpe_score * sharpe_weight +
+                drawdown_score * drawdown_weight +
+                factor_score * factor_weight
+            )
+            
+            # 交易次数调整
+            if total_trades < 10:
+                final_score *= 0.8  # 交易次数太少，降低评分
+            elif total_trades > 100:
+                final_score *= 1.1  # 交易次数充足，提升评分
+                
+            return max(min(final_score, 100), 0)
             
         except Exception as e:
-            print(f"保存评分历史失败: {e}")
+            print(f"计算策略评分失败: {e}")
+            return 50.0  # 默认评分
 
 class StrategySimulator:
     """策略模拟交易系统 - 用于计算初始评分和验证策略效果"""
