@@ -2778,10 +2778,21 @@ class QuantitativeService:
                     max_drawdown = min(abs(total_return) * 0.1, 0.2)  # 简化的最大回撤估算
                     profit_factor = max(1.0 + total_return, 0.1)
                 
-                # 获取评分和变化信息
-                score_info = self._calculate_strategy_score_with_history(
-                    strategy_id, total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor, total_trades
-                )
+                # 获取评分和变化信息 - 使用简化版本
+                try:
+                    score_info = self._calculate_strategy_score_with_history(
+                        strategy_id, total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor, total_trades
+                    )
+                except Exception as e:
+                    print(f"计算策略评分历史失败: {e}")
+                    # 使用默认评分信息
+                    score_info = {
+                        'current_score': current_score,
+                        'score_change': 0.0,
+                        'change_direction': 'stable',
+                        'trend_color': 'blue',
+                        'previous_score': current_score
+                    }
                 
                 strategies_list.append({
                     'id': strategy_id,
