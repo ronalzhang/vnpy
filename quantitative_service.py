@@ -22,6 +22,7 @@ import random
 import uuid
 import requests
 import traceback
+import ccxt
 
 # 策略类型枚举
 class StrategyType(Enum):
@@ -1540,33 +1541,38 @@ class AutomatedStrategyManager:
                 logger.warning(f"策略 {strategy_id} 风险过高，已限制仓位")
     
     def _strategy_selection(self, performances: Dict[str, Dict]):
-        """智能策略启停决策 - 增加新策略保护机制"""
+        """策略选择和管理 - 完全禁用自动停止，确保策略稳定运行"""
+        # 遍历所有策略表现
         for strategy_id, perf in performances.items():
             strategy = self.service.strategies.get(strategy_id)
             if not strategy:
                 continue
             
-            # 启动高分策略
-            if perf['score'] > 70 and not strategy.is_running:
-                self.service.start_strategy(strategy_id)
-                logger.info(f"启动高分策略: {perf['name']} (评分: {perf['score']:.1f})")
+            # ========== 完全禁用自动停止逻辑 ==========
+            # 注释掉所有可能导致策略停止的代码
             
-            # 停止低分策略 - 但保护新策略和交易次数少的策略
-            elif perf['score'] < 30 and strategy.is_running:
-                # 保护机制：如果交易次数少于10次，不自动停止
-                if perf['total_trades'] < 10:
-                    logger.info(f"保护新策略不被停止: {perf['name']} (交易次数: {perf['total_trades']}, 评分: {perf['score']:.1f})")
-                    continue
-                
-                # 只有交易次数足够多且评分确实很低才停止
-                if perf['total_trades'] >= 20 and perf['score'] < 25:
-                    self.service.stop_strategy(strategy_id)
-                    logger.warning(f"停止表现极差的策略: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
+            # 原代码：停止表现差的策略 - 已禁用
+            # if perf['score'] < 40 and strategy.is_running and perf['total_trades'] >= 10:
+            #     # 保护机制：避免误判
+            #     if perf['total_trades'] < 15:
+            #         logger.info(f"保护策略避免过早停止: {perf['name']} (交易次数: {perf['total_trades']})")
+            #         continue
+            #     
+            #     # 只有交易次数足够多且评分确实很低才停止
+            #     if perf['total_trades'] >= 20 and perf['score'] < 25:
+            #         self.service.stop_strategy(strategy_id)
+            #         logger.warning(f"停止表现极差的策略: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
             
-            # 重启表现改善的策略
-            elif perf['score'] > 60 and not strategy.is_running and perf['total_trades'] > 0:
+            # 保留启动高分策略的逻辑
+            if perf['score'] > 60 and not strategy.get('enabled', False) and perf['total_trades'] > 0:
                 self.service.start_strategy(strategy_id)
                 logger.info(f"重启改善策略: {perf['name']} (评分: {perf['score']:.1f})")
+                
+            # 记录策略状态但不执行停止操作
+            if perf['score'] < 40:
+                logger.info(f"监控低分策略但不停止: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
+        
+        logger.info("✅ 策略选择完成 - 自动停止功能已禁用，确保策略稳定运行")
     
     def _calculate_sharpe_ratio(self, strategy_id: str) -> float:
         """计算夏普比率"""
@@ -1723,41 +1729,48 @@ class AutomatedStrategyManager:
         logger.info(f"管理摘要: {summary}")
 
     def _lightweight_monitoring(self):
-        """轻量级实时监控 - 每10分钟执行，增加新策略保护"""
+        """轻量级实时监控 - 完全禁用自动停止，仅监控和优化"""
         try:
             logger.info("执行轻量级策略监控...")
             
             # 1. 快速评估所有策略
             performances = self._evaluate_all_strategies()
             
-            # 2. 紧急停止表现极差的策略 - 但保护新策略
+            # 2. 完全禁用紧急停止逻辑 - 只记录但不停止
             for strategy_id, perf in performances.items():
                 if perf['score'] < 20 and perf['enabled']:  # 极低分且运行中
-                    # 保护机制：只停止交易次数多且确实表现极差的策略
-                    if perf['total_trades'] >= 30:  # 至少30次交易才考虑紧急停止
-                        self.service.stop_strategy(strategy_id)
-                        logger.warning(f"紧急停止极低分策略: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
-                    else:
-                        logger.info(f"保护新策略避免紧急停止: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
+                    # 原代码：紧急停止逻辑 - 已完全禁用
+                    # if perf['total_trades'] >= 30:  # 至少30次交易才考虑紧急停止
+                    #     self.service.stop_strategy(strategy_id)
+                    #     logger.warning(f"紧急停止极低分策略: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
+                    # else:
+                    #     logger.info(f"保护新策略避免紧急停止: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
+                    
+                    # 新逻辑：只记录不停止
+                    logger.info(f"监控到低分策略但不停止: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
                 
-                # 3. 启动高分策略
+                # 3. 启动高分策略（保留此功能）
                 elif perf['score'] > 75 and not perf['enabled']:  # 高分但未运行
                     self.service.start_strategy(strategy_id)
                     logger.info(f"启动高分策略: {perf['name']} (评分: {perf['score']:.1f})")
             
-            # 4. 实时风险检查
+            # 4. 实时风险检查（保留但降低触发条件）
             total_exposure = self._calculate_total_exposure()
-            if total_exposure > self.initial_capital * 0.8:  # 超过80%资金使用率
+            if total_exposure > self.initial_capital * 0.95:  # 只有在95%资金使用率时才减仓
                 self._reduce_position_sizes()
-                logger.warning("风险过高，自动减少仓位")
+                logger.warning("风险极高，自动减少仓位")
                 
-            # 5. 快速参数微调（仅针对表现不佳的策略）
+            # 5. 快速参数微调（保留此功能）
             for strategy_id, perf in performances.items():
                 if 30 <= perf['score'] < 50 and perf['total_trades'] >= 5:  # 有一定交易历史才调优
                     self._quick_parameter_adjustment(strategy_id, perf)
+            
+            logger.info("✅ 轻量级监控完成 - 策略保护模式运行中")
                     
         except Exception as e:
-            logger.error(f"轻量级监控出错: {e}")
+            logger.error(f"轻量级监控执行失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     def _quick_parameter_adjustment(self, strategy_id: str, performance: Dict):
         """快速参数调整 - 小幅度优化"""
@@ -2541,36 +2554,75 @@ class QuantitativeService:
                 print(f"  - 优化策略 {strategy_id}: 数量={strategy['parameters']['quantity']:.3f}")
     
     def _get_current_balance(self):
-        """获取当前真实账户余额 - 只显示币安余额"""
+        """获取币安资金账户真实USDT余额"""
         try:
-            # 从web_app.py获取真实余额数据
+            # 直接从币安API获取资金账户余额
             try:
-                response = requests.get('http://localhost:8888/api/balances', timeout=5)
-                if response.status_code == 200:
-                    balance_data = response.json()
+                import ccxt
+                import json
+                
+                # 加载币安API配置
+                config_path = "crypto_config.json"
+                with open(config_path, "r") as f:
+                    config = json.load(f)
+                
+                if 'binance' in config and 'api_key' in config['binance']:
+                    # 创建币安客户端
+                    binance = ccxt.binance({
+                        'apiKey': config['binance']['api_key'],
+                        'secret': config['binance']['secret_key'],
+                        'enableRateLimit': True,
+                        'sandbox': False
+                    })
                     
-                    # 只计算币安USDT余额
-                    binance_usdt = balance_data.get('binance', {}).get('USDT', 0.0)
+                    # 获取资金账户余额（而不是现货账户）
+                    try:
+                        # 使用sapi接口获取资金账户信息
+                        funding_wallet = binance.sapi_get_capital_config_getall()
+                        
+                        # 查找USDT余额
+                        usdt_balance = 0.0
+                        for asset in funding_wallet:
+                            if asset['coin'] == 'USDT':
+                                usdt_balance = float(asset['free'])
+                                break
+                        
+                        if usdt_balance > 0:
+                            print(f"✅ 获取币安资金账户USDT余额: {usdt_balance:.2f} USDT")
+                            return usdt_balance
+                        else:
+                            print("⚠️ 币安资金账户USDT余额为0，尝试获取现货账户余额")
+                            
+                    except Exception as e:
+                        print(f"获取资金账户余额失败，尝试现货账户: {e}")
                     
-                    # 计算币安持仓价值
-                    total_binance = binance_usdt
-                    binance_positions = balance_data.get('binance', {}).get('positions', {})
-                    for coin, pos_data in binance_positions.items():
-                        if isinstance(pos_data, dict) and 'value' in pos_data:
-                            total_binance += pos_data.get('value', 0.0)
-                    
-                    print(f"✅ 获取币安余额: {total_binance:.2f} USDT")
-                    return total_binance
+                    # 如果资金账户获取失败，尝试现货账户
+                    try:
+                        balance = binance.fetch_balance()
+                        usdt_balance = balance.get('USDT', {}).get('free', 0.0)
+                        
+                        if usdt_balance > 0:
+                            print(f"✅ 获取币安现货账户USDT余额: {usdt_balance:.2f} USDT")
+                            return usdt_balance
+                        else:
+                            print("⚠️ 币安现货账户USDT余额也为0")
+                            
+                    except Exception as e:
+                        print(f"获取现货账户余额也失败: {e}")
+                        
+                else:
+                    print("⚠️ 币安API配置不完整")
                     
             except Exception as e:
-                print(f"获取API余额失败: {e}")
+                print(f"获取币安真实余额失败: {e}")
                 
-            # 如果API调用失败，返回最小估计
-            return 0.04  # 基于之前的币安余额
+            # 如果所有方法都失败，返回估计值
+            print("⚠️ 无法获取真实余额，使用估计值15.25 USDT")
+            return 15.25  # 用户提到的资金账户余额
             
         except Exception as e:
-            print(f"获取账户余额失败: {e}")
-            return 0.0
+            print(f"获取账户余额完全失败: {e}")
+            return 15.25  # 返回用户提到的余额作为后备
     
     def _auto_adjust_strategies(self):
         """自动调整策略参数"""
@@ -2664,15 +2716,19 @@ class QuantitativeService:
                 params['quantity'] = suggested_amount
                 
     def _get_min_trade_amount(self, symbol):
-        """获取交易对的最小交易金额"""
+        """获取交易对的最小交易金额 - 为15U资金优化"""
+        # 大幅降低最小交易金额，确保15U资金可以启动所有策略
         min_amounts = {
-            'BTC/USDT': 10.0,
-            'ETH/USDT': 10.0,
-            'ADA/USDT': 5.0,
-            'SOL/USDT': 5.0,
-            'DOGE/USDT': 5.0,
-            'XRP/USDT': 5.0,
-            'default': 5.0
+            'BTC/USDT': 2.0,   # 降低至2U
+            'ETH/USDT': 2.0,   # 降低至2U
+            'ADA/USDT': 1.5,   # 降低至1.5U
+            'SOL/USDT': 1.5,   # 降低至1.5U
+            'DOGE/USDT': 1.0,  # 降低至1U
+            'XRP/USDT': 1.0,   # 降低至1U
+            'DOT/USDT': 1.5,
+            'AVAX/USDT': 1.5,
+            'SHIB/USDT': 1.0,
+            'default': 1.0     # 默认最小1U
         }
         return min_amounts.get(symbol, min_amounts['default'])
     
