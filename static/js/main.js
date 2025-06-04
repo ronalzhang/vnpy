@@ -360,10 +360,17 @@ function renderBalanceData(balances) {
         const element = document.getElementById(elementId);
         if (element) {
             if (value !== undefined && value !== null && !isNaN(value)) {
-                element.textContent = parseFloat(value).toFixed(2);
+                const formattedValue = parseFloat(value).toFixed(2);
+                element.textContent = formattedValue;
+                element.dataset.value = formattedValue;  // 保存原始值用于隐私模式
             } else {
                 element.textContent = '-';
+                element.dataset.value = '-';
             }
+            
+            // 应用当前的隐私模式
+            const isPrivate = document.body.classList.contains('privacy-mode');
+            element.classList.toggle('privacy-blur', isPrivate && element.dataset.value !== '-');
         }
     }
     
@@ -439,9 +446,9 @@ function updatePositionsTable(tableId, positions) {
     table.innerHTML = positions.map(pos => `
         <tr>
             <td>${pos.symbol || '-'}</td>
-            <td>${pos.total !== undefined ? parseFloat(pos.total).toFixed(8) : '-'}</td>
-            <td>${pos.available !== undefined ? parseFloat(pos.available).toFixed(8) : '-'}</td>
-            <td>${pos.locked !== undefined ? parseFloat(pos.locked).toFixed(8) : '-'}</td>
+            <td>${pos.total !== undefined ? parseFloat(pos.total).toFixed(2) : '-'}</td>
+            <td>${pos.available !== undefined ? parseFloat(pos.available).toFixed(2) : '-'}</td>
+            <td>${pos.locked !== undefined ? parseFloat(pos.locked).toFixed(2) : '-'}</td>
             <td>${pos.value !== undefined ? parseFloat(pos.value).toFixed(2) : '-'}</td>
         </tr>
     `).join('');

@@ -2869,15 +2869,40 @@ class QuantitativeService:
     def _get_current_balance(self):
         """获取当前账户余额"""
         try:
-            # 直接返回用户的实际资金
-            actual_balance = 15.24  # 用户实际资金
-            print(f"✅ 返回用户实际资金: {actual_balance} USDT")
-            return actual_balance
+            # 从web_app.py获取真实余额数据
+            try:
+                import requests
+                response = requests.get('http://localhost:8888/api/account/balances', timeout=5)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('status') == 'success' and data.get('data'):
+                        balance_data = data['data']
+                        
+                        # 只获取币安USDT现货余额，不包括持仓价值
+                        binance_data = balance_data.get('binance', {})
+                        binance_usdt = binance_data.get('total', 0.0)  # 这是USDT现货余额
+                        
+                        print(f"✅ 获取币安USDT现货余额: {binance_usdt} USDT")
+                        
+                        # 如果获取到的余额大于10U，说明是正确的
+                        if binance_usdt > 10.0:
+                            return binance_usdt
+                        else:
+                            print(f"⚠️ 币安余额({binance_usdt})似乎偏低，检查API配置")
+                            return binance_usdt
+                    else:
+                        print(f"❌ API返回失败: {data}")
+                        
+            except Exception as e:
+                print(f"获取API余额失败: {e}")
+                
+            # 如果API调用失败，返回保守估计
+            print("⚠️ 使用保守估计余额 1.0 USDT")
+            return 1.0
             
         except Exception as e:
-            print(f"获取余额失败: {e}")
-            # 即使失败也返回用户的实际资金
-            return 15.24
+            print(f"获取账户余额失败: {e}")
+            return 1.0
     
     def _auto_adjust_strategies(self):
         """自动调整策略参数"""
@@ -3841,32 +3866,38 @@ class QuantitativeService:
         try:
             # 从web_app.py获取真实余额数据
             try:
-                response = requests.get('http://localhost:8888/api/balances', timeout=5)
+                import requests
+                response = requests.get('http://localhost:8888/api/account/balances', timeout=5)
                 if response.status_code == 200:
-                    balance_data = response.json()
-                    
-                    # 只计算币安USDT余额
-                    binance_usdt = balance_data.get('binance', {}).get('USDT', 0.0)
-                    
-                    # 计算币安持仓价值
-                    total_binance = binance_usdt
-                    binance_positions = balance_data.get('binance', {}).get('positions', {})
-                    for coin, pos_data in binance_positions.items():
-                        if isinstance(pos_data, dict) and 'value' in pos_data:
-                            total_binance += pos_data.get('value', 0.0)
-                    
-                    print(f"✅ 获取币安余额: {total_binance:.2f} USDT")
-                    return total_binance
-                    
+                    data = response.json()
+                    if data.get('status') == 'success' and data.get('data'):
+                        balance_data = data['data']
+                        
+                        # 只获取币安USDT现货余额，不包括持仓价值
+                        binance_data = balance_data.get('binance', {})
+                        binance_usdt = binance_data.get('total', 0.0)  # 这是USDT现货余额
+                        
+                        print(f"✅ 获取币安USDT现货余额: {binance_usdt} USDT")
+                        
+                        # 如果获取到的余额大于10U，说明是正确的
+                        if binance_usdt > 10.0:
+                            return binance_usdt
+                        else:
+                            print(f"⚠️ 币安余额({binance_usdt})似乎偏低，检查API配置")
+                            return binance_usdt
+                    else:
+                        print(f"❌ API返回失败: {data}")
+                        
             except Exception as e:
                 print(f"获取API余额失败: {e}")
                 
-            # 如果API调用失败，返回最小估计
-            return 0.04  # 基于之前的币安余额
+            # 如果API调用失败，返回保守估计
+            print("⚠️ 使用保守估计余额 1.0 USDT")
+            return 1.0
             
         except Exception as e:
             print(f"获取账户余额失败: {e}")
-            return 0.0
+            return 1.0
 
     def _calculate_strategy_score_with_history(self, strategy_id, total_return: float, win_rate: float, 
                                             sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> Dict:
