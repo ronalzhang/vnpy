@@ -4330,27 +4330,15 @@ class StrategySimulator:
         """保存模拟结果到数据库"""
         try:
             cursor = self.service.conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS strategy_simulation_results (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    strategy_id TEXT,
-                    simulation_data TEXT,
-                    final_score REAL,
-                    qualified_for_live INTEGER,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
             
             import json
             cursor.execute('''
-                INSERT INTO strategy_simulation_results 
-                (strategy_id, simulation_data, final_score, qualified_for_live)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO simulation_results 
+                (strategy_id, result_data)
+                VALUES (?, ?)
             ''', (
                 strategy_id,
-                json.dumps(result),
-                result['final_score'],
-                1 if result['qualified_for_live_trading'] else 0
+                json.dumps(result)
             ))
             
             self.service.conn.commit()
