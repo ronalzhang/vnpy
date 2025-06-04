@@ -24,11 +24,19 @@ import pickle
 quantitative_service = None
 
 try:
-    from quantitative_service import QuantitativeService
+    from quantitative_service import QuantitativeService, StrategyType
+    # 创建量化服务实例
     quantitative_service = QuantitativeService()
+    QUANTITATIVE_ENABLED = True
+    logger.info("量化交易模块加载成功")
     print("✅ 量化交易服务初始化成功")
+except ImportError as e:
+    logger.warning(f"量化交易模块未找到，量化功能将被禁用: {e}")
+    QUANTITATIVE_ENABLED = False
+    quantitative_service = None
 except Exception as e:
     print(f"❌ 量化交易服务初始化失败: {e}")
+    QUANTITATIVE_ENABLED = False
     quantitative_service = None
 
 # 导入套利系统模块
@@ -38,17 +46,6 @@ try:
 except ImportError:
     logger.warning("套利系统模块未找到，套利功能将被禁用")
     ARBITRAGE_ENABLED = False
-
-# 导入量化交易服务模块
-try:
-    from quantitative_service import quantitative_service, StrategyType
-    QUANTITATIVE_ENABLED = True
-    logger.info("量化交易模块加载成功")
-except ImportError as e:
-    logger.warning(f"量化交易模块未找到，量化功能将被禁用: {e}")
-    QUANTITATIVE_ENABLED = False
-    quantitative_service = None
-    quantitative_service = None
 
 # 创建Flask应用
 app = Flask(__name__)
@@ -655,22 +652,10 @@ def monitor_thread(interval=5):
                               f"差价: {item['price_diff']:.2f} ({item['price_diff_pct']*100:.2f}%)")
                 
                 # 量化交易数据处理
-                if QUANTITATIVE_ENABLED:
+                if QUANTITATIVE_ENABLED and quantitative_service:
                     try:
-                        # 为每个交易所的每个交易对处理量化数据
-                        for exchange_name, exchange_prices in prices.items():
-                            for symbol, price_info in exchange_prices.items():
-                                if isinstance(price_info, dict) and 'buy' in price_info and 'sell' in price_info:
-                                    # 使用买卖价格的中间价作为市场价格
-                                    mid_price = (price_info['buy'] + price_info['sell']) / 2
-                                    price_data = {
-                                        'price': mid_price,
-                                        'exchange': exchange_name,
-                                        'timestamp': datetime.now()
-                                    }
-                                    
-                                    # 传递给量化服务处理
-                                    quantitative_service.process_market_data(symbol, price_data)
+                        # 量化服务会自动处理市场数据，这里不需要手动传递
+                        pass
                     except Exception as e:
                         logger.error(f"量化交易数据处理错误: {e}")
                 
