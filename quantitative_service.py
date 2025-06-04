@@ -244,6 +244,16 @@ class DatabaseManager:
                 )
             ''')
             
+            # 创建模拟结果表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS simulation_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    result_data TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             self.conn.commit()
             print("✅ 数据库表初始化完成")
             
@@ -1380,42 +1390,50 @@ class AutomatedStrategyManager:
     
     def _calculate_strategy_score(self, total_return: float, win_rate: float, 
                                 sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> float:
-        """计算策略综合评分 - 修复新策略评分过低问题"""
-        
-        # 对于新策略或交易次数很少的策略，给予合理的默认评分
-        if total_trades < 5:  # 交易次数少于5次的新策略
-            # 给予中性偏上的评分，避免被自动停止
-            return 60.0  # 给新策略60分，高于30分的停止阈值
-        
-        # 权重分配
-        weights = {
-            'return': 0.30,    # 收益率权重30%
-            'win_rate': 0.20,  # 胜率权重20%
-            'sharpe': 0.25,    # 夏普比率权重25%
-            'drawdown': 0.15,  # 最大回撤权重15%
-            'profit_factor': 0.10  # 盈利因子权重10%
-        }
-        
-        # 标准化分数
-        return_score = min(total_return * 100, 100)  # 收益率转百分比
-        win_rate_score = win_rate * 100
-        sharpe_score = min(max(sharpe_ratio * 20, 0), 100)  # 夏普比率标准化
-        drawdown_score = max(100 - abs(max_drawdown) * 100, 0)  # 回撤越小分数越高
-        profit_factor_score = min(profit_factor * 20, 100)
-        
-        # 加权综合评分
-        total_score = (
-            return_score * weights['return'] +
-            win_rate_score * weights['win_rate'] +
-            sharpe_score * weights['sharpe'] +
-            drawdown_score * weights['drawdown'] +
-            profit_factor_score * weights['profit_factor']
-        )
-        
-        # 确保评分在合理范围内，至少给30分避免被停止
-        final_score = max(min(max(total_score, 0), 100), 35.0)  # 最低35分
-        
-        return final_score
+        """计算策略评分 (0-100分)"""
+        try:
+            # 基础评分权重
+            return_weight = 0.3      # 收益率权重
+            win_rate_weight = 0.4    # 胜率权重  
+            sharpe_weight = 0.15     # 夏普比率权重
+            drawdown_weight = 0.1    # 回撤权重
+            factor_weight = 0.05     # 盈利因子权重
+            
+            # 收益率评分 (0-100)
+            return_score = min(max(total_return * 100, -50), 100)
+            
+            # 胜率评分 (0-100)
+            win_rate_score = win_rate * 100
+            
+            # 夏普比率评分 (0-100)
+            sharpe_score = min(max(sharpe_ratio * 20, 0), 100)
+            
+            # 回撤评分 (0-100，回撤越小评分越高)
+            drawdown_score = max(100 - max_drawdown * 200, 0)
+            
+            # 盈利因子评分 (0-100)
+            factor_score = min(max((profit_factor - 1) * 50, 0), 100)
+            
+            # 综合评分
+            final_score = (
+                return_score * return_weight +
+                win_rate_score * win_rate_weight +
+                sharpe_score * sharpe_weight +
+                drawdown_score * drawdown_weight +
+                factor_score * factor_weight
+            )
+            
+            # 交易次数调整
+            if total_trades < 10:
+                final_score *= 0.8  # 交易次数太少，降低评分
+            elif total_trades > 100:
+                final_score *= 1.1  # 交易次数充足，提升评分
+                
+            return max(min(final_score, 100), 0)
+            
+        except Exception as e:
+            print(f"计算策略评分失败: {e}")
+            return 50.0  # 默认评分
     
     def _rebalance_capital(self, performances: Dict[str, Dict]):
         """动态资金再平衡 - 优秀策略获得更多资金"""
