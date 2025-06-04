@@ -2158,5 +2158,32 @@ def main():
     # 启动Web服务器
     app.run(host='0.0.0.0', port=args.port)
 
+@app.route('/api/quantitative/account-info', methods=['GET'])
+def get_account_info():
+    """获取账户基本信息"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            'success': False,
+            'message': '量化模块未启用',
+            'data': {}
+        })
+    
+    try:
+        # 从量化服务获取账户信息
+        account_info = quantitative_service.get_account_info()
+        
+        return jsonify({
+            'success': True,
+            'data': account_info
+        })
+        
+    except Exception as e:
+        print(f"获取账户信息失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'获取失败: {str(e)}',
+            'data': {}
+        })
+
 if __name__ == "__main__":
     main() 

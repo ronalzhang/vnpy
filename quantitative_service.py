@@ -4199,7 +4199,6 @@ class QuantitativeService:
                     generation INTEGER DEFAULT 0,
                     current_score REAL DEFAULT 50.0,
                     last_score_update TEXT,
-                    # ⭐ 添加参数优化相关列
                     last_parameter_update TEXT,
                     optimization_count INTEGER DEFAULT 0,
                     qualified_for_trading INTEGER DEFAULT 0
@@ -4300,7 +4299,6 @@ class QuantitativeService:
                 )
             ''')
             
-            # ⭐ 新增：创建系统状态表 - 解决前后端状态同步问题
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS system_status (
                     id INTEGER PRIMARY KEY DEFAULT 1,
