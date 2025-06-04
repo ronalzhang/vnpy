@@ -439,19 +439,36 @@ function updatePositionsTable(tableId, positions) {
     if (!table) return;
     
     if (!positions || positions.length === 0) {
-        table.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无持仓</td></tr>';
+        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无持仓</td></tr>';
         return;
     }
-    
+
     table.innerHTML = positions.map(pos => `
         <tr>
             <td>${pos.symbol || '-'}</td>
-            <td>${pos.total !== undefined ? parseFloat(pos.total).toFixed(2) : '-'}</td>
-            <td>${pos.available !== undefined ? parseFloat(pos.available).toFixed(2) : '-'}</td>
-            <td>${pos.locked !== undefined ? parseFloat(pos.locked).toFixed(2) : '-'}</td>
-            <td>${pos.value !== undefined ? parseFloat(pos.value).toFixed(2) : '-'}</td>
+            <td data-value="${pos.quantity || 0}">${safeDisplayValue(pos.quantity || 0, 2)}</td>
+            <td data-value="${pos.avg_price || 0}">${safeDisplayValue(pos.avg_price || 0, 2)}</td>
+            <td data-value="${pos.current_price || 0}">${safeDisplayValue(pos.current_price || 0, 2)}</td>
+            <td data-value="${pos.unrealized_pnl || 0}" class="${(pos.unrealized_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}">${safeDisplayValue(pos.unrealized_pnl || 0, 2)}</td>
+            <td data-value="${pos.realized_pnl || 0}" class="${(pos.realized_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}">${safeDisplayValue(pos.realized_pnl || 0, 2)}</td>
         </tr>
     `).join('');
+}
+
+// 安全显示数值 - 支持隐私模式
+function safeDisplayValue(value, decimals = 2) {
+    const privacyToggle = document.getElementById('privacy-toggle');
+    const isPrivate = privacyToggle ? privacyToggle.checked : false;
+    
+    if (isPrivate) {
+        return '****';
+    }
+    
+    if (value === null || value === undefined || isNaN(value)) {
+        return '-';
+    }
+    
+    return parseFloat(value).toFixed(decimals);
 }
 
 // 更新系统状态
