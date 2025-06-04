@@ -8,7 +8,7 @@ import sys
 import time
 import threading
 import logging
-from quantitative_service import AutomatedStrategyManager, EvolutionaryStrategyEngine
+from quantitative_service import QuantitativeService, AutomatedStrategyManager, EvolutionaryStrategyEngine
 
 # 配置日志
 logging.basicConfig(
@@ -26,6 +26,7 @@ class QuantitativeBackgroundService:
     """量化交易后台服务"""
     
     def __init__(self):
+        self.quantitative_service = None
         self.manager = None
         self.engine = None
         self.running = False
@@ -35,7 +36,11 @@ class QuantitativeBackgroundService:
         try:
             logger.info("🚀 初始化量化交易系统...")
             
-            self.manager = AutomatedStrategyManager()
+            # 先创建QuantitativeService实例
+            self.quantitative_service = QuantitativeService()
+            
+            # 使用QuantitativeService实例初始化管理器
+            self.manager = AutomatedStrategyManager(self.quantitative_service)
             self.engine = EvolutionaryStrategyEngine()
             
             logger.info("✅ 量化服务组件初始化成功")
