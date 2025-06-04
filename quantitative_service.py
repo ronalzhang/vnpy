@@ -1983,7 +1983,10 @@ class QuantitativeService:
                 strategy['running'] = True
                 strategy['status'] = 'running'
                 
-                print(f"✅ 策略 {strategy['name']} 已启动")
+                # 保存状态到数据库
+                self._save_strategy_status(strategy_id, True)
+                
+                print(f"✅ 策略 {strategy['name']} 已启动并保存状态")
                 return True
             else:
                 print(f"❌ 策略 {strategy_id} 不存在")
@@ -2002,7 +2005,10 @@ class QuantitativeService:
                 strategy['running'] = False
                 strategy['status'] = 'stopped'
                 
-                print(f"⏹️ 策略 {strategy['name']} 已停止")
+                # 保存状态到数据库
+                self._save_strategy_status(strategy_id, False)
+                
+                print(f"⏹️ 策略 {strategy['name']} 已停止并保存状态")
                 return True
             else:
                 print(f"❌ 策略 {strategy_id} 不存在")
@@ -2726,19 +2732,26 @@ class QuantitativeService:
         try:
             if strategy_id in self.strategies:
                 strategy = self.strategies[strategy_id]
-                strategy['enabled'] = not strategy['enabled']
+                new_enabled = not strategy['enabled']
                 
                 # 如果是启用策略，检查资金是否足够
-                if strategy['enabled']:
+                if new_enabled:
                     current_balance = self._get_current_balance()
                     min_trade_amount = self._get_min_trade_amount(strategy['symbol'])
                     
                     if current_balance < min_trade_amount:
-                        strategy['enabled'] = False
                         return False, f"余额不足，最小需要 {min_trade_amount}U"
                 
-                status = "启用" if strategy['enabled'] else "禁用"
-                return True, f"策略 {strategy['name']} 已{status}"
+                # 更新策略状态
+                strategy['enabled'] = new_enabled
+                strategy['running'] = new_enabled
+                strategy['status'] = 'running' if new_enabled else 'stopped'
+                
+                # 保存状态到数据库
+                self._save_strategy_status(strategy_id, new_enabled)
+                
+                status = "启用" if new_enabled else "禁用"
+                return True, f"策略 {strategy['name']} 已{status}并保存状态"
             else:
                 return False, "策略不存在"
                 
@@ -3146,6 +3159,20 @@ class QuantitativeService:
                 )
             ''')
             
+            # 策略表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategies (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    symbol TEXT,
+                    type TEXT,
+                    enabled INTEGER DEFAULT 0,
+                    parameters TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             # 交易信号表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS trading_signals (
@@ -3202,6 +3229,32 @@ class QuantitativeService:
                 )
             ''')
             
+            # 账户余额历史表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS balance_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    total_balance REAL,
+                    available_balance REAL,
+                    frozen_balance REAL,
+                    daily_pnl REAL,
+                    daily_return REAL,
+                    milestone_note TEXT,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 操作日志表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS operation_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    operation_type TEXT,
+                    operation_detail TEXT,
+                    result TEXT,
+                    user_id TEXT DEFAULT 'system',
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             self.conn.commit()
             print("数据库初始化完成")
             
@@ -3220,12 +3273,81 @@ class QuantitativeService:
     def _load_strategies_from_db(self):
         """从数据库加载策略配置"""
         try:
-            # 这里可以从数据库加载已保存的策略配置
-            # 暂时使用默认配置
-            pass
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT id, name, symbol, type, enabled, parameters FROM strategies')
+            rows = cursor.fetchall()
+            
+            # 如果数据库中有策略，从数据库加载
+            if rows:
+                print(f"从数据库加载了 {len(rows)} 个策略配置")
+                for row in rows:
+                    strategy_id, name, symbol, strategy_type, enabled, parameters_json = row
+                    if strategy_id in self.strategies:
+                        # 更新内存中的策略状态
+                        self.strategies[strategy_id]['enabled'] = bool(enabled)
+                        self.strategies[strategy_id]['running'] = bool(enabled)
+                        self.strategies[strategy_id]['status'] = 'running' if enabled else 'stopped'
+                        
+                        # 如果有保存的参数，更新参数
+                        if parameters_json:
+                            try:
+                                import json
+                                saved_parameters = json.loads(parameters_json)
+                                self.strategies[strategy_id]['parameters'].update(saved_parameters)
+                            except Exception as e:
+                                print(f"解析策略 {strategy_id} 参数失败: {e}")
+                        
+                        print(f"策略 {name} 状态: {'启用' if enabled else '禁用'}")
+            else:
+                # 数据库中没有策略，保存当前默认策略到数据库
+                self._save_strategies_to_db()
+                
         except Exception as e:
             print(f"从数据库加载策略失败: {e}")
+            # 如果加载失败，保存当前策略到数据库
+            self._save_strategies_to_db()
     
+    def _save_strategies_to_db(self):
+        """保存策略配置到数据库"""
+        try:
+            cursor = self.conn.cursor()
+            import json
+            
+            for strategy_id, strategy in self.strategies.items():
+                cursor.execute('''
+                    INSERT OR REPLACE INTO strategies 
+                    (id, name, symbol, type, enabled, parameters, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (
+                    strategy_id,
+                    strategy['name'],
+                    strategy['symbol'],
+                    strategy['type'],
+                    1 if strategy.get('enabled', False) else 0,
+                    json.dumps(strategy['parameters'])
+                ))
+            
+            self.conn.commit()
+            print(f"保存了 {len(self.strategies)} 个策略到数据库")
+            
+        except Exception as e:
+            print(f"保存策略到数据库失败: {e}")
+    
+    def _save_strategy_status(self, strategy_id, enabled):
+        """保存单个策略状态到数据库"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                UPDATE strategies 
+                SET enabled = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            ''', (1 if enabled else 0, strategy_id))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"保存策略 {strategy_id} 状态到数据库失败: {e}")
+            return False
+
     def _init_trading_engine(self):
         """初始化交易引擎"""
         try:
@@ -3246,21 +3368,10 @@ class QuantitativeService:
                     strategy['status'] = 'running'
                     
                     # 保存到数据库
-                    try:
-                        cursor = self.conn.cursor()
-                        cursor.execute('''
-                            UPDATE strategies 
-                            SET enabled = 1, updated_at = CURRENT_TIMESTAMP 
-                            WHERE id = ?
-                        ''', (strategy_id,))
-                        self.conn.commit()
-                        print(f"✅ 策略 {strategy['name']} 已启动并保存到数据库")
-                        started_count += 1
-                    except Exception as e:
-                        print(f"保存策略状态到数据库失败: {e}")
-                        # 即使数据库保存失败，也继续启动策略
-                        started_count += 1
-                        print(f"✅ 强制启动策略: {strategy['name']} (内存中)")
+                    self._save_strategy_status(strategy_id, True)
+                    
+                    print(f"✅ 策略 {strategy['name']} 已启动并保存状态")
+                    started_count += 1
                         
             if started_count > 0:
                 print(f"🚀 已强制启动 {started_count} 个策略")
