@@ -115,7 +115,24 @@ class DatabaseManager:
     
     def __init__(self, db_path: str = "quantitative.db"):
         self.db_path = db_path
-        self.init_database()
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+    
+    def execute_query(self, query: str, params: tuple = (), fetch_one: bool = False, fetch_all: bool = False):
+        """执行SQL查询"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, params)
+            
+            if fetch_one:
+                return cursor.fetchone()
+            elif fetch_all:
+                return cursor.fetchall()
+            else:
+                self.conn.commit()
+                return cursor.rowcount
+        except Exception as e:
+            print(f"数据库查询失败: {e}")
+            return None
     
     def init_database(self):
         """初始化数据库表"""
@@ -3618,6 +3635,9 @@ class QuantitativeService:
             # 初始化数据库表
             self.db_manager.init_database()
             
+            # 为向后兼容，保留conn属性
+            self.conn = self.db_manager.conn
+            
             # 确保初始余额历史数据
             self._ensure_initial_balance_history()
             
@@ -3630,6 +3650,7 @@ class QuantitativeService:
             print(f"数据库初始化失败: {e}")
             # 创建备用数据库管理器
             self.db_manager = DatabaseManager()
+            self.conn = self.db_manager.conn
     
     def _ensure_initial_balance_history(self):
         """确保有初始的资产历史数据"""
