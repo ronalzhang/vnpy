@@ -266,16 +266,35 @@ class QuantitativeSystem {
             return;
         }
 
-        // 按成功率排序 - 修复字段名
+        // 按评分排序 - 使用正确的字段名
         const sortedStrategies = this.strategies.sort((a, b) => 
-            (b.success_rate || 0) - (a.success_rate || 0)
+            (b.final_score || 0) - (a.final_score || 0)
         );
 
         console.log('排序后的策略:', sortedStrategies);
 
         container.innerHTML = sortedStrategies.map(strategy => {
-            // 生成评分变化箭头和颜色
-            const scoreDisplay = this.getScoreDisplay(strategy);
+            // 生成评分显示 - 使用正确的字段名
+            const score = strategy.final_score || 0;
+            const winRate = strategy.win_rate || 0;
+            const totalReturn = strategy.total_return || 0;
+            const totalTrades = strategy.total_trades || 0;
+            const dataSource = strategy.data_source || '实际交易';
+            const qualified = strategy.qualified_for_trading || false;
+            
+            // 评分状态显示
+            let scoreColor = 'text-secondary';
+            let scoreStatus = '';
+            if (score >= 70) {
+                scoreColor = 'text-success';
+                scoreStatus = '🏆 优秀';
+            } else if (score >= 60) {
+                scoreColor = 'text-warning';
+                scoreStatus = '✅ 合格';
+            } else {
+                scoreColor = 'text-danger';
+                scoreStatus = '⚠️ 待优化';
+            }
             
             return `
             <div class="col-md-4 mb-3">
@@ -293,11 +312,12 @@ class QuantitativeSystem {
                         </div>
                         
                         <p class="card-text">
-                            <small class="text-muted">${strategy.symbol}</small><br>
-                            <span class="text-success">成功率: ${((strategy.success_rate || 0) * 100).toFixed(1)}%</span><br>
-                            <span class="text-info">收益率: ${((strategy.total_return || 0) * 100).toFixed(2)}%</span><br>
-                            <span class="text-muted">交易次数: ${strategy.total_trades || 0}</span><br>
-                            ${scoreDisplay}
+                            <small class="text-muted">${strategy.symbol} • ${dataSource}</small><br>
+                            <span class="${scoreColor}">评分: ${score.toFixed(1)} ${scoreStatus}</span><br>
+                            <span class="text-success">成功率: ${(winRate * 100).toFixed(1)}%</span><br>
+                            <span class="text-info">收益率: ${(totalReturn * 100).toFixed(2)}%</span><br>
+                            <span class="text-muted">交易次数: ${totalTrades}</span><br>
+                            ${qualified ? '<span class="badge bg-success">已选中交易</span>' : '<span class="badge bg-secondary">未选中</span>'}
                         </p>
                         
                         <div class="d-flex justify-content-between">
@@ -317,41 +337,6 @@ class QuantitativeSystem {
         }).join('');
 
         console.log('策略卡片渲染完成');
-    }
-
-    // 生成评分显示HTML
-    getScoreDisplay(strategy) {
-        const score = strategy.score || 0;
-        const scoreChange = strategy.score_change || 0;
-        const changeDirection = strategy.change_direction || 'stable';
-        const trendColor = strategy.trend_color || 'blue';
-        
-        let arrowIcon = '';
-        let changeText = '';
-        let colorClass = '';
-        
-        // 设置箭头图标和颜色
-        if (changeDirection === 'up') {
-            arrowIcon = '<i class="fas fa-chart-line-up"></i>';
-            changeText = `+${scoreChange}`;
-            colorClass = 'text-warning'; // 金色用warning类
-        } else if (changeDirection === 'down') {
-            arrowIcon = '<i class="fas fa-chart-line-down"></i>';
-            changeText = `-${scoreChange}`;
-            colorClass = 'text-secondary'; // 灰色用secondary类
-        } else {
-            arrowIcon = '<i class="fas fa-minus"></i>';
-            changeText = '0';
-            colorClass = 'text-primary'; // 稳定用蓝色
-        }
-        
-        return `
-            <span class="strategy-score ${colorClass}">
-                评分: ${score.toFixed(1)} 
-                ${arrowIcon} 
-                <small>(${changeText})</small>
-            </span>
-        `;
     }
 
     // 渲染空策略提示（没有假数据）

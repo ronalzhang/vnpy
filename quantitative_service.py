@@ -3243,72 +3243,210 @@ class QuantitativeService:
             self.auto_trading_enabled = False
     
     def get_strategies(self):
-        """获取所有策略信息，包含最新的模拟结果"""
+        """获取所有策略信息 - 区分初始化和运行阶段的数据逻辑"""
         try:
             strategies_list = []
             
             for strategy_id, strategy in self.strategies.items():
-                # 获取最新的模拟结果
-                simulation_result = self._get_latest_simulation_result(strategy_id)
+                # 检查策略是否已完成初始化
+                is_initialized = self._is_strategy_initialized(strategy_id)
                 
-                # 计算实际交易数据
-                real_win_rate = self._calculate_real_win_rate(strategy_id)
-                real_total_trades = self._count_real_strategy_trades(strategy_id) 
-                real_total_return = self._calculate_real_strategy_return(strategy_id)
-                
-                # 使用模拟数据优先，实际数据作为备用
-                if simulation_result and simulation_result.get('final_score', 0) > 0:
-                    # 使用模拟数据
-                    final_score = simulation_result['final_score']
-                    final_win_rate = simulation_result.get('combined_win_rate', 0)
-                    # 🔧 修复：显示模拟收益率而非实际收益率
-                    display_return = simulation_result.get('combined_return', 0)
-                    display_trades = simulation_result.get('total_trades', 0)
-                    data_source = "模拟交易"
-                    qualified_for_trading = simulation_result.get('qualified_for_live_trading', False)
-                    print(f"  📊 {strategy['name']}: 使用模拟数据 - {final_score:.1f}分, {final_win_rate:.1%}胜率, {display_return:.2%}收益")
+                if not is_initialized:
+                    # 未初始化策略：使用模拟数据提供合理的起始值
+                    print(f"📊 策略 {strategy_id} 未初始化，使用模拟数据提供起始值")
+                    strategy_data = self._get_strategy_with_simulation_data(strategy_id, strategy)
+                    # 标记为初始化完成
+                    self._mark_strategy_initialized(strategy_id, strategy_data)
                 else:
-                    # 使用实际交易数据
-                    score_result = self._calculate_strategy_score_with_history(
-                        strategy_id, real_total_return, real_win_rate, 2.0, 0.05, 2.0, real_total_trades
-                    )
-                    final_score = score_result['current_score']
-                    final_win_rate = real_win_rate
-                    display_return = real_total_return
-                    display_trades = real_total_trades
-                    data_source = "实际交易"
-                    qualified_for_trading = final_score >= self.fund_allocation_config['min_score_for_trading']
-                    print(f"  📊 {strategy['name']}: 使用实际数据 - {final_score:.1f}分, {final_win_rate:.1%}胜率, {display_return:.2%}收益")
+                    # 已初始化策略：完全基于真实交易数据
+                    print(f"🎯 策略 {strategy_id} 已初始化，使用真实交易数据")
+                    strategy_data = self._get_strategy_with_real_data(strategy_id, strategy)
                 
-                strategies_list.append({
-                    'id': strategy_id,
-                    'name': strategy['name'],
-                    'type': strategy['type'],
-                    'symbol': strategy['symbol'],
-                    'enabled': strategy['enabled'],
-                    'parameters': strategy['parameters'],
-                    'final_score': round(final_score, 1),
-                    'win_rate': round(final_win_rate, 1),
-                    'total_trades': display_trades,
-                    'total_return': round(display_return, 4),  # 🔧 修复：显示模拟收益率
-                    'data_source': data_source,
-                    'qualified_for_trading': qualified_for_trading,
-                    'ranking': simulation_result.get('ranking') if simulation_result else None,
-                    'real_trading_enabled': simulation_result.get('real_trading_enabled', False) if simulation_result else False
-                })
-            
-            # 按评分排序
-            strategies_list.sort(key=lambda x: x['final_score'], reverse=True)
-            
-            print(f"✅ 返回 {len(strategies_list)} 个策略信息")
-            return strategies_list
+                strategies_list.append(strategy_data)
+                
+            print(f"✅ 返回 {len(strategies_list)} 个策略的数据")
+            return {'success': True, 'data': strategies_list}
             
         except Exception as e:
-            print(f"获取策略信息失败: {e}")
-            import traceback
-            traceback.print_exc()
-            return []
-
+            print(f"❌ 获取策略列表失败: {e}")
+            return {'success': False, 'error': str(e), 'data': []}
+    
+    def _is_strategy_initialized(self, strategy_id: str) -> bool:
+        """检查策略是否已完成初始化"""
+        try:
+            query = """
+            SELECT initialized_at FROM strategy_initialization 
+            WHERE strategy_id = ? AND initialized = 1
+            """
+            result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+            return result is not None
+        except Exception as e:
+            print(f"检查策略初始化状态失败: {e}")
+            return False
+    
+    def _get_strategy_with_simulation_data(self, strategy_id: str, strategy: Dict) -> Dict:
+        """获取带模拟数据的策略信息（仅用于初始化）"""
+        # 获取模拟结果作为初始值
+        simulation_result = self._get_latest_simulation_result(strategy_id)
+        
+        if not simulation_result:
+            print(f"⚠️ 策略 {strategy_id} 缺少模拟数据，运行模拟...")
+            # 使用内部模拟器
+            if not self.simulator:
+                self.simulator = StrategySimulator(self)
+            simulation_result = self.simulator.run_strategy_simulation(strategy_id)
+        
+        # 使用模拟数据作为初始值
+        final_score = simulation_result.get('final_score', 0)
+        win_rate = simulation_result.get('win_rate', 0.0)
+        total_return = simulation_result.get('total_return', 0.0)
+        total_trades = simulation_result.get('total_trades', 0)
+        
+        return {
+            'id': strategy_id,
+            'name': strategy.get('name', strategy_id),
+            'symbol': strategy.get('symbol', 'BTC/USDT'),
+            'type': strategy.get('type', 'unknown'),
+            'enabled': strategy.get('enabled', False),
+            'parameters': strategy.get('parameters', {}),
+            'final_score': final_score,
+            'win_rate': win_rate,
+            'total_return': total_return,
+            'total_trades': total_trades,
+            'data_source': '模拟初始化',
+            'qualified_for_trading': final_score >= self.fund_allocation_config.get('min_score_for_trading', 60.0),
+            'created_time': strategy.get('created_time', datetime.now().isoformat()),
+            'last_updated': datetime.now().isoformat()
+        }
+    
+    def _get_strategy_with_real_data(self, strategy_id: str, strategy: Dict) -> Dict:
+        """获取基于真实交易数据的策略信息"""
+        # 计算真实交易数据
+        real_win_rate = self._calculate_real_win_rate(strategy_id)
+        real_total_trades = self._count_real_strategy_trades(strategy_id)
+        real_total_return = self._calculate_real_strategy_return(strategy_id)
+        
+        # 获取初始化时的评分作为基准
+        initial_score = self._get_initial_strategy_score(strategy_id)
+        
+        # 基于真实交易表现调整评分
+        current_score = self._calculate_strategy_score_with_real_data(
+            strategy_id, real_total_return, real_win_rate, 
+            real_total_trades, initial_score
+        )
+        
+        return {
+            'id': strategy_id,
+            'name': strategy.get('name', strategy_id),
+            'symbol': strategy.get('symbol', 'BTC/USDT'),
+            'type': strategy.get('type', 'unknown'),
+            'enabled': strategy.get('enabled', False),
+            'parameters': strategy.get('parameters', {}),
+            'final_score': current_score,
+            'win_rate': real_win_rate,
+            'total_return': real_total_return,
+            'total_trades': real_total_trades,
+            'data_source': '真实交易',
+            'qualified_for_trading': current_score >= self.fund_allocation_config.get('min_score_for_trading', 60.0),
+            'created_time': strategy.get('created_time', datetime.now().isoformat()),
+            'last_updated': datetime.now().isoformat()
+        }
+    
+    def _mark_strategy_initialized(self, strategy_id: str, initial_data: Dict):
+        """标记策略完成初始化并保存初始数据"""
+        try:
+            # 创建初始化记录表（如果不存在）
+            self.db_manager.execute_query("""
+                CREATE TABLE IF NOT EXISTS strategy_initialization (
+                    strategy_id TEXT PRIMARY KEY,
+                    initialized BOOLEAN DEFAULT 0,
+                    initialized_at TIMESTAMP,
+                    initial_score REAL,
+                    initial_win_rate REAL,
+                    initial_return REAL,
+                    initial_trades INTEGER,
+                    data_source TEXT
+                )
+            """)
+            
+            # 插入初始化数据
+            query = """
+            INSERT OR REPLACE INTO strategy_initialization 
+            (strategy_id, initialized, initialized_at, initial_score, initial_win_rate, 
+             initial_return, initial_trades, data_source)
+            VALUES (?, 1, ?, ?, ?, ?, ?, ?)
+            """
+            
+            self.db_manager.execute_query(query, (
+                strategy_id,
+                datetime.now().isoformat(),
+                initial_data['final_score'],
+                initial_data['win_rate'],
+                initial_data['total_return'],
+                initial_data['total_trades'],
+                '模拟初始化'
+            ))
+            
+            print(f"✅ 策略 {strategy_id} 初始化完成，评分: {initial_data['final_score']:.1f}")
+            
+        except Exception as e:
+            print(f"❌ 标记策略初始化失败: {e}")
+    
+    def _get_initial_strategy_score(self, strategy_id: str) -> float:
+        """获取策略的初始评分"""
+        try:
+            query = """
+            SELECT initial_score FROM strategy_initialization 
+            WHERE strategy_id = ?
+            """
+            result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+            return result[0] if result else 60.0
+        except:
+            return 60.0
+    
+    def _calculate_strategy_score_with_real_data(self, strategy_id: str, 
+                                               real_return: float, real_win_rate: float, 
+                                               real_trades: int, initial_score: float) -> float:
+        """基于真实交易数据计算当前评分"""
+        if real_trades == 0:
+            # 没有真实交易，返回初始评分
+            return initial_score
+        
+        # 基于真实交易表现调整评分
+        performance_factor = 1.0
+        
+        # 收益率调整 (±20分)
+        if real_return > 0.1:  # 收益率 > 10%
+            performance_factor += 0.2
+        elif real_return > 0.05:  # 收益率 > 5%
+            performance_factor += 0.1
+        elif real_return < -0.1:  # 收益率 < -10%
+            performance_factor -= 0.2
+        elif real_return < -0.05:  # 收益率 < -5%
+            performance_factor -= 0.1
+        
+        # 成功率调整 (±15分)
+        if real_win_rate > 0.8:  # 成功率 > 80%
+            performance_factor += 0.15
+        elif real_win_rate > 0.6:  # 成功率 > 60%
+            performance_factor += 0.05
+        elif real_win_rate < 0.4:  # 成功率 < 40%
+            performance_factor -= 0.15
+        elif real_win_rate < 0.5:  # 成功率 < 50%
+            performance_factor -= 0.05
+        
+        # 交易频率调整 (±5分)
+        if real_trades > 100:
+            performance_factor += 0.05
+        elif real_trades < 10:
+            performance_factor -= 0.05
+        
+        # 计算最终评分
+        adjusted_score = initial_score * performance_factor
+        
+        # 限制评分范围 [0, 100]
+        return max(0, min(100, adjusted_score))
+    
     def _get_latest_simulation_result(self, strategy_id: str) -> Dict:
         """获取策略的最新模拟结果"""
         try:
