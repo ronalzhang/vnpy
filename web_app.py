@@ -1933,7 +1933,7 @@ def select_top_strategies():
         # 获取请求参数
         data = request.get_json() or {}
         max_strategies = data.get('max_strategies', 2)
-        min_score = data.get('min_score', 70.0)
+        min_score = data.get('min_score', 60.0)  # 修改默认值从70.0改为60.0
         
         # 更新配置
         quantitative_service.fund_allocation_config['max_active_strategies'] = max_strategies
