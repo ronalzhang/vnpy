@@ -234,17 +234,23 @@ class QuantitativeSystem {
             const data = await response.json();
             console.log('策略API响应:', data);
             
-            if (data.status === 'success' && data.data) {
-                this.strategies = data.data || [];
-                console.log(`成功加载 ${this.strategies.length} 个策略`);
+            // 处理双层data嵌套：{data: {data: [...]}}
+            if (data.data && data.data.data && Array.isArray(data.data.data)) {
+                this.strategies = data.data.data;
+                console.log(`✅ 成功加载 ${this.strategies.length} 个策略`);
+                this.renderStrategies();
+            } else if (data.data && Array.isArray(data.data)) {
+                // 兼容单层data结构
+                this.strategies = data.data;
+                console.log(`✅ 成功加载 ${this.strategies.length} 个策略`);
                 this.renderStrategies();
             } else {
-                console.error('加载策略失败:', data.message || '未知错误');
+                console.error('❌ 无效的策略数据结构:', data);
                 console.log('尝试渲染空策略状态');
                 this.renderEmptyStrategies();
             }
         } catch (error) {
-            console.error('加载策略失败:', error);
+            console.error('❌ 加载策略失败:', error);
             console.log('网络或解析错误，渲染空策略状态');
             this.renderEmptyStrategies();
         }
