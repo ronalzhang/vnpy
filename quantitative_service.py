@@ -1308,6 +1308,8 @@ class AutomatedStrategyManager:
     
     def __init__(self, quantitative_service):
         self.service = quantitative_service
+        # ⭐ 修复db_manager属性缺失问题
+        self.db_manager = quantitative_service.db_manager
         self.initial_capital = 10000  # 初始资金10000 USDT
         self.monthly_target = 1.0  # 月收益目标100%
         self.risk_limit = 0.05  # 单次风险限制5%
