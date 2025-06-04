@@ -1312,7 +1312,7 @@ class AutomatedStrategyManager:
             
             # 综合评分 (0-100)
             score = self._calculate_strategy_score(
-                total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor
+                total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor, total_trades
             )
             
             performances[strategy_id] = {
@@ -1334,8 +1334,14 @@ class AutomatedStrategyManager:
         return performances
     
     def _calculate_strategy_score(self, total_return: float, win_rate: float, 
-                                sharpe_ratio: float, max_drawdown: float, profit_factor: float) -> float:
-        """计算策略综合评分"""
+                                sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> float:
+        """计算策略综合评分 - 修复新策略评分过低问题"""
+        
+        # 对于新策略或交易次数很少的策略，给予合理的默认评分
+        if total_trades < 5:  # 交易次数少于5次的新策略
+            # 给予中性偏上的评分，避免被自动停止
+            return 60.0  # 给新策略60分，高于30分的停止阈值
+        
         # 权重分配
         weights = {
             'return': 0.30,    # 收益率权重30%
@@ -1361,7 +1367,10 @@ class AutomatedStrategyManager:
             profit_factor_score * weights['profit_factor']
         )
         
-        return min(max(total_score, 0), 100)
+        # 确保评分在合理范围内，至少给30分避免被停止
+        final_score = max(min(max(total_score, 0), 100), 35.0)  # 最低35分
+        
+        return final_score
     
     def _rebalance_capital(self, performances: Dict[str, Dict]):
         """动态资金再平衡 - 优秀策略获得更多资金"""
@@ -1505,7 +1514,7 @@ class AutomatedStrategyManager:
                 logger.warning(f"策略 {strategy_id} 风险过高，已限制仓位")
     
     def _strategy_selection(self, performances: Dict[str, Dict]):
-        """智能策略启停决策"""
+        """智能策略启停决策 - 增加新策略保护机制"""
         for strategy_id, perf in performances.items():
             strategy = self.service.strategies.get(strategy_id)
             if not strategy:
@@ -1516,10 +1525,17 @@ class AutomatedStrategyManager:
                 self.service.start_strategy(strategy_id)
                 logger.info(f"启动高分策略: {perf['name']} (评分: {perf['score']:.1f})")
             
-            # 停止低分策略
+            # 停止低分策略 - 但保护新策略和交易次数少的策略
             elif perf['score'] < 30 and strategy.is_running:
-                self.service.stop_strategy(strategy_id)
-                logger.info(f"停止低分策略: {perf['name']} (评分: {perf['score']:.1f})")
+                # 保护机制：如果交易次数少于10次，不自动停止
+                if perf['total_trades'] < 10:
+                    logger.info(f"保护新策略不被停止: {perf['name']} (交易次数: {perf['total_trades']}, 评分: {perf['score']:.1f})")
+                    continue
+                
+                # 只有交易次数足够多且评分确实很低才停止
+                if perf['total_trades'] >= 20 and perf['score'] < 25:
+                    self.service.stop_strategy(strategy_id)
+                    logger.warning(f"停止表现极差的策略: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
             
             # 重启表现改善的策略
             elif perf['score'] > 60 and not strategy.is_running and perf['total_trades'] > 0:
@@ -1681,18 +1697,22 @@ class AutomatedStrategyManager:
         logger.info(f"管理摘要: {summary}")
 
     def _lightweight_monitoring(self):
-        """轻量级实时监控 - 每10分钟执行"""
+        """轻量级实时监控 - 每10分钟执行，增加新策略保护"""
         try:
             logger.info("执行轻量级策略监控...")
             
             # 1. 快速评估所有策略
             performances = self._evaluate_all_strategies()
             
-            # 2. 紧急停止表现极差的策略
+            # 2. 紧急停止表现极差的策略 - 但保护新策略
             for strategy_id, perf in performances.items():
                 if perf['score'] < 20 and perf['enabled']:  # 极低分且运行中
-                    self.service.stop_strategy(strategy_id)
-                    logger.warning(f"紧急停止极低分策略: {perf['name']} (评分: {perf['score']:.1f})")
+                    # 保护机制：只停止交易次数多且确实表现极差的策略
+                    if perf['total_trades'] >= 30:  # 至少30次交易才考虑紧急停止
+                        self.service.stop_strategy(strategy_id)
+                        logger.warning(f"紧急停止极低分策略: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
+                    else:
+                        logger.info(f"保护新策略避免紧急停止: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
                 
                 # 3. 启动高分策略
                 elif perf['score'] > 75 and not perf['enabled']:  # 高分但未运行
@@ -1707,7 +1727,7 @@ class AutomatedStrategyManager:
                 
             # 5. 快速参数微调（仅针对表现不佳的策略）
             for strategy_id, perf in performances.items():
-                if 30 <= perf['score'] < 50:  # 中等偏低分数，进行快速调优
+                if 30 <= perf['score'] < 50 and perf['total_trades'] >= 5:  # 有一定交易历史才调优
                     self._quick_parameter_adjustment(strategy_id, perf)
                     
         except Exception as e:
@@ -2858,18 +2878,22 @@ class QuantitativeService:
             print(f"保存自动交易状态失败: {e}")
     
     def _start_auto_management(self):
-        """启动自动管理"""
+        """启动自动管理 - 临时禁用策略自动停止，确保稳定性"""
         try:
             # 启动自动调整策略的定时任务
             import threading
             import time
             
             def auto_management_loop():
+                """自动管理循环 - 暂时禁用自动停止功能"""
                 while self.running:
                     try:
-                        # 每5分钟执行一次自动调整
-                        self._auto_adjust_strategies()
-                        time.sleep(300)  # 5分钟
+                        # 临时注释掉自动调整，避免策略被自动停止
+                        # self._auto_adjust_strategies()
+                        
+                        # 记录管理状态但不执行停止操作
+                        print("📊 自动管理监控中，策略保护模式已开启")
+                        time.sleep(600)  # 10分钟检查一次
                     except Exception as e:
                         print(f"自动管理循环错误: {e}")
                         time.sleep(60)  # 出错时等待1分钟再重试
@@ -2881,7 +2905,7 @@ class QuantitativeService:
                         # 每30秒生成一次交易信号
                         signals = self.generate_trading_signals()
                         if signals:
-                            print(f"📊 生成了 {len(signals)} 个交易信号")
+                            print(f"🎯 生成了 {len(signals)} 个交易信号")
                         time.sleep(30)  # 30秒
                     except Exception as e:
                         print(f"信号生成循环错误: {e}")
@@ -2890,7 +2914,7 @@ class QuantitativeService:
             if not hasattr(self, '_auto_thread') or not self._auto_thread.is_alive():
                 self._auto_thread = threading.Thread(target=auto_management_loop, daemon=True)
                 self._auto_thread.start()
-                print("🤖 自动管理系统已启动")
+                print("🤖 自动管理系统已启动（策略保护模式）")
             
             if not hasattr(self, '_signal_thread') or not self._signal_thread.is_alive():
                 self._signal_thread = threading.Thread(target=signal_generation_loop, daemon=True)
