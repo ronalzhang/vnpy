@@ -41,7 +41,7 @@ class QuantitativeBackgroundService:
             
             # 使用QuantitativeService实例初始化管理器
             self.manager = AutomatedStrategyManager(self.quantitative_service)
-            self.engine = EvolutionaryStrategyEngine()
+            self.engine = EvolutionaryStrategyEngine(self.quantitative_service)
             
             logger.info("✅ 量化服务组件初始化成功")
             return True
