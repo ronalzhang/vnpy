@@ -1912,7 +1912,7 @@ class QuantitativeService:
         # 资金分配策略配置
         self.fund_allocation_config = {
             'max_active_strategies': 2,    # 最多2个策略进行真实交易
-            'min_score_for_trading': 70.0, # 最低70分才能真实交易
+            'min_score_for_trading': 55.0, # 最低55分才能真实交易 (从70降至55)
             'simulation_required': True,    # 必须先模拟交易
             'allocation_ratio': [0.6, 0.4] # 第1名60%资金，第2名40%资金
         }
@@ -4109,7 +4109,7 @@ class StrategySimulator:
             'max_drawdown': max_drawdown,
             'profit_factor': profit_factor,
             'final_score': final_score,
-            'qualified_for_live_trading': final_score >= 70.0,  # 70分以上才能真实交易
+            'qualified_for_live_trading': final_score >= 55.0,  # 55分以上才能真实交易 (从70降至55)
             'simulation_date': datetime.now().isoformat()
         }
     
@@ -4196,7 +4196,7 @@ class StrategySimulator:
                 strategy_id,
                 json.dumps(result),
                 result['final_score'],
-                1 if result['qualified_for_live'] else 0
+                1 if result['qualified_for_live_trading'] else 0
             ))
             
             self.service.conn.commit()
