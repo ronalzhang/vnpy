@@ -9,6 +9,7 @@ import time
 import threading
 import logging
 from quantitative_service import QuantitativeService, AutomatedStrategyManager, EvolutionaryStrategyEngine
+from datetime import datetime
 
 # 配置日志
 logging.basicConfig(
@@ -53,18 +54,48 @@ class QuantitativeBackgroundService:
     def run_quantitative_cycle(self):
         """运行一次量化系统循环"""
         try:
+            # 计算当前策略统计
+            total_strategies = len(self.quantitative_service.strategies)
+            running_strategies = sum(1 for s in self.quantitative_service.strategies.values() if s.get('enabled', False))
+            selected_strategies = sum(1 for s in self.quantitative_service.strategies.values() if s.get('qualified_for_trading', False))
+            
+            # ⭐ 更新系统状态到数据库
+            self.quantitative_service.update_system_status(
+                quantitative_running=True,
+                auto_trading_enabled=self.quantitative_service.auto_trading_enabled,
+                total_strategies=total_strategies,
+                running_strategies=running_strategies,
+                selected_strategies=selected_strategies,
+                system_health='healthy',
+                notes='后台量化服务正常运行'
+            )
+            
             # 自动策略管理
             self.manager.auto_manage_strategies()
             logger.info("✅ 策略管理完成")
             
             # 策略进化
-            self.engine.run_evolution_cycle()
+            evolution_result = self.engine.run_evolution_cycle()
+            if evolution_result:
+                # 更新进化代数
+                current_generation = getattr(self.engine, 'current_generation', 0)
+                self.quantitative_service.update_system_status(
+                    current_generation=current_generation,
+                    last_evolution_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                )
             logger.info("✅ 策略进化完成")
             
             return True
             
         except Exception as e:
             logger.error(f"❌ 量化系统运行错误: {e}")
+            
+            # ⭐ 更新错误状态到数据库
+            self.quantitative_service.update_system_status(
+                system_health='error',
+                notes=f'运行错误: {str(e)}'
+            )
+            
             return False
     
     def start_background_service(self):

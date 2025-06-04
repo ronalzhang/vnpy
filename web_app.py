@@ -1367,95 +1367,94 @@ def get_balance_history():
 
 @app.route('/api/quantitative/system-status', methods=['GET'])
 def get_system_status():
-    """获取量化系统状态"""
+    """获取量化系统状态 - 从数据库读取，确保前后端状态同步"""
     try:
         if quantitative_service:
+            # ⭐ 从数据库读取系统状态，而不是从内存实例
+            db_status = quantitative_service.get_system_status_from_db()
+            
+            # 计算策略统计信息
+            total_strategies = len(quantitative_service.strategies) if quantitative_service.strategies else 0
             running_strategies = 0
-            total_strategies = len(quantitative_service.strategies)
+            selected_strategies = 0
             
-            for strategy in quantitative_service.strategies.values():
-                if strategy.get('enabled', False):
-                    running_strategies += 1
+            if quantitative_service.strategies:
+                for strategy in quantitative_service.strategies.values():
+                    if strategy.get('enabled', False):
+                        running_strategies += 1
+                    if strategy.get('qualified_for_trading', False):
+                        selected_strategies += 1
             
+            # 更新数据库中的策略统计信息
+            quantitative_service.update_system_status(
+                total_strategies=total_strategies,
+                running_strategies=running_strategies,
+                selected_strategies=selected_strategies
+            )
+            
+            # 组合返回数据，优先使用数据库状态
             return jsonify({
                 'success': True,
-                'running': quantitative_service.running,
-                'auto_trading_enabled': quantitative_service.auto_trading_enabled,
+                'running': db_status.get('quantitative_running', False),
+                'auto_trading_enabled': db_status.get('auto_trading_enabled', False),
                 'total_strategies': total_strategies,
                 'running_strategies': running_strategies,
-                'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'system_health': 'healthy' if quantitative_service.running else 'offline'
+                'selected_strategies': selected_strategies,
+                'current_generation': db_status.get('current_generation', 0),
+                'evolution_enabled': db_status.get('evolution_enabled', True),
+                'last_evolution_time': db_status.get('last_evolution_time'),
+                'last_update': db_status.get('last_update_time', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+                'system_health': db_status.get('system_health', 'unknown'),
+                'notes': db_status.get('notes'),
+                'data_source': 'database'  # 标明数据来源
             })
         else:
+            # 如果量化服务未初始化，仍尝试从数据库读取
+            try:
+                import sqlite3
+                conn = sqlite3.connect('quantitative.db')
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT quantitative_running, auto_trading_enabled, total_strategies,
+                           running_strategies, selected_strategies, current_generation,
+                           evolution_enabled, last_evolution_time, last_update_time,
+                           system_health, notes
+                    FROM system_status WHERE id = 1
+                ''')
+                
+                row = cursor.fetchone()
+                if row:
+                    conn.close()
+                    return jsonify({
+                        'success': True,
+                        'running': bool(row[0]),
+                        'auto_trading_enabled': bool(row[1]),
+                        'total_strategies': row[2] or 0,
+                        'running_strategies': row[3] or 0,
+                        'selected_strategies': row[4] or 0,
+                        'current_generation': row[5] or 0,
+                        'evolution_enabled': bool(row[6]),
+                        'last_evolution_time': row[7],
+                        'last_update': row[8] or datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'system_health': row[9] or 'offline',
+                        'notes': row[10],
+                        'data_source': 'database_direct'
+                    })
+                conn.close()
+            except Exception as e:
+                print(f"直接从数据库读取状态失败: {e}")
+            
             return jsonify({
                 'success': False,
                 'running': False,
                 'auto_trading_enabled': False,
                 'total_strategies': 0,
                 'running_strategies': 0,
+                'selected_strategies': 0,
+                'current_generation': 0,
+                'evolution_enabled': False,
                 'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'system_health': 'not_initialized',
-                'message': '量化服务未初始化'
-            })
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'running': False,
-            'auto_trading_enabled': False,
-            'message': f'获取系统状态失败: {str(e)}',
-            'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'system_health': 'error'
-        })
-
-@app.route('/api/quantitative/account-info', methods=['GET'])
-def get_account_info():
-    """获取账户信息"""
-    try:
-        print("正在获取币安真实账户余额...")
-        
-        if quantitative_service:
-            account_info = quantitative_service.get_account_info()
-            return jsonify({
-                'success': True,
-                'data': account_info
-            })
-        else:
-            # 返回模拟账户数据
-            return jsonify({
-                'success': True,
-                'data': {
-                    'balance': 9.47,
-                    'daily_pnl': 0.0,
-                    'daily_return': 0.0,
-                    'daily_trades': 0,
-                    'available_balance': 9.47,
-                    'frozen_balance': 0.0
-                }
-            })
-    except Exception as e:
-        print(f"获取账户信息失败: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'获取失败: {str(e)}',
-            'data': {
-                'balance': 0.0,
-                'daily_pnl': 0.0,
-                'daily_return': 0.0,
-                'daily_trades': 0
-            }
-        })
-
-@app.route('/api/quantitative/system-control', methods=['POST'])
-def system_control():
-    """系统启停控制"""
-    try:
-        data = request.json
-        action = data.get('action')
-        
-        if not quantitative_service:
-            return jsonify({
-                'success': False,
                 'message': '量化服务未初始化'
             })
         

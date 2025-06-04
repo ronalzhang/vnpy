@@ -2501,45 +2501,92 @@ class QuantitativeService:
             return current_balance * 0.1  # 默认10%
     
     def start(self):
-        """启动量化系统"""
+        """启动量化交易系统"""
+        if self.running:
+            print("量化系统已经在运行中")
+            return True
+        
         try:
+            # 启动系统
             self.running = True
-            self.is_running = True
-            self.system_status = 'running'
+            self.auto_trading_enabled = True
             
-            # 初始化小资金优化
-            self._init_small_fund_optimization()
+            # ⭐ 更新数据库状态 - 后台服务启动
+            self.update_system_status(
+                quantitative_running=True,
+                auto_trading_enabled=True,
+                system_health='online',
+                notes='后台量化服务已启动'
+            )
             
-            # 启动自动管理
+            print("🚀 量化交易系统启动成功")
+            
+            # 启动数据监控线程
             self._start_auto_management()
             
-            # 保存状态到数据库
-            self._save_system_status()
+            # 启动进化引擎
+            self._init_evolution_engine()
             
-            print("✅ 量化交易系统启动成功")
+            # 记录操作日志
+            self._log_operation("系统启动", "量化交易系统启动成功", "success")
+            
+            print("✅ 量化系统启动完成，所有子系统就绪")
             return True
+            
         except Exception as e:
             print(f"❌ 启动量化系统失败: {e}")
-            return False
-    
-    def stop(self):
-        """停止量化系统"""
-        try:
+            traceback.print_exc()
+            
+            # ⭐ 更新失败状态到数据库
+            self.update_system_status(
+                quantitative_running=False,
+                system_health='error',
+                notes=f'启动失败: {str(e)}'
+            )
+            
             self.running = False
-            self.is_running = False
-            self.system_status = 'offline'
+            return False
+
+    def stop(self):
+        """停止量化交易系统"""
+        if not self.running:
+            print("量化系统已经停止")
+            return True
+        
+        try:
+            print("🛑 正在停止量化交易系统...")
+            
+            # 停止系统
+            self.running = False
+            self.auto_trading_enabled = False
+            
+            # ⭐ 更新数据库状态 - 后台服务停止
+            self.update_system_status(
+                quantitative_running=False,
+                auto_trading_enabled=False,
+                system_health='offline',
+                notes='后台量化服务已停止'
+            )
             
             # 停止所有策略
-            for strategy in self.strategies.values():
-                strategy['enabled'] = False
+            for strategy_id in self.strategies:
+                self.stop_strategy(strategy_id)
             
-            # 保存状态到数据库
-            self._save_system_status()
+            # 记录操作日志
+            self._log_operation("系统停止", "量化交易系统停止成功", "success")
             
             print("✅ 量化交易系统已停止")
             return True
+            
         except Exception as e:
             print(f"❌ 停止量化系统失败: {e}")
+            
+            # ⭐ 更新错误状态到数据库
+            self.update_system_status(
+                system_health='error',
+                notes=f'停止失败: {str(e)}'
+            )
+            
             return False
 
     def get_strategy(self, strategy_id):
@@ -4116,29 +4163,283 @@ class QuantitativeService:
     def init_database(self):
         """初始化数据库"""
         try:
-            # 创建数据库管理器实例
-            self.db_manager = DatabaseManager()
+            cursor = self.conn.cursor()
             
-            # 初始化数据库表
-            self.db_manager.init_database()
+            # 策略表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategies (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    type TEXT,
+                    symbol TEXT,
+                    parameters TEXT,
+                    enabled INTEGER DEFAULT 0,
+                    created_time TEXT,
+                    last_trade_time TEXT,
+                    total_trades INTEGER DEFAULT 0,
+                    win_trades INTEGER DEFAULT 0,
+                    total_profit REAL DEFAULT 0,
+                    max_drawdown REAL DEFAULT 0,
+                    generation INTEGER DEFAULT 0,
+                    current_score REAL DEFAULT 50.0,
+                    last_score_update TEXT,
+                    simulation_score REAL DEFAULT 50.0,
+                    simulation_win_rate REAL DEFAULT 0.5,
+                    qualified_for_trading INTEGER DEFAULT 0,
+                    creation_method TEXT DEFAULT 'manual'
+                )
+            ''')
             
-            # 为向后兼容，保留conn属性
-            self.conn = self.db_manager.conn
+            # 信号表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    symbol TEXT,
+                    signal_type TEXT,
+                    price REAL,
+                    quantity REAL,
+                    confidence REAL,
+                    timestamp TEXT,
+                    executed INTEGER DEFAULT 0
+                )
+            ''')
             
-            # 确保初始余额历史数据
-            self._ensure_initial_balance_history()
+            # 交易日志表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_trade_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    symbol TEXT,
+                    side TEXT,
+                    amount REAL,
+                    price REAL,
+                    timestamp TEXT,
+                    executed INTEGER DEFAULT 0,
+                    pnl REAL DEFAULT 0
+                )
+            ''')
             
-            # 初始化策略模拟器
-            if not self.simulator:
-                self.simulator = StrategySimulator(self)
+            # 优化记录表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_optimization_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    strategy_name TEXT,
+                    optimization_type TEXT,
+                    old_params TEXT,
+                    new_params TEXT,
+                    trigger_reason TEXT,
+                    old_success_rate REAL,
+                    new_success_rate REAL,
+                    target_success_rate REAL,
+                    timestamp TEXT
+                )
+            ''')
             
-            print("数据库初始化完成")
+            # 账户资产历史表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS account_balance_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT,
+                    total_balance REAL,
+                    available_balance REAL,
+                    frozen_balance REAL,
+                    daily_pnl REAL DEFAULT 0,
+                    daily_return REAL DEFAULT 0,
+                    cumulative_return REAL DEFAULT 0,
+                    total_trades INTEGER DEFAULT 0,
+                    milestone_note TEXT
+                )
+            ''')
+            
+            # 创建操作日志表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS operation_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    operation_type TEXT,
+                    operation_detail TEXT,
+                    result TEXT,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 策略评分历史表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_score_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    score REAL,
+                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 创建模拟结果表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS simulation_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_id TEXT,
+                    result_data TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # ⭐ 新增：创建系统状态表 - 解决前后端状态同步问题
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_status (
+                    id INTEGER PRIMARY KEY DEFAULT 1,
+                    quantitative_running BOOLEAN DEFAULT FALSE,
+                    auto_trading_enabled BOOLEAN DEFAULT FALSE,
+                    total_strategies INTEGER DEFAULT 0,
+                    running_strategies INTEGER DEFAULT 0,
+                    selected_strategies INTEGER DEFAULT 0,
+                    current_generation INTEGER DEFAULT 0,
+                    evolution_enabled BOOLEAN DEFAULT TRUE,
+                    last_evolution_time TEXT,
+                    last_update_time TEXT DEFAULT CURRENT_TIMESTAMP,
+                    system_health TEXT DEFAULT 'offline',
+                    backend_process_id INTEGER,
+                    web_process_id INTEGER,
+                    notes TEXT
+                )
+            ''')
+            
+            # 插入初始系统状态记录（如果不存在）
+            cursor.execute('''
+                INSERT OR IGNORE INTO system_status (
+                    id, quantitative_running, system_health, last_update_time
+                ) VALUES (1, FALSE, 'initializing', datetime('now'))
+            ''')
+            
+            self.conn.commit()
+            print("✅ 数据库表初始化完成，包括系统状态表")
+            
+            # 插入初始资产记录（如果没有的话）
+            cursor.execute('SELECT COUNT(*) FROM account_balance_history')
+            if cursor.fetchone()[0] == 0:
+                current_balance = self._get_current_balance()
+                self.record_balance_history(
+                    total_balance=current_balance,
+                    available_balance=current_balance,
+                    milestone_note="系统初始化"
+                )
+                print(f"✅ 初始资产记录已创建: {current_balance}U")
+            
         except Exception as e:
-            print(f"数据库初始化失败: {e}")
-            # 创建备用数据库管理器
-            self.db_manager = DatabaseManager()
-            self.conn = self.db_manager.conn
+            print(f"❌ 初始化数据库失败: {e}")
+            traceback.print_exc()
     
+    # ⭐ 新增：系统状态同步方法
+    def update_system_status(self, quantitative_running=None, auto_trading_enabled=None, 
+                           total_strategies=None, running_strategies=None, 
+                           selected_strategies=None, current_generation=None,
+                           evolution_enabled=None, system_health=None, notes=None):
+        """更新系统状态到数据库 - 解决前后端状态同步问题"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # 构建更新语句
+            updates = []
+            params = []
+            
+            if quantitative_running is not None:
+                updates.append("quantitative_running = ?")
+                params.append(quantitative_running)
+            
+            if auto_trading_enabled is not None:
+                updates.append("auto_trading_enabled = ?")
+                params.append(auto_trading_enabled)
+                
+            if total_strategies is not None:
+                updates.append("total_strategies = ?")
+                params.append(total_strategies)
+                
+            if running_strategies is not None:
+                updates.append("running_strategies = ?")
+                params.append(running_strategies)
+                
+            if selected_strategies is not None:
+                updates.append("selected_strategies = ?")
+                params.append(selected_strategies)
+                
+            if current_generation is not None:
+                updates.append("current_generation = ?")
+                params.append(current_generation)
+                
+            if evolution_enabled is not None:
+                updates.append("evolution_enabled = ?")
+                params.append(evolution_enabled)
+                
+            if system_health is not None:
+                updates.append("system_health = ?")
+                params.append(system_health)
+                
+            if notes is not None:
+                updates.append("notes = ?")
+                params.append(notes)
+            
+            # 总是更新最后更新时间
+            updates.append("last_update_time = datetime('now')")
+            
+            if updates:
+                sql = f"UPDATE system_status SET {', '.join(updates)} WHERE id = 1"
+                cursor.execute(sql, params)
+                self.conn.commit()
+                
+        except Exception as e:
+            print(f"更新系统状态失败: {e}")
+    
+    def get_system_status_from_db(self):
+        """从数据库获取系统状态"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT quantitative_running, auto_trading_enabled, total_strategies,
+                       running_strategies, selected_strategies, current_generation,
+                       evolution_enabled, last_evolution_time, last_update_time,
+                       system_health, notes
+                FROM system_status WHERE id = 1
+            ''')
+            
+            row = cursor.fetchone()
+            if row:
+                return {
+                    'quantitative_running': bool(row[0]),
+                    'auto_trading_enabled': bool(row[1]),
+                    'total_strategies': row[2],
+                    'running_strategies': row[3],
+                    'selected_strategies': row[4],
+                    'current_generation': row[5],
+                    'evolution_enabled': bool(row[6]),
+                    'last_evolution_time': row[7],
+                    'last_update_time': row[8],
+                    'system_health': row[9],
+                    'notes': row[10]
+                }
+            else:
+                # 如果没有记录，返回默认状态
+                return {
+                    'quantitative_running': False,
+                    'auto_trading_enabled': False,
+                    'total_strategies': 0,
+                    'running_strategies': 0,
+                    'selected_strategies': 0,
+                    'current_generation': 0,
+                    'evolution_enabled': True,
+                    'last_evolution_time': None,
+                    'last_update_time': None,
+                    'system_health': 'offline',
+                    'notes': None
+                }
+                
+        except Exception as e:
+            print(f"获取系统状态失败: {e}")
+            return {
+                'quantitative_running': False,
+                'auto_trading_enabled': False,
+                'system_health': 'error'
+            }
+
     def _ensure_initial_balance_history(self):
         """确保有初始的余额历史数据"""
         try:
