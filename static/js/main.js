@@ -86,40 +86,48 @@ function initButtons() {
     }
 }
 
-// 初始化余额隐私设置
+// 初始化隐私设置
 function initPrivacySettings() {
-    const togglePrivacyBtn = document.getElementById('toggle-privacy');
-    if (togglePrivacyBtn) {
-        // 默认开启隐私模式
-        let isPrivate = true;
-        document.body.classList.add('privacy-mode');
-        
-        togglePrivacyBtn.addEventListener('click', function() {
-            isPrivate = !isPrivate;
-            document.body.classList.toggle('privacy-mode');
-            
-            // 更新图标
-            const icon = togglePrivacyBtn.querySelector('i');
-            if (icon) {
-                icon.className = isPrivate ? 'fas fa-eye-slash' : 'fas fa-eye';
-            }
-            
-            // 更新按钮样式
-            togglePrivacyBtn.classList.toggle('btn-outline-light');
-            togglePrivacyBtn.classList.toggle('btn-light');
-            
-            // 更新所有余额显示
+    const privacyToggle = document.getElementById('toggle-privacy');
+    
+    if (privacyToggle) {
+        // 监听隐私切换按钮
+        privacyToggle.addEventListener('change', function() {
+            const isPrivate = this.checked;
             updateBalanceDisplay(isPrivate);
+            
+            // 更新按钮图标
+            const icon = this.querySelector('i');
+            if (icon) {
+                icon.className = isPrivate ? 'fas fa-eye' : 'fas fa-eye-slash';
+            }
+        });
+        
+        // 监听按钮点击事件
+        privacyToggle.addEventListener('click', function() {
+            this.checked = !this.checked;
+            const event = new Event('change');
+            this.dispatchEvent(event);
         });
     }
 }
 
 // 更新余额显示
 function updateBalanceDisplay(isPrivate) {
-    const balanceElements = document.querySelectorAll('.balance-info h4, .table td:not(:first-child)');
+    const balanceElements = document.querySelectorAll('.balance-info h4, .balance-info .table td[data-value]');
     balanceElements.forEach(element => {
         if (element.dataset.value) {
-            element.textContent = element.dataset.value;
+            if (isPrivate) {
+                element.textContent = '****';
+            } else {
+                // 统一格式化为2位小数
+                const value = parseFloat(element.dataset.value);
+                if (!isNaN(value)) {
+                    element.textContent = value.toFixed(2);
+                } else {
+                    element.textContent = element.dataset.value;
+                }
+            }
             element.classList.toggle('privacy-blur', isPrivate);
         }
     });
@@ -355,22 +363,22 @@ function updateBalanceData() {
 
 // 渲染余额数据
 function renderBalanceData(balances) {
+    // 检查当前隐私模式状态
+    const privacyToggle = document.getElementById('toggle-privacy');
+    const isPrivate = privacyToggle ? privacyToggle.checked : false;
+    
     // 安全显示数据的辅助函数
     function safeDisplayBalance(elementId, value) {
         const element = document.getElementById(elementId);
         if (element) {
             if (value !== undefined && value !== null && !isNaN(value)) {
                 const formattedValue = parseFloat(value).toFixed(2);
-                element.textContent = formattedValue;
                 element.dataset.value = formattedValue;  // 保存原始值用于隐私模式
+                element.textContent = isPrivate ? '****' : formattedValue;
             } else {
-                element.textContent = '-';
                 element.dataset.value = '-';
+                element.textContent = '-';
             }
-            
-            // 应用当前的隐私模式
-            const isPrivate = document.body.classList.contains('privacy-mode');
-            element.classList.toggle('privacy-blur', isPrivate && element.dataset.value !== '-');
         }
     }
     
@@ -438,28 +446,38 @@ function updatePositionsTable(tableId, positions) {
     const table = document.getElementById(tableId);
     if (!table) return;
     
+    // 检查当前隐私模式状态
+    const privacyToggle = document.getElementById('toggle-privacy');
+    const isPrivate = privacyToggle ? privacyToggle.checked : false;
+    
     if (!positions || positions.length === 0) {
         table.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无持仓</td></tr>';
         return;
     }
 
-    table.innerHTML = positions.map(pos => `
+    table.innerHTML = positions.map(pos => {
+        // 统一格式化数值为2位小数
+        const quantity = !isNaN(pos.quantity) ? parseFloat(pos.quantity).toFixed(2) : '-';
+        const avgPrice = !isNaN(pos.avg_price) ? parseFloat(pos.avg_price).toFixed(2) : '-';
+        const currentPrice = !isNaN(pos.current_price) ? parseFloat(pos.current_price).toFixed(2) : '-';
+        const unrealizedPnl = !isNaN(pos.unrealized_pnl) ? parseFloat(pos.unrealized_pnl).toFixed(2) : '-';
+        const realizedPnl = !isNaN(pos.realized_pnl) ? parseFloat(pos.realized_pnl).toFixed(2) : '-';
+        
+        return `
         <tr>
             <td>${pos.symbol || '-'}</td>
-            <td data-value="${pos.quantity || 0}">${safeDisplayValue(pos.quantity || 0, 2)}</td>
-            <td data-value="${pos.avg_price || 0}">${safeDisplayValue(pos.avg_price || 0, 2)}</td>
-            <td data-value="${pos.current_price || 0}">${safeDisplayValue(pos.current_price || 0, 2)}</td>
-            <td data-value="${pos.unrealized_pnl || 0}" class="${(pos.unrealized_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}">${safeDisplayValue(pos.unrealized_pnl || 0, 2)}</td>
-            <td data-value="${pos.realized_pnl || 0}" class="${(pos.realized_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}">${safeDisplayValue(pos.realized_pnl || 0, 2)}</td>
+            <td data-value="${pos.quantity || 0}">${isPrivate ? '****' : quantity}</td>
+            <td data-value="${pos.avg_price || 0}">${isPrivate ? '****' : avgPrice}</td>
+            <td data-value="${pos.current_price || 0}">${isPrivate ? '****' : currentPrice}</td>
+            <td data-value="${pos.unrealized_pnl || 0}" class="${(pos.unrealized_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}">${isPrivate ? '****' : unrealizedPnl}</td>
+            <td data-value="${pos.realized_pnl || 0}" class="${(pos.realized_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}">${isPrivate ? '****' : realizedPnl}</td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
-// 安全显示数值 - 支持隐私模式
-function safeDisplayValue(value, decimals = 2) {
-    const privacyToggle = document.getElementById('privacy-toggle');
-    const isPrivate = privacyToggle ? privacyToggle.checked : false;
-    
+// 删除重复的safeDisplayValue函数，统一使用formatDisplayValue
+function formatDisplayValue(value, decimals = 2, isPrivate = false) {
     if (isPrivate) {
         return '****';
     }
