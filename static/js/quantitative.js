@@ -224,18 +224,28 @@ class QuantitativeSystem {
     // 加载策略列表
     async loadStrategies() {
         try {
+            console.log('正在加载策略列表...');
             const response = await fetch('/api/quantitative/strategies');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
+            console.log('策略API响应:', data);
             
             if (data.status === 'success' && data.data) {
                 this.strategies = data.data || [];
+                console.log(`成功加载 ${this.strategies.length} 个策略`);
                 this.renderStrategies();
             } else {
                 console.error('加载策略失败:', data.message || '未知错误');
+                console.log('尝试渲染空策略状态');
                 this.renderEmptyStrategies();
             }
         } catch (error) {
             console.error('加载策略失败:', error);
+            console.log('网络或解析错误，渲染空策略状态');
             this.renderEmptyStrategies();
         }
     }
@@ -243,17 +253,25 @@ class QuantitativeSystem {
     // 渲染策略列表
     renderStrategies() {
         const container = document.getElementById('strategiesContainer');
-        if (!container) return;
+        if (!container) {
+            console.error('策略容器不存在');
+            return;
+        }
 
-        if (this.strategies.length === 0) {
+        console.log('渲染策略数据:', this.strategies);
+
+        if (!this.strategies || this.strategies.length === 0) {
+            console.log('没有策略数据，渲染空状态');
             this.renderEmptyStrategies();
             return;
         }
 
-        // 按成功率排序
+        // 按成功率排序 - 修复字段名
         const sortedStrategies = this.strategies.sort((a, b) => 
-            (b.performance?.success_rate || 0) - (a.performance?.success_rate || 0)
+            (b.success_rate || 0) - (a.success_rate || 0)
         );
+
+        console.log('排序后的策略:', sortedStrategies);
 
         container.innerHTML = sortedStrategies.map(strategy => {
             // 生成评分变化箭头和颜色
@@ -276,8 +294,9 @@ class QuantitativeSystem {
                         
                         <p class="card-text">
                             <small class="text-muted">${strategy.symbol}</small><br>
-                            <span class="text-success">成功率: ${(strategy.success_rate || 0).toFixed(1)}%</span><br>
-                            <span class="text-info">收益率: ${(strategy.total_return || 0).toFixed(2)}%</span><br>
+                            <span class="text-success">成功率: ${((strategy.success_rate || 0) * 100).toFixed(1)}%</span><br>
+                            <span class="text-info">收益率: ${((strategy.total_return || 0) * 100).toFixed(2)}%</span><br>
+                            <span class="text-muted">交易次数: ${strategy.total_trades || 0}</span><br>
                             ${scoreDisplay}
                         </p>
                         
@@ -296,6 +315,8 @@ class QuantitativeSystem {
             </div>
             `;
         }).join('');
+
+        console.log('策略卡片渲染完成');
     }
 
     // 生成评分显示HTML
@@ -834,11 +855,19 @@ class QuantitativeSystem {
     // 加载资产历史数据
     async loadBalanceHistory(days = 90) {
         try {
+            console.log(`正在加载 ${days} 天的资产历史...`);
             const response = await fetch(`/api/quantitative/balance-history?days=${days}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
+            console.log('资产历史API响应:', data);
             
             if (data.success && data.data && data.data.length > 0) {
                 this.balanceHistory = data.data;
+                console.log(`成功加载 ${data.data.length} 条资产历史记录`);
                 
                 // 更新图表数据
                 const labels = data.data.map(item => {
@@ -848,9 +877,14 @@ class QuantitativeSystem {
                 
                 const balances = data.data.map(item => item.total_balance);
                 
-                this.balanceChart.data.labels = labels;
-                this.balanceChart.data.datasets[0].data = balances;
-                this.balanceChart.update();
+                if (this.balanceChart) {
+                    this.balanceChart.data.labels = labels;
+                    this.balanceChart.data.datasets[0].data = balances;
+                    this.balanceChart.update();
+                    console.log('资产图表已更新');
+                } else {
+                    console.warn('资产图表未初始化');
+                }
                 
                 // 更新当前资产显示
                 const currentBalance = data.data[data.data.length - 1].total_balance;
@@ -868,6 +902,7 @@ class QuantitativeSystem {
                     } else {
                         currentBalanceEl.className = 'milestone-value text-warning';
                     }
+                    console.log(`当前资产显示已更新: ${currentBalance}U`);
                 }
                 
                 // 显示里程碑提示
@@ -877,11 +912,21 @@ class QuantitativeSystem {
                 }
                 
             } else {
-                console.warn('未获取到资产历史数据');
+                console.warn('未获取到资产历史数据，响应数据:', data);
+                // 如果没有真实数据，尝试显示模拟数据
+                if (data.data && data.data.length === 0) {
+                    console.log('返回了空数组，可能是新系统还没有历史数据');
+                }
             }
             
         } catch (error) {
             console.error('加载资产历史失败:', error);
+            // 显示错误信息给用户
+            const currentBalanceEl = document.getElementById('currentBalance');
+            if (currentBalanceEl) {
+                currentBalanceEl.textContent = '加载失败';
+                currentBalanceEl.className = 'milestone-value text-danger';
+            }
         }
     }
 

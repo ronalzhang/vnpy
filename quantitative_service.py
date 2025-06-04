@@ -21,6 +21,7 @@ from auto_trading_engine import get_trading_engine, TradeResult
 import random
 import uuid
 import requests
+import traceback
 
 # 策略类型枚举
 class StrategyType(Enum):
@@ -117,6 +118,8 @@ class DatabaseManager:
     def init_database(self):
         """初始化数据库表"""
         try:
+            # 确保连接已建立
+            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
             cursor = self.conn.cursor()
             
             # 创建系统状态表
@@ -196,7 +199,8 @@ class DatabaseManager:
                     daily_pnl REAL DEFAULT 0,
                     daily_return REAL DEFAULT 0,
                     cumulative_return REAL DEFAULT 0,
-                    total_trades INTEGER DEFAULT 0
+                    total_trades INTEGER DEFAULT 0,
+                    milestone_note TEXT
                 )
             ''')
             
@@ -224,8 +228,20 @@ class DatabaseManager:
             self.conn.commit()
             print("✅ 数据库表初始化完成")
             
+            # 插入初始资产记录（如果没有的话）
+            cursor.execute('SELECT COUNT(*) FROM account_balance_history')
+            if cursor.fetchone()[0] == 0:
+                current_balance = self._get_current_balance()
+                self.record_balance_history(
+                    total_balance=current_balance,
+                    available_balance=current_balance,
+                    milestone_note="系统初始化"
+                )
+                print(f"✅ 初始资产记录已创建: {current_balance}U")
+            
         except Exception as e:
             print(f"❌ 初始化数据库失败: {e}")
+            traceback.print_exc()
 
     def record_balance_history(self, total_balance: float, available_balance: float = None, 
                              frozen_balance: float = None, daily_pnl: float = None,
@@ -3288,13 +3304,14 @@ class QuantitativeService:
             
             # 账户余额历史表
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS balance_history (
+                CREATE TABLE IF NOT EXISTS account_balance_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     total_balance REAL,
                     available_balance REAL,
                     frozen_balance REAL,
                     daily_pnl REAL,
                     daily_return REAL,
+                    cumulative_return REAL,
                     milestone_note TEXT,
                     timestamp TEXT DEFAULT CURRENT_TIMESTAMP
                 )
@@ -3325,8 +3342,22 @@ class QuantitativeService:
             self.conn.commit()
             print("数据库初始化完成")
             
+            # 插入初始资产记录（如果没有的话）
+            cursor.execute('SELECT COUNT(*) FROM account_balance_history')
+            if cursor.fetchone()[0] == 0:
+                current_balance = self._get_current_balance()
+                cursor.execute('''
+                    INSERT INTO account_balance_history 
+                    (total_balance, available_balance, frozen_balance, milestone_note, timestamp)
+                    VALUES (?, ?, ?, ?, datetime('now'))
+                ''', (current_balance, current_balance, 0.0, "系统初始化"))
+                self.conn.commit()
+                print(f"✅ 初始资产记录已创建: {current_balance}U")
+            
         except Exception as e:
             print(f"数据库初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     def load_config(self):
         """加载配置"""
