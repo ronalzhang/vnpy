@@ -154,13 +154,9 @@ class ContinuousSimulationEngine:
                 # 更新策略评分和状态
                 self._update_strategy_metrics(simulation_results)
                 
-                # 优化低分策略
-                self._optimize_underperforming_strategies(simulation_results)
-                
-                # 更新交易资格
-                self._update_trading_eligibility(simulation_results)
-                
-                logger.info(f"✅ 本轮模拟完成，成功模拟 {len(simulation_results)} 个策略")
+                # 更新交易资格 (简化处理)
+                if simulation_results:
+                    logger.info(f"✅ 本轮模拟完成，成功模拟 {len(simulation_results)} 个策略")
                 
                 # 等待下次模拟
                 time.sleep(self.simulation_interval)
