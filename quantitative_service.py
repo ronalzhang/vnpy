@@ -3291,7 +3291,7 @@ class QuantitativeService:
             print(f"获取余额失败: {e}")
             return 0.0
 
-def _fetch_fresh_balance(self):
+    def _fetch_fresh_balance(self):
         """获取最新余额 - 区分USDT现货余额和持仓总价值"""
         try:
             if not hasattr(self, 'exchange_client') or not self.exchange_client:
@@ -3344,7 +3344,7 @@ def _fetch_fresh_balance(self):
             print(f"❌ 获取余额失败: {e}")
             return None
 
-def invalidate_balance_cache(self, trigger='manual_refresh'):
+    def invalidate_balance_cache(self, trigger='manual_refresh'):
         """使余额缓存失效 - 在特定事件时调用"""
         print(f"🔄 触发余额缓存刷新: {trigger}")
         self.balance_cache['cache_valid'] = False
@@ -4125,7 +4125,7 @@ def invalidate_balance_cache(self, trigger='manual_refresh'):
                 'daily_trades': 0
             }
 
-def log_strategy_optimization(self, strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate):
+    def log_strategy_optimization(self, strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate):
         """记录策略优化日志"""
         try:
             cursor = self.conn.cursor()
@@ -4885,7 +4885,7 @@ def log_strategy_optimization(self, strategy_id, optimization_type, old_paramete
             print(f"获取余额失败: {e}")
             return 0.0
 
-def _calculate_strategy_score_with_history(self, strategy_id, total_return: float, win_rate: float, 
+    def _calculate_strategy_score_with_history(self, strategy_id, total_return: float, win_rate: float, 
                                             sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> Dict:
         """计算策略综合评分并记录历史变化"""
         
