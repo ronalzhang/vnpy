@@ -25,6 +25,7 @@ import requests
 import traceback
 import ccxt
 import logging
+from db_config import get_db_adapter
 
 # 策略类型枚举
 class StrategyType(Enum):
@@ -112,27 +113,20 @@ class PerformanceMetrics:
     timestamp: datetime
 
 class DatabaseManager:
-    """数据库管理类"""
+    """数据库管理类 - 使用PostgreSQL适配器"""
     
     def __init__(self, db_path: str = "quantitative.db"):
-        self.db_path = db_path
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.db_path = db_path  # 保持兼容性
+        self.db_adapter = get_db_adapter()
+        self.conn = self.db_adapter.connection
+        print("✅ 使用PostgreSQL数据库管理器")
     
     def execute_query(self, query: str, params: tuple = (), fetch_one: bool = False, fetch_all: bool = False):
-        """执行SQL查询"""
+        """执行SQL查询 - 使用PostgreSQL适配器"""
         try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, params)
-            
-            if fetch_one:
-                return cursor.fetchone()
-            elif fetch_all:
-                return cursor.fetchall()
-            else:
-                self.conn.commit()
-                return cursor.rowcount
+            return self.db_adapter.execute_query(query, params, fetch_one, fetch_all)
         except Exception as e:
-            print(f"数据库查询失败: {e}")
+            print(f"PostgreSQL查询失败: {e}")
             return None
     
     def init_database(self):
