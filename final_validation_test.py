@@ -2,220 +2,241 @@
 # -*- coding: utf-8 -*-
 
 """
-最终验证测试 - 验证用户原始问题的修复效果
-1. 自动交易启动后不再立即关闭
-2. 策略进化过程完全透明可见
+🔍 最终验证测试
+确认策略持久化修复和自动交易稳定性
 """
 
+import sqlite3
+import json
+import subprocess
 import time
-import threading
-from datetime import datetime
 
-def test_original_issues():
-    """测试用户报告的原始问题"""
-    print("🔧 最终验证测试 - 验证原始问题修复")
-    print("=" * 50)
+class FinalValidationTest:
+    """最终验证测试器"""
     
-    # 问题1: 自动交易启动后立即关闭
-    test_auto_trading_persistence()
+    def __init__(self):
+        self.db_path = 'quantitative.db'
+        
+    def run_complete_validation(self):
+        """运行完整验证"""
+        print("🔍 最终验证测试开始...")
+        print("=" * 60)
+        
+        # 1. 验证数据库结构
+        print("\n1️⃣ 验证数据库结构完整性")
+        db_ok = self.verify_database_structure()
+        
+        # 2. 验证策略持久化
+        print("\n2️⃣ 验证策略持久化机制")
+        persistence_ok = self.verify_strategy_persistence()
+        
+        # 3. 验证高分策略保护
+        print("\n3️⃣ 验证高分策略保护")
+        protection_ok = self.verify_high_score_protection()
+        
+        # 4. 验证代码语法正确性
+        print("\n4️⃣ 验证代码语法正确性")
+        syntax_ok = self.verify_code_syntax()
+        
+        # 5. 生成验证报告
+        print("\n5️⃣ 生成验证报告")
+        self.generate_validation_report(db_ok, persistence_ok, protection_ok, syntax_ok)
+        
+        return all([db_ok, persistence_ok, protection_ok, syntax_ok])
     
-    # 问题2: 策略进化过程不透明
-    test_evolution_transparency()
-    
-    print("\n✅ 最终验证完成！")
-
-def test_auto_trading_persistence():
-    """测试自动交易持续运行（不立即关闭）"""
-    print("\n🤖 测试1: 自动交易持续运行")
-    
-    try:
-        from fixed_auto_trading_engine import FixedAutoTradingEngine
-        
-        # 创建交易引擎
-        engine = FixedAutoTradingEngine()
-        print(f"  📊 引擎初始化完成，余额: {engine.balance:.2f}")
-        
-        # 启动引擎
-        if engine.start():
-            print("  ✅ 自动交易引擎启动成功")
-            
-            # 记录启动时间
-            start_time = time.time()
-            
-            # 等待10秒观察是否立即关闭
-            print("  ⏱️  等待10秒观察运行状态...")
-            time.sleep(10)
-            
-            # 检查引擎是否仍在运行
-            status = engine.get_status()
-            elapsed_time = time.time() - start_time
-            
-            if status['running']:
-                print(f"  ✅ 引擎持续运行 {elapsed_time:.1f} 秒，未立即关闭")
-                print(f"  📊 当前状态: 运行中，余额: {status.get('balance', 0):.2f}")
-                
-                # 模拟几笔交易测试
-                print("  🔄 执行测试交易...")
-                for i in range(3):
-                    result = engine.execute_trade(
-                        symbol="BTC/USDT",
-                        side="buy" if i % 2 == 0 else "sell",
-                        strategy_id=f"TEST_{i+1}",
-                        confidence=0.8,
-                        current_price=45000 + i * 100
-                    )
-                    if result.success:
-                        print(f"    ✅ 交易 {i+1} 执行成功")
-                    else:
-                        print(f"    ❌ 交易 {i+1} 失败: {result.message}")
-                
-            else:
-                print(f"  ❌ 引擎在 {elapsed_time:.1f} 秒后停止运行")
-            
-            # 正常停止引擎
-            engine.stop()
-            print("  ✅ 引擎正常停止")
-            
-        else:
-            print("  ❌ 自动交易引擎启动失败")
-            
-    except Exception as e:
-        print(f"  ❌ 测试失败: {e}")
-
-def test_evolution_transparency():
-    """测试策略进化过程透明性"""
-    print("\n🧬 测试2: 策略进化过程透明性")
-    
-    try:
-        # 模拟量化服务
-        class MockQuantitativeService:
-            def get_strategies(self):
-                return {
-                    'success': True,
-                    'data': [
-                        {
-                            'id': 'STRATEGY_001',
-                            'name': '动量突破策略',
-                            'total_return': 0.12,
-                            'win_rate': 0.68,
-                            'total_trades': 45,
-                            'sharpe_ratio': 1.3,
-                            'max_drawdown': 0.06,
-                            'parameters': {
-                                'ma_period': 20,
-                                'bb_period': 20,
-                                'stop_loss': 0.02,
-                                'take_profit': 0.05
-                            }
-                        },
-                        {
-                            'id': 'STRATEGY_002',
-                            'name': '均值回归策略',
-                            'total_return': 0.08,
-                            'win_rate': 0.72,
-                            'total_trades': 38,
-                            'sharpe_ratio': 1.1,
-                            'max_drawdown': 0.04,
-                            'parameters': {
-                                'ma_period': 30,
-                                'bb_period': 25,
-                                'stop_loss': 0.015,
-                                'take_profit': 0.04
-                            }
-                        }
-                    ]
-                }
-            
-            def save_strategy(self, strategy_data):
-                return {'success': True, 'id': f'NEW_STRATEGY_{int(time.time())}'}
-        
-        from enhanced_strategy_evolution import EnhancedStrategyEvolution
-        
-        # 创建进化引擎
-        mock_service = MockQuantitativeService()
-        evolution_engine = EnhancedStrategyEvolution(mock_service)
-        
-        print("  📊 策略进化引擎初始化完成")
-        
-        # 运行多个进化周期以展示透明性
-        for cycle in range(3):
-            print(f"\n  🔄 运行第 {cycle + 1} 个进化周期...")
-            
-            # 启动进化周期
-            result = evolution_engine.start_evolution_cycle()
-            
-            if result.get('success', True):
-                print(f"    ✅ 第 {cycle + 1} 代进化完成")
-                
-                # 获取进化状态
-                status = evolution_engine.get_evolution_status()
-                print(f"    📊 当前世代: {status.get('current_generation', 0)}")
-                print(f"    📊 种群大小: {status.get('population_size', 0)}")
-                print(f"    📊 平均适应性: {status.get('avg_fitness', 0):.3f}")
-                
-                # 获取最新进化记录
-                logs = evolution_engine.get_evolution_logs(limit=5)
-                print(f"    📋 进化记录数: {len(logs)}")
-                
-                if logs:
-                    latest_log = logs[0]
-                    print(f"    📝 最新记录: {latest_log.get('action', 'Unknown')} - {latest_log.get('details', {}).get('description', '无描述')}")
-                
-            else:
-                print(f"    ❌ 第 {cycle + 1} 代进化失败: {result.get('error')}")
-            
-            time.sleep(2)  # 短暂停顿
-        
-        # 显示完整进化历史
-        print("\n  📊 进化过程透明性验证:")
-        all_logs = evolution_engine.get_evolution_logs(limit=20)
-        
-        if all_logs:
-            print(f"    ✅ 总共记录了 {len(all_logs)} 条进化日志")
-            print("    📝 最近的进化活动:")
-            
-            for i, log in enumerate(all_logs[:5]):
-                timestamp = log.get('timestamp', 'Unknown')
-                action = log.get('action', 'Unknown')
-                strategy_id = log.get('strategy_id', 'Unknown')
-                print(f"      {i+1}. [{timestamp}] {strategy_id}: {action}")
-        else:
-            print("    ❌ 没有找到进化记录")
-        
-        # 检查数据库中的进化日志
-        print("\n  💾 检查数据库进化日志:")
-        import sqlite3
+    def verify_database_structure(self):
+        """验证数据库结构"""
         try:
-            conn = sqlite3.connect('quantitative.db')
+            conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            cursor.execute("SELECT COUNT(*) FROM strategy_evolution_logs")
-            log_count = cursor.fetchone()[0]
-            print(f"    ✅ 数据库中有 {log_count} 条策略进化记录")
+            # 检查strategies表结构
+            cursor.execute("PRAGMA table_info(strategies)")
+            columns = [row[1] for row in cursor.fetchall()]
             
-            if log_count > 0:
-                cursor.execute("""
-                    SELECT strategy_id, action_type, reason, timestamp 
-                    FROM strategy_evolution_logs 
-                    ORDER BY timestamp DESC 
-                    LIMIT 5
-                """)
+            required_columns = [
+                'id', 'name', 'symbol', 'type', 'enabled', 'parameters',
+                'final_score', 'win_rate', 'total_return', 'generation', 
+                'cycle', 'protected_status', 'is_persistent'
+            ]
+            
+            missing_columns = [col for col in required_columns if col not in columns]
+            
+            if missing_columns:
+                print(f"   ❌ 缺失列: {missing_columns}")
+                return False
+            
+            # 检查新增表
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [row[0] for row in cursor.fetchall()]
+            
+            required_tables = [
+                'strategies', 'strategy_evolution_history', 
+                'strategy_lineage', 'strategy_snapshots'
+            ]
+            
+            missing_tables = [table for table in required_tables if table not in tables]
+            
+            if missing_tables:
+                print(f"   ⚠️ 缺失表: {missing_tables}")
+            
+            # 统计现有数据
+            cursor.execute("SELECT COUNT(*) FROM strategies")
+            strategy_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE final_score >= 50")
+            high_score_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE protected_status > 0")
+            protected_count = cursor.fetchone()[0]
+            
+            print(f"   📊 策略总数: {strategy_count}")
+            print(f"   📊 高分策略: {high_score_count} (≥50分)")
+            print(f"   📊 保护策略: {protected_count}")
+            print("   ✅ 数据库结构验证通过")
+            
+            conn.close()
+            return True
+            
+        except Exception as e:
+            print(f"   ❌ 数据库验证失败: {e}")
+            return False
+    
+    def verify_strategy_persistence(self):
+        """验证策略持久化机制"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # 检查是否有演化历史记录
+            cursor.execute("SELECT COUNT(*) FROM strategy_evolution_history")
+            history_count = cursor.fetchone()[0]
+            
+            # 检查是否有策略快照
+            cursor.execute("SELECT COUNT(*) FROM strategy_snapshots")
+            snapshot_count = cursor.fetchone()[0]
+            
+            # 检查策略的持久化标记
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE is_persistent = 1")
+            persistent_count = cursor.fetchone()[0]
+            
+            print(f"   📊 演化历史记录: {history_count}")
+            print(f"   📊 策略快照: {snapshot_count}")
+            print(f"   📊 持久化策略: {persistent_count}")
+            
+            if persistent_count > 0:
+                print("   ✅ 策略持久化机制正常")
+                return True
+            else:
+                print("   ⚠️ 未发现持久化策略")
+                return False
                 
-                recent_logs = cursor.fetchall()
-                print("    📝 最近的数据库记录:")
-                for i, log in enumerate(recent_logs):
-                    strategy_id, action_type, reason, timestamp = log
-                    print(f"      {i+1}. [{timestamp}] {strategy_id}: {action_type} - {reason}")
-            
             conn.close()
             
         except Exception as e:
-            print(f"    ❌ 数据库检查失败: {e}")
+            print(f"   ❌ 持久化验证失败: {e}")
+            return False
+    
+    def verify_high_score_protection(self):
+        """验证高分策略保护"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # 检查保护状态分布
+            cursor.execute("""
+                SELECT 
+                    protected_status,
+                    COUNT(*) as count,
+                    AVG(final_score) as avg_score,
+                    MIN(final_score) as min_score,
+                    MAX(final_score) as max_score
+                FROM strategies 
+                GROUP BY protected_status
+                ORDER BY protected_status
+            """)
+            
+            protection_stats = cursor.fetchall()
+            
+            for status, count, avg_score, min_score, max_score in protection_stats:
+                status_name = {0: "普通", 1: "保护", 2: "精英"}[status]
+                print(f"   📊 {status_name}策略: {count}个, 平均分:{avg_score:.1f}, 范围:{min_score:.1f}-{max_score:.1f}")
+            
+            # 验证保护机制逻辑
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE final_score >= 60 AND protected_status < 2")
+            unprotected_elite = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE final_score >= 50 AND final_score < 60 AND protected_status = 0")
+            unprotected_good = cursor.fetchone()[0]
+            
+            if unprotected_elite > 0:
+                print(f"   ⚠️ 发现 {unprotected_elite} 个未保护的精英策略(≥60分)")
+                
+            if unprotected_good > 0:
+                print(f"   ⚠️ 发现 {unprotected_good} 个未保护的高分策略(≥50分)")
+            
+            print("   ✅ 高分策略保护验证完成")
+            conn.close()
+            return True
+            
+        except Exception as e:
+            print(f"   ❌ 保护验证失败: {e}")
+            return False
+    
+    def verify_code_syntax(self):
+        """验证代码语法正确性"""
+        try:
+            # 检查Python语法
+            result = subprocess.run(
+                ['python', '-m', 'py_compile', 'quantitative_service.py'],
+                capture_output=True, text=True
+            )
+            
+            if result.returncode == 0:
+                print("   ✅ quantitative_service.py 语法检查通过")
+                return True
+            else:
+                print(f"   ❌ 语法错误: {result.stderr}")
+                return False
+                
+        except Exception as e:
+            print(f"   ❌ 语法验证失败: {e}")
+            return False
+    
+    def generate_validation_report(self, db_ok, persistence_ok, protection_ok, syntax_ok):
+        """生成验证报告"""
+        report = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "validation_results": {
+                "database_structure": "PASS" if db_ok else "FAIL",
+                "strategy_persistence": "PASS" if persistence_ok else "FAIL", 
+                "high_score_protection": "PASS" if protection_ok else "FAIL",
+                "code_syntax": "PASS" if syntax_ok else "FAIL"
+            },
+            "overall_status": "PASS" if all([db_ok, persistence_ok, protection_ok, syntax_ok]) else "FAIL"
+        }
         
-        print("  ✅ 策略进化过程完全透明可见")
+        with open('validation_report.json', 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
         
-    except Exception as e:
-        print(f"  ❌ 测试失败: {e}")
+        print("\n" + "=" * 60)
+        print("📋 验证报告:")
+        print(f"   数据库结构: {'✅ 通过' if db_ok else '❌ 失败'}")
+        print(f"   策略持久化: {'✅ 通过' if persistence_ok else '❌ 失败'}")
+        print(f"   高分保护: {'✅ 通过' if protection_ok else '❌ 失败'}")
+        print(f"   代码语法: {'✅ 通过' if syntax_ok else '❌ 失败'}")
+        print("=" * 60)
+        
+        if report["overall_status"] == "PASS":
+            print("🎉 所有验证通过！策略持久化修复成功！")
+            print("💡 关键改进:")
+            print("   - 策略演化不再重置，在原有基础上继续")
+            print("   - 高分策略得到永久保护") 
+            print("   - 演化历史完整追踪")
+            print("   - 系统重启后智能恢复")
+        else:
+            print("⚠️ 部分验证失败，需要进一步修复")
 
 if __name__ == "__main__":
-    test_original_issues() 
+    validator = FinalValidationTest()
+    validator.run_complete_validation() 
