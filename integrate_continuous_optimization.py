@@ -170,6 +170,9 @@ class FullyEnhancedQuantitativeService(QuantitativeService):
                     self.evolution_engine.current_generation = 0
                 if not hasattr(self.evolution_engine, 'current_cycle'):
                     self.evolution_engine.current_cycle = 1
+                # 确保service属性指向当前实例
+                if not hasattr(self.evolution_engine, 'service'):
+                    self.evolution_engine.service = self
                 
                 evolution_result = self.evolution_engine.run_evolution_cycle()
                 if evolution_result:
