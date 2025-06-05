@@ -2177,15 +2177,8 @@ class QuantitativeService:
         import sqlite3
         self.conn = sqlite3.connect("quantitative.db", check_same_thread=False)
         
-        # ⭐ 初始化数据库管理器
-        self.db_manager = DatabaseManager("quantitative.db")
-        
         self.init_database()
         self.init_strategies()
-        
-        # ⭐ 初始化模拟器和策略管理器
-        self.simulator = StrategySimulator(self)
-        self.strategy_manager = AutomatedStrategyManager(self)
         
         # 🧬 启动进化引擎
         self._init_evolution_engine()
@@ -4018,7 +4011,7 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT timestamp, total_balance, available_balance, frozen_balance,
-                       daily_pnl, daily_return, cumulative_return, milestone_note
+                       daily_pnl, daily_return, cumulative_return, total_trades
                 FROM account_balance_history 
                 WHERE timestamp > datetime('now', '-{} days')
                 ORDER BY timestamp ASC
@@ -4028,13 +4021,14 @@ class QuantitativeService:
             for row in cursor.fetchall():
                 history.append({
                     'timestamp': row[0],
-                    'total_balance': float(row[1]) if row[1] is not None else 0.0,
-                    'available_balance': float(row[2]) if row[2] is not None else 0.0,
-                    'frozen_balance': float(row[3]) if row[3] is not None else 0.0,
-                    'daily_pnl': float(row[4]) if row[4] is not None else 0.0,
-                    'daily_return': float(row[5]) if row[5] is not None else 0.0,
-                    'cumulative_return': float(row[6]) if row[6] is not None else 0.0,
-                    'milestone_note': row[7] if row[7] is not None else ''
+                    'total_balance': float(row[1]),
+                    'available_balance': float(row[2]),
+                    'frozen_balance': float(row[3]),
+                    'daily_pnl': float(row[4]) if row[4] else 0.0,
+                    'daily_return': float(row[5]) if row[5] else 0.0,
+                    'cumulative_return': float(row[6]) if row[6] else 0.0,
+                    'total_trades': int(row[7]) if row[7] else 0,
+                    'milestone_note': None
                 })
             
             return history
@@ -4102,90 +4096,6 @@ class QuantitativeService:
             self.conn.commit()
         except Exception as e:
             print(f"记录策略优化日志失败: {e}")
-    
-    def get_strategy_trade_logs(self, strategy_id, limit=100):
-        """获取策略交易日志"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp
-                FROM strategy_trade_logs 
-                WHERE strategy_id = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
-            ''', (strategy_id, limit))
-            
-            logs = []
-            for row in cursor.fetchall():
-                logs.append({
-                    'strategy_id': row[0],
-                    'signal_type': row[1],
-                    'price': float(row[2]),
-                    'quantity': float(row[3]),
-                    'confidence': float(row[4]),
-                    'executed': bool(row[5]),
-                    'pnl': float(row[6]) if row[6] is not None else 0.0,
-                    'timestamp': row[7]
-                })
-            
-            return logs
-            
-        except Exception as e:
-            print(f"获取策略交易日志失败: {e}")
-            return []
-    
-    def get_strategy_optimization_logs(self, strategy_id, limit=100):
-        """获取策略优化记录"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT strategy_id, optimization_type, old_parameters, new_parameters, 
-                       trigger_reason, target_success_rate, timestamp
-                FROM strategy_optimization_logs 
-                WHERE strategy_id = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
-            ''', (strategy_id, limit))
-            
-            logs = []
-            for row in cursor.fetchall():
-                logs.append({
-                    'strategy_id': row[0],
-                    'optimization_type': row[1],
-                    'old_parameters': row[2],
-                    'new_parameters': row[3],
-                    'trigger_reason': row[4],
-                    'target_success_rate': float(row[5]) if row[5] is not None else 0.0,
-                    'timestamp': row[6]
-                })
-            
-            return logs
-            
-        except Exception as e:
-            print(f"获取策略优化日志失败: {e}")
-            return []
-    
-    def log_strategy_trade(self, strategy_id, signal_type, price, quantity, confidence, executed=False, pnl=0.0):
-        """记录策略交易日志"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                INSERT INTO strategy_trade_logs 
-                (strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-            ''', (
-                strategy_id,
-                signal_type,
-                price,
-                quantity,
-                confidence,
-                executed,
-                pnl
-            ))
-            self.conn.commit()
-            
-        except Exception as e:
-            print(f"记录策略交易日志失败: {e}")
     
     def init_strategies(self):
         """初始化策略"""
