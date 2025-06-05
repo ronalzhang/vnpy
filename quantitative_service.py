@@ -3247,92 +3247,104 @@ class QuantitativeService:
                 
                 print(f"  - 优化策略 {strategy_id}: 数量={strategy['parameters']['quantity']:.3f}")
     
+    
     def _get_current_balance(self):
-        """获取当前余额 - 带缓存机制，只在特定事件触发时更新"""
+        """获取当前USDT余额 - 主要用于交易决策"""
         try:
             import datetime
             
-            # 检查缓存是否有效 (5分钟内有效)
-            if (self.balance_cache['cache_valid'] and 
-                self.balance_cache['last_update'] and
-                (datetime.datetime.now() - self.balance_cache['last_update']).seconds < 300):
+            # 检查缓存是否有效 (2分钟内有效)
+            if (self.balance_cache.get('cache_valid') and 
+                self.balance_cache.get('last_update') and
+                (datetime.datetime.now() - self.balance_cache['last_update']).seconds < 120):
                 
-                print(f"💾 使用余额缓存: {self.balance_cache['balance']:.2f}U (缓存时间: {self.balance_cache['last_update']})")
-                return self.balance_cache['balance']
+                return self.balance_cache.get('usdt_balance', 0.0)
             
             # 缓存失效，重新获取余额
-            print("🔄 刷新余额缓存...")
             balance_data = self._fetch_fresh_balance()
             
             if balance_data is None:
-                print("❌ API获取余额失败，返回错误标识")
-                # API失败时返回特殊值，前端将显示"-"
-                return -1.0
+                print("❌ API获取余额失败")
+                return 0.0
             
             # 更新缓存
             self.balance_cache.update({
-                'balance': balance_data['total'],
-                'available_balance': balance_data['available'], 
-                'frozen_balance': balance_data['frozen'],
+                'usdt_balance': balance_data['usdt_balance'],
+                'position_value': balance_data['position_value'],
+                'total_value': balance_data['total_value'],
+                'available_balance': balance_data['usdt_balance'],
+                'frozen_balance': 0.0,
                 'last_update': datetime.datetime.now(),
                 'cache_valid': True
             })
             
-            # 记录余额历史（只在余额变化时）
-            if abs(balance_data['total'] - self.balance_cache.get('previous_balance', 0)) > 0.01:
-                self.db_manager.record_balance_history(
-                    balance_data['total'],
-                    balance_data['available'],
-                    balance_data['frozen']
-                )
-                self.balance_cache['previous_balance'] = balance_data['total']
+            # 记录余额历史
+            self.db_manager.record_balance_history(
+                balance_data['total_value'],
+                balance_data['usdt_balance'],
+                balance_data['position_value']
+            )
             
-            print(f"✅ 余额缓存已更新: {balance_data['total']:.2f}U")
-            return balance_data['total']
+            return balance_data['usdt_balance']
             
         except Exception as e:
             print(f"获取余额失败: {e}")
-            # 发生异常时也返回错误标识，前端将显示"-"
-            return -1.0
-    
-    def _fetch_fresh_balance(self):
-        """获取最新余额数据 - 仅使用真实API"""
-        try:
-            # 🔗 直接调用真实API获取余额
-            if hasattr(self, 'binance_client') and self.binance_client:
-                print("🔗 正在从Binance API获取真实余额数据...")
-                account_info = self.binance_client.get_account()
-                
-                total_balance = 0.0
-                available_balance = 0.0
-                frozen_balance = 0.0
-                
-                for balance in account_info.get('balances', []):
-                    asset = balance.get('asset', '')
-                    free = float(balance.get('free', 0))
-                    locked = float(balance.get('locked', 0))
-                    
-                    # 主要计算USDT余额
-                    if asset == 'USDT':
-                        available_balance = free
-                        frozen_balance = locked
-                        total_balance = free + locked
-                
-                print(f"✅ 从Binance获取真实余额: 总额 {total_balance:.2f} USDT")
-                return {
-                    'total': total_balance,
-                    'available': available_balance,
-                    'frozen': frozen_balance
-                }
-            else:
-                print("❌ Binance客户端未初始化")
-                return None
-                
-        except Exception as e:
-            print(f"❌ API获取余额失败: {e}")
-            return None  # 🚨 API失败时直接返回None
+            return 0.0
 
-    def invalidate_balance_cache(self, trigger='manual_refresh'):
+def _fetch_fresh_balance(self):
+        """获取最新余额 - 区分USDT现货余额和持仓总价值"""
+        try:
+            if not hasattr(self, 'exchange_client') or not self.exchange_client:
+                print("❌ 交易所客户端未初始化")
+                return None
+            
+            # 获取账户信息
+            account_info = self.exchange_client.get_account()
+            
+            usdt_balance = 0.0  # USDT现货余额
+            total_position_value = 0.0  # 持仓总价值
+            
+            # 计算USDT余额和持仓价值
+            for balance in account_info.get('balances', []):
+                asset = balance['asset']
+                free = float(balance['free'])
+                locked = float(balance['locked'])
+                total = free + locked
+                
+                if asset == 'USDT':
+                    usdt_balance = total
+                    print(f"💰 USDT余额: {usdt_balance:.2f}U")
+                elif total > 0:
+                    # 获取当前价格计算价值
+                    try:
+                        if asset != 'USDT':
+                            ticker = self.exchange_client.get_symbol_ticker(symbol=f"{asset}USDT")
+                            price = float(ticker['price'])
+                            value = total * price
+                            total_position_value += value
+                            print(f"📊 {asset}: {total:.6f} * ${price:.4f} = ${value:.2f}")
+                    except:
+                        pass
+            
+            print(f"💰 USDT现货余额: {usdt_balance:.2f}U")
+            print(f"📊 持仓总价值: {total_position_value:.2f}U")
+            print(f"💼 账户总价值: {usdt_balance + total_position_value:.2f}U")
+            
+            return {
+                'usdt_balance': usdt_balance,
+                'position_value': total_position_value,
+                'total_value': usdt_balance + total_position_value,
+                # 保持向后兼容
+                'total': usdt_balance,  # 主要显示USDT余额
+                'available': usdt_balance,
+                'frozen': 0.0
+            }
+            
+        except Exception as e:
+            print(f"❌ 获取余额失败: {e}")
+            return None
+
+def invalidate_balance_cache(self, trigger='manual_refresh'):
         """使余额缓存失效 - 在特定事件时调用"""
         print(f"🔄 触发余额缓存刷新: {trigger}")
         self.balance_cache['cache_valid'] = False
@@ -4067,58 +4079,53 @@ class QuantitativeService:
             print(f"获取资产历史失败: {e}")
             return []
     
+    
     def get_account_info(self):
-        """获取账户信息"""
+        """获取账户信息 - 区分显示USDT余额和持仓价值"""
         try:
-            # 获取真实币安账户余额
-            current_balance = self._get_current_balance()
+            current_balance = self._get_current_balance()  # USDT余额
             
-            # 如果余额获取失败，返回"-"标识
-            if current_balance == -1.0:
-                return {
-                    'balance': "-",
-                    'daily_pnl': 0.0,
-                    'daily_return': 0.0,
-                    'daily_trades': 0,
-                    'available_balance': "-",
-                    'frozen_balance': "-"
-                }
+            # 获取详细余额信息
+            balance_data = self._fetch_fresh_balance()
+            if balance_data:
+                usdt_balance = balance_data['usdt_balance']
+                position_value = balance_data['position_value'] 
+                total_value = balance_data['total_value']
+            else:
+                usdt_balance = current_balance
+                position_value = 0.0
+                total_value = current_balance
             
-            # 计算今日盈亏
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT COALESCE(SUM(pnl), 0) as daily_pnl, COUNT(*) as daily_trades
-                FROM trading_signals 
-                WHERE DATE(timestamp) = DATE('now') AND executed = 1
-            ''')
-            result = cursor.fetchone()
-            daily_pnl = float(result[0]) if result[0] else 0.0
-            daily_trades = int(result[1]) if result[1] else 0
-            
-            # 计算今日收益率
-            daily_return = daily_pnl / current_balance if current_balance > 0 else 0.0
+            # 获取今日交易统计
+            today_stats = self.db_manager.get_daily_stats()
             
             return {
-                'balance': round(current_balance, 2) if current_balance != -1.0 else "-",
-                'daily_pnl': round(daily_pnl, 2),
-                'daily_return': round(daily_return, 4),
-                'daily_trades': daily_trades,
-                'available_balance': round(current_balance * 0.9, 2),
-                'frozen_balance': round(current_balance * 0.1, 2)
+                'usdt_balance': round(usdt_balance, 2),      # USDT现货余额
+                'position_value': round(position_value, 2),  # 持仓价值
+                'total_value': round(total_value, 2),        # 总价值
+                'balance': round(usdt_balance, 2),           # 向下兼容
+                'available_balance': round(usdt_balance, 2),
+                'frozen_balance': 0.0,
+                'daily_pnl': today_stats.get('pnl', 0.0),
+                'daily_return': today_stats.get('return', 0.0), 
+                'daily_trades': today_stats.get('trades', 0)
             }
             
         except Exception as e:
             print(f"获取账户信息失败: {e}")
             return {
+                'usdt_balance': 0.0,
+                'position_value': 0.0,
+                'total_value': 0.0,
                 'balance': 0.0,
+                'available_balance': 0.0,
+                'frozen_balance': 0.0,
                 'daily_pnl': 0.0,
                 'daily_return': 0.0,
-                'daily_trades': 0,
-                'available_balance': 0.0,
-                'frozen_balance': 0.0
+                'daily_trades': 0
             }
 
-    def log_strategy_optimization(self, strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate):
+def log_strategy_optimization(self, strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate):
         """记录策略优化日志"""
         try:
             cursor = self.conn.cursor()
@@ -4834,45 +4841,51 @@ class QuantitativeService:
         except Exception as e:
             print(f"创建操作日志表失败: {e}")
 
+    
     def _get_current_balance(self):
-        """获取当前真实账户余额"""
+        """获取当前USDT余额 - 主要用于交易决策"""
         try:
-            # 从web_app.py获取真实余额数据
-            try:
-                import requests
-                response = requests.get('http://localhost:8888/api/account/balances', timeout=5)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get('status') == 'success' and data.get('data'):
-                        balance_data = data['data']
-                        
-                        # 只获取币安USDT现货余额，不包括持仓价值
-                        binance_data = balance_data.get('binance', {})
-                        binance_usdt = binance_data.get('total', 0.0)  # 这是USDT现货余额
-                        
-                        print(f"✅ 获取币安USDT现货余额: {binance_usdt} USDT")
-                        
-                        # 如果获取到的余额大于10U，说明是正确的
-                        if binance_usdt > 10.0:
-                            return binance_usdt
-                        else:
-                            print(f"⚠️ 币安余额({binance_usdt})似乎偏低，检查API配置")
-                            return binance_usdt
-                    else:
-                        print(f"❌ API返回失败: {data}")
-                        
-            except Exception as e:
-                print(f"获取API余额失败: {e}")
+            import datetime
+            
+            # 检查缓存是否有效 (2分钟内有效)
+            if (self.balance_cache.get('cache_valid') and 
+                self.balance_cache.get('last_update') and
+                (datetime.datetime.now() - self.balance_cache['last_update']).seconds < 120):
                 
-            # 如果API调用失败，返回保守估计
-            print("⚠️ 使用保守估计余额 1.0 USDT")
-            return 1.0
+                return self.balance_cache.get('usdt_balance', 0.0)
+            
+            # 缓存失效，重新获取余额
+            balance_data = self._fetch_fresh_balance()
+            
+            if balance_data is None:
+                print("❌ API获取余额失败")
+                return 0.0
+            
+            # 更新缓存
+            self.balance_cache.update({
+                'usdt_balance': balance_data['usdt_balance'],
+                'position_value': balance_data['position_value'],
+                'total_value': balance_data['total_value'],
+                'available_balance': balance_data['usdt_balance'],
+                'frozen_balance': 0.0,
+                'last_update': datetime.datetime.now(),
+                'cache_valid': True
+            })
+            
+            # 记录余额历史
+            self.db_manager.record_balance_history(
+                balance_data['total_value'],
+                balance_data['usdt_balance'],
+                balance_data['position_value']
+            )
+            
+            return balance_data['usdt_balance']
             
         except Exception as e:
-            print(f"获取账户余额失败: {e}")
-            return 1.0
+            print(f"获取余额失败: {e}")
+            return 0.0
 
-    def _calculate_strategy_score_with_history(self, strategy_id, total_return: float, win_rate: float, 
+def _calculate_strategy_score_with_history(self, strategy_id, total_return: float, win_rate: float, 
                                             sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> Dict:
         """计算策略综合评分并记录历史变化"""
         
