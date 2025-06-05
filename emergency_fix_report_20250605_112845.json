@@ -1,0 +1,37 @@
+{
+  "fix_time": "2025-06-05T11:28:45.703548",
+  "account_balances": {},
+  "high_score_strategies_count": 1,
+  "top_strategies": [
+    {
+      "id": "ETH_momentum",
+      "name": "ETH动量策略",
+      "symbol": "ETH/USDT",
+      "type": "momentum",
+      "parameters": {
+        "lookback_period": 20,
+        "threshold": 0.02,
+        "quantity": 10.0
+      },
+      "final_score": 51.0,
+      "win_rate": 0.45,
+      "total_return": 4.0,
+      "sharpe_ratio": 0.0,
+      "profit_factor": 0.0
+    }
+  ],
+  "actions_taken": [
+    "停止自动交易",
+    "取消所有挂单",
+    "清仓所有持仓",
+    "加载历史高分策略",
+    "修复日志系统"
+  ],
+  "recommendations": [
+    "确认所有持仓已清仓完成",
+    "验证USDT余额是否正确",
+    "重新配置策略参数",
+    "启动真正的持续优化系统",
+    "设置更严格的风险控制"
+  ]
+}
