@@ -17,7 +17,8 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 from loguru import logger
-from auto_trading_engine import get_trading_engine, TradeResult
+# 延迟导入 auto_trading_engine 避免启动时加载ccxt
+# from auto_trading_engine import get_trading_engine, TradeResult
 import random
 import uuid
 import requests
