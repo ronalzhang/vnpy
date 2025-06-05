@@ -1304,6 +1304,25 @@ class TrendFollowingStrategy(QuantitativeStrategy):
         return (current - low) / (high - low)
 
 class AutomatedStrategyManager:
+
+    def _safe_get_strategy_attr(self, strategy, attr_path, default=None):
+        """安全获取策略属性，支持嵌套路径"""
+        try:
+            # 如果是字典，使用字典访问
+            if isinstance(strategy, dict):
+                keys = attr_path.split('.')
+                value = strategy
+                for key in keys:
+                    if isinstance(value, dict):
+                        value = value.get(key, {})
+                    else:
+                        return default
+                return value if value != {} else default
+            else:
+                # 如果是对象，使用属性访问
+                return getattr(strategy, attr_path, default)
+        except Exception:
+            return default
     """全自动化策略管理系统 - 目标每月100%收益"""
     
     def __init__(self, quantitative_service):
@@ -1321,6 +1340,9 @@ class AutomatedStrategyManager:
         logger.info("开始执行全自动策略管理...")
         
         try:
+        # 调试：记录策略数据类型
+        logger.debug(f"策略数据类型: {type(strategy)}, 内容预览: {list(strategy.keys()) if isinstance(strategy, dict) else 'not dict'}")
+
             # 1. 评估所有策略表现
             strategy_performances = self._evaluate_all_strategies()
             
@@ -1819,18 +1841,18 @@ class AutomatedStrategyManager:
             strategy = self.service.strategies.get(strategy_id)
             if strategy:
                 # 根据分配调整交易量
-                base_quantity = strategy.config.parameters.get('quantity', 1.0)
+                base_quantity = strategy.get("parameters", {}).get('quantity', 1.0)
                 allocation_factor = allocation / (self.initial_capital / len(self.service.strategies))
                 new_quantity = base_quantity * allocation_factor
                 
                 # 更新策略参数
-                new_params = strategy.config.parameters.copy()
+                new_params = strategy.get("parameters", {}).copy()
                 new_params['quantity'] = new_quantity
                 
                 self.service.update_strategy(
                     strategy_id, 
-                    strategy.config.name, 
-                    strategy.config.symbol, 
+                    strategy.get("name", ""), 
+                    strategy.get("symbol", ""), 
                     new_params
                 )
     
@@ -1838,7 +1860,7 @@ class AutomatedStrategyManager:
         """计算总风险敞口"""
         total = 0
         for strategy in self.service.strategies.values():
-            quantity = strategy.config.parameters.get('quantity', 0)
+            quantity = strategy.get("parameters", {}).get('quantity', 0)
             # 假设平均价格计算敞口
             total += quantity * 50000  # 简化计算
         return total
@@ -1849,20 +1871,20 @@ class AutomatedStrategyManager:
         if not strategy:
             return 0
         
-        quantity = strategy.config.parameters.get('quantity', 0)
+        quantity = strategy.get("parameters", {}).get('quantity', 0)
         return quantity * 50000 / self.initial_capital  # 风险比例
     
     def _reduce_position_sizes(self):
         """减少所有策略仓位"""
         for strategy in self.service.strategies.values():
-            current_quantity = strategy.config.parameters.get('quantity', 1.0)
-            new_params = strategy.config.parameters.copy()
+            current_quantity = strategy.get("parameters", {}).get('quantity', 1.0)
+            new_params = strategy.get("parameters", {}).copy()
             new_params['quantity'] = current_quantity * 0.8  # 减少20%
             
             self.service.update_strategy(
-                strategy.config.id,
-                strategy.config.name,
-                strategy.config.symbol,
+                strategy.get("id", ""),
+                strategy.get("name", ""),
+                strategy.get("symbol", ""),
                 new_params
             )
     
@@ -1870,13 +1892,13 @@ class AutomatedStrategyManager:
         """限制单一策略仓位"""
         strategy = self.service.strategies.get(strategy_id)
         if strategy:
-            new_params = strategy.config.parameters.copy()
+            new_params = strategy.get("parameters", {}).copy()
             new_params['quantity'] = min(new_params.get('quantity', 1.0), 0.5)  # 最大0.5
             
             self.service.update_strategy(
                 strategy_id,
-                strategy.config.name,
-                strategy.config.symbol,
+                strategy.get("name", ""),
+                strategy.get("symbol", ""),
                 new_params
             )
     
@@ -1964,7 +1986,7 @@ class AutomatedStrategyManager:
             return
         
         strategy_type = performance['type']
-        current_params = strategy.config.parameters.copy()
+        current_params = strategy.get("parameters", {}).copy()
         adjusted = False
         
         # 根据策略类型进行小幅调整
@@ -1987,8 +2009,8 @@ class AutomatedStrategyManager:
             # 应用调整
             self.service.update_strategy(
                 strategy_id, 
-                strategy.config.name, 
-                strategy.config.symbol, 
+                strategy.get("name", ""), 
+                strategy.get("symbol", ""), 
                 current_params
             )
             logger.info(f"快速调优策略: {performance['name']}")
@@ -2000,7 +2022,7 @@ class AutomatedStrategyManager:
             return
         
         strategy_type = performance['type']
-        current_params = strategy.config.parameters.copy()
+        current_params = strategy.get("parameters", {}).copy()
         
         # 基于机器学习的参数优化（简化版）
         if strategy_type == 'momentum':
@@ -2026,8 +2048,8 @@ class AutomatedStrategyManager:
         # 应用优化后的参数
         self.service.update_strategy(
             strategy_id, 
-            strategy.config.name, 
-            strategy.config.symbol, 
+            strategy.get("name", ""), 
+            strategy.get("symbol", ""), 
             current_params
         )
         
