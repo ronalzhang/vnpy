@@ -1090,7 +1090,7 @@ class HighFrequencyStrategy(QuantitativeStrategy):
         if len(prices) < 5:
             return 0.5
         recent_slope = (prices.iloc[-1] - prices.iloc[-5]) / prices.iloc[-5]
-        return max(0, min(1, 0.5 + recent_slope * 100))  # 标准化到0-1
+        return max(0, min(1, 0.5 + recent_slope * 100))  # 标准化到0-1范围
     
     def _detect_volume_spike(self, volumes: pd.Series) -> bool:
         """检测成交量激增"""
@@ -5553,98 +5553,6 @@ class EvolutionaryStrategyEngine:
         except Exception as e:
             logger.error(f"演化失败恢复机制执行失败: {e}")
 
-    def _save_evolution_snapshot(self, snapshot_type: str, strategies: List[Dict]):
-        """保存演化快照"""
-        try:
-            snapshot_data = {
-                'type': snapshot_type,
-                'generation': self.current_generation,
-                'cycle': self.current_cycle,
-                'strategy_count': len(strategies),
-                'avg_score': sum(s.get('final_score', 0) for s in strategies) / len(strategies) if strategies else 0,
-                'top_scores': sorted([s.get('final_score', 0) for s in strategies], reverse=True)[:10],
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            for strategy in strategies:
-                self.service.db_manager.execute_query("""
-                    INSERT INTO strategy_snapshots 
-                    (strategy_id, snapshot_name, parameters, final_score, performance_metrics)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (
-                    strategy['id'],
-                    f"{snapshot_type}_G{self.current_generation}_C{self.current_cycle}",
-                    json.dumps(strategy.get('parameters', {})),
-                    strategy.get('final_score', 0),
-                    json.dumps(snapshot_data)
-                ))
-                
-        except Exception as e:
-            logger.error(f"保存演化快照失败: {e}")
-    
-    def _save_evolution_history(self, elites: List[Dict], new_strategies: List[Dict]):
-        """保存演化历史"""
-        try:
-            # 保存精英策略历史
-            for elite in elites:
-                self.service.db_manager.execute_query("""
-                    INSERT INTO strategy_evolution_history 
-                    (strategy_id, generation, cycle, evolution_type, new_score, created_time)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (elite['id'], self.current_generation, self.current_cycle, 
-                      'elite_selected', elite.get('final_score', 0)))
-            
-            # 保存新策略历史
-            for new_strategy in new_strategies:
-                parent_id = new_strategy.get('parent_id', '')
-                evolution_type = new_strategy.get('evolution_type', 'unknown')
-                
-                self.service.db_manager.execute_query("""
-                    INSERT INTO strategy_evolution_history 
-                    (strategy_id, generation, cycle, parent_strategy_id, evolution_type, 
-                     new_parameters, new_score, created_time)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                """, (new_strategy['id'], self.current_generation, self.current_cycle,
-                      parent_id, evolution_type, 
-                      json.dumps(new_strategy.get('parameters', {})),
-                      new_strategy.get('final_score', 0)))
-                      
-        except Exception as e:
-            logger.error(f"保存演化历史失败: {e}")
-    
-    def _update_strategies_generation_info(self):
-        """更新所有策略的世代信息"""
-        try:
-            self.service.db_manager.execute_query("""
-                UPDATE strategies 
-                SET generation = ?, cycle = ?, last_evolution_time = CURRENT_TIMESTAMP,
-                    evolution_count = evolution_count + 1,
-                    is_persistent = 1
-                WHERE enabled = 1
-            """, (self.current_generation, self.current_cycle))
-            
-        except Exception as e:
-            logger.error(f"更新策略世代信息失败: {e}")
-    
-    def _recover_from_evolution_failure(self):
-        """演化失败后的恢复机制"""
-        try:
-            logger.warning("🔄 演化失败，尝试恢复上一个稳定状态...")
-            
-            # 回滚到上一个成功的快照
-            last_snapshot = self.service.db_manager.execute_query("""
-                SELECT snapshot_name FROM strategy_snapshots 
-                WHERE snapshot_name LIKE '%after_evolution%'
-                ORDER BY snapshot_time DESC LIMIT 1
-            """, fetch_one=True)
-            
-            if last_snapshot:
-                logger.info(f"🔄 恢复到快照: {last_snapshot[0]}")
-                # 这里可以添加具体的恢复逻辑
-            
-        except Exception as e:
-            logger.error(f"演化失败恢复机制执行失败: {e}")
-
     def _evaluate_all_strategies(self) -> List[Dict]:
         """评估所有当前策略"""
         strategies_data = self.quantitative_service.get_strategies()
@@ -5756,50 +5664,6 @@ class EvolutionaryStrategyEngine:
             
             return survivors
             
-        except Exception as e:
-            logger.error(f"策略淘汰过程出错: {e}")
-            return strategies  # 出错时保持所有策略
-    
-    def _mark_strategy_protected(self, strategy_id: str, protection_level: int, reason: str):
-        """标记策略为保护状态"""
-        try:
-            self.service.db_manager.execute_query("""
-                UPDATE strategies 
-                SET protected_status = ?, is_persistent = 1 
-                WHERE id = ?
-            """, (protection_level, strategy_id))
-            
-            # 记录保护历史
-            self.service.db_manager.execute_query("""
-                INSERT INTO strategy_evolution_history 
-                (strategy_id, generation, cycle, evolution_type, new_parameters, created_time)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (strategy_id, self.current_generation, self.current_cycle, 
-                  f"protection_{reason}", json.dumps({"protection_level": protection_level})))
-                  
-        except Exception as e:
-            logger.error(f"标记策略保护失败: {e}")
-    
-    def _record_strategy_elimination(self, strategy_id: str, final_score: float, reason: str):
-        """记录策略淘汰信息（但不实际删除）"""
-        try:
-            # 只记录，不删除，以备将来恢复
-            self.service.db_manager.execute_query("""
-                INSERT INTO strategy_evolution_history 
-                (strategy_id, generation, cycle, evolution_type, old_score, created_time)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (strategy_id, self.current_generation, self.current_cycle, 
-                  f"eliminated_{reason}", final_score))
-                  
-            # 将策略标记为非活跃而非删除
-            self.service.db_manager.execute_query("""
-                UPDATE strategies 
-                SET enabled = 0, last_evolution_time = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (strategy_id,))
-            
-        except Exception as e:
-            logger.error(f"记录策略淘汰失败: {e}")            
         except Exception as e:
             logger.error(f"策略淘汰过程出错: {e}")
             return strategies  # 出错时保持所有策略
