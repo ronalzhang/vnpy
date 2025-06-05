@@ -157,11 +157,20 @@ class FullyEnhancedQuantitativeService(QuantitativeService):
             
             # 原版核心功能：自动策略管理
             if self.strategy_manager:
+                # 确保策略管理器有strategies属性
+                if not hasattr(self.strategy_manager, 'strategies'):
+                    self.strategy_manager.strategies = self.strategies
                 self.strategy_manager.auto_manage_strategies()
                 logger.debug("✅ 自动策略管理完成")
             
             # 原版核心功能：策略进化
             if self.evolution_engine:
+                # 确保进化引擎有必要的属性
+                if not hasattr(self.evolution_engine, 'current_generation'):
+                    self.evolution_engine.current_generation = 0
+                if not hasattr(self.evolution_engine, 'current_cycle'):
+                    self.evolution_engine.current_cycle = 1
+                
                 evolution_result = self.evolution_engine.run_evolution_cycle()
                 if evolution_result:
                     # 更新进化代数
