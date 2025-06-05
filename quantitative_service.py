@@ -3264,6 +3264,11 @@ class QuantitativeService:
             print("🔄 刷新余额缓存...")
             balance_data = self._fetch_fresh_balance()
             
+            if balance_data is None:
+                print("❌ API获取余额失败，返回错误标识")
+                # API失败时返回特殊值，前端将显示"-"
+                return -1.0
+            
             # 更新缓存
             self.balance_cache.update({
                 'balance': balance_data['total'],
@@ -3287,8 +3292,8 @@ class QuantitativeService:
             
         except Exception as e:
             print(f"获取余额失败: {e}")
-            # 返回缓存值作为备用
-            return self.balance_cache.get('balance', 0.0)
+            # 发生异常时也返回错误标识，前端将显示"-"
+            return -1.0
     
     def _fetch_fresh_balance(self):
         """获取最新余额数据 - 仅使用真实API"""
@@ -4068,6 +4073,17 @@ class QuantitativeService:
             # 获取真实币安账户余额
             current_balance = self._get_current_balance()
             
+            # 如果余额获取失败，返回"-"标识
+            if current_balance == -1.0:
+                return {
+                    'balance': "-",
+                    'daily_pnl': 0.0,
+                    'daily_return': 0.0,
+                    'daily_trades': 0,
+                    'available_balance': "-",
+                    'frozen_balance': "-"
+                }
+            
             # 计算今日盈亏
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -4083,7 +4099,7 @@ class QuantitativeService:
             daily_return = daily_pnl / current_balance if current_balance > 0 else 0.0
             
             return {
-                'balance': round(current_balance, 2),
+                'balance': round(current_balance, 2) if current_balance != -1.0 else "-",
                 'daily_pnl': round(daily_pnl, 2),
                 'daily_return': round(daily_return, 4),
                 'daily_trades': daily_trades,
