@@ -4145,6 +4145,7 @@ class QuantitativeService:
         except Exception as e:
             print(f"记录策略优化日志失败: {e}")
     
+
     def get_strategy_trade_logs(self, strategy_id, limit=100):
         """获取策略交易日志"""
         try:
