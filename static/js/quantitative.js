@@ -288,13 +288,13 @@ class QuantitativeSystem {
             const dataSource = strategy.data_source || '实际交易';
             const qualified = strategy.qualified_for_trading || false;
             
-            // 评分状态显示
+            // 评分状态显示 - 使用6.5分合格线
             let scoreColor = 'text-secondary';
             let scoreStatus = '';
             if (score >= 70) {
                 scoreColor = 'text-success';
                 scoreStatus = '🏆 优秀';
-            } else if (score >= 60) {
+            } else if (score >= 6.5) {
                 scoreColor = 'text-warning';
                 scoreStatus = '✅ 合格';
             } else {

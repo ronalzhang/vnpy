@@ -4232,83 +4232,63 @@ class QuantitativeService:
             print(f"记录策略交易日志失败: {e}")
     
     def init_strategies(self):
-        """初始化策略"""
+        """初始化策略 - 从数据库加载或触发进化生成"""
+        try:
+            # 首先尝试从数据库加载现有策略
+            self._load_strategies_from_db()
+            
+            if not self.strategies:
+                print("🧬 数据库中无策略，启动进化引擎生成初始策略...")
+                
+                # 启动进化引擎进行初始种群创建
+                if self.evolution_engine:
+                    # 创建初始种群
+                    self.evolution_engine._load_or_create_population()
+                    
+                    # 运行模拟并评分
+                    print("🔬 运行策略模拟评估...")
+                    simulation_results = self.run_all_strategy_simulations()
+                    
+                    # 重新从数据库加载更新后的策略
+                    self._load_strategies_from_db()
+                    
+                    print(f"🎯 进化生成了 {len(self.strategies)} 个策略")
+                else:
+                    print("⚠️ 进化引擎未启动，创建默认策略...")
+                    self._create_default_strategies()
+            else:
+                print(f"✅ 从数据库加载了 {len(self.strategies)} 个策略")
+                
+        except Exception as e:
+            print(f"❌ 策略初始化失败: {e}")
+            # 回退到创建默认策略
+            self._create_default_strategies()
+    
+    def _create_default_strategies(self):
+        """创建默认策略（仅作为后备方案）"""
         self.strategies = {
-            'BTC_momentum': {
-                'id': 'BTC_momentum',
-                'name': 'BTC动量策略',
-                'symbol': 'BTC/USDT',
-                'type': 'momentum',
-                'enabled': False,  # 大资金策略默认禁用
-                'parameters': {
-                    'lookback_period': 20,
-                    'threshold': 0.02,
-                    'quantity': 10.0
-                }
-            },
-            'ETH_momentum': {
-                'id': 'ETH_momentum',
-                'name': 'ETH动量策略',
-                'symbol': 'ETH/USDT',
-                'type': 'momentum',
-                'enabled': False,  # 大资金策略默认禁用
-                'parameters': {
-                    'lookback_period': 20,
-                    'threshold': 0.02,
-                    'quantity': 10.0
-                }
-            },
-            'DOGE_momentum': {
-                'id': 'DOGE_momentum',
+            'DOGE_momentum_default': {
+                'id': 'DOGE_momentum_default',
                 'name': 'DOGE动量策略',
                 'symbol': 'DOGE/USDT',
                 'type': 'momentum',
-                'enabled': True,  # 小资金策略默认启用
+                'enabled': True,
                 'parameters': {
                     'lookback_period': 15,
                     'threshold': 0.015,
                     'quantity': 1.0
-                }
-            },
-            'XRP_momentum': {
-                'id': 'XRP_momentum',
-                'name': 'XRP动量策略',
-                'symbol': 'XRP/USDT',
-                'type': 'momentum',
-                'enabled': True,  # 小资金策略默认启用
-                'parameters': {
-                    'lookback_period': 15,
-                    'threshold': 0.015,
-                    'quantity': 1.0
-                }
-            },
-            'ADA_momentum': {
-                'id': 'ADA_momentum',
-                'name': 'ADA动量策略',
-                'symbol': 'ADA/USDT',
-                'type': 'momentum',
-                'enabled': True,  # 小资金策略默认启用
-                'parameters': {
-                    'lookback_period': 15,
-                    'threshold': 0.015,
-                    'quantity': 1.0
-                }
-            },
-            'SOL_grid': {
-                'id': 'SOL_grid',
-                'name': 'SOL网格策略',
-                'symbol': 'SOL/USDT',
-                'type': 'grid_trading',
-                'enabled': False,  # 网格策略需要更多资金，默认禁用
-                'parameters': {
-                    'grid_spacing': 1.0,
-                    'grid_count': 10,
-                    'quantity': 0.5
-                }
+                },
+                'final_score': 50.0,
+                'win_rate': 0.6,
+                'total_return': 0.0,
+                'total_trades': 0,
+                'qualified_for_trading': False
             }
         }
         
-        print(f"初始化了 {len(self.strategies)} 个策略")
+        # 保存到数据库
+        self._save_strategies_to_db()
+        print(f"📝 创建了 {len(self.strategies)} 个默认策略")
     
     def init_database(self):
         """初始化数据库"""
@@ -5332,6 +5312,9 @@ class EvolutionaryStrategyEngine:
     
     def __init__(self, quantitative_service):
         self.quantitative_service = quantitative_service
+        self.db_manager = quantitative_service.db_manager  # 添加数据库管理器引用
+        self.population_size = 20  # 添加种群大小
+        
         self.strategy_templates = {
             'momentum': {
                 'name_prefix': '动量策略',
@@ -5412,8 +5395,13 @@ class EvolutionaryStrategyEngine:
             'elimination_threshold': 45.0  # 低于45分的策略将被淘汰
         }
         
-        self.generation = 0
+        # 初始化世代和轮次信息
+        self.current_generation = self._load_current_generation()
+        self.current_cycle = self._load_current_cycle()
+        self.generation = self.current_generation  # 保持兼容性
         self.last_evolution_time = None
+        
+        print(f"🧬 进化引擎初始化完成 - 第{self.current_generation}代第{self.current_cycle}轮")
         
     
     
