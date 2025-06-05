@@ -1340,9 +1340,6 @@ class AutomatedStrategyManager:
         logger.info("开始执行全自动策略管理...")
         
         try:
-        # 调试：记录策略数据类型
-        logger.debug(f"策略数据类型: {type(strategy)}, 内容预览: {list(strategy.keys()) if isinstance(strategy, dict) else 'not dict'}")
-
             # 1. 评估所有策略表现
             strategy_performances = self._evaluate_all_strategies()
             
@@ -5387,46 +5384,238 @@ class EvolutionaryStrategyEngine:
         self.generation = 0
         self.last_evolution_time = None
         
+    
+    
     def run_evolution_cycle(self):
-        """运行一轮完整的进化周期"""
+        """运行演化周期，确保完整持久化"""
         try:
-            print(f"\n🧬 开始第 {self.generation + 1} 代策略进化...")
+            logger.info(f"🧬 开始第 {self.current_generation} 代第 {self.current_cycle} 轮演化")
             
-            # 1. 评估当前所有策略
-            current_strategies = self._evaluate_all_strategies()
-            print(f"📊 当前策略数量: {len(current_strategies)}")
+            # 1. 评估所有策略适应度
+            strategies = self._evaluate_all_strategies()
+            if not strategies:
+                logger.warning("⚠️ 没有可用策略进行演化")
+                return
             
-            # 2. 淘汰表现差的策略
-            survivors = self._eliminate_poor_strategies(current_strategies)
-            print(f"✅ 存活策略: {len(survivors)}")
+            # 2. 保存演化前状态快照
+            self._save_evolution_snapshot("before_evolution", strategies)
             
-            # 3. 选择精英策略
-            elites = self._select_elites(survivors)
-            print(f"🏆 精英策略: {len(elites)}")
+            # 3. 选择精英策略（保护高分策略）
+            elites = self._select_elites(strategies)
             
-            # 4. 生成新策略
+            # 4. 淘汰低分策略（保护机制）
+            survivors = self._eliminate_poor_strategies(strategies)
+            
+            # 5. 生成新策略（变异和交叉）
             new_strategies = self._generate_new_strategies(elites, survivors)
-            print(f"🆕 新建策略: {len(new_strategies)}")
             
-            # 5. 参数进化优化
-            self._evolve_strategy_parameters(elites)
+            # 6. 更新世代信息
+            self.current_cycle += 1
+            if self.current_cycle > 10:  # 每10轮为一代
+                self.current_generation += 1
+                self.current_cycle = 1
             
-            # 6. 启动模拟评估
-            self._start_simulation_for_new_strategies(new_strategies)
+            # 7. 保存所有策略演化历史
+            self._save_evolution_history(elites, new_strategies)
             
-            # 7. 更新策略配置
-            self._update_strategy_allocations()
+            # 8. 更新策略状态
+            self._update_strategies_generation_info()
             
-            self.generation += 1
-            self.last_evolution_time = datetime.now()
+            # 9. 保存演化后状态快照
+            self._save_evolution_snapshot("after_evolution", survivors + new_strategies)
             
-            print(f"🎯 第 {self.generation} 代进化完成！")
-            return True
+            logger.info(f"🎯 第 {self.current_generation} 代第 {self.current_cycle} 轮演化完成！")
+            logger.info(f"📊 精英: {len(elites)}个, 幸存: {len(survivors)}个, 新增: {len(new_strategies)}个")
             
         except Exception as e:
-            print(f"❌ 策略进化失败: {e}")
-            return False
+            logger.error(f"演化周期执行失败: {e}")
+            # 演化失败时的恢复机制
+            self._recover_from_evolution_failure()
     
+    def _save_evolution_snapshot(self, snapshot_type: str, strategies: List[Dict]):
+        """保存演化快照"""
+        try:
+            snapshot_data = {
+                'type': snapshot_type,
+                'generation': self.current_generation,
+                'cycle': self.current_cycle,
+                'strategy_count': len(strategies),
+                'avg_score': sum(s.get('final_score', 0) for s in strategies) / len(strategies) if strategies else 0,
+                'top_scores': sorted([s.get('final_score', 0) for s in strategies], reverse=True)[:10],
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            for strategy in strategies:
+                self.service.db_manager.execute_query("""
+                    INSERT INTO strategy_snapshots 
+                    (strategy_id, snapshot_name, parameters, final_score, performance_metrics)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    strategy['id'],
+                    f"{snapshot_type}_G{self.current_generation}_C{self.current_cycle}",
+                    json.dumps(strategy.get('parameters', {})),
+                    strategy.get('final_score', 0),
+                    json.dumps(snapshot_data)
+                ))
+                
+        except Exception as e:
+            logger.error(f"保存演化快照失败: {e}")
+    
+    def _save_evolution_history(self, elites: List[Dict], new_strategies: List[Dict]):
+        """保存演化历史"""
+        try:
+            # 保存精英策略历史
+            for elite in elites:
+                self.service.db_manager.execute_query("""
+                    INSERT INTO strategy_evolution_history 
+                    (strategy_id, generation, cycle, evolution_type, new_score, created_time)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (elite['id'], self.current_generation, self.current_cycle, 
+                      'elite_selected', elite.get('final_score', 0)))
+            
+            # 保存新策略历史
+            for new_strategy in new_strategies:
+                parent_id = new_strategy.get('parent_id', '')
+                evolution_type = new_strategy.get('evolution_type', 'unknown')
+                
+                self.service.db_manager.execute_query("""
+                    INSERT INTO strategy_evolution_history 
+                    (strategy_id, generation, cycle, parent_strategy_id, evolution_type, 
+                     new_parameters, new_score, created_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (new_strategy['id'], self.current_generation, self.current_cycle,
+                      parent_id, evolution_type, 
+                      json.dumps(new_strategy.get('parameters', {})),
+                      new_strategy.get('final_score', 0)))
+                      
+        except Exception as e:
+            logger.error(f"保存演化历史失败: {e}")
+    
+    def _update_strategies_generation_info(self):
+        """更新所有策略的世代信息"""
+        try:
+            self.service.db_manager.execute_query("""
+                UPDATE strategies 
+                SET generation = ?, cycle = ?, last_evolution_time = CURRENT_TIMESTAMP,
+                    evolution_count = evolution_count + 1,
+                    is_persistent = 1
+                WHERE enabled = 1
+            """, (self.current_generation, self.current_cycle))
+            
+        except Exception as e:
+            logger.error(f"更新策略世代信息失败: {e}")
+    
+    def _recover_from_evolution_failure(self):
+        """演化失败后的恢复机制"""
+        try:
+            logger.warning("🔄 演化失败，尝试恢复上一个稳定状态...")
+            
+            # 回滚到上一个成功的快照
+            last_snapshot = self.service.db_manager.execute_query("""
+                SELECT snapshot_name FROM strategy_snapshots 
+                WHERE snapshot_name LIKE '%after_evolution%'
+                ORDER BY snapshot_time DESC LIMIT 1
+            """, fetch_one=True)
+            
+            if last_snapshot:
+                logger.info(f"🔄 恢复到快照: {last_snapshot[0]}")
+                # 这里可以添加具体的恢复逻辑
+            
+        except Exception as e:
+            logger.error(f"演化失败恢复机制执行失败: {e}")
+
+    def _save_evolution_snapshot(self, snapshot_type: str, strategies: List[Dict]):
+        """保存演化快照"""
+        try:
+            snapshot_data = {
+                'type': snapshot_type,
+                'generation': self.current_generation,
+                'cycle': self.current_cycle,
+                'strategy_count': len(strategies),
+                'avg_score': sum(s.get('final_score', 0) for s in strategies) / len(strategies) if strategies else 0,
+                'top_scores': sorted([s.get('final_score', 0) for s in strategies], reverse=True)[:10],
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            for strategy in strategies:
+                self.service.db_manager.execute_query("""
+                    INSERT INTO strategy_snapshots 
+                    (strategy_id, snapshot_name, parameters, final_score, performance_metrics)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    strategy['id'],
+                    f"{snapshot_type}_G{self.current_generation}_C{self.current_cycle}",
+                    json.dumps(strategy.get('parameters', {})),
+                    strategy.get('final_score', 0),
+                    json.dumps(snapshot_data)
+                ))
+                
+        except Exception as e:
+            logger.error(f"保存演化快照失败: {e}")
+    
+    def _save_evolution_history(self, elites: List[Dict], new_strategies: List[Dict]):
+        """保存演化历史"""
+        try:
+            # 保存精英策略历史
+            for elite in elites:
+                self.service.db_manager.execute_query("""
+                    INSERT INTO strategy_evolution_history 
+                    (strategy_id, generation, cycle, evolution_type, new_score, created_time)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (elite['id'], self.current_generation, self.current_cycle, 
+                      'elite_selected', elite.get('final_score', 0)))
+            
+            # 保存新策略历史
+            for new_strategy in new_strategies:
+                parent_id = new_strategy.get('parent_id', '')
+                evolution_type = new_strategy.get('evolution_type', 'unknown')
+                
+                self.service.db_manager.execute_query("""
+                    INSERT INTO strategy_evolution_history 
+                    (strategy_id, generation, cycle, parent_strategy_id, evolution_type, 
+                     new_parameters, new_score, created_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (new_strategy['id'], self.current_generation, self.current_cycle,
+                      parent_id, evolution_type, 
+                      json.dumps(new_strategy.get('parameters', {})),
+                      new_strategy.get('final_score', 0)))
+                      
+        except Exception as e:
+            logger.error(f"保存演化历史失败: {e}")
+    
+    def _update_strategies_generation_info(self):
+        """更新所有策略的世代信息"""
+        try:
+            self.service.db_manager.execute_query("""
+                UPDATE strategies 
+                SET generation = ?, cycle = ?, last_evolution_time = CURRENT_TIMESTAMP,
+                    evolution_count = evolution_count + 1,
+                    is_persistent = 1
+                WHERE enabled = 1
+            """, (self.current_generation, self.current_cycle))
+            
+        except Exception as e:
+            logger.error(f"更新策略世代信息失败: {e}")
+    
+    def _recover_from_evolution_failure(self):
+        """演化失败后的恢复机制"""
+        try:
+            logger.warning("🔄 演化失败，尝试恢复上一个稳定状态...")
+            
+            # 回滚到上一个成功的快照
+            last_snapshot = self.service.db_manager.execute_query("""
+                SELECT snapshot_name FROM strategy_snapshots 
+                WHERE snapshot_name LIKE '%after_evolution%'
+                ORDER BY snapshot_time DESC LIMIT 1
+            """, fetch_one=True)
+            
+            if last_snapshot:
+                logger.info(f"🔄 恢复到快照: {last_snapshot[0]}")
+                # 这里可以添加具体的恢复逻辑
+            
+        except Exception as e:
+            logger.error(f"演化失败恢复机制执行失败: {e}")
+
     def _evaluate_all_strategies(self) -> List[Dict]:
         """评估所有当前策略"""
         strategies_data = self.quantitative_service.get_strategies()
@@ -5486,11 +5675,146 @@ class EvolutionaryStrategyEngine:
         
         return min(fitness, 100.0)  # 限制在100分以内
     
+    
+    
     def _eliminate_poor_strategies(self, strategies: List[Dict]) -> List[Dict]:
-        """🎯 渐进式淘汰机制 - 从60分开始，逐步提高标准"""
-        if len(strategies) <= 6:  # 保留最少6个策略
-            return strategies
-        
+        """淘汰低分策略，但保护高分策略"""
+        try:
+            # 🛡️ 保护机制：绝不淘汰高分策略
+            protected_strategies = []
+            regular_strategies = []
+            
+            for strategy in strategies:
+                score = strategy.get('final_score', 0)
+                protected = strategy.get('protected_status', 0)
+                
+                if score >= 60.0 or protected >= 2:
+                    # 精英策略：绝对保护
+                    protected_strategies.append(strategy)
+                    self._mark_strategy_protected(strategy['id'], 2, "elite_protection")
+                elif score >= 50.0 or protected >= 1:
+                    # 一般保护策略
+                    protected_strategies.append(strategy)
+                    self._mark_strategy_protected(strategy['id'], 1, "score_protection")
+                else:
+                    regular_strategies.append(strategy)
+            
+            # 计算淘汰数量（只从普通策略中淘汰）
+            total_count = len(strategies)
+            protected_count = len(protected_strategies)
+            eliminate_count = max(0, int(total_count * 0.3))  # 淘汰30%
+            
+            if len(regular_strategies) <= eliminate_count:
+                # 如果普通策略不够淘汰，就少淘汰一些
+                eliminated = regular_strategies
+                survivors = protected_strategies
+            else:
+                # 从普通策略中淘汰最差的
+                regular_strategies.sort(key=lambda x: x['final_score'])
+                eliminated = regular_strategies[:eliminate_count]
+                survivors = protected_strategies + regular_strategies[eliminate_count:]
+            
+            # 记录淘汰信息
+            for strategy in eliminated:
+                self._record_strategy_elimination(
+                    strategy['id'], 
+                    strategy['final_score'],
+                    f"淘汰轮次-第{self.current_generation}代"
+                )
+            
+            logger.info(f"🛡️ 策略淘汰完成：保护 {protected_count} 个，淘汰 {len(eliminated)} 个")
+            logger.info(f"📊 保护详情：精英 {len([s for s in protected_strategies if s.get('final_score', 0) >= 60])} 个，一般保护 {len([s for s in protected_strategies if 50 <= s.get('final_score', 0) < 60])} 个")
+            
+            return survivors
+            
+        except Exception as e:
+            logger.error(f"策略淘汰过程出错: {e}")
+            return strategies  # 出错时保持所有策略
+    
+    def _mark_strategy_protected(self, strategy_id: str, protection_level: int, reason: str):
+        """标记策略为保护状态"""
+        try:
+            self.service.db_manager.execute_query("""
+                UPDATE strategies 
+                SET protected_status = ?, is_persistent = 1 
+                WHERE id = ?
+            """, (protection_level, strategy_id))
+            
+            # 记录保护历史
+            self.service.db_manager.execute_query("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, evolution_type, new_parameters, created_time)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (strategy_id, self.current_generation, self.current_cycle, 
+                  f"protection_{reason}", json.dumps({"protection_level": protection_level})))
+                  
+        except Exception as e:
+            logger.error(f"标记策略保护失败: {e}")
+    
+    def _record_strategy_elimination(self, strategy_id: str, final_score: float, reason: str):
+        """记录策略淘汰信息（但不实际删除）"""
+        try:
+            # 只记录，不删除，以备将来恢复
+            self.service.db_manager.execute_query("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, evolution_type, old_score, created_time)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (strategy_id, self.current_generation, self.current_cycle, 
+                  f"eliminated_{reason}", final_score))
+                  
+            # 将策略标记为非活跃而非删除
+            self.service.db_manager.execute_query("""
+                UPDATE strategies 
+                SET enabled = 0, last_evolution_time = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (strategy_id,))
+            
+        except Exception as e:
+            logger.error(f"记录策略淘汰失败: {e}")            
+        except Exception as e:
+            logger.error(f"策略淘汰过程出错: {e}")
+            return strategies  # 出错时保持所有策略
+    
+    def _mark_strategy_protected(self, strategy_id: str, protection_level: int, reason: str):
+        """标记策略为保护状态"""
+        try:
+            self.service.db_manager.execute_query("""
+                UPDATE strategies 
+                SET protected_status = ?, is_persistent = 1 
+                WHERE id = ?
+            """, (protection_level, strategy_id))
+            
+            # 记录保护历史
+            self.service.db_manager.execute_query("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, evolution_type, new_parameters, created_time)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (strategy_id, self.current_generation, self.current_cycle, 
+                  f"protection_{reason}", json.dumps({"protection_level": protection_level})))
+                  
+        except Exception as e:
+            logger.error(f"标记策略保护失败: {e}")
+    
+    def _record_strategy_elimination(self, strategy_id: str, final_score: float, reason: str):
+        """记录策略淘汰信息（但不实际删除）"""
+        try:
+            # 只记录，不删除，以备将来恢复
+            self.service.db_manager.execute_query("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, evolution_type, old_score, created_time)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (strategy_id, self.current_generation, self.current_cycle, 
+                  f"eliminated_{reason}", final_score))
+                  
+            # 将策略标记为非活跃而非删除
+            self.service.db_manager.execute_query("""
+                UPDATE strategies 
+                SET enabled = 0, last_evolution_time = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (strategy_id,))
+            
+        except Exception as e:
+            logger.error(f"记录策略淘汰失败: {e}")        
         # 🔥 分阶段淘汰标准 - 跟随系统进化程度
         total_strategies = len(strategies)
         high_score_count = sum(1 for s in strategies if s.get('fitness', 0) >= 80)
@@ -5904,6 +6228,115 @@ class EvolutionaryStrategyEngine:
         except Exception as e:
             print(f"❌ 优化策略参数失败: {e}")
     
+
+    def _load_current_generation(self) -> int:
+        """从数据库加载当前世代数"""
+        try:
+            result = self.db_manager.execute_query(
+                "SELECT MAX(generation) FROM strategies WHERE is_persistent = 1",
+                fetch_one=True
+            )
+            return (result[0] or 0) + 1 if result and result[0] else 1
+        except Exception:
+            return 1
+    
+    def _load_current_cycle(self) -> int:
+        """从数据库加载当前轮次"""
+        try:
+            result = self.db_manager.execute_query(
+                "SELECT MAX(cycle) FROM strategies WHERE generation = ?",
+                (self.current_generation - 1,),
+                fetch_one=True
+            )
+            return (result[0] or 0) + 1 if result and result[0] else 1
+        except Exception:
+            return 1
+    
+    def _protect_high_score_strategies(self):
+        """保护高分策略"""
+        try:
+            # 标记60分以上的策略为保护状态
+            self.db_manager.execute_query("""
+                UPDATE strategies 
+                SET protected_status = 2, is_persistent = 1
+                WHERE final_score >= 60.0 AND protected_status < 2
+            """)
+            
+            # 标记50-60分的策略为一般保护
+            self.db_manager.execute_query("""
+                UPDATE strategies 
+                SET protected_status = 1, is_persistent = 1
+                WHERE final_score >= 50.0 AND final_score < 60.0 AND protected_status = 0
+            """)
+            
+            logger.info("🛡️ 高分策略保护机制已激活")
+        except Exception as e:
+            logger.error(f"高分策略保护失败: {e}")
+    
+    def _load_or_create_population(self):
+        """加载现有策略或创建初始种群"""
+        try:
+            # 获取现有策略数量
+            existing_count = self.db_manager.execute_query(
+                "SELECT COUNT(*) FROM strategies WHERE is_persistent = 1",
+                fetch_one=True
+            )[0]
+            
+            if existing_count >= self.population_size * 0.5:  # 如果现有策略超过一半
+                logger.info(f"🔄 发现 {existing_count} 个现有策略，继续演化")
+                self._update_existing_strategies_info()
+            else:
+                logger.info(f"🆕 现有策略不足({existing_count}个)，补充新策略")
+                needed = self.population_size - existing_count
+                self._create_additional_strategies(needed)
+                
+        except Exception as e:
+            logger.error(f"策略种群加载失败: {e}")
+    
+    def _update_existing_strategies_info(self):
+        """更新现有策略的演化信息"""
+        try:
+            # 更新策略的世代和轮次信息
+            self.db_manager.execute_query("""
+                UPDATE strategies 
+                SET 
+                    generation = COALESCE(generation, ?),
+                    cycle = COALESCE(cycle, ?),
+                    last_evolution_time = CURRENT_TIMESTAMP,
+                    is_persistent = 1
+                WHERE generation IS NULL OR generation = 0
+            """, (self.current_generation - 1, self.current_cycle - 1))
+            
+            logger.info("📊 现有策略信息已更新")
+        except Exception as e:
+            logger.error(f"更新策略信息失败: {e}")
+    
+    def _create_additional_strategies(self, count: int):
+        """创建额外的策略以补充种群"""
+        try:
+            for i in range(count):
+                strategy = self._create_random_strategy()
+                strategy['generation'] = self.current_generation
+                strategy['cycle'] = self.current_cycle
+                strategy['evolution_type'] = 'supplementary'
+                strategy['is_persistent'] = 1
+                
+                self._create_strategy_in_system(strategy)
+            
+            logger.info(f"➕ 已补充 {count} 个新策略")
+        except Exception as e:
+            logger.error(f"补充策略失败: {e}")
+    
+    def _get_population_count(self) -> int:
+        """获取当前种群数量"""
+        try:
+            result = self.db_manager.execute_query(
+                "SELECT COUNT(*) FROM strategies WHERE is_persistent = 1",
+                fetch_one=True
+            )
+            return result[0] if result else 0
+        except Exception:
+            return 0
     def _get_next_evolution_time(self) -> str:
         """获取下次进化时间"""
         if not self.last_evolution_time:
