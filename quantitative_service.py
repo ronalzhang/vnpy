@@ -6422,7 +6422,41 @@ class EvolutionaryStrategyEngine:
             print(f"⚠️ 启动检查异常: {e}")
 
 
-# 全局量化服务实例
-quantitative_service = QuantitativeService() 
+def main():
+    """主程序入口"""
+    print("🚀 启动量化交易服务...")
+    
+    try:
+        # 创建量化服务实例
+        quantitative_service = QuantitativeService()
+        
+        # 启动服务
+        quantitative_service.start()
+        
+        print("✅ 量化交易服务启动成功")
+        print("💡 服务将持续运行，按 Ctrl+C 停止")
+        
+        # 保持服务运行
+        try:
+            while True:
+                time.sleep(60)  # 每分钟检查一次
+                print("🔄 服务运行中...")
+        except KeyboardInterrupt:
+            print("\n⚠️ 接收到停止信号")
+        finally:
+            print("🛑 正在停止服务...")
+            quantitative_service.stop()
+            print("✅ 服务已安全停止")
+            
+    except Exception as e:
+        print(f"❌ 启动失败: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
-# 在QuantitativeService类末尾添加所有缺失的方法（在创建实例之前）
+if __name__ == "__main__":
+    main()
+
+# 为了向后兼容，提供全局实例（仅在直接运行时）
+if __name__ == "__main__":
+    quantitative_service = None  # 避免在导入时创建实例
