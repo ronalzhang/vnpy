@@ -6,7 +6,39 @@
 包含策略管理、信号生成、持仓监控、收益统计等功能
 """
 
-from safe_ccxt import get_safe_ccxt
+from safe_ccxt 
+# 增强导入保护机制
+import sys
+import signal
+import time
+
+def safe_module_import(module_name, timeout=10):
+    """安全的模块导入，带超时保护"""
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"导入模块 {module_name} 超时")
+    
+    try:
+        if hasattr(signal, 'SIGALRM'):
+            original_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout)
+        
+        module = __import__(module_name)
+        return module
+        
+    except (TimeoutError, KeyboardInterrupt, ImportError) as e:
+        print(f"⚠️ 模块 {module_name} 导入失败: {e}")
+        return None
+    finally:
+        if hasattr(signal, 'SIGALRM'):
+            signal.alarm(0)
+            if 'original_handler' in locals():
+                signal.signal(signal.SIGALRM, original_handler)
+
+# 预先尝试导入可能问题的模块
+for module in ['ccxt', 'requests', 'pandas', 'numpy']:
+    safe_module_import(module)
+
+import get_safe_ccxt
 import sqlite3
 import json
 import time
@@ -6364,6 +6396,33 @@ class EvolutionaryStrategyEngine:
         
         next_time = self.last_evolution_time + timedelta(seconds=self.evolution_config['evolution_interval'])
         return next_time.strftime("%H:%M:%S")
+    def _startup_checks(self):
+        """启动时的稳定性检查"""
+        try:
+            # 检查关键组件
+            checks = [
+                ("数据库连接", lambda: hasattr(self, 'conn') and self.conn is not None),
+                ("策略字典", lambda: hasattr(self, 'strategies') and isinstance(self.strategies, dict)),
+                ("配置加载", lambda: hasattr(self, 'config') and self.config is not None),
+                ("余额缓存", lambda: hasattr(self, 'balance_cache') and isinstance(self.balance_cache, dict))
+            ]
+            
+            failed_checks = []
+            for check_name, check_func in checks:
+                try:
+                    if not check_func():
+                        failed_checks.append(check_name)
+                except Exception as e:
+                    failed_checks.append(f"{check_name} (错误: {e})")
+            
+            if failed_checks:
+                print(f"⚠️ 启动检查失败: {', '.join(failed_checks)}")
+            else:
+                print("✅ 启动稳定性检查通过")
+                
+        except Exception as e:
+            print(f"⚠️ 启动检查异常: {e}")
+
 
 # 全局量化服务实例
 quantitative_service = QuantitativeService() 
