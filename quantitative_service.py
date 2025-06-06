@@ -2287,10 +2287,13 @@ class QuantitativeService:
         # 初始化配置
         self.fund_allocation_config = {
             'max_active_strategies': 2,
-            'min_score_for_trading': 65.0,
+            'min_score_for_trading': 65.0,  # 65分开始交易
             'fund_allocation_method': 'fitness_based',
             'risk_management_enabled': True,
-            'auto_rebalancing': True
+            'auto_rebalancing': True,
+            'precision_optimization_threshold': 80.0,  # 80分开始精细化优化
+            'high_frequency_evolution': True,  # 启用高频进化
+            'evolution_acceleration': True  # 启用进化加速
         }
         
         # 加载配置和初始化
@@ -2341,9 +2344,10 @@ class QuantitativeService:
                         print("🧬 触发自动进化...")
                         self.evolution_engine.run_evolution_cycle()
                     
-                    # 每10分钟检查一次
+                    # 每10分钟检查一次 (高频进化模式)
                     import time
-                    time.sleep(600)
+                    evolution_interval = self.evolution_engine.evolution_config.get('evolution_interval', 600)
+                    time.sleep(evolution_interval)
                     
                 except Exception as e:
                     print(f"❌ 自动进化失败: {e}")
@@ -5553,17 +5557,29 @@ class EvolutionaryStrategyEngine:
         self.evolution_config = {
             'target_score': 100.0,
             'target_success_rate': 1.0,  # 100%
-            'max_strategies': 20,  # 同时运行的最大策略数
-            'min_strategies': 8,   # 保持的最小策略数
-            'evolution_interval': 3600,  # 1小时进化一次
-            'mutation_rate': 0.3,
-            'crossover_rate': 0.7,
-            'elite_ratio': 0.2,  # 保留最好的20%
-            'elimination_threshold': 45.0  # 低于45分的策略将被淘汰
+            'max_strategies': 50,  # 同时运行的最大策略数 (增加到50个)
+            'min_strategies': 10,   # 保持的最小策略数
+            'evolution_interval': 600,  # 10分钟进化一次 (600秒)
+            'mutation_rate': 0.25,  # 降低变异率，提高稳定性
+            'crossover_rate': 0.75,  # 提高交叉率
+            'elite_ratio': 0.15,  # 保留最好的15%
+            'elimination_threshold': 45.0,  # 低于45分的策略将被淘汰
+            'trading_threshold': 65.0,  # 65分开始小额交易 (新增)
+            'precision_threshold': 80.0  # 80分开始精细化优化 (新增)
         }
         
         # 初始化世代和轮次信息
         self.current_generation = self._load_current_generation()
+        
+        # 优质策略备选池配置
+        self.strategy_pool_config = {
+            'enable_historical_backup': True,  # 启用历史备份
+            'backup_threshold': 70.0,  # 70分以上策略自动备份
+            'max_pool_size': 200,  # 备选池最大容量
+            'retention_days': 90,  # 保留90天历史
+            'auto_restore_best': True,  # 自动恢复最佳策略
+            'parameter_evolution_tracking': True  # 参数进化追踪
+        }
         self.current_cycle = self._load_current_cycle()
         self.generation = self.current_generation  # 保持兼容性
         self.last_evolution_time = None
@@ -5865,28 +5881,17 @@ class EvolutionaryStrategyEngine:
             
         except Exception as e:
             logger.error(f"记录策略淘汰失败: {e}")        
-        # 🔥 分阶段淘汰标准 - 跟随系统进化程度
-        total_strategies = len(strategies)
-        high_score_count = sum(1 for s in strategies if s.get('fitness', 0) >= 80)
-        medium_score_count = sum(1 for s in strategies if 60 <= s.get('fitness', 0) < 80)
+        # 🔥 使用配置的淘汰标准 - 45分以下淘汰策略
+        elimination_threshold = self.evolution_config['elimination_threshold']  # 45分
+        trading_threshold = self.evolution_config['trading_threshold']  # 65分
+        precision_threshold = self.evolution_config['precision_threshold']  # 80分
         
-        # 📊 根据策略群体质量动态调整淘汰标准
-        if high_score_count >= 5:
-            # 🌟 高质量策略群体 - 严格标准，追求90+分终极策略
-            elimination_threshold = 75.0
-            print(f"🌟 高质量策略群体 (80+分: {high_score_count}个)，淘汰标准: {elimination_threshold}分")
-        elif medium_score_count >= 10:
-            # 🚀 中等质量策略群体 - 中等标准，目标80+分
-            elimination_threshold = 65.0
-            print(f"🚀 中等质量策略群体 (60+分: {medium_score_count}个)，淘汰标准: {elimination_threshold}分")
-        elif medium_score_count >= 3:
-            # 📈 初级策略群体 - 基础标准，目标60+分
-            elimination_threshold = 50.0
-            print(f"📈 初级策略群体 (60+分: {medium_score_count}个)，淘汰标准: {elimination_threshold}分")
-        else:
-            # 🌱 新生策略群体 - 宽松标准，培养60+分策略
-            elimination_threshold = 40.0
-            print(f"🌱 新生策略群体，淘汰标准: {elimination_threshold}分")
+        total_strategies = len(strategies)
+        high_score_count = sum(1 for s in strategies if s.get('fitness', 0) >= precision_threshold)
+        trading_count = sum(1 for s in strategies if s.get('fitness', 0) >= trading_threshold)
+        
+        print(f"📊 策略评估: {precision_threshold}分以上(精细化): {high_score_count}个, {trading_threshold}分以上(可交易): {trading_count}个")
+        print(f"🗑️ 淘汰标准: {elimination_threshold}分以下策略")
         
         surviving_strategies = []
         eliminated_count = 0
