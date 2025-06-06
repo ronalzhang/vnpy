@@ -5648,7 +5648,7 @@ class EvolutionaryStrategyEngine:
             }
             
             for strategy in strategies:
-                self.service.db_manager.execute_query("""
+                self.quantitative_service.db_manager.execute_query("""
                     INSERT INTO strategy_snapshots 
                     (strategy_id, snapshot_name, parameters, final_score, performance_metrics)
                     VALUES (?, ?, ?, ?, ?)
@@ -5668,7 +5668,7 @@ class EvolutionaryStrategyEngine:
         try:
             # 保存精英策略历史
             for elite in elites:
-                self.service.db_manager.execute_query("""
+                self.quantitative_service.db_manager.execute_query("""
                     INSERT INTO strategy_evolution_history 
                     (strategy_id, generation, cycle, evolution_type, new_score, created_time)
                     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -5680,7 +5680,7 @@ class EvolutionaryStrategyEngine:
                 parent_id = new_strategy.get('parent_id', '')
                 evolution_type = new_strategy.get('evolution_type', 'unknown')
                 
-                self.service.db_manager.execute_query("""
+                self.quantitative_service.db_manager.execute_query("""
                     INSERT INTO strategy_evolution_history 
                     (strategy_id, generation, cycle, parent_strategy_id, evolution_type, 
                      new_parameters, new_score, created_time)
@@ -5696,7 +5696,7 @@ class EvolutionaryStrategyEngine:
     def _update_strategies_generation_info(self):
         """更新所有策略的世代信息"""
         try:
-            self.service.db_manager.execute_query("""
+            self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
                 SET generation = ?, cycle = ?, last_evolution_time = CURRENT_TIMESTAMP,
                     evolution_count = evolution_count + 1,
@@ -5713,7 +5713,7 @@ class EvolutionaryStrategyEngine:
             logger.warning("🔄 演化失败，尝试恢复上一个稳定状态...")
             
             # 回滚到上一个成功的快照
-            last_snapshot = self.service.db_manager.execute_query("""
+            last_snapshot = self.quantitative_service.db_manager.execute_query("""
                 SELECT snapshot_name FROM strategy_snapshots 
                 WHERE snapshot_name LIKE '%after_evolution%'
                 ORDER BY snapshot_time DESC LIMIT 1
@@ -5728,39 +5728,46 @@ class EvolutionaryStrategyEngine:
 
     def _evaluate_all_strategies(self) -> List[Dict]:
         """评估所有当前策略"""
-        strategies_data = self.quantitative_service.get_strategies()
-        if not strategies_data.get('success'):
+        try:
+            strategies_data = self.quantitative_service.get_strategies()
+            if not strategies_data.get('success'):
+                return []
+            
+            strategies = []
+            for strategy in strategies_data['data']:
+                score = strategy.get('final_score', 0)
+                win_rate = strategy.get('win_rate', 0)
+                total_return = strategy.get('total_return', 0)
+                total_trades = strategy.get('total_trades', 0)
+                age_days = self._calculate_strategy_age(strategy)
+                
+                # 计算综合适应度评分
+                fitness = self._calculate_fitness(score, win_rate, total_return, total_trades, age_days)
+                
+                strategies.append({
+                    'id': strategy['id'],
+                    'name': strategy['name'],
+                    'type': strategy.get('type', 'unknown'),
+                    'symbol': strategy.get('symbol', 'BTCUSDT'),
+                    'final_score': score,  # 确保包含final_score键
+                    'score': score,
+                    'win_rate': win_rate,
+                    'total_return': total_return,
+                    'total_trades': total_trades,
+                    'fitness': fitness,
+                    'age_days': age_days,
+                    'parameters': strategy.get('parameters', {}),
+                    'data_source': strategy.get('data_source', 'unknown'),
+                    'enabled': strategy.get('enabled', True),
+                    'protected_status': strategy.get('protected_status', 0)
+                })
+            
+            # 按适应度排序
+            strategies.sort(key=lambda x: x['fitness'], reverse=True)
+            return strategies
+        except Exception as e:
+            logger.error(f"评估策略失败: {e}")
             return []
-        
-        strategies = []
-        for strategy in strategies_data['data']:
-            score = strategy.get('final_score', 0)
-            win_rate = strategy.get('win_rate', 0)
-            total_return = strategy.get('total_return', 0)
-            total_trades = strategy.get('total_trades', 0)
-            age_days = self._calculate_strategy_age(strategy)
-            
-            # 计算综合适应度评分
-            fitness = self._calculate_fitness(score, win_rate, total_return, total_trades, age_days)
-            
-            strategies.append({
-                'id': strategy['id'],
-                'name': strategy['name'],
-                'type': strategy['type'],
-                'symbol': strategy['symbol'],
-                'score': score,
-                'win_rate': win_rate,
-                'total_return': total_return,
-                'total_trades': total_trades,
-                'fitness': fitness,
-                'age_days': age_days,
-                'parameters': strategy.get('parameters', {}),
-                'data_source': strategy.get('data_source', 'unknown')
-            })
-        
-        # 按适应度排序
-        strategies.sort(key=lambda x: x['fitness'], reverse=True)
-        return strategies
     
     def _calculate_fitness(self, score: float, win_rate: float, total_return: float, 
                           total_trades: int, age_days: int) -> float:
