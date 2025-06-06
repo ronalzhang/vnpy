@@ -5851,14 +5851,14 @@ class EvolutionaryStrategyEngine:
     def _mark_strategy_protected(self, strategy_id: str, protection_level: int, reason: str):
         """标记策略为保护状态"""
         try:
-            self.service.db_manager.execute_query("""
+            self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
                 SET protected_status = ?, is_persistent = 1 
                 WHERE id = ?
             """, (protection_level, strategy_id))
             
             # 记录保护历史
-            self.service.db_manager.execute_query("""
+            self.quantitative_service.db_manager.execute_query("""
                 INSERT INTO strategy_evolution_history 
                 (strategy_id, generation, cycle, evolution_type, new_parameters, created_time)
                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -5872,7 +5872,7 @@ class EvolutionaryStrategyEngine:
         """记录策略淘汰信息（但不实际删除）"""
         try:
             # 只记录，不删除，以备将来恢复
-            self.service.db_manager.execute_query("""
+            self.quantitative_service.db_manager.execute_query("""
                 INSERT INTO strategy_evolution_history 
                 (strategy_id, generation, cycle, evolution_type, old_score, created_time)
                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -5880,57 +5880,14 @@ class EvolutionaryStrategyEngine:
                   f"eliminated_{reason}", final_score))
                   
             # 将策略标记为非活跃而非删除
-            self.service.db_manager.execute_query("""
+            self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
                 SET enabled = 0, last_evolution_time = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (strategy_id,))
             
         except Exception as e:
-            logger.error(f"记录策略淘汰失败: {e}")        
-        # 🔥 使用配置的淘汰标准 - 45分以下淘汰策略
-        elimination_threshold = self.evolution_config['elimination_threshold']  # 45分
-        trading_threshold = self.evolution_config['trading_threshold']  # 65分
-        precision_threshold = self.evolution_config['precision_threshold']  # 80分
-        
-        total_strategies = len(strategies)
-        high_score_count = sum(1 for s in strategies if s.get('fitness', 0) >= precision_threshold)
-        trading_count = sum(1 for s in strategies if s.get('fitness', 0) >= trading_threshold)
-        
-        print(f"📊 策略评估: {precision_threshold}分以上(精细化): {high_score_count}个, {trading_threshold}分以上(可交易): {trading_count}个")
-        print(f"🗑️ 淘汰标准: {elimination_threshold}分以下策略")
-        
-        surviving_strategies = []
-        eliminated_count = 0
-        
-        for strategy in strategies:
-            score = strategy.get('fitness', 0)
-            win_rate = strategy.get('win_rate', 0)
-            total_return = strategy.get('total_return', 0)
-            
-            # 🎯 多重淘汰条件 - 确保质量提升
-            should_eliminate = (
-                score < elimination_threshold or                           # 基础评分不达标
-                (score < 60 and win_rate < 0.60) or                      # 低分且低胜率
-                (score < 70 and total_return < -0.03) or                 # 中低分且负收益超3%
-                (strategy.get('age_days', 0) > 30 and score < 45)        # 老策略但表现差
-            )
-            
-            if should_eliminate:
-                eliminated_count += 1
-                print(f"🗑️ 淘汰策略 {strategy.get('id', 'unknown')}: 评分{score:.1f}, 胜率{win_rate*100:.1f}%, 收益{total_return*100:.1f}%")
-            else:
-                surviving_strategies.append(strategy)
-        
-        # 确保至少保留6个策略用于持续进化
-        if len(surviving_strategies) < 6:
-            # 按评分排序，保留前6个
-            sorted_strategies = sorted(strategies, key=lambda x: x.get('fitness', 0), reverse=True)
-            surviving_strategies = sorted_strategies[:6]
-            print(f"⚠️ 强制保留前6个策略以维持进化能力")
-        
-        print(f"📊 策略淘汰完成: 保留{len(surviving_strategies)}个，淘汰{eliminated_count}个")
-        return surviving_strategies
+            logger.error(f"记录策略淘汰失败: {e}")
     
     def _select_elites(self, strategies: List[Dict]) -> List[Dict]:
         """选择精英策略 - 优先选择90+分策略"""
