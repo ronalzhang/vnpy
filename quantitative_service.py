@@ -23,9 +23,28 @@ from loguru import logger
 # from auto_trading_engine import get_trading_engine, TradeResult
 import random
 import uuid
-import requests
+# 安全导入模块
+def safe_import(module_name, fallback=None):
+    try:
+        return __import__(module_name)
+    except Exception as e:
+        logger.warning(f'安全导入失败 {module_name}: {e}')
+        return fallback
+
+# 安全导入可能有问题的模块
+try:
+    import requests
+except Exception as e:
+    logger.warning(f'requests导入失败: {e}')
+    requests = None
+
+try:
+    import ccxt
+except Exception as e:
+    logger.warning(f'ccxt导入失败: {e}')
+    ccxt = None
+
 import traceback
-import ccxt
 import logging
 from db_config import get_db_adapter
 
