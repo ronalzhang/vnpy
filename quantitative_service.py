@@ -4209,24 +4209,6 @@ class QuantitativeService:
                 'success': False,
                 'error': str(e),
                 'data': None
-            }")
-            import traceback
-            traceback.print_exc()
-            
-            # 返回默认值，避免前端显示错误
-            return {
-                'success': True,
-                'data': {
-                    'total_balance': 10.0,  # 默认初始资金
-                    'available_balance': 10.0,
-                'frozen_balance': 0.0,
-                'daily_pnl': 0.0,
-                'daily_return': 0.0,
-                    'total_trades': 0,
-                    'positions_count': 0,
-                    'total_position_value': 0.0,
-                    'last_updated': datetime.now().isoformat()
-            }
             }
     def log_strategy_optimization(self, strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate):
         """记录策略优化日志"""
