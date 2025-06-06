@@ -534,7 +534,7 @@ class MomentumStrategy(QuantitativeStrategy):
         
         return signal
     
-    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> float:
+    def _calculate_rsi(self, prices, period: int = 14) -> float:
         """计算RSI指标"""
         if len(prices) < period + 1:
             return 50.0  # 默认中性值
@@ -550,7 +550,7 @@ class MomentumStrategy(QuantitativeStrategy):
         rsi = 100 - (100 / (1 + rs))
         return rsi
     
-    def _calculate_macd(self, prices: pd.Series) -> tuple:
+    def _calculate_macd(self, prices) -> tuple:
         """计算MACD指标"""
         if len(prices) < 26:
             return 0, 0
@@ -694,7 +694,7 @@ class MeanReversionStrategy(QuantitativeStrategy):
         
         return signal
     
-    def _calculate_volatility(self, prices: pd.Series) -> float:
+    def _calculate_volatility(self, prices) -> float:
         """计算价格波动率"""
         if len(prices) < 2:
             return 0.01  # 默认低波动率
@@ -857,7 +857,7 @@ class BreakoutStrategy(QuantitativeStrategy):
         
         return signal
     
-    def _calculate_momentum(self, prices: pd.Series, period: int = 10) -> float:
+    def _calculate_momentum(self, prices, period: int = 10) -> float:
         """计算动量指标"""
         if len(prices) < period + 1:
             return 0.0
@@ -870,7 +870,7 @@ class BreakoutStrategy(QuantitativeStrategy):
             
         return (end_price - start_price) / start_price
     
-    def _calculate_acceleration(self, prices: pd.Series, period: int = 5) -> float:
+    def _calculate_acceleration(self, prices, period: int = 5) -> float:
         """计算加速度指标"""
         if len(prices) < period * 2:
             return 0.0
@@ -880,7 +880,7 @@ class BreakoutStrategy(QuantitativeStrategy):
         
         return recent_momentum - past_momentum
     
-    def _count_higher_highs(self, highs: pd.Series, period: int = 10) -> int:
+    def _count_higher_highs(self, highs, period: int = 10) -> int:
         """计算近期创新高次数"""
         if len(highs) < period:
             return 0
@@ -891,7 +891,7 @@ class BreakoutStrategy(QuantitativeStrategy):
                 count += 1
         return count
     
-    def _count_lower_lows(self, lows: pd.Series, period: int = 10) -> int:
+    def _count_lower_lows(self, lows, period: int = 10) -> int:
         """计算近期创新低次数"""
         if len(lows) < period:
             return 0
@@ -1111,14 +1111,14 @@ class HighFrequencyStrategy(QuantitativeStrategy):
         
         return signal
     
-    def _calculate_micro_trend(self, prices: pd.Series) -> float:
+    def _calculate_micro_trend(self, prices) -> float:
         """计算微趋势（0-1，0.5为中性）"""
         if len(prices) < 5:
             return 0.5
         recent_slope = (prices.iloc[-1] - prices.iloc[-5]) / prices.iloc[-5]
         return max(0, min(1, 0.5 + recent_slope * 100))  # 标准化到0-1范围
     
-    def _detect_volume_spike(self, volumes: pd.Series) -> bool:
+    def _detect_volume_spike(self, volumes) -> bool:
         """检测成交量激增"""
         if len(volumes) < 5:
             return False
@@ -1126,7 +1126,7 @@ class HighFrequencyStrategy(QuantitativeStrategy):
         avg_vol = volumes.iloc[-5:-1].mean()
         return current_vol > avg_vol * 2.0
     
-    def _estimate_order_imbalance(self, prices: pd.Series, volumes: pd.Series) -> float:
+    def _estimate_order_imbalance(self, prices, volumes) -> float:
         """估算订单不平衡"""
         if len(prices) < 2 or len(volumes) < 2:
             return 0.0
@@ -1265,7 +1265,7 @@ class TrendFollowingStrategy(QuantitativeStrategy):
         
         return signal
     
-    def _calculate_trend_strength(self, prices: pd.Series) -> float:
+    def _calculate_trend_strength(self, prices) -> float:
         """计算趋势强度（0-1）"""
         # 确保pandas和numpy已导入
         _ensure_pandas()
@@ -1282,7 +1282,7 @@ class TrendFollowingStrategy(QuantitativeStrategy):
         normalized_slope = np.tanh(slope / np.mean(y) * 1000)  # 放大并限制范围
         return (normalized_slope + 1) / 2  # 转换到0-1范围
     
-    def _calculate_adx(self, prices: pd.Series, period: int = 14) -> float:
+    def _calculate_adx(self, prices, period: int = 14) -> float:
         """计算ADX指标"""
         # 确保pandas和numpy已导入
         _ensure_pandas()
@@ -1323,7 +1323,7 @@ class TrendFollowingStrategy(QuantitativeStrategy):
         
         return adx.iloc[-1] if not pd.isna(adx.iloc[-1]) else 25.0
     
-    def _calculate_price_position(self, prices: pd.Series, period: int = 50) -> float:
+    def _calculate_price_position(self, prices, period: int = 50) -> float:
         """计算价格在区间中的位置"""
         if len(prices) < period:
             return 0.5  # 默认中间位置
