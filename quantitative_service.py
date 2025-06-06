@@ -38,7 +38,7 @@ def safe_module_import(module_name, timeout=10):
 for module in ['ccxt', 'requests', 'pandas', 'numpy']:
     safe_module_import(module)
 
-import get_safe_ccxt
+from safe_ccxt import get_safe_ccxt
 import sqlite3
 import json
 import time
