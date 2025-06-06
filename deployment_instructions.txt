@@ -1,0 +1,31 @@
+🚀 服务器部署指令
+
+1. 停止当前服务：
+   pm2 stop quant-b
+
+2. 启动最小化服务：
+   pm2 start ecosystem.config.js
+
+3. 查看服务状态：
+   pm2 list
+
+4. 查看日志：
+   pm2 logs quant-minimal
+
+5. 手动启动（如果需要）：
+   chmod +x start_minimal.sh
+   ./start_minimal.sh
+
+6. 测试服务：
+   curl http://localhost:8888/api/health
+
+7. 完整测试：
+   curl http://localhost:8888/api/strategies
+   curl http://localhost:8888/api/balance
+   curl http://localhost:8888/api/system/status
+
+8. 如果需要重启：
+   pm2 restart quant-minimal
+
+9. 查看详细日志：
+   pm2 logs quant-minimal --lines 50 
