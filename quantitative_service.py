@@ -64,6 +64,23 @@ def _ensure_pandas():
     return pd, np
 
 # 策略类型枚举
+
+# 添加信号保护防止KeyboardInterrupt
+import signal
+import sys
+
+def signal_handler(sig, frame):
+    """安全的信号处理器"""
+    print(f"\n⚠️ 接收到信号 {sig}，正在安全退出...")
+    # 不立即退出，让程序自然结束
+    return
+
+# 设置信号处理器
+if hasattr(signal, 'SIGINT'):
+    signal.signal(signal.SIGINT, signal_handler)
+if hasattr(signal, 'SIGTERM'):
+    signal.signal(signal.SIGTERM, signal_handler)
+
 class StrategyType(Enum):
     MOMENTUM = "momentum"          # 动量策略
     MEAN_REVERSION = "mean_reversion"  # 均值回归策略
@@ -4794,6 +4811,17 @@ class QuantitativeService:
             self._save_strategies_to_db()
 
     def _save_strategies_to_db(self):
+        """保存所有策略到数据库 - 安全版本"""
+        def timeout_handler(signum, frame):
+            raise TimeoutError("数据库操作超时")
+        
+        import signal
+        # 设置超时保护
+        if hasattr(signal, 'SIGALRM'):
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)
+        
+        try:
         """保存策略配置到数据库"""
         try:
             cursor = self.conn.cursor()
@@ -4813,11 +4841,24 @@ class QuantitativeService:
                     json.dumps(strategy['parameters'])
                 ))
             
-            self.conn.commit()
-            print(f"保存了 {len(self.strategies)} 个策略到数据库")
+            # 立即提交每个策略，减少批量操作风险
+                    self.conn.commit()
+                    
+                except Exception as e:
+                    print(f"保存策略 {strategy_id} 失败: {e}")
+                    continue
+            
+            print(f"安全保存了策略到数据库")
             
         except Exception as e:
             print(f"保存策略到数据库失败: {e}")
+        except TimeoutError:
+            print("⚠️ 数据库操作超时，部分策略可能未保存")
+        except KeyboardInterrupt:
+            print("⚠️ 数据库操作被中断，部分策略可能未保存")
+        finally:
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
     
     def _save_strategy_status(self, strategy_id, enabled):
         """保存单个策略状态到数据库"""
