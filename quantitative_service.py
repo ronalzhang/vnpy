@@ -1467,7 +1467,7 @@ class AutomatedStrategyManager:
     
     def _evaluate_all_strategies(self) -> Dict[str, Dict]:
         """评估所有策略表现"""
-        strategies_response = self.service.get_strategies()
+        strategies_response = self.quantitative_service.get_strategies()
         
         # ⭐ 修复数据结构问题 - 正确提取策略列表
         if not strategies_response.get('success', False):
@@ -1678,7 +1678,7 @@ class AutomatedStrategyManager:
         """⭐ 保存优化后的策略参数到数据库"""
         try:
             # 获取当前策略参数
-            current_strategy = self.service.strategies.get(strategy_id, {})
+            current_strategy = self.quantitative_service.strategies.get(strategy_id, {})
             parameters = performance.get('parameters', current_strategy.get('parameters', {}))
             
             # 更新strategies表中的参数
@@ -1689,15 +1689,15 @@ class AutomatedStrategyManager:
             """
             
             import json
-            self.service.db_manager.execute_query(query, (
+            self.quantitative_service.db_manager.execute_query(query, (
                 json.dumps(parameters),
                 datetime.now().isoformat(),
                 strategy_id
             ))
             
             # 更新内存中的策略参数
-            if strategy_id in self.service.strategies:
-                self.service.strategies[strategy_id]['parameters'] = parameters
+            if strategy_id in self.quantitative_service.strategies:
+                self.quantitative_service.strategies[strategy_id]['parameters'] = parameters
             
             # 记录参数优化历史
             self._record_parameter_optimization(strategy_id, parameters, performance['score'])
@@ -1711,7 +1711,7 @@ class AutomatedStrategyManager:
         """记录参数优化历史"""
         try:
             # 创建参数优化历史表
-            self.service.db_manager.execute_query("""
+            self.quantitative_service.db_manager.execute_query("""
                 CREATE TABLE IF NOT EXISTS parameter_optimization_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     strategy_id TEXT,
@@ -1726,7 +1726,7 @@ class AutomatedStrategyManager:
             """)
             
             # 获取旧参数和评分
-            old_strategy = self.service.strategies.get(strategy_id, {})
+            old_strategy = self.quantitative_service.strategies.get(strategy_id, {})
             old_parameters = old_strategy.get('parameters', {})
             old_score = old_strategy.get('final_score', 0)
             
@@ -1741,7 +1741,7 @@ class AutomatedStrategyManager:
             
             improvement = new_score - old_score
             
-            self.service.db_manager.execute_query(query, (
+            self.quantitative_service.db_manager.execute_query(query, (
                 strategy_id,
                 datetime.now().isoformat(),
                 json.dumps(old_parameters),
@@ -1765,7 +1765,7 @@ class AutomatedStrategyManager:
             logger.warning("总风险敞口过高，已减少仓位")
         
         # 检查单一策略风险
-        for strategy_id in self.service.strategies.keys():
+        for strategy_id in self.quantitative_service.strategies.keys():
             strategy_risk = self._calculate_strategy_risk(strategy_id)
             if strategy_risk > self.risk_limit:
                 self._limit_strategy_position(strategy_id)
@@ -1934,23 +1934,23 @@ class AutomatedStrategyManager:
     def _get_current_allocation(self, strategy_id: str) -> float:
         """获取当前资金分配"""
         # 简化实现，返回平均分配
-        return self.initial_capital / len(self.service.strategies) if self.service.strategies else 0
+        return self.initial_capital / len(self.quantitative_service.strategies) if self.quantitative_service.strategies else 0
     
     def _update_capital_allocations(self, allocations: Dict[str, float]):
         """更新资金分配"""
         for strategy_id, allocation in allocations.items():
-            strategy = self.service.strategies.get(strategy_id)
+            strategy = self.quantitative_service.strategies.get(strategy_id)
             if strategy:
                 # 根据分配调整交易量
                 base_quantity = strategy.get("parameters", {}).get('quantity', 1.0)
-                allocation_factor = allocation / (self.initial_capital / len(self.service.strategies))
+                allocation_factor = allocation / (self.initial_capital / len(self.quantitative_service.strategies))
                 new_quantity = base_quantity * allocation_factor
                 
                 # 更新策略参数
                 new_params = strategy.get("parameters", {}).copy()
                 new_params['quantity'] = new_quantity
                 
-                self.service.update_strategy(
+                self.quantitative_service.update_strategy(
                     strategy_id, 
                     strategy.get("name", ""), 
                     strategy.get("symbol", ""), 
@@ -1960,7 +1960,7 @@ class AutomatedStrategyManager:
     def _calculate_total_exposure(self) -> float:
         """计算总风险敞口"""
         total = 0
-        for strategy in self.service.strategies.values():
+        for strategy in self.quantitative_service.strategies.values():
             quantity = strategy.get("parameters", {}).get('quantity', 0)
             # 假设平均价格计算敞口
             total += quantity * 50000  # 简化计算
@@ -1968,7 +1968,7 @@ class AutomatedStrategyManager:
     
     def _calculate_strategy_risk(self, strategy_id: str) -> float:
         """计算单一策略风险"""
-        strategy = self.service.strategies.get(strategy_id)
+        strategy = self.quantitative_service.strategies.get(strategy_id)
         if not strategy:
             return 0
         
@@ -1977,12 +1977,12 @@ class AutomatedStrategyManager:
     
     def _reduce_position_sizes(self):
         """减少所有策略仓位"""
-        for strategy in self.service.strategies.values():
+        for strategy in self.quantitative_service.strategies.values():
             current_quantity = strategy.get("parameters", {}).get('quantity', 1.0)
             new_params = strategy.get("parameters", {}).copy()
             new_params['quantity'] = current_quantity * 0.8  # 减少20%
             
-            self.service.update_strategy(
+            self.quantitative_service.update_strategy(
                 strategy.get("id", ""),
                 strategy.get("name", ""),
                 strategy.get("symbol", ""),
@@ -1991,12 +1991,12 @@ class AutomatedStrategyManager:
     
     def _limit_strategy_position(self, strategy_id: str):
         """限制单一策略仓位"""
-        strategy = self.service.strategies.get(strategy_id)
+        strategy = self.quantitative_service.strategies.get(strategy_id)
         if strategy:
             new_params = strategy.get("parameters", {}).copy()
             new_params['quantity'] = min(new_params.get('quantity', 1.0), 0.5)  # 最大0.5
             
-            self.service.update_strategy(
+            self.quantitative_service.update_strategy(
                 strategy_id,
                 strategy.get("name", ""),
                 strategy.get("symbol", ""),
@@ -2028,7 +2028,7 @@ class AutomatedStrategyManager:
             'total_return': sum(p['total_return'] for p in performances.values()) / len(performances)
         }
         
-        self.service._log_operation(
+        self.quantitative_service._log_operation(
             "auto_management",
             f"自动管理完成: 平均评分{summary['avg_score']:.1f}, 最佳策略{summary['best_strategy']}, 平均收益{summary['total_return']*100:.2f}%",
             "success"
@@ -2049,7 +2049,7 @@ class AutomatedStrategyManager:
                 if perf['score'] < 20 and perf['enabled']:  # 极低分且运行中
                     # 原代码：紧急停止逻辑 - 已完全禁用
                     # if perf['total_trades'] >= 30:  # 至少30次交易才考虑紧急停止
-                    #     self.service.stop_strategy(strategy_id)
+                    #     self.quantitative_service.stop_strategy(strategy_id)
                     #     logger.warning(f"紧急停止极低分策略: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
                     # else:
                     #     logger.info(f"保护新策略避免紧急停止: {perf['name']} (评分: {perf['score']:.1f}, 交易次数: {perf['total_trades']})")
@@ -2059,7 +2059,7 @@ class AutomatedStrategyManager:
                 
                 # 3. 启动高分策略（保留此功能）
                 elif perf['score'] > 75 and not perf['enabled']:  # 高分但未运行
-                    self.service.start_strategy(strategy_id)
+                    self.quantitative_service.start_strategy(strategy_id)
                     logger.info(f"启动高分策略: {perf['name']} (评分: {perf['score']:.1f})")
             
             # 4. 实时风险检查（保留但降低触发条件）
@@ -2082,7 +2082,7 @@ class AutomatedStrategyManager:
     
     def _quick_parameter_adjustment(self, strategy_id: str, performance: Dict):
         """快速参数调整 - 小幅度优化"""
-        strategy = self.service.strategies.get(strategy_id)
+        strategy = self.quantitative_service.strategies.get(strategy_id)
         if not strategy:
             return
         
@@ -2108,7 +2108,7 @@ class AutomatedStrategyManager:
         
         if adjusted:
             # 应用调整
-            self.service.update_strategy(
+            self.quantitative_service.update_strategy(
                 strategy_id, 
                 strategy.get("name", ""), 
                 strategy.get("symbol", ""), 
@@ -2118,7 +2118,7 @@ class AutomatedStrategyManager:
     
     def _advanced_parameter_optimization(self, strategy_id: str, performance: Dict):
         """高级参数优化 - 目标100%成功率"""
-        strategy = self.service.strategies.get(strategy_id)
+        strategy = self.quantitative_service.strategies.get(strategy_id)
         if not strategy:
             return
         
@@ -2147,7 +2147,7 @@ class AutomatedStrategyManager:
                 current_params['grid_count'] = self._optimize_grid_count(strategy_id, current_params.get('grid_count', 12))
         
         # 应用优化后的参数
-        self.service.update_strategy(
+        self.quantitative_service.update_strategy(
             strategy_id, 
             strategy.get("name", ""), 
             strategy.get("symbol", ""), 
@@ -2159,7 +2159,7 @@ class AutomatedStrategyManager:
     def _optimize_threshold(self, strategy_id: str, current_threshold: float) -> float:
         """优化阈值参数"""
         # 基于历史表现调整阈值
-        win_rate = self.service._calculate_real_win_rate(strategy_id)
+        win_rate = self.quantitative_service._calculate_real_win_rate(strategy_id)
         if win_rate < 0.5:
             return current_threshold * 1.15  # 提高阈值，减少交易频次但提高准确性
         elif win_rate < 0.8:
@@ -2169,7 +2169,7 @@ class AutomatedStrategyManager:
     
     def _optimize_lookback(self, strategy_id: str, current_lookback: int) -> int:
         """优化回看周期"""
-        total_trades = self.service._count_real_strategy_trades(strategy_id)
+        total_trades = self.quantitative_service._count_real_strategy_trades(strategy_id)
         if total_trades < 5:  # 交易次数太少
             return max(10, int(current_lookback * 0.8))  # 缩短周期
         elif total_trades > 50:  # 交易过于频繁
@@ -2187,7 +2187,7 @@ class AutomatedStrategyManager:
     
     def _optimize_grid_spacing(self, strategy_id: str, current_spacing: float) -> float:
         """优化网格间距"""
-        total_return = self.service._calculate_real_strategy_return(strategy_id)
+        total_return = self.quantitative_service._calculate_real_strategy_return(strategy_id)
         if total_return < 0.01:  # 收益过低
             return current_spacing * 0.9  # 缩小间距，增加交易频次
         elif total_return > 0.05:  # 收益很好
@@ -2196,7 +2196,7 @@ class AutomatedStrategyManager:
     
     def _optimize_grid_count(self, strategy_id: str, current_count: int) -> int:
         """优化网格数量"""
-        win_rate = self.service._calculate_real_win_rate(strategy_id)
+        win_rate = self.quantitative_service._calculate_real_win_rate(strategy_id)
         if win_rate < 0.9:
             return min(20, current_count + 2)  # 增加网格密度
         return current_count
@@ -5212,7 +5212,7 @@ class StrategySimulator:
     def run_strategy_simulation(self, strategy_id: str, days: int = 7) -> Dict:
         """运行策略模拟交易"""
         try:
-            strategy = self.service.strategies.get(strategy_id)
+            strategy = self.quantitative_service.strategies.get(strategy_id)
             if not strategy:
                 return None
                 
@@ -5460,7 +5460,7 @@ class StrategySimulator:
     def _save_simulation_result(self, strategy_id: str, result: Dict):
         """保存模拟结果到数据库"""
         try:
-            cursor = self.service.conn.cursor()
+            cursor = self.quantitative_service.conn.cursor()
             
             import json
             cursor.execute('''
@@ -5472,7 +5472,7 @@ class StrategySimulator:
                 json.dumps(result)
             ))
             
-            self.service.conn.commit()
+            self.quantitative_service.conn.commit()
             print(f"  💾 模拟结果已保存到数据库")
             
         except Exception as e:
@@ -5713,15 +5713,21 @@ class EvolutionaryStrategyEngine:
             logger.warning("🔄 演化失败，尝试恢复上一个稳定状态...")
             
             # 回滚到上一个成功的快照
-            last_snapshot = self.quantitative_service.db_manager.execute_query("""
-                SELECT snapshot_name FROM strategy_snapshots 
-                WHERE snapshot_name LIKE '%after_evolution%'
-                ORDER BY snapshot_time DESC LIMIT 1
-            """, fetch_one=True)
-            
-            if last_snapshot:
-                logger.info(f"🔄 恢复到快照: {last_snapshot[0]}")
-                # 这里可以添加具体的恢复逻辑
+            try:
+                last_snapshot = self.quantitative_service.db_manager.execute_query("""
+                    SELECT snapshot_name FROM strategy_snapshots 
+                    WHERE snapshot_name LIKE '%after_evolution%'
+                    ORDER BY snapshot_time DESC LIMIT 1
+                """, fetch_one=True)
+                
+                if last_snapshot and len(last_snapshot) > 0:
+                    logger.info(f"🔄 恢复到快照: {last_snapshot[0]}")
+                    # 这里可以添加具体的恢复逻辑
+                else:
+                    logger.info("🔄 没有找到可恢复的快照，系统将继续运行")
+            except Exception as snapshot_error:
+                logger.error(f"快照恢复查询失败: {snapshot_error}")
+                logger.info("🔄 跳过快照恢复，系统将继续运行")
             
         except Exception as e:
             logger.error(f"演化失败恢复机制执行失败: {e}")
