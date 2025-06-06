@@ -6,7 +6,7 @@
 包含策略管理、信号生成、持仓监控、收益统计等功能
 """
 
-from safe_ccxt 
+from safe_ccxt import get_safe_ccxt
 # 增强导入保护机制
 import sys
 import signal
@@ -37,8 +37,6 @@ def safe_module_import(module_name, timeout=10):
 # 预先尝试导入可能问题的模块
 for module in ['ccxt', 'requests', 'pandas', 'numpy']:
     safe_module_import(module)
-
-from safe_ccxt import get_safe_ccxt
 import sqlite3
 import json
 import time
