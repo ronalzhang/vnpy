@@ -15,8 +15,9 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 from enum import Enum
-import pandas as pd
-import numpy as np
+# 延迟导入pandas和numpy避免启动时资源争抢
+# import pandas as pd
+# import numpy as np
 from loguru import logger
 # 延迟导入 auto_trading_engine 避免启动时加载ccxt
 # from auto_trading_engine import get_trading_engine, TradeResult
@@ -27,6 +28,20 @@ import traceback
 import ccxt
 import logging
 from db_config import get_db_adapter
+
+# 全局变量用于延迟导入
+pd = None
+np = None
+
+def _ensure_pandas():
+    """确保pandas已导入"""
+    global pd, np
+    if pd is None:
+        import pandas as pd_module
+        import numpy as np_module
+        pd = pd_module
+        np = np_module
+    return pd, np
 
 # 策略类型枚举
 class StrategyType(Enum):
@@ -437,6 +452,9 @@ class MomentumStrategy(QuantitativeStrategy):
         if len(self.price_history) < lookback_period:
             return None
             
+        # 确保pandas已导入
+        _ensure_pandas()
+        
         # 计算多重技术指标
         prices = pd.Series(self.price_history)
         volumes = pd.Series(self.volume_history)
@@ -572,6 +590,9 @@ class MeanReversionStrategy(QuantitativeStrategy):
         if len(self.price_history) < lookback_period:
             return None
             
+        # 确保pandas已导入
+        _ensure_pandas()
+        
         # 计算动态技术指标
         prices = pd.Series(self.price_history)
         volumes = pd.Series(self.volume_history)
@@ -606,7 +627,7 @@ class MeanReversionStrategy(QuantitativeStrategy):
         medium_ma = prices.rolling(window=10).mean().iloc[-1]
         
         # 5. 波动率突破确认
-        volatility_breakout = volatility > np.mean(self.volatility_history) * 1.5 if self.volatility_history else False
+        volatility_breakout = volatility > (sum(self.volatility_history) / len(self.volatility_history)) * 1.5 if self.volatility_history else False
         
         quantity = self.config.parameters.get('quantity', 1.0)
         
@@ -690,7 +711,7 @@ class MeanReversionStrategy(QuantitativeStrategy):
             return 1.0
             
         current_vol = self.volatility_history[-1]
-        avg_vol = np.mean(self.volatility_history)
+        avg_vol = sum(self.volatility_history) / len(self.volatility_history)
         
         # 高波动时扩大布林带，低波动时缩小布林带
         if current_vol > avg_vol * 1.5:
@@ -735,6 +756,9 @@ class BreakoutStrategy(QuantitativeStrategy):
         if len(self.price_history) < lookback_period:
             return None
             
+        # 确保pandas已导入
+        _ensure_pandas()
+        
         # 计算多重技术指标
         prices = pd.Series(self.price_history)
         volumes = pd.Series(self.volume_history)
@@ -909,6 +933,9 @@ class GridTradingStrategy(QuantitativeStrategy):
         grid_count = self.config.parameters.get('grid_count', 10)  # 网格数量
         quantity = self.config.parameters.get('quantity', 1.0)
         
+        # 确保pandas已导入
+        _ensure_pandas()
+        
         # 动态计算网格中心价格
         prices = pd.Series(self.price_history)
         center_price = prices.median()  # 使用中位数作为中心
@@ -1002,6 +1029,9 @@ class HighFrequencyStrategy(QuantitativeStrategy):
         if len(self.price_history) < 10:
             return None
             
+        # 确保pandas已导入
+        _ensure_pandas()
+        
         # 计算微观市场指标
         prices = pd.Series(self.price_history)
         volumes = pd.Series(self.volume_history)
@@ -1146,6 +1176,9 @@ class TrendFollowingStrategy(QuantitativeStrategy):
         if len(self.price_history) < lookback_period:
             return None
             
+        # 确保pandas已导入
+        _ensure_pandas()
+        
         # 计算多重趋势指标
         prices = pd.Series(self.price_history)
         volumes = pd.Series(self.volume_history)
@@ -1234,6 +1267,9 @@ class TrendFollowingStrategy(QuantitativeStrategy):
     
     def _calculate_trend_strength(self, prices: pd.Series) -> float:
         """计算趋势强度（0-1）"""
+        # 确保pandas和numpy已导入
+        _ensure_pandas()
+        
         if len(prices) < 20:
             return 0.5
         
@@ -1248,6 +1284,9 @@ class TrendFollowingStrategy(QuantitativeStrategy):
     
     def _calculate_adx(self, prices: pd.Series, period: int = 14) -> float:
         """计算ADX指标"""
+        # 确保pandas和numpy已导入
+        _ensure_pandas()
+        
         if len(prices) < period + 1:
             return 25.0  # 默认中性值
             
@@ -1780,13 +1819,15 @@ class AutomatedStrategyManager:
         if not returns or len(returns) < 2:
             return 0.0
             
-        avg_return = np.mean(returns)
-        std_return = np.std(returns)
+        avg_return = sum(returns) / len(returns)
+        # 计算标准差
+        variance = sum((x - avg_return) ** 2 for x in returns) / len(returns)
+        std_return = variance ** 0.5
         
         if std_return == 0:  # 防止除零错误
             return 0.0
             
-        return avg_return / std_return * np.sqrt(365)  # 年化夏普比率
+        return avg_return / std_return * (365 ** 0.5)  # 年化夏普比率
     
     def _calculate_max_drawdown(self, strategy_id: str) -> float:
         """计算最大回撤"""
@@ -1915,7 +1956,7 @@ class AutomatedStrategyManager:
             'timestamp': datetime.now().isoformat(),
             'total_strategies': len(performances),
             'running_strategies': sum(1 for p in performances.values() if p['enabled']),
-            'avg_score': np.mean([p['score'] for p in performances.values()]),
+            'avg_score': sum(p['score'] for p in performances.values()) / len(performances) if performances else 0,
             'best_strategy': max(performances.items(), key=lambda x: x[1]['score'])[1]['name'],
             'total_return': sum(p['total_return'] for p in performances.values()) / len(performances)
         }
