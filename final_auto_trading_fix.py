@@ -1,227 +1,251 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
 最终自动交易修复脚本
-解决所有剩余的自动交易问题
+彻底解决CCXT导入问题，防止KeyboardInterrupt
 """
 
 import os
 import sys
-import json
-import sqlite3
-from datetime import datetime
+import logging
 
-def fix_auto_trading_issues():
-    """修复自动交易所有问题"""
-    print("🔧 最终自动交易修复开始...")
-    
-    # 1. 确保数据库表结构完整
-    print("1. 检查数据库表结构...")
-    ensure_database_tables()
-    
-    # 2. 创建策略交易日志数据  
-    print("2. 创建策略交易日志...")
-    create_strategy_logs()
-    
-    # 3. 修复自动交易配置
-    print("3. 修复自动交易配置...")
-    fix_trading_config()
-    
-    # 4. 验证修复结果
-    print("4. 验证修复结果...")
-    verify_fixes()
-    
-    print("✅ 自动交易修复完成！")
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-def ensure_database_tables():
-    """确保数据库表结构完整"""
-    conn = sqlite3.connect('quantitative.db')
-    cursor = conn.cursor()
+class FinalAutoTradingFixer:
+    """最终自动交易修复器"""
     
-    try:
-        # 确保strategy_trade_logs表存在且有数据
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS strategy_trade_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                strategy_id TEXT NOT NULL,
-                signal_type TEXT,
-                price REAL,
-                quantity REAL,
-                confidence REAL,
-                executed BOOLEAN DEFAULT 1,
-                pnl REAL DEFAULT 0.0,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # 确保strategy_optimization_logs表存在
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS strategy_optimization_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                strategy_id TEXT NOT NULL,
-                optimization_type TEXT,
-                old_parameters TEXT,
-                new_parameters TEXT,
-                trigger_reason TEXT,
-                target_success_rate REAL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        conn.commit()
-        print("  ✅ 数据库表结构正常")
-        
-    except Exception as e:
-        print(f"  ❌ 数据库表创建失败: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-def create_strategy_logs():
-    """为所有策略创建日志数据"""
-    conn = sqlite3.connect('quantitative.db')
-    cursor = conn.cursor()
+    def __init__(self):
+        logger.info("🔧 最终自动交易修复器初始化")
     
-    try:
-        # 获取所有策略
-        cursor.execute("SELECT id, name, symbol FROM strategies")
-        strategies = cursor.fetchall()
+    def fix_all_ccxt_imports(self):
+        """修复所有文件中的CCXT导入"""
+        logger.info("🔧 修复所有CCXT导入...")
         
-        for strategy_id, name, symbol in strategies:
-            # 检查是否已有交易日志
-            cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs WHERE strategy_id = ?", (strategy_id,))
-            log_count = cursor.fetchone()[0]
+        files_to_fix = [
+            "auto_trading_engine.py",
+            "crypto_monitor_service.py", 
+            "crypto_price_monitor.py",
+            "crypto_web.py"
+        ]
+        
+        for file_path in files_to_fix:
+            if os.path.exists(file_path):
+                self._fix_ccxt_import_in_file(file_path)
+        
+        logger.info("✅ 所有CCXT导入修复完成")
+    
+    def _fix_ccxt_import_in_file(self, file_path):
+        """修复单个文件中的CCXT导入"""
+        logger.info(f"🔧 修复文件: {file_path}")
+        
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
             
-            if log_count == 0:
-                # 创建交易日志
-                base_price = 100.0
-                logs = [
-                    (strategy_id, "BUY", base_price * 0.99, 0.1, 0.85, 1, 0.0),
-                    (strategy_id, "SELL", base_price * 1.01, 0.1, 0.90, 1, 2.0),
-                    (strategy_id, "BUY", base_price * 0.98, 0.15, 0.82, 1, 0.0),
-                ]
+            # 如果已经是安全导入，跳过
+            if "try:" in content and "import ccxt" in content and "except" in content:
+                logger.info(f"✅ {file_path} 已经是安全导入，跳过")
+                return
+            
+            # 替换直接的ccxt导入为安全导入
+            if "import ccxt" in content:
+                old_import = "import ccxt"
+                new_import = """# 安全导入CCXT模块
+try:
+    import ccxt
+    logger.info("✅ CCXT模块导入成功")
+except Exception as e:
+    logger.warning(f"⚠️ CCXT模块导入失败: {e}")
+    ccxt = None"""
                 
-                cursor.executemany('''
-                    INSERT INTO strategy_trade_logs (strategy_id, signal_type, price, quantity, confidence, executed, pnl)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', logs)
-            
-            # 检查是否已有优化日志
-            cursor.execute("SELECT COUNT(*) FROM strategy_optimization_logs WHERE strategy_id = ?", (strategy_id,))
-            opt_count = cursor.fetchone()[0]
-            
-            if opt_count == 0:
-                # 创建优化日志
-                opt_log = (
-                    strategy_id, 
-                    "PARAMETER_OPTIMIZATION", 
-                    '{"threshold": 0.5}', 
-                    '{"threshold": 0.6}', 
-                    "自动优化提升收益率", 
-                    0.75
-                )
+                content = content.replace(old_import, new_import)
                 
-                cursor.execute('''
-                    INSERT INTO strategy_optimization_logs (strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', opt_log)
-        
-        conn.commit()
-        
-        # 统计结果
-        cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs")
-        trade_count = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM strategy_optimization_logs")
-        opt_count = cursor.fetchone()[0]
-        
-        print(f"  ✅ 交易日志: {trade_count} 条")
-        print(f"  ✅ 优化日志: {opt_count} 条")
-        
-    except Exception as e:
-        print(f"  ❌ 创建日志失败: {e}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-def fix_trading_config():
-    """修复自动交易配置"""
-    # 创建默认配置文件
-    config = {
-        "auto_trading": {
-            "enabled": True,
-            "max_position_size": 0.1,
-            "stop_loss": 0.02,
-            "take_profit": 0.05
-        },
-        "binance": {
-            "api_key": "",
-            "secret_key": "",
-            "sandbox": True
-        },
-        "risk_management": {
-            "max_daily_loss": 0.05,
-            "max_trades_per_day": 50
-        }
-    }
+                # 写回文件
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                
+                logger.info(f"✅ {file_path} 修复完成")
+            else:
+                logger.info(f"✅ {file_path} 不需要修复")
+                
+        except Exception as e:
+            logger.error(f"❌ 修复 {file_path} 失败: {e}")
     
-    try:
-        with open('crypto_config.json', 'w') as f:
-            json.dump(config, f, indent=2)
-        print("  ✅ 交易配置文件已创建")
-    except Exception as e:
-        print(f"  ❌ 配置文件创建失败: {e}")
+    def create_ccxt_wrapper(self):
+        """创建CCXT包装器"""
+        logger.info("🔧 创建CCXT包装器...")
+        
+        wrapper_content = '''# -*- coding: utf-8 -*-
+"""
+CCXT安全包装器
+防止导入时的KeyboardInterrupt问题
+"""
 
-def verify_fixes():
-    """验证修复结果"""
-    try:
-        # 测试API
-        import requests
-        
-        # 测试策略列表
-        response = requests.get("http://localhost:8888/api/quantitative/strategies", timeout=5)
-        if response.status_code == 200:
-            strategies = response.json().get('strategies', [])
-            print(f"  ✅ API正常，返回 {len(strategies)} 个策略")
-            
-            # 测试第一个策略的日志
-            if strategies:
-                strategy_id = strategies[0].get('id')
-                log_response = requests.get(f"http://localhost:8888/api/quantitative/strategies/{strategy_id}/trade-logs", timeout=5)
-                if log_response.status_code == 200:
-                    logs = log_response.json().get('logs', [])
-                    print(f"  ✅ 策略日志API正常，返回 {len(logs)} 条记录")
-                else:
-                    print(f"  ❌ 策略日志API错误: {log_response.status_code}")
-        else:
-            print(f"  ❌ API错误: {response.status_code}")
-            
-    except Exception as e:
-        print(f"  ⚠️ API测试失败: {e}")
+import sys
+import signal
+import logging
+
+logger = logging.getLogger(__name__)
+
+class CCXTSafeImporter:
+    """CCXT安全导入器"""
     
-    # 检查数据库
-    try:
-        conn = sqlite3.connect('quantitative.db')
-        cursor = conn.cursor()
+    def __init__(self):
+        self.ccxt = None
+        self.loaded = False
+    
+    def safe_import_ccxt(self, timeout=30):
+        """安全导入CCXT，带超时保护"""
+        if self.loaded:
+            return self.ccxt
         
-        cursor.execute("SELECT COUNT(*) FROM strategies")
-        strategy_count = cursor.fetchone()[0]
+        def timeout_handler(signum, frame):
+            raise TimeoutError("CCXT导入超时")
         
-        cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs")
-        trade_log_count = cursor.fetchone()[0]
+        try:
+            # 设置超时信号（仅在Unix系统上）
+            if hasattr(signal, 'SIGALRM'):
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(timeout)
+            
+            # 尝试导入CCXT
+            logger.info("开始安全导入CCXT...")
+            import ccxt
+            self.ccxt = ccxt
+            self.loaded = True
+            
+            # 取消超时
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+                
+            logger.info("✅ CCXT导入成功")
+            return self.ccxt
+            
+        except TimeoutError:
+            logger.warning("⚠️ CCXT导入超时，使用模拟模式")
+            self.ccxt = None
+            self.loaded = True
+            return None
+            
+        except Exception as e:
+            logger.warning(f"⚠️ CCXT导入失败: {e}")
+            self.ccxt = None
+            self.loaded = True
+            return None
+            
+        finally:
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+    
+    def get_ccxt(self):
+        """获取CCXT模块"""
+        if not self.loaded:
+            return self.safe_import_ccxt()
+        return self.ccxt
+
+# 全局实例
+ccxt_importer = CCXTSafeImporter()
+
+def get_safe_ccxt():
+    """获取安全的CCXT实例"""
+    return ccxt_importer.get_ccxt()
+
+# 兼容性导入
+ccxt = ccxt_importer
+'''
         
-        cursor.execute("SELECT COUNT(*) FROM strategy_optimization_logs")
-        opt_log_count = cursor.fetchone()[0]
+        try:
+            with open("safe_ccxt.py", "w", encoding="utf-8") as f:
+                f.write(wrapper_content)
+            
+            logger.info("✅ CCXT包装器创建完成")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ 创建CCXT包装器失败: {e}")
+            return False
+    
+    def update_import_statements(self):
+        """更新导入语句使用安全包装器"""
+        logger.info("🔧 更新导入语句...")
         
-        print(f"  ✅ 数据库验证:")
-        print(f"    - 策略数量: {strategy_count}")
-        print(f"    - 交易日志: {trade_log_count}")
-        print(f"    - 优化日志: {opt_log_count}")
+        files_to_update = [
+            "quantitative_service.py"
+        ]
         
-        conn.close()
+        for file_path in files_to_update:
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    
+                    # 在文件开头添加安全导入
+                    if "from safe_ccxt import get_safe_ccxt" not in content:
+                        # 找到第一个import语句的位置
+                        lines = content.split('\n')
+                        insert_index = 0
+                        
+                        for i, line in enumerate(lines):
+                            if line.strip().startswith('import ') or line.strip().startswith('from '):
+                                insert_index = i
+                                break
+                        
+                        # 插入安全导入
+                        lines.insert(insert_index, "from safe_ccxt import get_safe_ccxt")
+                        content = '\n'.join(lines)
+                        
+                        with open(file_path, "w", encoding="utf-8") as f:
+                            f.write(content)
+                        
+                        logger.info(f"✅ 更新 {file_path} 导入语句完成")
+                
+                except Exception as e:
+                    logger.error(f"❌ 更新 {file_path} 导入语句失败: {e}")
+    
+    def run_final_fix(self):
+        """运行最终修复"""
+        logger.info("🚀 开始最终自动交易修复...")
         
-    except Exception as e:
-        print(f"  ❌ 数据库验证失败: {e}")
+        success_count = 0
+        
+        # 1. 修复所有CCXT导入
+        try:
+            self.fix_all_ccxt_imports()
+            success_count += 1
+        except Exception as e:
+            logger.error(f"修复CCXT导入失败: {e}")
+        
+        # 2. 创建CCXT包装器
+        if self.create_ccxt_wrapper():
+            success_count += 1
+        
+        # 3. 更新导入语句
+        try:
+            self.update_import_statements()
+            success_count += 1
+        except Exception as e:
+            logger.error(f"更新导入语句失败: {e}")
+        
+        logger.info(f"🎉 最终修复完成！成功率: {success_count}/3")
+        
+        return success_count >= 2
+
+def main():
+    """主函数"""
+    fixer = FinalAutoTradingFixer()
+    success = fixer.run_final_fix()
+    
+    if success:
+        logger.info("✅ 最终修复成功，建议重启服务")
+    else:
+        logger.error("❌ 最终修复失败")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    fix_auto_trading_issues() 
+    main() 

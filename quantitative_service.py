@@ -6,6 +6,7 @@
 包含策略管理、信号生成、持仓监控、收益统计等功能
 """
 
+from safe_ccxt import get_safe_ccxt
 import sqlite3
 import json
 import time
