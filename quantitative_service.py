@@ -2920,7 +2920,7 @@ class QuantitativeService:
             # 模拟价格波动 ±2%
             fluctuation = random.uniform(0.98, 1.02)
             return round(base_price * fluctuation, 6)
-        except:
+        except Exception as e:
             return 1.0
 
     def _generate_signal_for_strategy(self, strategy_id, strategy, current_price):
@@ -3815,7 +3815,7 @@ class QuantitativeService:
             """
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             return result[0] if result else 60.0
-        except:
+        except Exception as e:
             return 60.0
     
     def _calculate_strategy_score_with_real_data(self, strategy_id: str, 
@@ -3932,7 +3932,7 @@ class QuantitativeService:
             import json
             try:
                 parameters = json.loads(result.get('parameters', '{}')) if result.get('parameters') else {}
-            except:
+            except Exception as e:
                 parameters = {}
             
             strategy_detail = {
@@ -6012,7 +6012,7 @@ class EvolutionaryStrategyEngine:
         try:
             created_time = datetime.fromisoformat(strategy.get('created_time', datetime.now().isoformat()))
             return (datetime.now() - created_time).days
-        except:
+        except Exception as e:
             return 0
     
     def should_run_evolution(self) -> bool:

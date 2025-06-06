@@ -712,7 +712,7 @@ class EnhancedStrategyEvolution:
                 # 停用策略
                 try:
                     self.service.stop_strategy(strategy_id)
-                except:
+                except Exception as e:
                     pass
                 
                 # 从DNA池移除
@@ -774,7 +774,9 @@ class EnhancedStrategyEvolution:
             # 基于策略类型的多样性
             strategy_types = {}
             for p in population_fitness.values():
-                strategy_type = p['strategy']['type']
+                # 安全获取策略类型
+                strategy = p.get('strategy', {})
+                strategy_type = strategy.get('type') or strategy.get('strategy_type', 'momentum')
                 strategy_types[strategy_type] = strategy_types.get(strategy_type, 0) + 1
             
             # 计算香农多样性指数
