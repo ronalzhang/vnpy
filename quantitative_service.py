@@ -3287,46 +3287,39 @@ class QuantitativeService:
             return 0.0
 
     def _fetch_fresh_balance(self):
-        """获取最新余额 - 修复API调用"""
+        """获取最新余额 - 调用真实的auto_trading_engine API"""
         try:
-            # 如果没有配置API，返回模拟余额
-            if not hasattr(self, 'trading_config') or not self.trading_config:
-                print("⚠️ 未配置交易API，使用模拟余额")
-                return {
-                    'usdt_balance': 100.0,  # 模拟初始资金100U
-                    'position_value': 0.0,
-                    'total_value': 100.0
-                }
-            
-            # 尝试从API获取真实余额
-            api_key = self.trading_config.get('api_key')
-            secret_key = self.trading_config.get('secret_key')
-            
-            if not api_key or not secret_key:
-                print("⚠️ API密钥未配置，使用模拟余额")
-                return {
-                    'usdt_balance': 100.0,
-                    'position_value': 0.0,
-                    'total_value': 100.0
-                }
-            
-            # 这里应该调用真实的交易所API
-            # 暂时返回模拟数据，避免API错误导致系统崩溃
-            print("📊 使用模拟余额数据（API集成待完善）")
-            return {
-                'usdt_balance': 100.0,
-                'position_value': 0.0,
-                'total_value': 100.0
-            }
+            # 延迟导入避免启动时加载
+            try:
+                from auto_trading_engine import get_trading_engine
+                trading_engine = get_trading_engine()
+                
+                if trading_engine and hasattr(trading_engine, 'exchange'):
+                    # 调用真实的交易所API
+                    balance_data = trading_engine.exchange.fetch_balance()
+                    usdt_balance = float(balance_data['USDT']['free'])
+                    
+                    print(f"💰 获取真实余额: {usdt_balance}U")
+                    
+                    return {
+                        'usdt_balance': usdt_balance,
+                        'position_value': 0.0,  # 简化处理
+                        'total_value': usdt_balance
+                    }
+                else:
+                    print("❌ 交易引擎未初始化")
+                    return None
+                    
+            except ImportError:
+                print("⚠️ auto_trading_engine模块未找到")
+                return None
+            except Exception as api_error:
+                print(f"❌ API调用失败: {api_error}")
+                return None
             
         except Exception as e:
             print(f"❌ 获取余额失败: {e}")
-            # 返回默认余额避免崩溃
-            return {
-                'usdt_balance': 100.0,
-                'position_value': 0.0,
-                'total_value': 100.0
-            }
+            return None
     def invalidate_balance_cache(self, trigger='manual_refresh'):
         """使余额缓存失效 - 在特定事件时调用"""
         print(f"🔄 触发余额缓存刷新: {trigger}")
@@ -4146,10 +4139,19 @@ class QuantitativeService:
     
     
     def get_account_info(self):
-        """获取账户信息 - 修复PostgreSQL兼容性"""
+        """获取账户信息 - 真实API调用，失败时返回失败状态"""
         try:
             # 获取当前余额
             current_balance = self._get_current_balance()
+            
+            # 如果余额获取失败（返回0或None），直接返回失败状态
+            if current_balance is None or current_balance <= 0:
+                print("❌ 余额获取失败，API未正确连接")
+                return {
+                    'success': False,
+                    'error': 'API连接失败或余额获取异常',
+                    'data': None
+                }
             
             # 获取持仓信息
             positions_response = self.get_positions()
@@ -4199,6 +4201,15 @@ class QuantitativeService:
             
         except Exception as e:
             print(f"❌ 获取账户信息失败: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # 不返回默认值，返回失败状态，让前端显示"-"
+            return {
+                'success': False,
+                'error': str(e),
+                'data': None
+            }")
             import traceback
             traceback.print_exc()
             
