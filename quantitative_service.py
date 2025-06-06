@@ -4822,8 +4822,6 @@ class QuantitativeService:
             signal.alarm(30)
         
         try:
-        """保存策略配置到数据库"""
-        try:
             cursor = self.conn.cursor()
             import json
             
@@ -4841,12 +4839,9 @@ class QuantitativeService:
                     json.dumps(strategy['parameters'])
                 ))
             
-            # 立即提交每个策略，减少批量操作风险
-                    self.conn.commit()
-                    
-                except Exception as e:
-                    print(f"保存策略 {strategy_id} 失败: {e}")
-                    continue
+            
+            self.conn.commit()
+            print(f"保存了 {len(self.strategies)} 个策略到数据库")
             
             print(f"安全保存了策略到数据库")
             
