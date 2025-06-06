@@ -5940,98 +5940,132 @@ class EvolutionaryStrategyEngine:
             new_strategies.append(new_strategy)
         
         return new_strategies
-    
+        
     def _mutate_strategy(self, parent: Dict) -> Dict:
         """突变策略 - 针对90+分优化的突变"""
         import random
         import uuid
         
-        mutated = parent.copy()
-        mutated['id'] = str(uuid.uuid4())[:8]
-        mutated['name'] = f"{parent['name']}_突变_{mutated['id']}"
+        # 🛡️ 安全性检查：确保parent是字典类型
+        if not isinstance(parent, dict):
+            print(f"❌ 突变失败：parent不是字典类型 {type(parent)}")
+            return self._create_random_strategy()
         
-        # 🧬 智能突变强度 - 高分策略小幅调整，低分策略大幅调整
-        parent_score = parent.get('fitness', 50.0)
-        if parent_score >= 90.0:
-            mutation_rate = 0.05  # 90+分策略轻微调整
-        elif parent_score >= 80.0:
-            mutation_rate = 0.10  # 80-90分策略适度调整
-        else:
-            mutation_rate = 0.20  # <80分策略大幅调整
-        
-        params = mutated['parameters'].copy()
-        
-        # 🎯 针对性参数突变
-        if 'threshold' in params:
-            if parent_score >= 85.0:
-                # 高分策略：精细调整阈值
-                params['threshold'] *= random.uniform(0.95, 1.05)
+        try:
+            mutated = parent.copy()
+            mutated['id'] = str(uuid.uuid4())[:8]
+            mutated['name'] = f"{parent.get('name', 'Unknown')}_突变_{mutated['id']}"
+            
+            # 🧬 智能突变强度 - 高分策略小幅调整，低分策略大幅调整
+            parent_score = parent.get('fitness', 50.0)
+            if parent_score >= 90.0:
+                mutation_rate = 0.05  # 90+分策略轻微调整
+            elif parent_score >= 80.0:
+                mutation_rate = 0.10  # 80-90分策略适度调整
             else:
-                # 低分策略：大幅调整阈值
-                params['threshold'] *= random.uniform(0.5, 1.5)
-        
-        if 'lookback_period' in params:
-            old_period = params['lookback_period']
-            if parent_score >= 85.0:
-                # 高分策略：小幅调整周期
-                params['lookback_period'] = max(5, min(50, old_period + random.randint(-2, 2)))
-            else:
-                # 低分策略：大幅调整周期
-                params['lookback_period'] = max(5, min(50, old_period + random.randint(-10, 10)))
-        
-        if 'quantity' in params:
-            params['quantity'] *= random.uniform(1 - mutation_rate, 1 + mutation_rate)
-        
-        # 🔄 策略类型变异 (低分策略可能改变类型)
-        if parent_score < 70.0 and random.random() < 0.3:
-            strategy_types = ['momentum', 'mean_reversion', 'breakout', 'grid_trading', 'high_frequency', 'trend_following']
-            mutated['type'] = random.choice(strategy_types)
-            print(f"🔄 策略 {mutated['id']} 变异类型为: {mutated['type']}")
-        
-        mutated['parameters'] = params
-        mutated['created_time'] = datetime.now().isoformat()
-        
-        return mutated
+                mutation_rate = 0.20  # <80分策略大幅调整
+            
+            # 🛡️ 安全获取parameters，确保是字典类型
+            original_params = parent.get('parameters', {})
+            if not isinstance(original_params, dict):
+                print(f"❌ 参数不是字典类型，使用默认参数: {type(original_params)}")
+                original_params = {}
+            
+            params = original_params.copy()
+            
+            # 🎯 针对性参数突变
+            if 'threshold' in params:
+                if parent_score >= 85.0:
+                    # 高分策略：精细调整阈值
+                    params['threshold'] *= random.uniform(0.95, 1.05)
+                else:
+                    # 低分策略：大幅调整阈值
+                    params['threshold'] *= random.uniform(0.5, 1.5)
+            
+            if 'lookback_period' in params:
+                old_period = params['lookback_period']
+                if parent_score >= 85.0:
+                    # 高分策略：小幅调整周期
+                    params['lookback_period'] = max(5, min(50, old_period + random.randint(-2, 2)))
+                else:
+                    # 低分策略：大幅调整周期
+                    params['lookback_period'] = max(5, min(50, old_period + random.randint(-10, 10)))
+            
+            if 'quantity' in params:
+                params['quantity'] *= random.uniform(1 - mutation_rate, 1 + mutation_rate)
+            
+            # 🔄 策略类型变异 (低分策略可能改变类型)
+            if parent_score < 70.0 and random.random() < 0.3:
+                strategy_types = ['momentum', 'mean_reversion', 'breakout', 'grid_trading', 'high_frequency', 'trend_following']
+                mutated['type'] = random.choice(strategy_types)
+                print(f"🔄 策略 {mutated['id']} 变异类型为: {mutated['type']}")
+            
+            mutated['parameters'] = params
+            mutated['created_time'] = datetime.now().isoformat()
+            
+            return mutated
+            
+        except Exception as e:
+            print(f"❌ 策略突变失败: {e}")
+            return self._create_random_strategy()
     
     def _crossover_strategies(self, parent1: Dict, parent2: Dict) -> Dict:
         """交叉策略 - 优化的交叉算法"""
         import random
         import uuid
         
-        # 🏆 选择更优秀的父策略作为主导
-        if parent1.get('fitness', 0) >= parent2.get('fitness', 0):
-            dominant, recessive = parent1, parent2
-        else:
-            dominant, recessive = parent2, parent1
+        # 🛡️ 安全性检查：确保parents是字典类型
+        if not isinstance(parent1, dict) or not isinstance(parent2, dict):
+            print(f"❌ 交叉失败：parents不是字典类型 {type(parent1)}, {type(parent2)}")
+            return self._create_random_strategy()
         
-        child = dominant.copy()
-        child['id'] = str(uuid.uuid4())[:8]
-        child['name'] = f"交叉_{dominant['name'][:5]}x{recessive['name'][:5]}_{child['id']}"
-        
-        # 🧬 智能参数交叉
-        params = {}
-        
-        for key in dominant.get('parameters', {}):
-            if key in recessive.get('parameters', {}):
-                dominant_val = dominant['parameters'][key]
-                recessive_val = recessive['parameters'][key]
-                
-                # 90+分策略的参数有70%概率被继承
-                if dominant.get('fitness', 0) >= 90.0:
-                    params[key] = dominant_val if random.random() < 0.7 else recessive_val
-                else:
-                    # 普通策略平均交叉
-                    if isinstance(dominant_val, (int, float)):
-                        params[key] = (dominant_val + recessive_val) / 2
-                    else:
-                        params[key] = dominant_val if random.random() < 0.5 else recessive_val
+        try:
+            # 🏆 选择更优秀的父策略作为主导
+            if parent1.get('fitness', 0) >= parent2.get('fitness', 0):
+                dominant, recessive = parent1, parent2
             else:
-                params[key] = dominant['parameters'][key]
-        
-        child['parameters'] = params
-        child['created_time'] = datetime.now().isoformat()
-        
-        return child
+                dominant, recessive = parent2, parent1
+            
+            child = dominant.copy()
+            child['id'] = str(uuid.uuid4())[:8]
+            child['name'] = f"交叉_{dominant.get('name', 'A')[:5]}x{recessive.get('name', 'B')[:5]}_{child['id']}"
+            
+            # 🧬 智能参数交叉
+            params = {}
+            dominant_params = dominant.get('parameters', {})
+            recessive_params = recessive.get('parameters', {})
+            
+            # 🛡️ 确保参数是字典类型
+            if not isinstance(dominant_params, dict):
+                dominant_params = {}
+            if not isinstance(recessive_params, dict):
+                recessive_params = {}
+            
+            for key in dominant_params:
+                if key in recessive_params:
+                    dominant_val = dominant_params[key]
+                    recessive_val = recessive_params[key]
+                    
+                    # 90+分策略的参数有70%概率被继承
+                    if dominant.get('fitness', 0) >= 90.0:
+                        params[key] = dominant_val if random.random() < 0.7 else recessive_val
+                    else:
+                        # 普通策略平均交叉
+                        if isinstance(dominant_val, (int, float)) and isinstance(recessive_val, (int, float)):
+                            params[key] = (dominant_val + recessive_val) / 2
+                        else:
+                            params[key] = dominant_val if random.random() < 0.5 else recessive_val
+                else:
+                    params[key] = dominant_params[key]
+            
+            child['parameters'] = params
+            child['created_time'] = datetime.now().isoformat()
+            
+            return child
+            
+        except Exception as e:
+            print(f"❌ 策略交叉失败: {e}")
+            return self._create_random_strategy()
     
     def _create_random_strategy(self) -> Dict:
         """创建随机新策略"""
