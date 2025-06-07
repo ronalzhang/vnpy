@@ -356,10 +356,10 @@ def get_exchange_balances():
                             value = 0  # 无法获取价格时设为0
                         
                         exchange_balances["positions"][coin] = {
-                            "amount": round(total, 4)_amount,
-                            "available": round(available, 4)_amount,
-                            "locked": round(locked, 4)_amount,
-                            "value": value
+                            "amount": round(total, 4),
+                            "available": round(available, 4),
+                            "locked": round(locked, 4),
+                            "value": round(value, 2)
                         }
                 
                 balances[exchange_id] = exchange_balances
