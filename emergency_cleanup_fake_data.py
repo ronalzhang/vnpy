@@ -80,7 +80,11 @@ def emergency_cleanup():
                 win_rate = trade_data[1] or 0
                 avg_return = trade_data[2] or 0
                 
-                # 基于真实数据计算评分
+                # 基于真实数据计算评分 (转换数据类型)
+                avg_return = float(avg_return) if avg_return else 0.0
+                win_rate = float(win_rate) if win_rate else 0.0
+                trade_count = int(trade_count) if trade_count else 0
+                
                 real_score = (avg_return * 40) + (win_rate * 40) + (min(trade_count/10, 10) * 2)
                 real_score = max(0, min(100, real_score))
                 
