@@ -2988,10 +2988,10 @@ class QuantitativeService:
             
             if score >= 90.0:
                 high_score_strategies.append((strategy_id, strategy))
-            elif score >= 70.0:
+            elif score >= 80.0:  # 🔧 调整阈值：80+分策略参与信号生成
                 normal_strategies.append((strategy_id, strategy))
             
-            print(f"📊 准备生成信号: 90+分策略 {len(high_score_strategies)}个, 70+分策略 {len(normal_strategies)}个")
+            print(f"📊 准备生成信号: 90+分策略 {len(high_score_strategies)}个, 80+分策略 {len(normal_strategies)}个")
             
             # 🌟 优先处理90+分策略
             for strategy_id, strategy in high_score_strategies:
