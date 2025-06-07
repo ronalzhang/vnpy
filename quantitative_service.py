@@ -2976,20 +2976,19 @@ class QuantitativeService:
                 if not strategy.get('enabled', False):
                     continue
                     
-                # 获取策略评分
-                            # 🔗 直接从数据库获取策略评分
-            try:
-                query = "SELECT final_score FROM strategies WHERE id = %s"
-                result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
-                score = float(result['final_score']) if result and result.get('final_score') else 0.0
-            except Exception as e:
-                print(f"⚠️ 获取策略 {strategy_id} 评分失败: {e}")
-                score = 0.0
-            
-            if score >= 90.0:
-                high_score_strategies.append((strategy_id, strategy))
-            elif score >= 80.0:  # 🔧 调整阈值：80+分策略参与信号生成
-                normal_strategies.append((strategy_id, strategy))
+                # 🔗 直接从数据库获取策略评分
+                try:
+                    query = "SELECT final_score FROM strategies WHERE id = %s"
+                    result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+                    score = float(result['final_score']) if result and result.get('final_score') else 0.0
+                except Exception as e:
+                    print(f"⚠️ 获取策略 {strategy_id} 评分失败: {e}")
+                    score = 0.0
+                
+                if score >= 90.0:
+                    high_score_strategies.append((strategy_id, strategy))
+                elif score >= 80.0:  # 🔧 调整阈值：80+分策略参与信号生成
+                    normal_strategies.append((strategy_id, strategy))
             
             print(f"📊 准备生成信号: 90+分策略 {len(high_score_strategies)}个, 80+分策略 {len(normal_strategies)}个")
             
