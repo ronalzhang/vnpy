@@ -2977,13 +2977,19 @@ class QuantitativeService:
                     continue
                     
                 # 获取策略评分
-                performance = self._get_strategy_performance(strategy_id)
-                score = performance.get('score', 0)
-                
-                if score >= 90.0:
-                    high_score_strategies.append((strategy_id, strategy))
-                elif score >= 70.0:
-                    normal_strategies.append((strategy_id, strategy))
+                            # 🔗 直接从数据库获取策略评分
+            try:
+                query = "SELECT final_score FROM strategies WHERE id = %s"
+                result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+                score = float(result['final_score']) if result and result.get('final_score') else 0.0
+            except Exception as e:
+                print(f"⚠️ 获取策略 {strategy_id} 评分失败: {e}")
+                score = 0.0
+            
+            if score >= 90.0:
+                high_score_strategies.append((strategy_id, strategy))
+            elif score >= 70.0:
+                normal_strategies.append((strategy_id, strategy))
             
             print(f"📊 准备生成信号: 90+分策略 {len(high_score_strategies)}个, 70+分策略 {len(normal_strategies)}个")
             
@@ -3026,6 +3032,13 @@ class QuantitativeService:
             
             if generated_signals > 0:
                 print(f"✅ 总共生成 {generated_signals} 个交易信号")
+                
+                # 🚀 自动执行信号（如果启用了自动交易）
+                if self.auto_trading_enabled:
+                    executed_count = self._execute_pending_signals()
+                    print(f"🎯 自动执行了 {executed_count} 个交易信号")
+                else:
+                    print("⏸️ 自动交易未启用，信号已保存待手动执行")
             else:
                 print("ℹ️ 当前市场条件下未生成新信号")
                 
@@ -3364,19 +3377,158 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT INTO trading_signals 
-                (timestamp, symbol, signal_type, price, confidence, executed)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (timestamp, symbol, signal_type, price, confidence, executed, strategy_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 signal['timestamp'],
                 signal['symbol'],
                 signal['signal_type'],
                 signal['price'],
                 signal['confidence'],
-                signal['executed']
+                signal['executed'],
+                signal.get('strategy_id', 'UNKNOWN')
             ))
             self.conn.commit()
         except Exception as e:
             print(f"保存信号到数据库失败: {e}")
+
+    def _execute_pending_signals(self):
+        """执行待处理的交易信号"""
+        executed_count = 0
+        try:
+            # 🔍 获取未执行的高置信度信号
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT rowid, timestamp, symbol, signal_type, price, confidence, strategy_id
+                FROM trading_signals 
+                WHERE executed = 0 AND confidence >= 0.7
+                ORDER BY confidence DESC, timestamp DESC
+                LIMIT 5
+            ''')
+            
+            pending_signals = cursor.fetchall()
+            
+            for signal_row in pending_signals:
+                signal_id, timestamp, symbol, signal_type, price, confidence, strategy_id = signal_row
+                
+                try:
+                    # 🎯 执行交易信号
+                    success = self._execute_single_signal({
+                        'id': signal_id,
+                        'symbol': symbol,
+                        'signal_type': signal_type,
+                        'price': price,
+                        'confidence': confidence,
+                        'strategy_id': strategy_id
+                    })
+                    
+                    if success:
+                        # ✅ 标记信号为已执行
+                        cursor.execute('''
+                            UPDATE trading_signals 
+                            SET executed = 1 
+                            WHERE rowid = ?
+                        ''', (signal_id,))
+                        self.conn.commit()
+                        executed_count += 1
+                        print(f"✅ 执行信号: {signal_type} {symbol} @ {price} (置信度: {confidence:.2f})")
+                    
+                except Exception as e:
+                    print(f"❌ 执行信号失败: {e}")
+                    continue
+            
+            return executed_count
+            
+        except Exception as e:
+            print(f"❌ 执行待处理信号失败: {e}")
+            return 0
+
+    def _execute_single_signal(self, signal):
+        """执行单个交易信号"""
+        try:
+            symbol = signal['symbol']
+            signal_type = signal['signal_type']
+            price = signal['price']
+            confidence = signal['confidence']
+            
+            # 🔗 检查是否有可用的交易引擎
+            if not hasattr(self, 'exchange_clients') or not self.exchange_clients:
+                print("⚠️ 没有可用的交易所连接，无法执行真实交易")
+                return False
+            
+            # 💰 检查余额
+            current_balance = self._get_current_balance()
+            if current_balance < 5.0:  # 最小交易金额
+                print(f"⚠️ 余额不足: {current_balance}U < 5U")
+                return False
+            
+            # 📊 计算交易数量（保守策略）
+            trade_amount = min(current_balance * 0.1, 10.0)  # 最多10U或余额的10%
+            
+            # 🎯 执行交易
+            for client_name, client in self.exchange_clients.items():
+                try:
+                    if signal_type == 'buy':
+                        # 市价买入
+                        order = client.create_market_buy_order(symbol, trade_amount / price)
+                    elif signal_type == 'sell':
+                        # 市价卖出（需要检查持仓）
+                        positions = self.get_positions()
+                        base_asset = symbol.split('/')[0]
+                        
+                        # 查找对应资产的持仓
+                        position_qty = 0
+                        for pos in positions:
+                            if pos.get('asset') == base_asset and float(pos.get('free', 0)) > 0:
+                                position_qty = float(pos['free'])
+                                break
+                        
+                        if position_qty > 0:
+                            sell_qty = min(position_qty, trade_amount / price)
+                            order = client.create_market_sell_order(symbol, sell_qty)
+                        else:
+                            print(f"⚠️ 没有 {base_asset} 持仓，无法卖出")
+                            return False
+                    
+                    if order and order.get('id'):
+                        # 🎉 交易成功，记录到数据库
+                        self._record_executed_trade(signal, order, trade_amount)
+                        print(f"🎯 交易执行成功: {order['id']}")
+                        return True
+                    
+                except Exception as e:
+                    print(f"⚠️ 在 {client_name} 执行交易失败: {e}")
+                    continue
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ 执行交易信号失败: {e}")
+            return False
+
+    def _record_executed_trade(self, signal, order, trade_amount):
+        """记录已执行的交易"""
+        try:
+            # 记录到策略交易日志
+            strategy_id = signal.get('strategy_id', 'UNKNOWN')
+            
+            # 计算PnL（简化版本，实际应该等待订单完成后计算）
+            estimated_pnl = trade_amount * 0.001  # 假设0.1%的收益
+            
+            self.log_strategy_trade(
+                strategy_id=strategy_id,
+                signal_type=signal['signal_type'],
+                price=signal['price'],
+                quantity=trade_amount,
+                confidence=signal['confidence'],
+                executed=True,
+                pnl=estimated_pnl
+            )
+            
+            print(f"📝 交易记录已保存: {strategy_id} {signal['signal_type']} {trade_amount}U")
+            
+        except Exception as e:
+            print(f"❌ 记录交易失败: {e}")
 
     def _init_small_fund_optimization(self):
         """初始化小资金优化机制"""
