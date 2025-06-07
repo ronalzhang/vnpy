@@ -68,10 +68,10 @@ def emergency_cleanup():
             # 计算真实交易数据
             cursor.execute("""
                 SELECT COUNT(*), 
-                       AVG(CASE WHEN profit > 0 THEN 1 ELSE 0 END) as win_rate,
-                       AVG(profit) as avg_return
+                       AVG(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as win_rate,
+                       AVG(pnl) as avg_return
                 FROM strategy_trade_logs 
-                WHERE strategy_id = %s
+                WHERE strategy_id = %s AND executed = true
             """, (strategy_id,))
             
             trade_data = cursor.fetchone()
