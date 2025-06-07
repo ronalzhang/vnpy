@@ -5690,6 +5690,32 @@ class StrategySimulator:
             print(f"保存模拟结果失败: {e}")
 
 class EvolutionaryStrategyEngine:
+    def _save_evolution_history_fixed(self, strategy_id: str, generation: int, cycle: int, 
+                                     evolution_type: str = 'mutation', 
+                                     new_parameters: dict = None, 
+                                     parent_strategy_id: str = None,
+                                     new_score: float = None):
+        """安全保存演化历史"""
+        try:
+            cursor = self.quantitative_service.db_manager.conn.cursor()
+            
+            # 确保字段类型正确
+            new_params_json = json.dumps(new_parameters) if new_parameters else '{}'
+            
+            cursor.execute(
+                """INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, evolution_type, new_parameters, 
+                 parent_strategy_id, new_score, created_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                (strategy_id, generation, cycle, evolution_type, 
+                 new_params_json, parent_strategy_id or '', new_score or 0.0)
+            )
+            
+            self.quantitative_service.db_manager.conn.commit()
+            
+        except Exception as e:
+            print(f"⚠️ 保存演化历史失败: {e}")
+
     """自进化策略管理引擎 - AI驱动的策略创建、优化和淘汰系统"""
     
     def __init__(self, quantitative_service):
@@ -6179,7 +6205,7 @@ class EvolutionaryStrategyEngine:
             # 🛡️ 安全获取parameters，确保是字典类型
             original_params = parent.get('parameters', {})
             if not isinstance(original_params, dict):
-                print(f"❌ 参数不是字典类型，使用默认参数: {type(original_params)}")
+                print(f"print(f'⚠️ 参数解析问题，使用默认参数: {type(parameters)}') {type(original_params)}")
                 original_params = {}
             
             params = original_params.copy()
