@@ -1429,6 +1429,7 @@ class AutomatedStrategyManager:
     
     def __init__(self, quantitative_service):
         self.service = quantitative_service
+        self.quantitative_service = quantitative_service  # ⭐ 修复属性名不匹配问题
         # ⭐ 修复db_manager属性缺失问题
         self.db_manager = quantitative_service.db_manager
         self.initial_capital = 10000  # 初始资金10000 USDT
@@ -2743,30 +2744,61 @@ class QuantitativeService:
     def get_strategy(self, strategy_id):
         """获取单个策略详情"""
         try:
-            if strategy_id in self.strategies:
-                strategy = self.strategies[strategy_id]
-                performance = self._get_strategy_performance(strategy_id)
-                
-                return {
-                    'id': strategy_id,
-                    'name': strategy['name'],
-                    'symbol': strategy['symbol'],
-                    'type': strategy['type'],
-                    'enabled': strategy['enabled'],
-                    'parameters': strategy['parameters'],
-                    'total_return': performance['total_pnl'] / 100.0 if performance['total_pnl'] else 0.0,
-                    'win_rate': performance['success_rate'],
-                    'total_trades': performance['total_trades'],
-                    'daily_return': performance['avg_pnl']
+            query = """
+            SELECT id, name, symbol, type, enabled, parameters,
+                   final_score, win_rate, total_return, total_trades,
+                   created_at, updated_at
+            FROM strategies 
+            WHERE id = ?
+            """
+            
+            row = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+            
+            if not row:
+                print(f"⚠️ 策略 {strategy_id} 不存在")
+                return None
+            
+            # 处理返回的数据格式
+            if isinstance(row, dict):
+                strategy_data = {
+                    'id': row['id'],
+                    'name': row['name'],
+                    'symbol': row['symbol'],
+                    'type': row['type'],
+                    'enabled': bool(row['enabled']),
+                    'parameters': json.loads(row.get('parameters', '{}')) if isinstance(row.get('parameters'), str) else row.get('parameters', {}),
+                    'final_score': float(row.get('final_score', 0)),
+                    'win_rate': float(row.get('win_rate', 0)),
+                    'total_return': float(row.get('total_return', 0)),
+                    'total_trades': int(row.get('total_trades', 0)),
+                    'created_time': row.get('created_at', ''),
+                    'last_updated': row.get('updated_at', ''),
                 }
             else:
-                return None
-                
+                # SQLite兼容格式
+                strategy_data = {
+                    'id': row[0],
+                    'name': row[1],
+                    'symbol': row[2],
+                    'type': row[3],
+                    'enabled': bool(row[4]),
+                    'parameters': json.loads(row[5]) if isinstance(row[5], str) else row[5],
+                    'final_score': float(row[6]) if len(row) > 6 else 0,
+                    'win_rate': float(row[7]) if len(row) > 7 else 0,
+                    'total_return': float(row[8]) if len(row) > 8 else 0,
+                    'total_trades': int(row[9]) if len(row) > 9 else 0,
+                    'created_time': row[10] if len(row) > 10 else '',
+                    'last_updated': row[11] if len(row) > 11 else '',
+                }
+            
+            print(f"✅ 找到策略: {strategy_data['name']} ({strategy_data['symbol']})")
+            return strategy_data
+            
         except Exception as e:
-            print(f"获取策略详情失败: {e}")
-            return None
-
-    def update_strategy(self, strategy_id, name, symbol, parameters):
+            print(f"❌ 获取策略 {strategy_id} 失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return Nonedef update_strategy(self, strategy_id, name, symbol, parameters):
         """更新策略配置"""
         try:
             if strategy_id in self.strategies:
@@ -2791,28 +2823,29 @@ class QuantitativeService:
             return False
 
     def start_strategy(self, strategy_id):
-        """启动单个策略"""
+        """启动策略"""
         try:
-            if strategy_id in self.strategies:
-                strategy = self.strategies[strategy_id]
-                strategy['enabled'] = True
-                strategy['running'] = True
-                strategy['status'] = 'running'
-                
-                # 保存状态到数据库
-                self._save_strategy_status(strategy_id, True)
-                
-                print(f"✅ 策略 {strategy['name']} 已启动并保存状态")
-                return True
-            else:
-                print(f"❌ 策略 {strategy_id} 不存在")
+            strategy = self.get_strategy(strategy_id)
+            if not strategy:
+                print(f"❌ 策略 {strategy_id} 不存在，无法启动")
                 return False
-                
+            
+            # 更新数据库中的状态
+            query = "UPDATE strategies SET enabled = 1 WHERE id = ?"
+            self.db_manager.execute_query(query, (strategy_id,))
+            
+            # 更新内存中的策略状态
+            if strategy_id in self.strategies:
+                self.strategies[strategy_id]['enabled'] = True
+            
+            print(f"✅ 策略 {strategy['name']} ({strategy_id}) 启动成功")
+            self._log_operation("start_strategy", f"启动策略 {strategy['name']}", "成功")
+            return True
+            
         except Exception as e:
-            print(f"❌ 启动策略失败: {e}")
-            return False
-
-    def stop_strategy(self, strategy_id):
+            print(f"❌ 启动策略 {strategy_id} 失败: {e}")
+            self._log_operation("start_strategy", f"启动策略 {strategy_id}", f"失败: {e}")
+            return Falsedef stop_strategy(self, strategy_id):
         """停止单个策略"""
         try:
             if strategy_id in self.strategies:

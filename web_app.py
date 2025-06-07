@@ -356,9 +356,9 @@ def get_exchange_balances():
                             value = 0  # 无法获取价格时设为0
                         
                         exchange_balances["positions"][coin] = {
-                            "amount": total_amount,
-                            "available": available_amount,
-                            "locked": locked_amount,
+                            "amount": round(total, 4)_amount,
+                            "available": round(available, 4)_amount,
+                            "locked": round(locked, 4)_amount,
                             "value": value
                         }
                 
@@ -434,9 +434,9 @@ def get_binance_balance(client):
                 if price > 0:
                     value = round(total * price, 2)
                     balance["positions"][symbol] = {
-                        "amount": total,
-                        "available": free,
-                        "locked": locked,
+                        "amount": round(total, 4),
+                        "available": round(free, 4),
+                        "locked": round(locked, 4),
                         "value": value
                     }
         
@@ -490,9 +490,9 @@ def get_okx_balance(client):
                 if price > 0:
                     value = round(total * price, 2)
                     balance["positions"][symbol] = {
-                        "amount": total,
-                        "available": available,
-                        "locked": frozen,
+                        "amount": round(total, 4),
+                        "available": round(available, 4),
+                        "locked": round(frozen, 4),
                         "value": value
                     }
         
@@ -538,9 +538,9 @@ def get_bitget_balance(client):
                 if price > 0:
                     value = round(total * price, 2)
                     balance["positions"][coin] = {
-                        "amount": total,
-                        "available": available,
-                        "locked": locked,
+                        "amount": round(total, 4),
+                        "available": round(available, 4),
+                        "locked": round(locked, 4),
                         "value": value
                     }
         
@@ -717,11 +717,6 @@ def get_diff():
     """获取价格差异数据"""
     return jsonify(diff_data)
 
-@app.route('/api/balances', methods=['GET'])
-def get_balances():
-    """获取账户余额数据"""
-    return jsonify(balances_data)
-
 @app.route('/api/account/balances', methods=['GET'])
 def get_account_balances():
     """获取账户余额数据（前端调用的API）"""
@@ -734,9 +729,9 @@ def get_account_balances():
         
         for exchange_id, balance_info in raw_balances.items():
             # 提取USDT余额和持仓信息
-            total_usdt = balance_info.get("USDT", 0)
-            available_usdt = balance_info.get("USDT_available", 0)
-            locked_usdt = balance_info.get("USDT_locked", 0)
+            total_usdt = round(float(balance_info.get("USDT", 0)), 2)
+            available_usdt = round(float(balance_info.get("USDT_available", 0)), 2)
+            locked_usdt = round(float(balance_info.get("USDT_locked", 0)), 2)
             positions = balance_info.get("positions", {})
             
             # 转换持仓格式
@@ -752,8 +747,8 @@ def get_account_balances():
             
             balance_data[exchange_id] = {
                 "total": total_usdt,
-                "available": available_usdt,
-                "locked": locked_usdt,
+                "available": round(available, 4)_usdt,
+                "locked": round(locked, 4)_usdt,
                 "positions": formatted_positions
             }
         
