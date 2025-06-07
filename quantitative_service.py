@@ -2798,7 +2798,9 @@ class QuantitativeService:
             print(f"❌ 获取策略 {strategy_id} 失败: {e}")
             import traceback
             traceback.print_exc()
-            return Nonedef update_strategy(self, strategy_id, name, symbol, parameters):
+            return None
+    
+    def update_strategy(self, strategy_id, name, symbol, parameters):
         """更新策略配置"""
         try:
             if strategy_id in self.strategies:
@@ -2845,7 +2847,9 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 启动策略 {strategy_id} 失败: {e}")
             self._log_operation("start_strategy", f"启动策略 {strategy_id}", f"失败: {e}")
-            return Falsedef stop_strategy(self, strategy_id):
+            return False
+    
+    def stop_strategy(self, strategy_id):
         """停止单个策略"""
         try:
             if strategy_id in self.strategies:
