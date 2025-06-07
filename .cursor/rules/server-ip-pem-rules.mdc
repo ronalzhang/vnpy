@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+服务器登录：ssh -i baba.pem root@47.236.39.134
+应用在这个目录下：/root/VNPY
+用pm2管理应用

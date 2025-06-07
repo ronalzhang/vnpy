@@ -2399,35 +2399,59 @@ class QuantitativeService:
         }
     
     def run_all_strategy_simulations(self):
-        """运行所有策略的模拟交易，计算初始评分"""
-        print("🔬 开始运行所有策略的模拟交易...")
+        """策略评估 - 基于真实交易数据，不再使用模拟"""
+        print("🔄 开始基于真实交易数据评估策略...")
         
-        simulation_results = {}
+        evaluation_results = {}
         
         for strategy_id, strategy in self.strategies.items():
-            print(f"\n🔍 正在模拟策略: {strategy['name']}")
+            print(f"\n🔍 正在评估策略: {strategy['name']}")
             
-            # 运行策略模拟
-            result = self.simulator.run_strategy_simulation(strategy_id, days=7)
+            # 基于真实交易数据评估
+            real_win_rate = self._calculate_real_win_rate(strategy_id)
+            real_total_trades = self._count_real_strategy_trades(strategy_id)
+            real_total_return = self._calculate_real_strategy_return(strategy_id)
             
-            if result:
-                simulation_results[strategy_id] = result
-                
-                # 更新策略的模拟评分
-                strategy['simulation_score'] = result['final_score']
-                strategy['qualified_for_trading'] = result['qualified_for_live_trading']
-                strategy['simulation_date'] = result['simulation_date']
-                
-                status = "✅ 合格" if result['qualified_for_live_trading'] else "❌ 不合格"
-                print(f"  {status} 评分: {result['final_score']:.1f}, 胜率: {result['combined_win_rate']*100:.1f}%")
+            # 获取初始评分配置
+            initial_score = self._get_initial_strategy_score(strategy_id)
+            
+            # 计算当前评分
+            if real_total_trades > 0:
+                # 有真实交易数据，计算真实评分
+                current_score = self._calculate_real_trading_score(
+                    real_return=real_total_return,
+                    win_rate=real_win_rate, 
+                    total_trades=real_total_trades
+                )
+                qualified = current_score >= 60.0
             else:
-                print(f"  ❌ 模拟失败")
+                # 没有真实交易数据，使用初始评分
+                current_score = initial_score
+                qualified = initial_score >= 60.0
+            
+            result = {
+                'final_score': current_score,
+                'combined_win_rate': real_win_rate,
+                'qualified_for_live_trading': qualified,
+                'simulation_date': datetime.now().isoformat(),
+                'data_source': '真实交易数据' if real_total_trades > 0 else '初始配置评分'
+            }
+            
+            evaluation_results[strategy_id] = result
+            
+            # 更新策略评分
+            strategy['simulation_score'] = current_score
+            strategy['qualified_for_trading'] = qualified
+            strategy['simulation_date'] = result['simulation_date']
+            
+            status = "✅ 合格" if qualified else "❌ 不合格"
+            print(f"  {status} 评分: {current_score:.1f}, 胜率: {real_win_rate*100:.1f}%, 真实交易: {real_total_trades}笔")
         
         # 选择最优策略进行真实交易
-        self._select_top_strategies_for_trading(simulation_results)
+        self._select_top_strategies_for_trading(evaluation_results)
         
-        print(f"\n🎯 策略模拟完成，共模拟 {len(simulation_results)} 个策略")
-        return simulation_results
+        print(f"\n🎯 策略评估完成，共评估 {len(evaluation_results)} 个策略")
+        return evaluation_results
     
     def _select_top_strategies_for_trading(self, simulation_results: Dict):
         """选择评分最高的前两名策略进行真实交易，考虑资金适配性"""
@@ -3067,32 +3091,31 @@ class QuantitativeService:
             return None
 
     def _get_or_simulate_price_history(self, symbol, periods=50):
-        """获取或模拟价格历史"""
-        # 这里应该从真实数据源获取历史价格
-        # 暂时使用模拟数据
-        import random
-        
-        base_price = 50000 if 'BTC' in symbol else 2500 if 'ETH' in symbol else 100
-        
-        history = []
-        current = base_price
-        
-        for i in range(periods):
-            # 模拟价格波动
-            change = random.uniform(-0.02, 0.02)  # ±2%波动
-            current = current * (1 + change)
-            history.append({
-                'price': current,
-                'volume': random.uniform(1000, 10000),
-                'timestamp': f"2025-06-04 {7 + i//10}:{i%60:02d}:00"
-            })
-        
-        return history
+        """获取真实价格历史数据"""
+        try:
+            # 🔗 尝试从真实API获取价格历史
+            if hasattr(self, 'exchange_clients') and self.exchange_clients:
+                for client_name, client in self.exchange_clients.items():
+                    try:
+                        real_history = client.fetch_ohlcv(symbol, '1m', limit=periods)
+                        if real_history:
+                            return [{'price': candle[4], 'volume': candle[5], 'timestamp': candle[0]} for candle in real_history]
+                    except Exception as e:
+                        print(f"⚠️ 从 {client_name} 获取 {symbol} 价格历史失败: {e}")
+            
+            # 如果没有真实数据，返回空列表
+            print(f"❌ 无法获取 {symbol} 的真实价格历史数据")
+            return []
+            
+        except Exception as e:
+            print(f"❌ 获取价格历史失败: {e}")
+            return []
 
     def _momentum_signal_logic(self, strategy_id, strategy, current_price, price_history):
         """动量策略信号逻辑"""
-        import random
-        
+        if not price_history or len(price_history) < 2:
+            return None
+            
         threshold = strategy['parameters'].get('threshold', 0.02)
         quantity = strategy['parameters'].get('quantity', 1.0)
         
@@ -3215,25 +3238,56 @@ class QuantitativeService:
         return None
 
     def _grid_trading_signal_logic(self, strategy_id, strategy, current_price, price_history):
-        """网格交易策略信号逻辑"""
+        """网格交易策略信号逻辑 - 基于真实网格计算"""
+        if not price_history or len(price_history) < 10:
+            return None
+            
         grid_spacing = strategy['parameters'].get('grid_spacing', 0.02)
         quantity = strategy['parameters'].get('quantity', 1.0)
+        grid_count = strategy['parameters'].get('grid_count', 10)
         
-        # 简化的网格逻辑：随机生成交易信号
-        import random
-        if random.random() < 0.1:  # 10%概率生成信号
-            signal_type = 'buy' if random.random() < 0.5 else 'sell'
-            return {
-                'id': f"signal_{int(time.time() * 1000)}",
-                'strategy_id': strategy_id,
-                'symbol': strategy['symbol'],
-                'signal_type': signal_type,
-                'price': current_price,
-                'quantity': quantity,
-                'confidence': 0.7,
-                'timestamp': datetime.now().isoformat(),
-                'executed': False
-            }
+        # 计算网格中心价格（最近10期价格平均值）
+        recent_prices = [p['price'] for p in price_history[-10:]]
+        center_price = sum(recent_prices) / len(recent_prices)
+        
+        # 计算网格级别
+        grid_levels = []
+        for i in range(-grid_count//2, grid_count//2 + 1):
+            level_price = center_price * (1 + i * grid_spacing)
+            grid_levels.append(level_price)
+        
+        # 检查当前价格是否触及网格级别
+        tolerance = center_price * 0.001  # 0.1%容差
+        
+        for level in grid_levels:
+            if abs(current_price - level) <= tolerance:
+                # 触及网格级别，生成相应信号
+                if current_price < center_price:
+                    # 价格低于中心，买入
+                    return {
+                        'id': f"signal_{int(time.time() * 1000)}",
+                        'strategy_id': strategy_id,
+                        'symbol': strategy['symbol'],
+                        'signal_type': 'buy',
+                        'price': current_price,
+                        'quantity': quantity,
+                        'confidence': 0.8,
+                        'timestamp': datetime.now().isoformat(),
+                        'executed': False
+                    }
+                else:
+                    # 价格高于中心，卖出
+                    return {
+                        'id': f"signal_{int(time.time() * 1000)}",
+                        'strategy_id': strategy_id,
+                        'symbol': strategy['symbol'],
+                        'signal_type': 'sell',
+                        'price': current_price,
+                        'quantity': quantity,
+                        'confidence': 0.8,
+                        'timestamp': datetime.now().isoformat(),
+                        'executed': False
+                    }
         
         return None
 
@@ -3807,36 +3861,43 @@ class QuantitativeService:
             return False
     
     def _get_strategy_with_simulation_data(self, strategy_id: str, strategy: Dict) -> Dict:
-        """获取带模拟数据的策略信息（仅用于初始化）"""
-        # 获取模拟结果作为初始值
-        simulation_result = self._get_latest_simulation_result(strategy_id)
+        """获取策略信息 - 仅使用真实交易数据"""
         
-        if not simulation_result:
-            print(f"⚠️ 策略 {strategy_id} 缺少模拟数据，运行模拟...")
-            # 使用内部模拟器
-            if not self.simulator:
-                self.simulator = StrategySimulator(self)
-            simulation_result = self.simulator.run_strategy_simulation(strategy_id)
+        # 🔗 直接使用真实交易数据，不再依赖任何模拟数据
+        print(f"🔄 策略 {strategy_id} 使用真实交易数据进行评分")
         
-        # 使用模拟数据作为初始值
-        final_score = simulation_result.get('final_score', 0)
-        win_rate = simulation_result.get('win_rate', 0.0)
-        total_return = simulation_result.get('total_return', 0.0)
-        total_trades = simulation_result.get('total_trades', 0)
+        # 计算真实交易表现
+        real_win_rate = self._calculate_real_win_rate(strategy_id)
+        real_total_trades = self._count_real_strategy_trades(strategy_id)
+        real_total_return = self._calculate_real_strategy_return(strategy_id)
+        
+        # 基于真实数据计算评分
+        if real_total_trades > 0:
+            # 有真实交易数据，计算真实评分
+            final_score = self._calculate_real_trading_score(real_return=real_total_return, 
+                                                           win_rate=real_win_rate, 
+                                                           total_trades=real_total_trades)
+            qualified = final_score >= self.fund_allocation_config.get('min_score_for_trading', 60.0)
+            data_source = '真实交易数据'
+        else:
+            # 没有真实交易数据，评分为0
+            final_score = 0.0
+            qualified = False
+            data_source = '等待真实交易数据'
         
         return {
-                    'id': strategy_id,
+            'id': strategy_id,
             'name': strategy.get('name', strategy_id),
             'symbol': strategy.get('symbol', 'BTC/USDT'),
             'type': strategy.get('type', 'unknown'),
             'enabled': strategy.get('enabled', False),
             'parameters': strategy.get('parameters', {}),
             'final_score': final_score,
-            'win_rate': win_rate,
-            'total_return': total_return,
-            'total_trades': total_trades,
-            'data_source': '模拟初始化',
-            'qualified_for_trading': final_score >= self.fund_allocation_config.get('min_score_for_trading', 60.0),
+            'win_rate': real_win_rate,
+            'total_return': real_total_return,
+            'total_trades': real_total_trades,
+            'data_source': data_source,
+            'qualified_for_trading': qualified,
             'created_time': strategy.get('created_time', datetime.now().isoformat()),
             'last_updated': datetime.now().isoformat()
         }
@@ -3915,16 +3976,74 @@ class QuantitativeService:
             print(f"❌ 标记策略初始化失败: {e}")
     
     def _get_initial_strategy_score(self, strategy_id: str) -> float:
-        """获取策略的初始评分"""
+        """获取策略的初始评分 - 基于真实数据库配置"""
         try:
+            # 🔗 从数据库获取已配置的初始评分
             query = """
             SELECT initial_score FROM strategy_initialization 
-            WHERE strategy_id = ?
+            WHERE strategy_id = %s
             """
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
-            return result[0] if result else 60.0
+            if result:
+                initial_score = float(result['initial_score']) if isinstance(result, dict) else float(result[0])
+                print(f"✅ 策略 {strategy_id} 获取到数据库配置的初始评分: {initial_score}")
+                return initial_score
+            else:
+                # 如果数据库中没有配置，返回0分等待真实交易数据
+                print(f"⚠️ 策略 {strategy_id} 未找到初始评分配置，设为0分等待真实交易")
+                return 0.0
         except Exception as e:
-            return 60.0
+            print(f"❌ 获取策略初始评分失败: {e}，设为0分等待真实交易")
+            return 0.0
+    
+    def _calculate_real_trading_score(self, real_return: float, win_rate: float, total_trades: int) -> float:
+        """基于真实交易数据计算策略评分"""
+        if total_trades == 0:
+            return 0.0
+        
+        # 基础评分权重
+        weights = {
+            'return': 0.4,        # 收益率权重40%
+            'win_rate': 0.4,      # 胜率权重40%
+            'activity': 0.2       # 交易活跃度权重20%
+        }
+        
+        # 收益率评分 (0-100)
+        return_score = 0
+        if real_return > 0.2:       # 收益率 > 20%
+            return_score = 100
+        elif real_return > 0.1:     # 收益率 > 10%
+            return_score = 80 + (real_return - 0.1) * 200
+        elif real_return > 0.05:    # 收益率 > 5%
+            return_score = 60 + (real_return - 0.05) * 400
+        elif real_return > 0:       # 收益率 > 0%
+            return_score = 50 + real_return * 200
+        elif real_return > -0.05:   # 收益率 > -5%
+            return_score = 30 + (real_return + 0.05) * 400
+        elif real_return > -0.1:    # 收益率 > -10%
+            return_score = 10 + (real_return + 0.1) * 400
+        else:                       # 收益率 <= -10%
+            return_score = max(0, 10 + real_return * 100)
+        
+        # 胜率评分 (0-100)
+        win_rate_score = win_rate * 100
+        
+        # 交易活跃度评分 (0-100)
+        activity_score = min(total_trades * 2, 100)  # 每笔交易2分，最高100分
+        
+        # 加权综合评分
+        final_score = (
+            return_score * weights['return'] +
+            win_rate_score * weights['win_rate'] +
+            activity_score * weights['activity']
+        )
+        
+        return max(0, min(100, final_score))
+    
+    def _is_real_data_only_mode(self) -> bool:
+        """检查系统是否配置为仅使用真实数据模式（已废弃，现在默认仅使用真实数据）"""
+        # 现在系统默认仅使用真实数据，不再需要配置检查
+        return True
     
     def _calculate_strategy_score_with_real_data(self, strategy_id: str, 
                                                real_return: float, real_win_rate: float, 
@@ -4211,8 +4330,38 @@ class QuantitativeService:
             return False
     
     def get_signals(self, limit=50):
-        """获取交易信号"""
+        """获取交易信号 - 仅返回真实交易信号"""
         try:
+            # 🚫 检查是否为真实数据模式
+            if self._is_real_data_only_mode():
+                print("🚫 系统配置为仅使用真实数据，仅返回实际执行的交易信号")
+                
+                # 只返回真实执行的交易记录
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    SELECT timestamp, symbol, signal_type, price, confidence, executed
+                    FROM trading_signals 
+                    WHERE executed = 1
+                    ORDER BY timestamp DESC 
+                    LIMIT ?
+                ''', (limit,))
+                
+                signals = []
+                for row in cursor.fetchall():
+                    signals.append({
+                        'timestamp': row[0],
+                        'symbol': row[1],
+                        'signal_type': row[2],
+                        'price': float(row[3]),
+                        'confidence': float(row[4]),
+                        'executed': bool(row[5]),
+                        'data_source': '真实交易记录'
+                    })
+                
+                print(f"📊 返回 {len(signals)} 个真实交易信号")
+                return signals
+            
+            # 原有逻辑（非真实数据模式）
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT timestamp, symbol, signal_type, price, confidence, executed
@@ -4235,7 +4384,7 @@ class QuantitativeService:
             return signals
             
         except Exception as e:
-            print(f"获取交易信号失败: {e}")
+            print(f"❌ 获取交易信号失败: {e}")
             return []
     
     def get_balance_history(self, days=30):
@@ -4780,28 +4929,20 @@ class QuantitativeService:
                 for i in range(30):
                     date = base_date + timedelta(days=i)
                     
-                    # 模拟历史余额变化（围绕15.24波动）
-                    import random
-                    daily_change = random.uniform(-0.3, 0.5)  # 每日变化-0.3到+0.5
-                    simulated_balance = current_balance + daily_change * (i / 30.0)  # 逐渐接近当前值
-                    simulated_balance = max(12.0, min(18.0, simulated_balance))  # 限制在合理范围
-                    
-                    # 计算当日收益率
-                    if i > 0:
-                        previous_balance = current_balance + daily_change * ((i-1) / 30.0)
-                        previous_balance = max(12.0, min(18.0, previous_balance))
-                        daily_return = (simulated_balance - previous_balance) / previous_balance * 100
-                    else:
-                        daily_return = 0.0
+                    # 🚫 不再生成模拟历史数据，使用默认值等待真实数据填充
+                    # 为保持系统运行，使用当前实际余额作为历史基线
+                    daily_change = 0.0  # 无真实历史变化数据时设为0
+                    historical_balance = current_balance  # 使用当前余额作为历史基线
+                    daily_return = 0.0
                     
                     cursor.execute('''
                         INSERT OR IGNORE INTO account_balance_history 
                         (total_balance, available_balance, frozen_balance, daily_pnl, daily_return, timestamp)
                         VALUES (?, ?, ?, ?, ?, ?)
                     ''', (
-                        round(simulated_balance, 2),
-                        round(simulated_balance * 0.95, 2),  # 95%可用
-                        round(simulated_balance * 0.05, 2),  # 5%冻结
+                        round(historical_balance, 2),
+                        round(historical_balance * 0.95, 2),  # 95%可用
+                        round(historical_balance * 0.05, 2),  # 5%冻结
                         round(daily_change, 2),
                         round(daily_return, 2),
                         date.strftime('%Y-%m-%d %H:%M:%S')
@@ -5278,48 +5419,35 @@ class StrategySimulator:
             return None
     
     def _run_backtest(self, strategy: Dict, days: int = 5) -> Dict:
-        """运行历史回测"""
-        print(f"  📊 运行历史回测 ({days}天)")
+        """基于真实交易历史数据运行回测"""
+        print(f"  📊 基于真实交易历史运行回测 ({days}天)")
         
-        # 模拟历史价格数据和交易
-        import random
-        import numpy as np
+        strategy_id = strategy['id']
         
-        total_trades = 0
-        winning_trades = 0
-        total_pnl = 0.0
-        simulation_capital = self.initial_simulation_capital
+        # 获取真实历史交易数据
+        real_trades = self._get_real_historical_trades(strategy_id, days)
         
-        # 模拟每日交易
-        for day in range(days):
-            daily_trades = random.randint(2, 8)  # 每日2-8笔交易
-            
-            for trade in range(daily_trades):
-                # 模拟交易信号生成
-                signal_strength = random.uniform(0.3, 1.0)
-                
-                # 根据策略类型调整胜率
-                strategy_type = strategy['type']
-                base_win_rate = self._get_strategy_base_win_rate(strategy_type)
-                
-                # 实际胜率受信号强度影响
-                actual_win_rate = base_win_rate + (signal_strength - 0.5) * 0.2
-                is_winning = random.random() < actual_win_rate
-                
-                # 计算盈亏
-                trade_amount = simulation_capital * 0.1  # 10%仓位
-                if is_winning:
-                    pnl = trade_amount * random.uniform(0.01, 0.05)  # 1-5%收益
-                    winning_trades += 1
-                else:
-                    pnl = -trade_amount * random.uniform(0.005, 0.03)  # 0.5-3%亏损
-                
-                total_pnl += pnl
-                simulation_capital += pnl
-                total_trades += 1
+        if not real_trades:
+            print(f"  ⚠️ 策略 {strategy_id} 没有历史交易数据，无法生成真实评分")
+            return {
+                'type': 'backtest',
+                'total_trades': 0,
+                'winning_trades': 0,
+                'win_rate': 0.0,
+                'total_pnl': 0.0,
+                'total_return': 0.0,
+                'final_capital': self.initial_simulation_capital,
+                'note': '无历史交易数据，需要实际交易后才能获得真实评分'
+            }
+        
+        # 计算真实回测结果
+        total_trades = len(real_trades)
+        winning_trades = sum(1 for trade in real_trades if trade['pnl'] > 0)
+        total_pnl = sum(trade['pnl'] for trade in real_trades)
         
         win_rate = winning_trades / total_trades if total_trades > 0 else 0
-        total_return = total_pnl / self.initial_simulation_capital
+        total_return = total_pnl / self.initial_simulation_capital if self.initial_simulation_capital > 0 else 0
+        final_capital = self.initial_simulation_capital + total_pnl
         
         return {
             'type': 'backtest',
@@ -5328,47 +5456,40 @@ class StrategySimulator:
             'win_rate': win_rate,
             'total_pnl': total_pnl,
             'total_return': total_return,
-            'final_capital': simulation_capital
+            'final_capital': final_capital,
+            'note': '基于真实历史交易数据'
         }
     
     def _run_live_simulation(self, strategy: Dict, days: int = 2) -> Dict:
-        """运行实时模拟交易"""
-        print(f"  🔴 运行实时模拟 ({days}天)")
+        """基于真实实时交易数据运行模拟"""
+        print(f"  🔄 基于真实实时交易数据运行模拟 ({days}天)")
         
-        # 实时模拟使用更真实的市场数据
-        import random
+        strategy_id = strategy['id']
         
-        total_trades = 0
-        winning_trades = 0
-        total_pnl = 0.0
-        simulation_capital = self.initial_simulation_capital
+        # 获取最近实时交易数据
+        recent_trades = self._get_recent_real_trades(strategy_id, days)
         
-        # 获取实时价格波动模拟更真实的交易环境
-        for day in range(days):
-            # 实时模拟每日交易较少但更精确
-            daily_trades = random.randint(1, 4)  # 每日1-4笔交易
-            
-            for trade in range(daily_trades):
-                # 实时模拟的胜率通常比回测低一些
-                strategy_type = strategy['type']
-                base_win_rate = self._get_strategy_base_win_rate(strategy_type) * 0.9  # 降低10%
-                
-                is_winning = random.random() < base_win_rate
-                
-                # 实时交易的盈亏波动更大
-                trade_amount = simulation_capital * 0.08  # 8%仓位，更保守
-                if is_winning:
-                    pnl = trade_amount * random.uniform(0.005, 0.04)  # 0.5-4%收益
-                    winning_trades += 1
-                else:
-                    pnl = -trade_amount * random.uniform(0.01, 0.035)  # 1-3.5%亏损
-                
-                total_pnl += pnl
-                simulation_capital += pnl
-                total_trades += 1
+        if not recent_trades:
+            print(f"  ⚠️ 策略 {strategy_id} 没有最近实时交易数据，无法生成真实评分")
+            return {
+                'type': 'live_simulation',
+                'total_trades': 0,
+                'winning_trades': 0,
+                'win_rate': 0.0,
+                'total_pnl': 0.0,
+                'total_return': 0.0,
+                'final_capital': self.initial_simulation_capital,
+                'note': '无最近实时交易数据，需要启用实际交易'
+            }
+        
+        # 计算真实实时交易结果
+        total_trades = len(recent_trades)
+        winning_trades = sum(1 for trade in recent_trades if trade['pnl'] > 0)
+        total_pnl = sum(trade['pnl'] for trade in recent_trades)
         
         win_rate = winning_trades / total_trades if total_trades > 0 else 0
-        total_return = total_pnl / self.initial_simulation_capital
+        total_return = total_pnl / self.initial_simulation_capital if self.initial_simulation_capital > 0 else 0
+        final_capital = self.initial_simulation_capital + total_pnl
         
         return {
             'type': 'live_simulation',
@@ -5377,20 +5498,74 @@ class StrategySimulator:
             'win_rate': win_rate,
             'total_pnl': total_pnl,
             'total_return': total_return,
-            'final_capital': simulation_capital
+            'final_capital': final_capital,
+            'note': '基于真实实时交易数据'
         }
     
+    def _get_real_historical_trades(self, strategy_id: str, days: int) -> List[Dict]:
+        """获取策略的真实历史交易数据"""
+        try:
+            query = """
+            SELECT signal_type, price, quantity, confidence, pnl, timestamp
+            FROM trading_logs 
+            WHERE strategy_id = ? AND executed = 1 
+            AND timestamp >= datetime('now', '-{} days')
+            ORDER BY timestamp ASC
+            """.format(days)
+            
+            result = self.db_manager.execute_query(query, params=(strategy_id,), fetch_all=True)
+            
+            trades = []
+            for row in result:
+                trades.append({
+                    'signal_type': row[0],
+                    'price': float(row[1]),
+                    'quantity': float(row[2]),
+                    'confidence': float(row[3]),
+                    'pnl': float(row[4]) if row[4] is not None else 0.0,
+                    'timestamp': row[5]
+                })
+            
+            return trades
+            
+        except Exception as e:
+            print(f"获取策略 {strategy_id} 历史交易数据失败: {e}")
+            return []
+    
+    def _get_recent_real_trades(self, strategy_id: str, days: int) -> List[Dict]:
+        """获取策略的最近真实交易数据"""
+        try:
+            query = """
+            SELECT signal_type, price, quantity, confidence, pnl, timestamp
+            FROM trading_logs 
+            WHERE strategy_id = ? AND executed = 1 
+            AND timestamp >= datetime('now', '-{} days')
+            ORDER BY timestamp DESC
+            """.format(days)
+            
+            result = self.db_manager.execute_query(query, params=(strategy_id,), fetch_all=True)
+            
+            trades = []
+            for row in result:
+                trades.append({
+                    'signal_type': row[0],
+                    'price': float(row[1]),
+                    'quantity': float(row[2]), 
+                    'confidence': float(row[3]),
+                    'pnl': float(row[4]) if row[4] is not None else 0.0,
+                    'timestamp': row[5]
+                })
+            
+            return trades
+            
+        except Exception as e:
+            print(f"获取策略 {strategy_id} 最近交易数据失败: {e}")
+            return []
+    
     def _get_strategy_base_win_rate(self, strategy_type: str) -> float:
-        """获取策略基础胜率"""
-        base_win_rates = {
-            'momentum': 0.65,      # 动量策略65%基础胜率
-            'mean_reversion': 0.72, # 均值回归72%基础胜率
-            'breakout': 0.58,      # 突破策略58%基础胜率
-            'grid_trading': 0.85,  # 网格交易85%基础胜率
-            'high_frequency': 0.62, # 高频交易62%基础胜率
-            'trend_following': 0.68 # 趋势跟踪68%基础胜率
-        }
-        return base_win_rates.get(strategy_type, 0.60)
+        """获取策略基础胜率（已废弃，改用真实数据）"""
+        # 这个方法已废弃，现在只用真实交易数据评分
+        return 0.0
     
     def _combine_simulation_results(self, strategy_id: str, backtest: Dict, live_sim: Dict) -> Dict:
         """综合回测和实时模拟结果"""

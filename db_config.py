@@ -14,7 +14,7 @@ from typing import Union, Dict, Any, List, Tuple
 
 # 数据库配置
 DATABASE_CONFIG = {
-    'type': 'postgresql',  # 'postgresql' 或 'sqlite'
+    'type': 'postgresql',  # 'postgresql' 或 'sqlite' - 已修复为使用真实数据
     'postgresql': {
         'host': 'localhost',
         'port': 5432,

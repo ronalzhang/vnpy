@@ -1327,42 +1327,24 @@ def get_strategy_optimization_logs(strategy_id):
 
 @app.route('/api/quantitative/positions', methods=['GET'])
 def get_quantitative_positions():
-    """获取量化交易持仓信息"""
+    """获取量化交易持仓信息 - 仅使用真实API数据"""
     try:
-        # 模拟持仓数据，基于当前运行的策略
         if quantitative_service:
-            strategies = quantitative_service.get_strategies()
-            positions = []
-            
-            # 为每个启用的策略生成持仓数据
-            for strategy in strategies:
-                if strategy.get('enabled', False):
-                    strategy_id = strategy.get('id', '')
-                    score = strategy.get('final_score', 90)
-                    
-                    positions.append({
-                        "symbol": strategy.get('symbol', 'BTC/USDT'),
-                        "strategy_id": strategy_id,
-                        "strategy_name": strategy.get('name', f'Strategy #{strategy_id}'),
-                        "side": "long" if score > 85 else "short",
-                        "quantity": round(100 / float(score), 2),
-                        "entry_price": 45000 + (hash(strategy_id) % 1000),
-                        "current_price": 45500,
-                        "unrealized_pnl": round((45500 - (45000 + (hash(strategy_id) % 1000))) * (100 / float(score)), 2),
-                        "pnl_percentage": round(((45500 / (45000 + (hash(strategy_id) % 1000))) - 1) * 100, 2)
-                    })
+            # 🔗 直接调用量化服务获取真实持仓数据
+            positions = quantitative_service.get_positions()
             
             return jsonify({
                 "status": "success",
                 "data": positions
             })
         else:
+            print("❌ 量化服务未初始化")
             return jsonify({
-                "status": "success", 
-                "data": []
-            })
+                "status": "error",
+                "message": "量化服务未初始化"
+            }), 500
     except Exception as e:
-        print(f"获取持仓信息失败: {e}")
+        print(f"❌ 获取持仓信息失败: {e}")
         return jsonify({
             "status": "error",
             "message": f"获取持仓信息失败: {str(e)}"
@@ -1370,40 +1352,24 @@ def get_quantitative_positions():
 
 @app.route('/api/quantitative/signals', methods=['GET'])
 def get_quantitative_signals():
-    """获取最新交易信号"""
+    """获取最新交易信号 - 仅使用真实交易信号"""
     try:
         if quantitative_service:
-            strategies = quantitative_service.get_strategies()
-            signals = []
-            
-            # 为每个策略生成最新信号
-            for strategy in strategies[:5]:  # 只显示前5个策略的信号
-                strategy_id = strategy.get('id', '')
-                score = strategy.get('final_score', 90)
-                
-                signals.append({
-                    "id": f"signal_{strategy_id}",
-                    "strategy_id": strategy_id,
-                    "strategy_name": strategy.get('name', f'Strategy #{strategy_id}'),
-                    "symbol": strategy.get('symbol', 'BTC/USDT'),
-                    "signal_type": "buy" if score > 87 else "sell",
-                    "price": 45500 + (hash(strategy_id) % 100),
-                    "confidence": round(score / 100, 2),
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "status": "active" if strategy.get('enabled', False) else "inactive"
-                })
+            # 🔗 直接调用量化服务获取真实交易信号
+            signals = quantitative_service.get_signals()
             
             return jsonify({
                 "status": "success",
                 "data": signals
             })
         else:
+            print("❌ 量化服务未初始化")
             return jsonify({
-                "status": "success",
-                "data": []
-            })
+                "status": "error",
+                "message": "量化服务未初始化"
+            }), 500
     except Exception as e:
-        print(f"获取交易信号失败: {e}")
+        print(f"❌ 获取交易信号失败: {e}")
         return jsonify({
             "status": "error",
             "message": f"获取交易信号失败: {str(e)}"
@@ -1411,7 +1377,7 @@ def get_quantitative_signals():
 
 @app.route('/api/quantitative/balance-history', methods=['GET'])
 def get_balance_history():
-    """获取账户资产历史"""
+    """获取账户资产历史 - 仅使用真实数据"""
     try:
         days = request.args.get('days', 30, type=int)
         if quantitative_service:
@@ -1421,33 +1387,11 @@ def get_balance_history():
                 'data': history
             })
         else:
-            # 返回模拟数据用于展示
-            import datetime
-            mock_data = []
-            start_date = datetime.datetime.now() - datetime.timedelta(days=days)
-            for i in range(days):
-                date = start_date + datetime.timedelta(days=i)
-                # 从10U增长到9.47U的模拟数据
-                base_value = 10.0
-                growth_factor = i / days * -0.53  # 实际是下降了0.53U
-                daily_noise = (hash(str(date.date())) % 100 - 50) / 1000  # 随机波动
-                value = max(0.1, base_value + growth_factor + daily_noise)
-                
-                mock_data.append({
-                    'timestamp': date.isoformat(),
-                    'total_balance': round(value, 2),
-                    'available_balance': round(value * 0.9, 2),
-                    'frozen_balance': round(value * 0.1, 2),
-                    'daily_pnl': round((hash(str(date.date())) % 200 - 100) / 100, 2),
-                    'daily_return': round((hash(str(date.date())) % 10 - 5) / 100, 3),
-                    'cumulative_return': round((value - 10.0) / 10.0 * 100, 2),
-                    'total_trades': hash(str(date.date())) % 5,
-                    'milestone_note': '达到10U起始资金' if i == 0 else None
-                })
-            
+            print("❌ 量化服务未初始化，无法获取真实资产历史")
             return jsonify({
-                'success': True,
-                'data': mock_data
+                'success': False,
+                'message': '量化服务未初始化，无法获取真实资产历史',
+                'data': []
             })
     except Exception as e:
         print(f"获取资产历史失败: {e}")
