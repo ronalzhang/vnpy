@@ -6205,7 +6205,7 @@ class EvolutionaryStrategyEngine:
             # 🛡️ 安全获取parameters，确保是字典类型
             original_params = parent.get('parameters', {})
             if not isinstance(original_params, dict):
-                print(f"print(f'⚠️ 参数解析问题，使用默认参数: {type(parameters)}') {type(original_params)}")
+                print(f"⚠️ 参数解析问题，使用默认参数: {type(original_params)}")
                 original_params = {}
             
             params = original_params.copy()
