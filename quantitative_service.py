@@ -2992,6 +2992,22 @@ class QuantitativeService:
             
             print(f"📊 准备生成信号: 90+分策略 {len(high_score_strategies)}个, 80+分策略 {len(normal_strategies)}个")
             
+                                # 🧪 如果没有足够的高分策略，启动真实环境验证
+            if len(high_score_strategies) == 0 and len(normal_strategies) < 3:
+                print("🧪 策略分数不足，启动真实环境验证...")
+                try:
+                    # 动态导入验证模块
+                    from real_environment_verification import add_verification_to_quantitative_service
+                    add_verification_to_quantitative_service(self)
+                    
+                    # 执行验证
+                    verified_strategies = self._verify_strategies_with_real_trading()
+                    high_score_strategies.extend(verified_strategies['high_score'])
+                    normal_strategies.extend(verified_strategies['normal_score'])
+                except Exception as e:
+                    print(f"❌ 真实环境验证失败: {e}")
+                    print("🔄 继续使用现有策略...")
+            
             # 🌟 优先处理90+分策略
             for strategy_id, strategy in high_score_strategies:
                 try:
@@ -6855,5 +6871,7 @@ if __name__ == "__main__":
     main()
 
 # 为了向后兼容，提供全局实例（仅在直接运行时）
+
+
 if __name__ == "__main__":
     quantitative_service = None  # 避免在导入时创建实例
