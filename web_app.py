@@ -747,8 +747,8 @@ def get_account_balances():
             
             balance_data[exchange_id] = {
                 "total": total_usdt,
-                "available": round(available, 4)_usdt,
-                "locked": round(locked, 4)_usdt,
+                                            "available": round(available, 4),
+                            "locked": round(locked, 4),
                 "positions": formatted_positions
             }
         
