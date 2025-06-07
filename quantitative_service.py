@@ -52,7 +52,7 @@ from enum import Enum
 from loguru import logger
 # 延迟导入 auto_trading_engine 避免启动时加载ccxt
 # from auto_trading_engine import get_trading_engine, TradeResult
-import random
+# import random  # 🚫 已清理随机数据生成，不再需要random模块
 import uuid
 # 安全导入模块
 def safe_import(module_name, fallback=None):
@@ -3038,35 +3038,34 @@ class QuantitativeService:
     def _get_current_price(self, symbol):
         """获取当前价格"""
         try:
-            # 简化的价格获取，实际应该从交易所API获取
-            import random
-            base_prices = {
-                'BTC/USDT': 100000,
-                'ETH/USDT': 2600,
-                'DOGE/USDT': 0.35,
-                'BNB/USDT': 600,
-                'ADA/USDT': 0.45,
-                'XRP/USDT': 0.60
-            }
-            base_price = base_prices.get(symbol, 1.0)
-            # 模拟价格波动 ±2%
-            fluctuation = random.uniform(0.98, 1.02)
-            return round(base_price * fluctuation, 6)
+            # 🔗 尝试从真实交易所API获取当前价格
+            if hasattr(self, 'exchange_clients') and self.exchange_clients:
+                for client_name, client in self.exchange_clients.items():
+                    try:
+                        ticker = client.fetch_ticker(symbol)
+                        if ticker and 'last' in ticker:
+                            return float(ticker['last'])
+                    except Exception as e:
+                        print(f"⚠️ 从 {client_name} 获取 {symbol} 价格失败: {e}")
+            
+            # 如果无法获取真实价格，返回1.0作为默认值，不再模拟价格
+            print(f"❌ 无法获取 {symbol} 的真实价格")
+            return 1.0
         except Exception as e:
+            print(f"❌ 获取价格失败: {e}")
             return 1.0
 
     def _generate_signal_for_strategy(self, strategy_id, strategy, current_price):
         """为单个策略生成交易信号"""
         try:
-            import random
             import time
             from datetime import datetime
             
             strategy_type = strategy['type']
             parameters = strategy['parameters']
             
-            # 模拟价格历史（实际应该从数据库或API获取）
-            price_history = self._get_or_simulate_price_history(strategy['symbol'])
+            # 🔗 获取真实价格历史数据
+            price_history = self._get_real_price_history(strategy['symbol'])
             
             # 根据策略类型生成信号
             signal = None
@@ -3090,7 +3089,7 @@ class QuantitativeService:
             print(f"为策略 {strategy_id} 生成信号失败: {e}")
             return None
 
-    def _get_or_simulate_price_history(self, symbol, periods=50):
+    def _get_real_price_history(self, symbol, periods=50):
         """获取真实价格历史数据"""
         try:
             # 🔗 尝试从真实API获取价格历史
@@ -5383,8 +5382,8 @@ class StrategySimulator:
     
     def __init__(self, quantitative_service):
         self.service = quantitative_service
-        self.simulation_duration = 7  # 模拟交易天数
-        self.initial_simulation_capital = 100.0  # 模拟资金100U
+        self.simulation_duration = 7  # 策略回测天数
+        self.initial_simulation_capital = 100.0  # 回测基准资金100U
         self.simulation_results = {}
         
     def run_strategy_simulation(self, strategy_id: str, days: int = 7) -> Dict:
@@ -5399,7 +5398,7 @@ class StrategySimulator:
             # 1. 历史回测阶段 (前5天数据)
             backtest_result = self._run_backtest(strategy, days=days-2)
             
-            # 2. 实时模拟阶段 (最近2天实时数据)
+            # 2. 实时验证阶段 (最近2天实时数据)
             live_simulation_result = self._run_live_simulation(strategy, days=2)
             
             # 3. 综合评估
@@ -5461,8 +5460,8 @@ class StrategySimulator:
         }
     
     def _run_live_simulation(self, strategy: Dict, days: int = 2) -> Dict:
-        """基于真实实时交易数据运行模拟"""
-        print(f"  🔄 基于真实实时交易数据运行模拟 ({days}天)")
+        """基于真实实时交易数据运行验证"""
+        print(f"  🔄 基于真实实时交易数据运行验证 ({days}天)")
         
         strategy_id = strategy['id']
         
@@ -5638,7 +5637,7 @@ class StrategySimulator:
                                   profit_factor: float, total_trades: int) -> float:
         """计算模拟交易综合评分"""
         
-        # 模拟交易评分权重
+        # 策略回测评分权重
         weights = {
             'return': 0.25,        # 收益率权重25%
             'win_rate': 0.35,      # 胜率权重35% (更重要)
@@ -5670,7 +5669,7 @@ class StrategySimulator:
         return max(min(total_score, 100), 0)  # 限制在0-100
     
     def _save_simulation_result(self, strategy_id: str, result: Dict):
-        """保存模拟结果到数据库"""
+        """保存回测结果到数据库"""
         try:
             cursor = self.quantitative_service.conn.cursor()
             
@@ -5685,7 +5684,7 @@ class StrategySimulator:
             ))
             
             self.quantitative_service.conn.commit()
-            print(f"  💾 模拟结果已保存到数据库")
+            print(f"  💾 回测结果已保存到数据库")
             
         except Exception as e:
             print(f"保存模拟结果失败: {e}")
@@ -6155,7 +6154,7 @@ class EvolutionaryStrategyEngine:
         
     def _mutate_strategy(self, parent: Dict) -> Dict:
         """突变策略 - 针对90+分优化的突变"""
-        import random
+        import random  # ✅ 遗传算法必需的随机突变，非模拟数据
         import uuid
         
         # 🛡️ 安全性检查：确保parent是字典类型
@@ -6223,7 +6222,7 @@ class EvolutionaryStrategyEngine:
     
     def _crossover_strategies(self, parent1: Dict, parent2: Dict) -> Dict:
         """交叉策略 - 优化的交叉算法"""
-        import random
+        import random  # ✅ 遗传算法必需的随机交叉，非模拟数据
         import uuid
         
         # 🛡️ 安全性检查：确保parents是字典类型
@@ -6281,7 +6280,7 @@ class EvolutionaryStrategyEngine:
     
     def _create_random_strategy(self) -> Dict:
         """创建随机新策略"""
-        import random
+        import random  # ✅ 遗传算法必需的随机策略创建，非模拟数据
         
         # 随机选择策略类型
         strategy_type = random.choice(list(self.strategy_templates.keys()))

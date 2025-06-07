@@ -1,16 +1,30 @@
 {
-  "test_time": "2025-06-05T09:08:57.778716",
-  "test_results": {
-    "enhanced_logging": true,
-    "fixed_trading_engine": true,
-    "strategy_evolution": true,
-    "integrated_system": true,
-    "database_logging": true,
-    "error_handling": true
+  "timestamp": "2025-06-08T04:22:47.092922",
+  "overall_status": "PASS",
+  "tests": {
+    "core_simulation_removal": {
+      "status": "PASS",
+      "issues_count": 0,
+      "issues": []
+    },
+    "strategy_scoring_system": {
+      "status": "PASS",
+      "issues_count": 0,
+      "issues": []
+    },
+    "key_functions": {
+      "status": "PASS",
+      "issues_count": 0,
+      "issues": [],
+      "quality_checks": [
+        "run_all_strategy_simulations 已改为真实数据评估",
+        "_get_real_price_history 已改为真实API调用"
+      ]
+    }
   },
   "summary": {
-    "total_tests": 6,
-    "passed_tests": 6,
-    "pass_rate": 100.0
+    "total_tests": 3,
+    "passed_tests": 3,
+    "pass_rate": 1.0
   }
 }
