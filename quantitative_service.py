@@ -372,7 +372,7 @@ class DatabaseManager:
                 INSERT INTO account_balance_history 
                 (timestamp, total_balance, available_balance, frozen_balance, daily_pnl, 
                  daily_return, cumulative_return, total_trades, milestone_note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 datetime.now().isoformat(),
                 total_balance,
@@ -418,7 +418,7 @@ class DatabaseManager:
                 )
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT COUNT(*) FROM account_balance_history WHERE milestone_note = ?", 
+                    "SELECT COUNT(*) FROM account_balance_history WHERE milestone_note = %s", 
                     (note,)
                 )
                 if cursor.fetchone()[0] == 0:
@@ -1684,8 +1684,8 @@ class AutomatedStrategyManager:
             # 更新strategies表中的参数
             query = """
             UPDATE strategies 
-            SET parameters = ?, last_parameter_update = ?, optimization_count = optimization_count + 1
-            WHERE id = ?
+            SET parameters = %s, last_parameter_update = ?, optimization_count = optimization_count + 1
+            WHERE id = %s
             """
             
             import json
@@ -1736,7 +1736,7 @@ class AutomatedStrategyManager:
             INSERT INTO parameter_optimization_history 
             (strategy_id, optimization_time, old_parameters, new_parameters, 
              old_score, new_score, optimization_type, improvement)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
             
             improvement = new_score - old_score
@@ -2671,7 +2671,7 @@ class QuantitativeService:
             # 首先关闭所有策略的真实交易
             for strategy_id in self.strategies:
                 self.db_manager.execute_query(
-                    "UPDATE strategies SET real_trading_enabled = 0, ranking = NULL WHERE id = ?",
+                    "UPDATE strategies SET real_trading_enabled = 0, ranking = NULL WHERE id = %s",
                     (strategy_id,)
                 )
             
@@ -2695,7 +2695,7 @@ class QuantitativeService:
                         ranking = ?, 
                         allocated_amount = ?,
                         optimal_quantity = ?
-                    WHERE id = ?
+                    WHERE id = %s
                 """, (ranking, allocated_amount, optimal_quantity, strategy_id))
                 
                 # 更新内存中的策略状态
@@ -2884,7 +2884,7 @@ class QuantitativeService:
                    final_score, win_rate, total_return, total_trades,
                    created_at, updated_at
             FROM strategies 
-            WHERE id = ?
+            WHERE id = %s
             """
             
             row = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
@@ -2968,7 +2968,7 @@ class QuantitativeService:
                 return False
             
             # 更新数据库中的状态
-            query = "UPDATE strategies SET enabled = 1 WHERE id = ?"
+            query = "UPDATE strategies SET enabled = 1 WHERE id = %s"
             self.db_manager.execute_query(query, (strategy_id,))
             
             # 更新内存中的策略状态
@@ -3014,7 +3014,7 @@ class QuantitativeService:
                 SELECT COUNT(*) as total, 
                        SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins
                 FROM strategy_trade_logs 
-                WHERE strategy_id = ? AND executed = 1
+                WHERE strategy_id = %s AND executed = 1
             ''', (strategy_id,))
             
             result = cursor.fetchone()
@@ -3033,7 +3033,7 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT COUNT(*) FROM strategy_trade_logs 
-                WHERE strategy_id = ? AND executed = 1
+                WHERE strategy_id = %s AND executed = 1
             ''', (strategy_id,))
             
             result = cursor.fetchone()
@@ -3049,7 +3049,7 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT SUM(pnl) FROM strategy_trade_logs 
-                WHERE strategy_id = ? AND executed = 1
+                WHERE strategy_id = %s AND executed = 1
             ''', (strategy_id,))
             
             result = cursor.fetchone()
@@ -3605,37 +3605,66 @@ class QuantitativeService:
             
             # 💰 检查余额
             current_balance = self._get_current_balance()
-            if current_balance < 5.0:  # 最小交易金额
-                print(f"⚠️ 余额不足: {current_balance}U < 5U")
+            if current_balance < 1.0:  # 降低最小交易金额到1U
+                print(f"⚠️ 余额不足: {current_balance}U < 1U")
                 return False
             
-            # 📊 计算交易数量（保守策略）
-            trade_amount = min(current_balance * 0.1, 10.0)  # 最多10U或余额的10%
+            # 📊 计算交易数量（小资金保守策略）
+            base_amount = current_balance * 0.06  # 6%的余额
+            trade_amount = base_amount * confidence  # 根据置信度调整
+            trade_amount = min(trade_amount, 1.5)    # 最大1.5U
+            trade_amount = max(trade_amount, 0.5)    # 最小0.5U
+            
+            print(f"💰 计算交易金额: {trade_amount:.3f} USDT (余额: {current_balance:.2f}, 置信度: {confidence:.2f})")
             
             # 🎯 执行交易
             for client_name, client in self.exchange_clients.items():
                 try:
-                    if signal_type == 'buy':
-                        # 市价买入
-                        order = client.create_market_buy_order(symbol, trade_amount / price)
-                    elif signal_type == 'sell':
-                        # 市价卖出（需要检查持仓）
-                        positions = self.get_positions()
-                        base_asset = symbol.split('/')[0]
-                        
-                        # 查找对应资产的持仓
-                        position_qty = 0
-                        for pos in positions:
-                            if pos.get('asset') == base_asset and float(pos.get('free', 0)) > 0:
-                                position_qty = float(pos['free'])
-                                break
-                        
-                        if position_qty > 0:
-                            sell_qty = min(position_qty, trade_amount / price)
-                            order = client.create_market_sell_order(symbol, sell_qty)
-                        else:
-                            print(f"⚠️ 没有 {base_asset} 持仓，无法卖出")
-                            return False
+                    if client_name == 'bitget':
+                        # Bitget特殊处理
+                        try:
+                            ticker = client.fetch_ticker(symbol)
+                            current_price = ticker['last']
+                            
+                            if signal_type == 'buy':
+                                # Bitget买单：指定花费金额
+                                order = client.create_market_buy_order(symbol, trade_amount, current_price, None, {'cost': trade_amount})
+                            else:
+                                # Bitget卖单：检查持仓后指定数量
+                                positions = self.get_positions()
+                                coin_symbol = symbol.split('/')[0]
+                                position = next((p for p in positions if coin_symbol in p.get('symbol', '')), None)
+                                if not position or position.get('quantity', 0) <= 0:
+                                    print(f"⚠️ 没有 {coin_symbol} 持仓，无法卖出")
+                                    continue
+                                quantity = min(trade_amount / current_price, position.get('quantity', 0))
+                                order = client.create_market_sell_order(symbol, quantity)
+                        except Exception as bitget_error:
+                            print(f"⚠️ Bitget交易失败: {str(bitget_error)}")
+                            continue
+                    else:
+                        # 标准交易所处理
+                        if signal_type == 'buy':
+                            # 市价买入
+                            order = client.create_market_buy_order(symbol, trade_amount / price)
+                        elif signal_type == 'sell':
+                            # 市价卖出（需要检查持仓）
+                            positions = self.get_positions()
+                            base_asset = symbol.split('/')[0]
+                            
+                            # 查找对应资产的持仓
+                            position_qty = 0
+                            for pos in positions:
+                                if pos.get('asset') == base_asset and float(pos.get('free', 0)) > 0:
+                                    position_qty = float(pos['free'])
+                                    break
+                            
+                            if position_qty > 0:
+                                sell_qty = min(position_qty, trade_amount / price)
+                                order = client.create_market_sell_order(symbol, sell_qty)
+                            else:
+                                print(f"⚠️ 没有 {base_asset} 持仓，无法卖出")
+                                continue
                     
                     if order and order.get('id'):
                         # 🎉 交易成功，记录到数据库
@@ -4006,7 +4035,7 @@ class QuantitativeService:
                        AVG(pnl) as avg_pnl,
                        SUM(pnl) as total_pnl
                 FROM strategy_trade_logs 
-                WHERE strategy_id = ? AND timestamp > datetime('now', '-7 days')
+                WHERE strategy_id = %s AND timestamp > datetime('now', '-7 days')
             ''', (strategy_id,))
             
             result = cursor.fetchone()
@@ -4041,7 +4070,7 @@ class QuantitativeService:
         """从数据库加载系统运行状态"""
         try:
             cursor = self.conn.cursor()
-            cursor.execute('SELECT value FROM system_status WHERE key = ?', ('running',))
+            cursor.execute('SELECT value FROM system_status WHERE key = %s', ('running',))
             result = cursor.fetchone()
             if result:
                 self.running = result[0] == 'True'
@@ -4055,7 +4084,7 @@ class QuantitativeService:
         """从数据库加载自动交易状态"""
         try:
             cursor = self.conn.cursor()
-            cursor.execute('SELECT value FROM system_status WHERE key = ?', ('auto_trading_enabled',))
+            cursor.execute('SELECT value FROM system_status WHERE key = %s', ('auto_trading_enabled',))
             result = cursor.fetchone()
             if result:
                 self.auto_trading_enabled = result[0] == 'True'
@@ -4172,7 +4201,7 @@ class QuantitativeService:
         try:
             query = """
             SELECT initialized_at FROM strategy_initialization 
-            WHERE strategy_id = ? AND initialized = 1
+            WHERE strategy_id = %s AND initialized = 1
             """
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             return result is not None
@@ -4277,7 +4306,7 @@ class QuantitativeService:
             INSERT INTO strategy_initialization 
             (strategy_id, initialized, initialized_at, initial_score, initial_win_rate, 
              initial_return, initial_trades, data_source)
-            VALUES (?, 1, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, 1, %s, %s, %s, %s, %s, %s)
             """
             
             self.db_manager.execute_query(query, (
@@ -4413,7 +4442,7 @@ class QuantitativeService:
         try:
             if hasattr(self, 'db_manager') and self.db_manager:
                 result = self.db_manager.execute_query(
-                    "SELECT result_data FROM simulation_results WHERE strategy_id = ? ORDER BY created_at DESC LIMIT 1",
+                    "SELECT result_data FROM simulation_results WHERE strategy_id = %s ORDER BY created_at DESC LIMIT 1",
                     (strategy_id,),
                     fetch_one=True
                 )
@@ -4816,7 +4845,7 @@ class QuantitativeService:
             cursor.execute('''
                 SELECT strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp
                 FROM strategy_trade_logs 
-                WHERE strategy_id = ?
+                WHERE strategy_id = %s
                 ORDER BY timestamp DESC
                 LIMIT %s
             ''', (strategy_id, limit))
@@ -4848,7 +4877,7 @@ class QuantitativeService:
                 SELECT strategy_id, optimization_type, old_parameters, new_parameters, 
                        trigger_reason, target_success_rate, timestamp
                 FROM strategy_optimization_logs 
-                WHERE strategy_id = ?
+                WHERE strategy_id = %s
                 ORDER BY timestamp DESC
                 LIMIT %s
             ''', (strategy_id, limit))
@@ -5574,7 +5603,7 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT score FROM strategy_score_history 
-                WHERE strategy_id = ? 
+                WHERE strategy_id = %s 
                 ORDER BY timestamp DESC 
                 LIMIT 1 OFFSET 1
             ''', (strategy_id,))
@@ -5835,7 +5864,7 @@ class StrategySimulator:
             query = """
             SELECT signal_type, price, quantity, confidence, pnl, timestamp
             FROM trading_logs 
-            WHERE strategy_id = ? AND executed = 1 
+            WHERE strategy_id = %s AND executed = 1 
             AND timestamp >= NOW() - INTERVAL '{} days'
             ORDER BY timestamp ASC
             """.format(days)
@@ -5865,7 +5894,7 @@ class StrategySimulator:
             query = """
             SELECT signal_type, price, quantity, confidence, pnl, timestamp
             FROM trading_logs 
-            WHERE strategy_id = ? AND executed = 1 
+            WHERE strategy_id = %s AND executed = 1 
             AND timestamp >= NOW() - INTERVAL '{} days'
             ORDER BY timestamp DESC
             """.format(days)
@@ -6236,7 +6265,7 @@ class EvolutionaryStrategyEngine:
                 self.quantitative_service.db_manager.execute_query("""
                     INSERT INTO strategy_evolution_history 
                     (strategy_id, generation, cycle, evolution_type, new_score, created_time)
-                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """, (elite['id'], self.current_generation, self.current_cycle, 
                       'elite_selected', elite.get('final_score', 0)))
             
@@ -6249,7 +6278,7 @@ class EvolutionaryStrategyEngine:
                     INSERT INTO strategy_evolution_history 
                     (strategy_id, generation, cycle, parent_strategy_id, evolution_type, 
                      new_parameters, new_score, created_time)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """, (new_strategy['id'], self.current_generation, self.current_cycle,
                       parent_id, evolution_type, 
                       json.dumps(new_strategy.get('parameters', {})),
@@ -6263,7 +6292,7 @@ class EvolutionaryStrategyEngine:
         try:
             self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
-                SET generation = ?, cycle = ?, last_evolution_time = CURRENT_TIMESTAMP,
+                SET generation = %s, cycle = ?, last_evolution_time = CURRENT_TIMESTAMP,
                     evolution_count = evolution_count + 1,
                     is_persistent = 1
                 WHERE enabled = 1
@@ -6424,15 +6453,15 @@ class EvolutionaryStrategyEngine:
         try:
             self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
-                SET protected_status = ?, is_persistent = 1 
-                WHERE id = ?
+                SET protected_status = %s, is_persistent = 1 
+                WHERE id = %s
             """, (protection_level, strategy_id))
             
             # 记录保护历史
             self.quantitative_service.db_manager.execute_query("""
                 INSERT INTO strategy_evolution_history 
                 (strategy_id, generation, cycle, evolution_type, new_parameters, created_time)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (strategy_id, self.current_generation, self.current_cycle, 
                   f"protection_{reason}", json.dumps({"protection_level": protection_level})))
                   
@@ -6446,7 +6475,7 @@ class EvolutionaryStrategyEngine:
             self.quantitative_service.db_manager.execute_query("""
                 INSERT INTO strategy_evolution_history 
                 (strategy_id, generation, cycle, evolution_type, old_score, created_time)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (strategy_id, self.current_generation, self.current_cycle, 
                   f"eliminated_{reason}", final_score))
                   
@@ -6454,7 +6483,7 @@ class EvolutionaryStrategyEngine:
             self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
                 SET enabled = 0, last_evolution_time = CURRENT_TIMESTAMP
-                WHERE id = ?
+                WHERE id = %s
             """, (strategy_id,))
             
         except Exception as e:
@@ -6712,13 +6741,13 @@ class EvolutionaryStrategyEngine:
             
             # 从数据库删除
             self.quantitative_service.db_manager.execute_query(
-                "DELETE FROM strategies WHERE strategy_id = ?", (strategy_id,)
+                "DELETE FROM strategies WHERE strategy_id = %s", (strategy_id,)
             )
             self.quantitative_service.db_manager.execute_query(
-                "DELETE FROM simulation_results WHERE strategy_id = ?", (strategy_id,)
+                "DELETE FROM simulation_results WHERE strategy_id = %s", (strategy_id,)
             )
             self.quantitative_service.db_manager.execute_query(
-                "DELETE FROM strategy_initialization WHERE strategy_id = ?", (strategy_id,)
+                "DELETE FROM strategy_initialization WHERE strategy_id = %s", (strategy_id,)
             )
             
             print(f"🗑️ 策略 {strategy_id} 已删除")
@@ -6868,7 +6897,7 @@ class EvolutionaryStrategyEngine:
         """从数据库加载当前轮次"""
         try:
             result = self.db_manager.execute_query(
-                "SELECT MAX(cycle) FROM strategies WHERE generation = ?",
+                "SELECT MAX(cycle) FROM strategies WHERE generation = %s",
                 (self.current_generation - 1,),
                 fetch_one=True
             )
