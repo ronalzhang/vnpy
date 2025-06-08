@@ -2865,20 +2865,21 @@ class QuantitativeService:
                     'last_updated': row.get('updated_at', ''),
                 }
             else:
-                # SQLite兼容格式
+                # 备用处理（不应该执行到这里，因为只使用PostgreSQL）
+                print("⚠️ 意外的数据格式，使用备用处理")
                 strategy_data = {
-                    'id': row[0],
-                    'name': row[1],
-                    'symbol': row[2],
-                    'type': row[3],
-                    'enabled': bool(row[4]),
-                    'parameters': json.loads(row[5]) if isinstance(row[5], str) else row[5],
-                    'final_score': float(row[6]) if len(row) > 6 else 0,
-                    'win_rate': float(row[7]) if len(row) > 7 else 0,
-                    'total_return': float(row[8]) if len(row) > 8 else 0,
-                    'total_trades': int(row[9]) if len(row) > 9 else 0,
-                    'created_time': row[10] if len(row) > 10 else '',
-                    'last_updated': row[11] if len(row) > 11 else '',
+                    'id': str(row.get('id', '')),
+                    'name': str(row.get('name', '')),
+                    'symbol': str(row.get('symbol', '')),
+                    'type': str(row.get('type', '')),
+                    'enabled': bool(row.get('enabled', 0)),
+                    'parameters': row.get('parameters', {}),
+                    'final_score': float(row.get('final_score', 0)),
+                    'win_rate': float(row.get('win_rate', 0)),
+                    'total_return': float(row.get('total_return', 0)),
+                    'total_trades': int(row.get('total_trades', 0)),
+                    'created_time': row.get('created_at', ''),
+                    'last_updated': row.get('updated_at', ''),
                 }
             
             print(f"✅ 找到策略: {strategy_data['name']} ({strategy_data['symbol']})")
@@ -3575,22 +3576,23 @@ class QuantitativeService:
                             'data_source': self._get_strategy_evolution_display(row['id'])
                         }
                     else:
-                        # SQLite兼容格式
+                        # 备用处理（不应该执行到这里，因为只使用PostgreSQL）
+                        print("⚠️ 意外的数据格式，使用备用处理")
                         strategy_data = {
-                            'id': row[0],
-                            'name': row[1],
-                            'symbol': row[2],
-                            'type': row[3],
-                            'enabled': bool(row[4]),
-                            'parameters': row[5] if len(row) > 5 else '{}',
-                            'final_score': float(row[6]) if len(row) > 6 else 0,
-                            'win_rate': float(row[7]) if len(row) > 7 else 0,
-                            'total_return': float(row[8]) if len(row) > 8 else 0,
-                            'total_trades': int(row[9]) if len(row) > 9 else 0,
-                            'qualified_for_trading': float(row[6]) >= 65.0 if len(row) > 6 else False,
-                            'created_time': row[10] if len(row) > 10 else '',
-                            'last_updated': row[11] if len(row) > 11 else '',
-                            'data_source': self._get_strategy_evolution_display(row[0])
+                            'id': str(row.get('id', '')),
+                            'name': str(row.get('name', '')),
+                            'symbol': str(row.get('symbol', '')),
+                            'type': str(row.get('type', '')),
+                            'enabled': bool(row.get('enabled', 0)),
+                            'parameters': row.get('parameters', '{}'),
+                            'final_score': float(row.get('final_score', 0)),
+                            'win_rate': float(row.get('win_rate', 0)),
+                            'total_return': float(row.get('total_return', 0)),
+                            'total_trades': int(row.get('total_trades', 0)),
+                            'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,
+                            'created_time': row.get('created_at', ''),
+                            'last_updated': row.get('updated_at', ''),
+                            'data_source': self._get_strategy_evolution_display(row.get('id', ''))
                         }
                     
                     strategies_list.append(strategy_data)
