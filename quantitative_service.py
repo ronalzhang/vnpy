@@ -2245,7 +2245,7 @@ class QuantitativeService:
     def __init__(self, config_file='crypto_config.json'):
         self.config_file = config_file
         self.config = {}
-        self.strategies = {}
+        # 删除老版本的self.strategies字典，统一使用get_strategies() API
         self.db_manager = None
         self.running = False
         self.auto_trading_enabled = False
@@ -2327,8 +2327,39 @@ class QuantitativeService:
         
         print("✅ QuantitativeService 初始化完成")
     
-
+    def _get_strategy_by_id(self, strategy_id: str) -> Dict:
+        """统一的策略获取方法 - 替代老版本的self.strategies[strategy_id]"""
+        try:
+            strategies_response = self.get_strategies()
+            if not strategies_response.get('success', False):
+                return {}
+            
+            strategies_data = strategies_response.get('data', [])
+            for strategy in strategies_data:
+                if isinstance(strategy, dict) and strategy.get('id') == strategy_id:
+                    return strategy
+            return {}
+        except Exception as e:
+            print(f"❌ 获取策略 {strategy_id} 失败: {e}")
+            return {}
     
+    def _get_all_strategies_dict(self) -> Dict[str, Dict]:
+        """统一的策略字典获取方法 - 替代老版本的self.strategies"""
+        try:
+            strategies_response = self.get_strategies()
+            if not strategies_response.get('success', False):
+                return {}
+            
+            strategies_data = strategies_response.get('data', [])
+            strategies_dict = {}
+            for strategy in strategies_data:
+                if isinstance(strategy, dict) and strategy.get('id'):
+                    strategies_dict[strategy['id']] = strategy
+            return strategies_dict
+        except Exception as e:
+            print(f"❌ 获取策略字典失败: {e}")
+            return {}
+
     def _init_exchange_clients(self):
         """初始化交易所客户端"""
         clients = {}
@@ -4632,89 +4663,7 @@ class QuantitativeService:
             print(f"加载配置失败: {e}")
             self.config = {}
     
-    def _load_strategies_from_db(self):
-        """从数据库加载策略配置"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('SELECT id, name, symbol, type, enabled, parameters FROM strategies')
-            rows = cursor.fetchall()
-            
-            # 如果数据库中有策略，从数据库加载
-            if rows:
-                print(f"从数据库加载了 {len(rows)} 个策略配置")
-                for row in rows:
-                    strategy_id, name, symbol, strategy_type, enabled, parameters_json = row
-                    if strategy_id in self.strategies:
-                        # 更新内存中的策略状态
-                        self.strategies[strategy_id]['enabled'] = bool(enabled)
-                        self.strategies[strategy_id]['running'] = bool(enabled)
-                        self.strategies[strategy_id]['status'] = 'running' if enabled else 'stopped'
-                        
-                        # 如果有保存的参数，更新参数
-                        if parameters_json:
-                            try:
-                                import json
-                                saved_parameters = json.loads(parameters_json)
-                                self.strategies[strategy_id]['parameters'].update(saved_parameters)
-                            except Exception as e:
-                                print(f"解析策略 {strategy_id} 参数失败: {e}")
-                
-                        print(f"策略 {name} 状态: {'启用' if enabled else '禁用'}")
-            else:
-                # 数据库中没有策略，保存当前默认策略到数据库
-                self._save_strategies_to_db()
-                
-        except Exception as e:
-            print(f"从数据库加载策略失败: {e}")
-            # 如果加载失败，保存当前策略到数据库
-            self._save_strategies_to_db()
-
-    def _save_strategies_to_db(self):
-        """保存所有策略到数据库 - 安全版本"""
-        def timeout_handler(signum, frame):
-            raise TimeoutError("数据库操作超时")
-        
-        import signal
-        # 设置超时保护
-        if hasattr(signal, 'SIGALRM'):
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(30)
-        
-        try:
-            cursor = self.conn.cursor()
-            import json
-            
-            for strategy_id, strategy in self.strategies.items():
-                cursor.execute('''
-                    INSERT INTO strategies 
-                    (id, name, symbol, type, enabled, parameters, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP) 
-                    ON CONFLICT (id) DO UPDATE SET
-                    name = EXCLUDED.name, enabled = EXCLUDED.enabled, parameters = EXCLUDED.parameters
-                ''', (
-                    strategy_id,
-                    strategy['name'],
-                    strategy['symbol'],
-                    strategy['type'],
-                    1 if strategy.get('enabled', False) else 0,
-                    json.dumps(strategy['parameters'])
-                ))
-            
-            
-            self.conn.commit()
-            print(f"保存了 {len(self.strategies)} 个策略到数据库")
-            
-            print(f"安全保存了策略到数据库")
-            
-        except Exception as e:
-            print(f"保存策略到数据库失败: {e}")
-        except TimeoutError:
-            print("⚠️ 数据库操作超时，部分策略可能未保存")
-        except KeyboardInterrupt:
-            print("⚠️ 数据库操作被中断，部分策略可能未保存")
-        finally:
-            if hasattr(signal, 'SIGALRM'):
-                signal.alarm(0)
+    # 删除老版本的策略加载/保存方法，统一使用get_strategies() API
     
     def _save_strategy_status(self, strategy_id, enabled):
         """保存单个策略状态到数据库"""
