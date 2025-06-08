@@ -326,14 +326,10 @@ class QuantitativeSystem {
                             ${qualified ? '<span class="badge bg-success">已选中交易</span>' : '<span class="badge bg-secondary">未选中</span>'}
                         </p>
                         
-                        <div class="d-flex justify-content-between">
-                            <button class="btn btn-sm ${strategy.enabled ? 'btn-danger' : 'btn-success'}" 
-                                    onclick="app.toggleStrategy('${strategy.id}')">
-                                ${strategy.enabled ? '停止' : '启动'}
-                            </button>
+                        <div class="d-flex justify-content-center">
                             <button class="btn btn-sm btn-outline-info" 
                                     onclick="app.showStrategyLogs('${strategy.id}')">
-                                日志
+                                查看日志
                             </button>
                         </div>
                     </div>

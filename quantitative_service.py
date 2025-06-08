@@ -3555,14 +3555,13 @@ class QuantitativeService:
     def _get_strategy_evolution_display(self, strategy_id: str) -> str:
         """获取策略演化信息显示"""
         try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT generation, round, evolution_type 
-                FROM strategy_evolution_info 
-                WHERE strategy_id = %s
-            ''', (strategy_id,))
+            query = """
+            SELECT generation, round, evolution_type 
+            FROM strategy_evolution_info 
+            WHERE strategy_id = %s
+            """
+            result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             
-            result = cursor.fetchone()
             if result:
                 generation = result[0] if isinstance(result, tuple) else result.get('generation', 1)
                 round_num = result[1] if isinstance(result, tuple) else result.get('round', 1)
@@ -3577,7 +3576,7 @@ class QuantitativeService:
                 
         except Exception as e:
             print(f"获取策略演化信息失败: {e}")
-            return "未知代数"
+            return "初代策略"
 
     def get_strategies(self):
         """获取前20个高分策略 - 直接从PostgreSQL查询"""
@@ -4289,14 +4288,19 @@ class QuantitativeService:
             
             if current_balance is None:
                 return {
-                    'success': False,
+                    'balance': None,
+                    'available_balance': None,
+                    'frozen_balance': None,
+                    'daily_pnl': None,
+                    'daily_return': None,
+                    'daily_trades': None,
                     'error': 'API连接失败'
                 }
             
             # 计算今日盈亏
             today_start_balance = 10.0  # 假设今日起始余额
             daily_pnl = current_balance - today_start_balance
-            daily_return = (daily_pnl / today_start_balance * 100) if today_start_balance > 0 else 0
+            daily_return = (daily_pnl / today_start_balance) if today_start_balance > 0 else 0
             
             # 统计交易次数
             try:
@@ -4308,22 +4312,24 @@ class QuantitativeService:
                 total_trades = 0
             
             return {
-                'success': True,
-                'data': {
-                    'total_balance': current_balance,
-                    'available_balance': current_balance,
-                    'frozen_balance': 0.0,
-                    'daily_pnl': daily_pnl,
-                    'daily_return': daily_return,
-                    'total_trades': total_trades,
-                    'data_source': 'Real API'
-                }
+                'balance': current_balance,
+                'available_balance': current_balance,
+                'frozen_balance': 0.0,
+                'daily_pnl': daily_pnl,
+                'daily_return': daily_return,
+                'daily_trades': total_trades,
+                'data_source': 'Real API'
             }
             
         except Exception as e:
             print(f"获取账户信息失败: {e}")
             return {
-                'success': False,
+                'balance': None,
+                'available_balance': None,
+                'frozen_balance': None,
+                'daily_pnl': None,
+                'daily_return': None,
+                'daily_trades': None,
                 'error': str(e)
             }
     def log_strategy_optimization(self, strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate):
