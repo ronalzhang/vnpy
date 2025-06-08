@@ -430,36 +430,7 @@ class DatabaseManager:
                     print(f"🎉 资产里程碑达成：{note}")
                 conn.close()
 
-    def get_balance_history(self, days: int = 30) -> List[Dict[str, Any]]:
-        """获取账户资产历史 - 使用PostgreSQL"""
-        try:
-            # 使用PostgreSQL适配器
-            result = self.db_adapter.execute_query('''
-                SELECT timestamp, total_balance, available_balance, daily_pnl, 
-                       daily_return, cumulative_return, total_trades, milestone_note
-                FROM account_balance_history 
-                WHERE timestamp >= %s
-                ORDER BY timestamp ASC
-            ''', ((datetime.now() - timedelta(days=days)).isoformat(),), fetch_all=True)
-            
-            records = []
-            for row in result:
-                records.append({
-                    'timestamp': row[0],
-                    'total_balance': row[1],
-                    'available_balance': row[2],
-                    'daily_pnl': row[3],
-                    'daily_return': row[4],
-                    'cumulative_return': row[5],
-                    'total_trades': row[6],
-                    'milestone_note': row[7]
-                })
-            
-            return records
-            
-        except Exception as e:
-            print(f"获取资产历史失败: {e}")
-            return []
+
 
 class QuantitativeStrategy:
     """量化策略基类"""
@@ -2349,30 +2320,7 @@ class QuantitativeService:
         
         print("✅ QuantitativeService 初始化完成")
     
-    def record_balance_history(self, total_balance: float, available_balance: float = None, 
-                              frozen_balance: float = None, daily_pnl: float = None,
-                              daily_return: float = None, milestone_note: str = None):
-        """记录余额历史"""
-        try:
-            # 使用DatabaseManager的方法
-            if hasattr(self.db_manager, 'record_balance_history'):
-                return self.db_manager.record_balance_history(
-                    total_balance, available_balance, frozen_balance, 
-                    daily_pnl, daily_return, milestone_note
-                )
-            else:
-                # 直接插入数据库
-                cursor = self.conn.cursor()
-                cursor.execute("""
-                    INSERT INTO account_balance_history 
-                    (total_balance, available_balance, frozen_balance, daily_pnl, daily_return, timestamp)
-                    VALUES (%s, %s, %s, %s, %s, NOW())
-                """, (total_balance, available_balance or 0, frozen_balance or 0, 
-                     daily_pnl or 0, daily_return or 0))
-                self.conn.commit()
-                print(f"✅ 记录余额历史: {total_balance}")
-        except Exception as e:
-            print(f"❌ 记录余额历史失败: {e}")
+
     
     def _init_exchange_clients(self):
         """初始化交易所客户端"""
@@ -3519,33 +3467,7 @@ class QuantitativeService:
                 'total_pnl': 0
             }
 
-    def _load_system_status(self) -> bool:
-        """从数据库加载系统运行状态"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('SELECT value FROM system_status WHERE key = %s', ('running',))
-            result = cursor.fetchone()
-            if result:
-                self.running = result[0] == 'True'
-            else:
-                self.running = False
-        except Exception as e:
-            print(f"加载系统状态失败: {e}")
-            self.running = False
-    
-    def _load_auto_trading_status(self) -> bool:
-        """从数据库加载自动交易状态"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('SELECT value FROM system_status WHERE key = %s', ('auto_trading_enabled',))
-            result = cursor.fetchone()
-            if result:
-                self.auto_trading_enabled = result[0] == 'True'
-            else:
-                self.auto_trading_enabled = False
-        except Exception as e:
-            print(f"加载自动交易状态失败: {e}")
-            self.auto_trading_enabled = False
+
     
     def _get_strategy_evolution_display(self, strategy_id: str) -> str:
         """获取策略演化信息显示"""
@@ -4064,33 +3986,7 @@ class QuantitativeService:
         if 'lookback_period' in params:
             params['lookback_period'] = max(5, min(100, params['lookback_period']))  # 限制在5-100
     
-    def _save_system_status(self):
-        """保存系统状态到数据库"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                INSERT INTO system_status (key, value, timestamp)
-                VALUES ('running', %s, NOW())
-                ON CONFLICT (key) DO UPDATE SET
-                value = EXCLUDED.value, timestamp = EXCLUDED.timestamp
-            ''', (str(self.running),))
-            self.conn.commit()
-        except Exception as e:
-            print(f"保存系统状态失败: {e}")
-    
-    def _save_auto_trading_status(self):
-        """保存自动交易状态到数据库"""
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                INSERT INTO system_status (key, value, timestamp)
-                VALUES ('auto_trading_enabled', %s, NOW())
-                ON CONFLICT (key) DO UPDATE SET
-                value = EXCLUDED.value, timestamp = EXCLUDED.timestamp
-            ''', (str(self.auto_trading_enabled),))
-            self.conn.commit()
-        except Exception as e:
-            print(f"保存自动交易状态失败: {e}")
+
     
     def _start_auto_management(self):
         """启动自动管理 - 确保信号生成和数据持久化"""
