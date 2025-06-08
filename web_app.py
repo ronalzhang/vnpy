@@ -681,8 +681,13 @@ def get_exchange_prices():
     return prices
 
 def monitor_thread(interval=5):
-    """监控线程函数"""
+    """监控线程函数 - 已禁用以减少内存使用"""
     global prices_data, diff_data, balances_data, status
+    
+    # 禁用后台监控线程以减少内存泄漏
+    # 数据将通过API调用时按需获取
+    print("监控线程已禁用，数据将按需获取")
+    return
     
     while True:
         try:
@@ -741,12 +746,23 @@ def get_status():
 @app.route('/api/prices', methods=['GET'])
 def get_prices():
     """获取所有价格数据"""
-    return jsonify(prices_data)
+    try:
+        prices = get_exchange_prices()
+        return jsonify(prices)
+    except Exception as e:
+        print(f"获取价格数据失败: {e}")
+        return jsonify({})
 
 @app.route('/api/diff', methods=['GET'])
 def get_diff():
     """获取价格差异数据"""
-    return jsonify(diff_data)
+    try:
+        prices = get_exchange_prices()
+        diff = calculate_price_differences(prices)
+        return jsonify(diff)
+    except Exception as e:
+        print(f"获取价格差异数据失败: {e}")
+        return jsonify([])
 
 @app.route('/api/account/balances', methods=['GET'])
 def get_account_balances():
