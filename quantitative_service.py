@@ -2319,6 +2319,9 @@ class QuantitativeService:
         # 加载配置和初始化
         self.load_config()
         
+        # 初始化交易所客户端
+        self.exchange_clients = self._init_exchange_clients()
+        
         # ⭐ PostgreSQL连接配置 - 移除SQLite
         import psycopg2
         self.db_config = {
@@ -2345,6 +2348,88 @@ class QuantitativeService:
         self._init_evolution_engine()
         
         print("✅ QuantitativeService 初始化完成")
+    
+    def record_balance_history(self, total_balance: float, available_balance: float = None, 
+                              frozen_balance: float = None, daily_pnl: float = None,
+                              daily_return: float = None, milestone_note: str = None):
+        """记录余额历史"""
+        try:
+            # 使用DatabaseManager的方法
+            if hasattr(self.db_manager, 'record_balance_history'):
+                return self.db_manager.record_balance_history(
+                    total_balance, available_balance, frozen_balance, 
+                    daily_pnl, daily_return, milestone_note
+                )
+            else:
+                # 直接插入数据库
+                cursor = self.conn.cursor()
+                cursor.execute("""
+                    INSERT INTO account_balance_history 
+                    (total_balance, available_balance, frozen_balance, daily_pnl, daily_return, timestamp)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                """, (total_balance, available_balance or 0, frozen_balance or 0, 
+                     daily_pnl or 0, daily_return or 0))
+                self.conn.commit()
+                print(f"✅ 记录余额历史: {total_balance}")
+        except Exception as e:
+            print(f"❌ 记录余额历史失败: {e}")
+    
+    def _init_exchange_clients(self):
+        """初始化交易所客户端"""
+        clients = {}
+        try:
+            import ccxt
+            
+            # 初始化Binance
+            if 'binance' in self.config and self.config['binance'].get('api_key'):
+                try:
+                    clients['binance'] = ccxt.binance({
+                        'apiKey': self.config['binance']['api_key'],
+                        'secret': self.config['binance']['secret'],
+                        'sandbox': False,
+                        'enableRateLimit': True,
+                    })
+                    print("✅ Binance客户端初始化成功")
+                except Exception as e:
+                    print(f"⚠️ Binance初始化失败: {e}")
+            
+            # 初始化OKX
+            if 'okx' in self.config and self.config['okx'].get('api_key'):
+                try:
+                    clients['okx'] = ccxt.okx({
+                        'apiKey': self.config['okx']['api_key'],
+                        'secret': self.config['okx']['secret'],
+                        'password': self.config['okx']['passphrase'],
+                        'sandbox': False,
+                        'enableRateLimit': True,
+                    })
+                    print("✅ OKX客户端初始化成功")
+                except Exception as e:
+                    print(f"⚠️ OKX初始化失败: {e}")
+            
+            # 初始化Bitget
+            if 'bitget' in self.config and self.config['bitget'].get('api_key'):
+                try:
+                    clients['bitget'] = ccxt.bitget({
+                        'apiKey': self.config['bitget']['api_key'],
+                        'secret': self.config['bitget']['secret'],
+                        'password': self.config['bitget'].get('passphrase', ''),
+                        'sandbox': False,
+                        'enableRateLimit': True,
+                    })
+                    print("✅ Bitget客户端初始化成功")
+                except Exception as e:
+                    print(f"⚠️ Bitget初始化失败: {e}")
+            
+            print(f"✅ 初始化了 {len(clients)} 个交易所客户端")
+            return clients
+            
+        except ImportError:
+            print("❌ ccxt库未安装，无法初始化交易所客户端")
+            return {}
+        except Exception as e:
+            print(f"❌ 初始化交易所客户端失败: {e}")
+            return {}
     
     def _init_evolution_engine(self):
         """初始化进化引擎"""
