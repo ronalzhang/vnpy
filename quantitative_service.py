@@ -1807,7 +1807,15 @@ class AutomatedStrategyManager:
               f"发展{len(developing_strategies)}个, 劣质{len(poor_strategies)}个")
         
         # 🎯 渐进式策略启用逻辑
-        for strategy_id, strategy in self.strategies.items():
+        # 从quantitative_service获取策略数据
+        strategies_response = self.quantitative_service.get_strategies()
+        if not strategies_response.get('success', False):
+            print("❌ 无法获取策略数据，跳过策略选择")
+            return
+        
+        strategies_data = {s['id']: s for s in strategies_response.get('data', [])}
+        
+        for strategy_id, strategy in strategies_data.items():
             current_score = performances.get(strategy_id, {}).get('score', 0)
             current_enabled = strategy.get('enabled', False)
             
@@ -2990,18 +2998,22 @@ class QuantitativeService:
             high_score_strategies = []
             normal_strategies = []
             
-            for strategy_id, strategy in self.strategies.items():
+            # 🔧 正确获取策略数据
+            strategies_response = self.get_strategies()
+            if not strategies_response.get('success', False):
+                print("❌ 无法获取策略数据，信号生成失败")
+                return 0
+            
+            strategies_data = strategies_response.get('data', [])
+            print(f"📊 获取到 {len(strategies_data)} 个策略进行信号生成")
+            
+            for strategy in strategies_data:
+                strategy_id = strategy['id']
                 if not strategy.get('enabled', False):
                     continue
                     
-                # 🔗 直接从数据库获取策略评分
-                try:
-                    query = "SELECT final_score FROM strategies WHERE id = %s"
-                    result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
-                    score = float(result['final_score']) if result and result.get('final_score') else 0.0
-                except Exception as e:
-                    print(f"⚠️ 获取策略 {strategy_id} 评分失败: {e}")
-                    score = 0.0
+                # 🔗 使用策略已有的评分数据
+                score = strategy.get('final_score', 0.0)
                 
                 if score >= 90.0:
                     high_score_strategies.append((strategy_id, strategy))
@@ -3980,13 +3992,29 @@ class QuantitativeService:
                 try:
                     # PostgreSQL返回字典格式
                     if isinstance(row, dict):
+                        # 🔧 正确解析parameters字段
+                        import json
+                        raw_parameters = row.get('parameters', '{}')
+                        
+                        # 确保parameters是字典类型
+                        if isinstance(raw_parameters, str):
+                            try:
+                                parsed_parameters = json.loads(raw_parameters)
+                            except (json.JSONDecodeError, ValueError):
+                                print(f"⚠️ 策略 {row['id']} 参数解析失败，使用默认参数")
+                                parsed_parameters = {}
+                        elif isinstance(raw_parameters, dict):
+                            parsed_parameters = raw_parameters
+                        else:
+                            parsed_parameters = {}
+                        
                         strategy_data = {
                             'id': row['id'],
                             'name': row['name'],
                             'symbol': row['symbol'],
                             'type': row['type'],
                             'enabled': bool(row['enabled']),
-                            'parameters': row.get('parameters', '{}'),
+                            'parameters': parsed_parameters,
                             'final_score': float(row.get('final_score', 0)),
                             'win_rate': float(row.get('win_rate', 0)),
                             'total_return': float(row.get('total_return', 0)),
