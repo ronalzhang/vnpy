@@ -681,13 +681,12 @@ def get_exchange_prices():
     return prices
 
 def monitor_thread(interval=5):
-    """监控线程函数 - 已禁用以减少内存使用"""
+    """监控线程函数 - 优化内存使用，降低调用频率"""
     global prices_data, diff_data, balances_data, status
     
-    # 禁用后台监控线程以减少内存泄漏
-    # 数据将通过API调用时按需获取
-    print("监控线程已禁用，数据将按需获取")
-    return
+    # 使用更长的间隔来减少内存使用，同时保持功能
+    optimized_interval = max(interval, 60)  # 最少60秒间隔
+    print(f"监控线程启动，优化间隔: {optimized_interval}秒（原{interval}秒）")
     
     while True:
         try:
@@ -725,7 +724,7 @@ def monitor_thread(interval=5):
         except Exception as e:
             print(f"监控线程错误: {e}")
         
-        time.sleep(interval)
+        time.sleep(optimized_interval)
 
 # 路由
 @app.route('/')
@@ -2237,10 +2236,10 @@ def main():
         except Exception as e:
             print(f"❌ 量化交易服务启动失败: {e}")
     
-    # 启动监控线程 - 已禁用以减少内存使用
-    # monitor = threading.Thread(target=monitor_thread, daemon=True)
-    # monitor.start()
-    print("监控线程已禁用，数据将通过API按需获取")
+    # 启动监控线程 - 使用优化间隔以减少内存使用
+    monitor = threading.Thread(target=monitor_thread, daemon=True)
+    monitor.start()
+    print("监控线程已启动，使用优化的60秒间隔")
     
     # 初始化套利系统
     if args.arbitrage and ARBITRAGE_ENABLED:
