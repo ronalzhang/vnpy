@@ -186,9 +186,9 @@ class FullyEnhancedQuantitativeService(QuantitativeService):
         except Exception as e:
             logger.error(f"量化系统运行错误: {e}")
             
-            # 更新错误状态到数据库
+            # 更新系统状态到数据库（设置为offline而非error）
             self.update_system_status(
-                system_health='error',
+                system_health='offline',
                 notes=f'运行错误: {str(e)}'
             )
             

@@ -1648,8 +1648,13 @@ class AutomatedStrategyManager:
     def _save_optimized_parameters(self, strategy_id: str, performance: Dict):
         """⭐ 保存优化后的策略参数到数据库"""
         try:
-            # 获取当前策略参数
-            current_strategy = self.quantitative_service.strategies.get(strategy_id, {})
+            # ⭐ 使用统一API获取当前策略参数
+            strategy_response = self.quantitative_service.get_strategy(strategy_id)
+            if not strategy_response.get('success', False):
+                print(f"❌ 无法获取策略 {strategy_id} 信息")
+                return
+                
+            current_strategy = strategy_response.get('data', {})
             parameters = performance.get('parameters', current_strategy.get('parameters', {}))
             
             # 更新strategies表中的参数
@@ -1666,9 +1671,13 @@ class AutomatedStrategyManager:
                 strategy_id
             ))
             
-            # 更新内存中的策略参数
-            if strategy_id in self.quantitative_service.strategies:
-                self.quantitative_service.strategies[strategy_id]['parameters'] = parameters
+            # ⭐ 使用统一API更新策略参数
+            self.quantitative_service.update_strategy(
+                strategy_id,
+                current_strategy.get('name', ''),
+                current_strategy.get('symbol', ''),
+                parameters
+            )
             
             # 记录参数优化历史
             self._record_parameter_optimization(strategy_id, parameters, performance['score'])
@@ -1696,8 +1705,9 @@ class AutomatedStrategyManager:
                 )
             """)
             
-            # 获取旧参数和评分
-            old_strategy = self.quantitative_service.strategies.get(strategy_id, {})
+            # ⭐ 使用统一API获取旧参数和评分
+            strategy_response = self.quantitative_service.get_strategy(strategy_id)
+            old_strategy = strategy_response.get('data', {}) if strategy_response.get('success', False) else {}
             old_parameters = old_strategy.get('parameters', {})
             old_score = old_strategy.get('final_score', 0)
             
@@ -1735,12 +1745,16 @@ class AutomatedStrategyManager:
             self._reduce_position_sizes()
             logger.warning("总风险敞口过高，已减少仓位")
         
-        # 检查单一策略风险
-        for strategy_id in self.quantitative_service.strategies.keys():
-            strategy_risk = self._calculate_strategy_risk(strategy_id)
-            if strategy_risk > self.risk_limit:
-                self._limit_strategy_position(strategy_id)
-                logger.warning(f"策略 {strategy_id} 风险过高，已限制仓位")
+        # ⭐ 使用统一API检查单一策略风险
+        strategies_response = self.quantitative_service.get_strategies()
+        if strategies_response.get('success', False):
+            for strategy in strategies_response.get('data', []):
+                strategy_id = strategy.get('id')
+                if strategy_id:
+                    strategy_risk = self._calculate_strategy_risk(strategy_id)
+                    if strategy_risk > self.risk_limit:
+                        self._limit_strategy_position(strategy_id)
+                        logger.warning(f"策略 {strategy_id} 风险过高，已限制仓位")
     
     def _strategy_selection(self, performances: Dict[str, Dict]):
         """🎯 渐进式策略选择 - 60分起步，逐步进化到终极策略"""
@@ -1930,11 +1944,17 @@ class AutomatedStrategyManager:
     def _update_capital_allocations(self, allocations: Dict[str, float]):
         """更新资金分配"""
         for strategy_id, allocation in allocations.items():
-            strategy = self.quantitative_service.strategies.get(strategy_id)
+            # ⭐ 使用统一方法获取策略
+            strategy = self.quantitative_service._get_strategy_by_id(strategy_id)
             if strategy:
                 # 根据分配调整交易量
                 base_quantity = strategy.get("parameters", {}).get('quantity', 1.0)
-                allocation_factor = allocation / (self.initial_capital / len(self.quantitative_service.strategies))
+                
+                # ⭐ 使用统一API获取策略总数
+                strategies_response = self.quantitative_service.get_strategies()
+                total_strategies = len(strategies_response.get('data', [])) if strategies_response.get('success') else 1
+                
+                allocation_factor = allocation / (self.initial_capital / total_strategies)
                 new_quantity = base_quantity * allocation_factor
                 
                 # 更新策略参数
@@ -1951,15 +1971,22 @@ class AutomatedStrategyManager:
     def _calculate_total_exposure(self) -> float:
         """计算总风险敞口"""
         total = 0
-        for strategy in self.quantitative_service.strategies.values():
-            quantity = strategy.get("parameters", {}).get('quantity', 0)
-            # 假设平均价格计算敞口
-            total += quantity * 50000  # 简化计算
+        
+        # ⭐ 使用统一API获取策略
+        strategies_response = self.quantitative_service.get_strategies()
+        if strategies_response.get('success', False):
+            for strategy in strategies_response.get('data', []):
+                if isinstance(strategy, dict):
+                    quantity = strategy.get("parameters", {}).get('quantity', 0)
+                    # 假设平均价格计算敞口
+                    total += quantity * 50000  # 简化计算
+        
         return total
     
     def _calculate_strategy_risk(self, strategy_id: str) -> float:
         """计算单一策略风险"""
-        strategy = self.quantitative_service.strategies.get(strategy_id)
+        # ⭐ 使用统一方法获取策略
+        strategy = self.quantitative_service._get_strategy_by_id(strategy_id)
         if not strategy:
             return 0
         
@@ -1968,7 +1995,13 @@ class AutomatedStrategyManager:
     
     def _reduce_position_sizes(self):
         """减少所有策略仓位"""
-        for strategy in self.quantitative_service.strategies.values():
+        # ⭐ 使用统一API获取所有策略
+        strategies_response = self.quantitative_service.get_strategies()
+        if not strategies_response.get('success', False):
+            logger.warning("无法获取策略列表，跳过减仓操作")
+            return
+            
+        for strategy in strategies_response.get('data', []):
             current_quantity = strategy.get("parameters", {}).get('quantity', 1.0)
             new_params = strategy.get("parameters", {}).copy()
             new_params['quantity'] = current_quantity * 0.8  # 减少20%
@@ -1982,8 +2015,10 @@ class AutomatedStrategyManager:
     
     def _limit_strategy_position(self, strategy_id: str):
         """限制单一策略仓位"""
-        strategy = self.quantitative_service.strategies.get(strategy_id)
-        if strategy:
+        # ⭐ 使用统一API获取策略信息
+        strategy_response = self.quantitative_service.get_strategy(strategy_id)
+        if strategy_response.get('success', False):
+            strategy = strategy_response.get('data', {})
             new_params = strategy.get("parameters", {}).copy()
             new_params['quantity'] = min(new_params.get('quantity', 1.0), 0.5)  # 最大0.5
             
@@ -2073,9 +2108,11 @@ class AutomatedStrategyManager:
     
     def _quick_parameter_adjustment(self, strategy_id: str, performance: Dict):
         """快速参数调整 - 小幅度优化"""
-        strategy = self.quantitative_service.strategies.get(strategy_id)
-        if not strategy:
+        # ⭐ 使用统一API获取策略信息
+        strategy_response = self.quantitative_service.get_strategy(strategy_id)
+        if not strategy_response.get('success', False):
             return
+        strategy = strategy_response.get('data', {})
         
         strategy_type = performance['type']
         current_params = strategy.get("parameters", {}).copy()
@@ -2109,9 +2146,11 @@ class AutomatedStrategyManager:
     
     def _advanced_parameter_optimization(self, strategy_id: str, performance: Dict):
         """高级参数优化 - 目标100%成功率"""
-        strategy = self.quantitative_service.strategies.get(strategy_id)
-        if not strategy:
+        # ⭐ 使用统一API获取策略信息
+        strategy_response = self.quantitative_service.get_strategy(strategy_id)
+        if not strategy_response.get('success', False):
             return
+        strategy = strategy_response.get('data', {})
         
         strategy_type = performance['type']
         current_params = strategy.get("parameters", {}).copy()
@@ -2854,10 +2893,12 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 停止量化系统失败: {e}")
             
-            # ⭐ 更新错误状态到数据库
+            # ⭐ 更新异常状态到数据库，但不设为error
             self.update_system_status(
-                system_health='error',
-                notes=f'停止失败: {str(e)}'
+                quantitative_running=False,
+                auto_trading_enabled=False,
+                system_health='offline',  # 改为offline
+                notes=f'停止过程中出现异常: {str(e)}'
             )
             
             return False
@@ -4602,10 +4643,19 @@ class QuantitativeService:
                 
         except Exception as e:
             print(f"获取系统状态失败: {e}")
+            # ⭐ 改善异常处理，不直接返回error状态
             return {
                 'quantitative_running': False,
                 'auto_trading_enabled': False,
-                'system_health': 'error'
+                'total_strategies': 0,
+                'running_strategies': 0,
+                'selected_strategies': 0,
+                'current_generation': 0,
+                'evolution_enabled': True,
+                'last_evolution_time': None,
+                'last_update_time': None,
+                'system_health': 'offline',  # 改为offline而不是error
+                'notes': f'数据库查询异常: {str(e)}'
             }
 
     def _ensure_initial_balance_history(self):
@@ -5013,9 +5063,11 @@ class StrategySimulator:
     def run_strategy_simulation(self, strategy_id: str, days: int = 7) -> Dict:
         """运行策略模拟交易"""
         try:
-            strategy = self.quantitative_service.strategies.get(strategy_id)
-            if not strategy:
+            # ⭐ 使用统一API获取策略信息
+            strategy_response = self.quantitative_service.get_strategy(strategy_id)
+            if not strategy_response.get('success', False):
                 return None
+            strategy = strategy_response.get('data', {})
                 
             print(f"🔬 开始策略模拟交易: {strategy['name']} (周期: {days}天)")
             
