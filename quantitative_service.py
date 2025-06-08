@@ -4251,7 +4251,7 @@ class QuantitativeService:
             
             # 插入初始化数据
             query = """
-            INSERT OR REPLACE INTO strategy_initialization 
+            INSERT INTO strategy_initialization 
             (strategy_id, initialized, initialized_at, initial_score, initial_win_rate, 
              initial_return, initial_trades, data_source)
             VALUES (?, 1, ?, ?, ?, ?, ?, ?)
@@ -4533,7 +4533,7 @@ class QuantitativeService:
         if 'lookback_period' in params:
             params['lookback_period'] = max(5, min(100, params['lookback_period']))  # 限制在5-100
     
-            def _save_system_status(self):
+    def _save_system_status(self):
         """保存系统状态到数据库"""
         try:
             cursor = self.conn.cursor()
@@ -4644,7 +4644,7 @@ class QuantitativeService:
                     FROM trading_signals 
                     WHERE executed = 1
                     ORDER BY timestamp DESC 
-                    LIMIT ?
+                    LIMIT %s
                 ''', (limit,))
                 
                 signals = []
@@ -4668,7 +4668,7 @@ class QuantitativeService:
                 SELECT timestamp, symbol, signal_type, price, confidence, executed
                 FROM trading_signals 
                 ORDER BY timestamp DESC 
-                LIMIT ?
+                LIMIT %s
             ''', (limit,))
             
             signals = []
@@ -4696,7 +4696,7 @@ class QuantitativeService:
                 SELECT timestamp, total_balance, available_balance, frozen_balance,
                        daily_pnl, daily_return, cumulative_return, milestone_note
                 FROM account_balance_history 
-                WHERE timestamp > datetime('now', '-{} days')
+                WHERE timestamp > NOW() - INTERVAL '{} days'
                 ORDER BY timestamp ASC
             '''.format(days))
             
@@ -4795,7 +4795,7 @@ class QuantitativeService:
                 FROM strategy_trade_logs 
                 WHERE strategy_id = ?
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT %s
             ''', (strategy_id, limit))
             
             logs = []
@@ -4827,7 +4827,7 @@ class QuantitativeService:
                 FROM strategy_optimization_logs 
                 WHERE strategy_id = ?
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT %s
             ''', (strategy_id, limit))
             
             logs = []
@@ -5146,7 +5146,7 @@ class QuantitativeService:
                 params.append(notes)
             
             # 总是更新最后更新时间
-            updates.append("last_update_time = datetime('now')")
+            updates.append("last_update_time = NOW()")
             
             if updates:
                 sql = f"UPDATE system_status SET {', '.join(updates)} WHERE id = 1"
@@ -5813,7 +5813,7 @@ class StrategySimulator:
             SELECT signal_type, price, quantity, confidence, pnl, timestamp
             FROM trading_logs 
             WHERE strategy_id = ? AND executed = 1 
-            AND timestamp >= datetime('now', '-{} days')
+            AND timestamp >= NOW() - INTERVAL '{} days'
             ORDER BY timestamp ASC
             """.format(days)
             
@@ -5843,7 +5843,7 @@ class StrategySimulator:
             SELECT signal_type, price, quantity, confidence, pnl, timestamp
             FROM trading_logs 
             WHERE strategy_id = ? AND executed = 1 
-            AND timestamp >= datetime('now', '-{} days')
+            AND timestamp >= NOW() - INTERVAL '{} days'
             ORDER BY timestamp DESC
             """.format(days)
             
@@ -5982,7 +5982,7 @@ class StrategySimulator:
             cursor.execute('''
                 INSERT INTO simulation_results 
                 (strategy_id, result_data)
-                VALUES (?, ?)
+                VALUES (%s, %s)
             ''', (
                 strategy_id,
                 json.dumps(result)
@@ -6193,7 +6193,7 @@ class EvolutionaryStrategyEngine:
                 self.quantitative_service.db_manager.execute_query("""
                     INSERT INTO strategy_snapshots 
                     (strategy_id, snapshot_name, parameters, final_score, performance_metrics)
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s)
                 """, (
                     strategy['id'],
                     f"{snapshot_type}_G{self.current_generation}_C{self.current_cycle}",
