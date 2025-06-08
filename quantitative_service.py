@@ -1629,21 +1629,29 @@ class AutomatedStrategyManager:
         logger.info(f"资金再平衡完成，前3名策略: {[perf['name'] for _, perf in high_performers]}")
     
     def _optimize_strategy_parameters(self, performances: Dict[str, Dict]):
-        """优化策略参数 - 增强持久化机制"""
+        """⭐ 全面参数优化机制 - 所有策略都持续优化参数"""
         for strategy_id, performance in performances.items():
-            if performance['score'] < 70:  # 只优化低分策略
-                if performance['total_trades'] > 10:  # 有足够的交易数据
-                    # 高级参数优化
+            score = performance.get('score', 0)
+            total_trades = performance.get('total_trades', 0)
+            
+            # 🎯 根据评分选择不同的优化策略
+            if score < 65.0:  # 低分策略：激进优化
+                if total_trades > 10:
                     self._advanced_parameter_optimization(strategy_id, performance)
-                    
-                    # ⭐ 保存优化后的参数到数据库
-                    self._save_optimized_parameters(strategy_id, performance)
                 else:
-                    # 快速参数调整
                     self._quick_parameter_adjustment(strategy_id, performance)
                     
-                    # ⭐ 保存调整后的参数到数据库
-                    self._save_optimized_parameters(strategy_id, performance)
+            elif score < 80.0:  # 中分策略：适度优化
+                self._moderate_parameter_optimization(strategy_id, performance)
+                
+            elif score < 90.0:  # 高分策略：精细调优
+                self._fine_tune_high_score_strategy(strategy_id, performance)
+                
+            else:  # 顶级策略：微调保持
+                self._preserve_elite_strategy(strategy_id, performance)
+            
+            # ⭐ 所有策略都保存优化结果
+            self._save_optimized_parameters(strategy_id, performance)
     
     def _save_optimized_parameters(self, strategy_id: str, performance: Dict):
         """⭐ 保存优化后的策略参数到数据库"""
@@ -2230,6 +2238,89 @@ class AutomatedStrategyManager:
         if win_rate < 0.9:
             return min(20, current_count + 2)  # 增加网格密度
         return current_count
+    
+    def _moderate_parameter_optimization(self, strategy_id: str, performance: Dict):
+        """⭐ 中分策略适度参数优化"""
+        try:
+            strategy_response = self.quantitative_service.get_strategy(strategy_id)
+            if not strategy_response.get('success', False):
+                return
+            strategy = strategy_response.get('data', {})
+            
+            current_params = strategy.get('parameters', {})
+            optimized_params = current_params.copy()
+            
+            # 🎯 适度调整关键参数
+            for param_name, value in current_params.items():
+                if isinstance(value, (int, float)):
+                    if 'threshold' in param_name.lower():
+                        # 阈值参数适度调整 ±10%
+                        adjustment = value * 0.1 * (1 if performance.get('score', 50) < 75 else -1)
+                        optimized_params[param_name] = max(0.001, value + adjustment)
+                    elif 'period' in param_name.lower():
+                        # 周期参数小幅调整 ±2
+                        adjustment = 2 if performance.get('score', 50) < 75 else -2
+                        optimized_params[param_name] = max(5, min(60, value + adjustment))
+                        
+            performance['parameters'] = optimized_params
+            print(f"🔧 中分策略 {strategy_id} 适度参数优化完成")
+            
+        except Exception as e:
+            print(f"❌ 中分策略优化失败 {strategy_id}: {e}")
+    
+    def _fine_tune_high_score_strategy(self, strategy_id: str, performance: Dict):
+        """⭐ 高分策略精细调优"""
+        try:
+            strategy_response = self.quantitative_service.get_strategy(strategy_id)
+            if not strategy_response.get('success', False):
+                return
+            strategy = strategy_response.get('data', {})
+            
+            current_params = strategy.get('parameters', {})
+            optimized_params = current_params.copy()
+            
+            # 🎯 精细调整，保持高分策略的稳定性
+            for param_name, value in current_params.items():
+                if isinstance(value, (int, float)):
+                    if 'threshold' in param_name.lower():
+                        # 阈值参数微调 ±3%
+                        adjustment = value * 0.03 * (1 if performance.get('win_rate', 0.5) < 0.8 else -1)
+                        optimized_params[param_name] = max(0.001, value + adjustment)
+                    elif 'period' in param_name.lower():
+                        # 周期参数微调 ±1
+                        adjustment = 1 if performance.get('win_rate', 0.5) < 0.8 else -1
+                        optimized_params[param_name] = max(5, min(60, value + adjustment))
+                        
+            performance['parameters'] = optimized_params
+            print(f"✨ 高分策略 {strategy_id} 精细调优完成")
+            
+        except Exception as e:
+            print(f"❌ 高分策略调优失败 {strategy_id}: {e}")
+    
+    def _preserve_elite_strategy(self, strategy_id: str, performance: Dict):
+        """⭐ 顶级策略微调保持"""
+        try:
+            strategy_response = self.quantitative_service.get_strategy(strategy_id)
+            if not strategy_response.get('success', False):
+                return
+            strategy = strategy_response.get('data', {})
+            
+            current_params = strategy.get('parameters', {})
+            optimized_params = current_params.copy()
+            
+            # 🎯 极小调整，主要维持现状
+            for param_name, value in current_params.items():
+                if isinstance(value, (int, float)):
+                    if 'threshold' in param_name.lower():
+                        # 阈值参数极微调 ±1%
+                        adjustment = value * 0.01 * (1 if performance.get('total_return', 0) < 0.05 else 0)
+                        optimized_params[param_name] = max(0.001, value + adjustment)
+                        
+            performance['parameters'] = optimized_params
+            print(f"🏆 顶级策略 {strategy_id} 微调保持完成")
+            
+        except Exception as e:
+            print(f"❌ 顶级策略维护失败 {strategy_id}: {e}")
 
 class QuantitativeService:
     """
@@ -2364,7 +2455,163 @@ class QuantitativeService:
         # 🧬 启动进化引擎
         self._init_evolution_engine()
         
+        # ⭐ 初始化策略参数模板
+        self._init_strategy_templates()
+        
         print("✅ QuantitativeService 初始化完成")
+    
+    def _init_strategy_templates(self):
+        """初始化策略参数模板 - 每种策略类型都有丰富的参数"""
+        self.strategy_templates = {
+            'momentum': {
+                'name_prefix': '动量策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'ADA/USDT', 'DOT/USDT'],
+                'param_ranges': {
+                    'rsi_period': (10, 30),           # RSI周期
+                    'rsi_oversold': (20, 40),         # RSI超卖线
+                    'rsi_overbought': (60, 80),       # RSI超买线
+                    'macd_fast': (8, 15),             # MACD快线
+                    'macd_slow': (20, 30),            # MACD慢线
+                    'macd_signal': (7, 12),           # MACD信号线
+                    'momentum_period': (5, 25),        # 动量周期
+                    'price_change_threshold': (0.01, 0.05),  # 价格变化阈值
+                    'volume_filter': (0.8, 2.0),      # 成交量过滤器
+                    'stop_loss': (0.02, 0.08),        # 止损比例
+                    'take_profit': (0.03, 0.12),      # 止盈比例
+                    'quantity': (0.5, 2.0)            # 交易数量
+                }
+            },
+            'mean_reversion': {
+                'name_prefix': '均值回归',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'LTC/USDT', 'XRP/USDT'],
+                'param_ranges': {
+                    'lookback_period': (10, 50),      # 回望周期
+                    'std_multiplier': (1.5, 3.0),     # 标准差倍数
+                    'bollinger_period': (15, 30),     # 布林带周期
+                    'bollinger_std': (1.8, 2.5),      # 布林带标准差
+                    'volatility_threshold': (0.02, 0.08),  # 波动率阈值
+                    'mean_reversion_strength': (0.1, 0.4),  # 回归强度
+                    'entry_threshold': (0.015, 0.04), # 入场阈值
+                    'exit_threshold': (0.005, 0.02),  # 出场阈值
+                    'max_hold_period': (12, 72),      # 最大持有时间(小时)
+                    'risk_per_trade': (0.01, 0.03),   # 单笔交易风险
+                    'quantity': (0.3, 1.5)            # 交易数量
+                }
+            },
+            'breakout': {
+                'name_prefix': '突破策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT'],
+                'param_ranges': {
+                    'breakout_period': (15, 40),      # 突破检测周期
+                    'resistance_lookback': (20, 60),  # 阻力位回望
+                    'support_lookback': (20, 60),     # 支撑位回望
+                    'breakout_threshold': (0.008, 0.025),  # 突破阈值
+                    'volume_confirmation': (1.2, 3.0), # 成交量确认倍数
+                    'momentum_confirmation': (0.5, 1.5), # 动量确认
+                    'false_breakout_filter': (0.3, 0.8), # 假突破过滤器
+                    'consolidation_period': (8, 24),   # 整理期检测
+                    'trend_strength_min': (0.4, 0.8),  # 最小趋势强度
+                    'stop_loss': (0.015, 0.06),       # 止损
+                    'trailing_stop': (0.01, 0.04),    # 移动止损
+                    'quantity': (0.4, 1.8)            # 交易数量
+                }
+            },
+            'grid_trading': {
+                'name_prefix': '网格交易',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'SHIB/USDT', 'MATIC/USDT'],
+                'param_ranges': {
+                    'grid_spacing': (0.005, 0.025),   # 网格间距
+                    'grid_count': (5, 15),            # 网格数量
+                    'upper_limit': (0.03, 0.10),      # 上限百分比
+                    'lower_limit': (0.03, 0.10),      # 下限百分比
+                    'take_profit_each': (0.008, 0.020), # 单格止盈
+                    'rebalance_threshold': (0.15, 0.35), # 再平衡阈值
+                    'volatility_adjustment': (0.5, 1.5), # 波动率调整
+                    'trend_following_ratio': (0.2, 0.6), # 趋势跟随比例
+                    'max_grid_positions': (3, 8),     # 最大网格仓位
+                    'base_quantity': (0.1, 0.5),      # 基础数量
+                    'quantity_multiplier': (1.0, 2.0), # 数量倍数
+                    'safety_margin': (0.05, 0.15)     # 安全边际
+                }
+            },
+            'high_frequency': {
+                'name_prefix': '高频策略',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'LTC/USDT', 'BCH/USDT'],
+                'param_ranges': {
+                    'tick_size': (0.001, 0.005),      # 最小变动单位
+                    'spread_threshold': (0.0005, 0.002), # 价差阈值
+                    'order_book_depth': (3, 10),      # 订单簿深度
+                    'latency_tolerance': (50, 200),   # 延迟容忍度(ms)
+                    'market_impact_limit': (0.001, 0.005), # 市场冲击限制
+                    'inventory_limit': (0.1, 0.4),    # 库存限制
+                    'profit_target': (0.0008, 0.003), # 盈利目标
+                    'max_position_time': (5, 30),     # 最大持仓时间(分钟)
+                    'volatility_scaling': (0.5, 2.0), # 波动率缩放
+                    'risk_limit': (0.005, 0.02),      # 风险限制
+                    'min_volume': (100, 1000),        # 最小成交量
+                    'quantity': (0.1, 0.8)            # 交易数量
+                }
+            },
+            'trend_following': {
+                'name_prefix': '趋势跟踪',
+                'symbols': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT'],
+                'param_ranges': {
+                    'trend_period': (20, 60),         # 趋势检测周期
+                    'ema_fast': (8, 20),              # 快速EMA
+                    'ema_slow': (25, 55),             # 慢速EMA
+                    'adx_period': (10, 25),           # ADX周期
+                    'adx_threshold': (20, 35),        # ADX阈值
+                    'trend_strength_min': (0.3, 0.7), # 最小趋势强度
+                    'pullback_tolerance': (0.02, 0.08), # 回调容忍度
+                    'entry_confirmation': (2, 5),     # 入场确认周期
+                    'exit_signal_period': (3, 10),    # 出场信号周期
+                    'trailing_stop_atr': (1.5, 4.0),  # ATR移动止损
+                    'position_sizing': (0.5, 1.5),    # 仓位大小
+                    'quantity': (0.4, 1.6)            # 交易数量
+                }
+            }
+        }
+        print("✅ 策略参数模板初始化完成，包含6种策略类型，每种策略10-12个参数")
+    
+    def _generate_strategy_from_template(self, strategy_type: str) -> Dict:
+        """⭐ 从模板生成具有丰富参数的新策略"""
+        import random
+        import uuid
+        
+        if strategy_type not in self.strategy_templates:
+            print(f"❌ 未知策略类型: {strategy_type}")
+            return {}
+        
+        template = self.strategy_templates[strategy_type]
+        strategy_id = f"{strategy_type}_{uuid.uuid4().hex[:8]}"
+        
+        # 🎯 根据参数范围随机生成参数
+        parameters = {}
+        for param_name, (min_val, max_val) in template['param_ranges'].items():
+            if isinstance(min_val, int) and isinstance(max_val, int):
+                parameters[param_name] = random.randint(min_val, max_val)
+            else:
+                parameters[param_name] = round(random.uniform(min_val, max_val), 4)
+        
+        # 🎯 随机选择交易对
+        symbol = random.choice(template['symbols'])
+        
+        strategy_config = {
+            'id': strategy_id,
+            'name': f"{template['name_prefix']}_{strategy_id[-8:]}",
+            'strategy_type': strategy_type,
+            'symbol': symbol,
+            'enabled': True,
+            'parameters': parameters,
+            'created_time': datetime.now().isoformat(),
+            'updated_time': datetime.now().isoformat(),
+            'generation': 1,
+            'parent_id': None,
+            'initial_score': 50.0  # 默认初始分数
+        }
+        
+        print(f"✅ 从模板生成新策略: {strategy_config['name']} ({len(parameters)}个参数)")
+        return strategy_config
     
     def _get_strategy_by_id(self, strategy_id: str) -> Dict:
         """统一的策略获取方法 - 替代老版本的self.strategies[strategy_id]"""
@@ -2551,7 +2798,7 @@ class QuantitativeService:
             # 获取初始评分配置
             initial_score = self._get_initial_strategy_score(strategy_id)
             
-            # 计算当前评分
+            # ⭐ 计算当前评分 - 提高交易门槛到65分
             if real_total_trades > 0:
                 # 有真实交易数据，计算真实评分
                 current_score = self._calculate_real_trading_score(
@@ -2559,11 +2806,11 @@ class QuantitativeService:
                     win_rate=real_win_rate, 
                     total_trades=real_total_trades
                 )
-                qualified = current_score >= 60.0
+                qualified = current_score >= 65.0  # 提高到65分门槛
             else:
                 # 没有真实交易数据，使用初始评分
                 current_score = initial_score
-                qualified = initial_score >= 60.0
+                qualified = initial_score >= 65.0  # 提高到65分门槛
             
             result = {
                 'final_score': current_score,
@@ -2822,22 +3069,22 @@ class QuantitativeService:
             return current_balance * 0.1  # 默认10%
     
     def start(self):
-        """启动量化交易系统"""
+        """启动量化交易系统 - 24小时运行策略进化，但不自动交易"""
         if self.running:
             print("量化系统已经在运行中")
             return True
         
         try:
-            # 启动系统
+            # ⭐ 启动量化系统（策略进化），但不启动自动交易
             self.running = True
-            self.auto_trading_enabled = True  # ⭐ 启动时默认开启自动交易
+            self.auto_trading_enabled = False  # 默认不开启自动交易，由用户控制
             
-            # ⭐ 更新数据库状态 - 包含自动交易状态
+            # ⭐ 更新数据库状态 - 分离系统运行和自动交易
             self.update_system_status(
                 quantitative_running=True,
-                auto_trading_enabled=True,  # 明确设置自动交易开启
+                auto_trading_enabled=False,  # 明确设置自动交易关闭
                 system_health='online',
-                notes='后台量化服务已启动，自动交易已开启'
+                notes='量化系统已启动，策略正在进化，自动交易待开启'
             )
             
             print("🚀 量化交易系统启动成功")

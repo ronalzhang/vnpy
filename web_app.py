@@ -2351,12 +2351,15 @@ def main():
     # 强制初始化交易所客户端
     init_api_clients()
     
-    # 启动量化服务（如果可用）
+    # ⭐ 启动量化服务（默认启动系统但不开启自动交易）
     if QUANTITATIVE_ENABLED and quantitative_service:
         try:
-            print("🚀 启动量化交易服务...")
-            quantitative_service.start()
-            print("✅ 量化交易服务启动成功")
+            print("🚀 启动量化交易服务（24小时策略进化模式）...")
+            success = quantitative_service.start()  # 这个会设置 auto_trading_enabled=False
+            if success:
+                print("✅ 量化系统启动成功 - 策略正在24小时进化，自动交易待用户手动开启")
+            else:
+                print("❌ 量化系统启动失败")
         except Exception as e:
             print(f"❌ 量化交易服务启动失败: {e}")
     
