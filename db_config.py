@@ -19,7 +19,7 @@ DATABASE_CONFIG = {
         'host': 'localhost',
         'port': 5432,
         'database': 'quantitative',
-        'user': 'postgres',
+        'user': 'quant_user',
         'password': 'chenfei0421'
     },
 

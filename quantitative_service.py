@@ -2299,7 +2299,7 @@ class QuantitativeService:
         self.db_config = {
             'host': 'localhost',
             'database': 'quantitative',
-            'user': 'postgres',
+            'user': 'quant_user',
             'password': 'chenfei0421'
         }
         self.conn = psycopg2.connect(**self.db_config)
