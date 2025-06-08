@@ -11,7 +11,7 @@ import time
 import random
 import threading
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Any
 from loguru import logger
 import ccxt
@@ -22,6 +22,8 @@ import pickle
 from functools import wraps
 import time
 import threading
+import gc
+import weakref
 
 # 缓存装饰器
 def cache_with_ttl(ttl_seconds):
@@ -173,42 +175,45 @@ def init_api_clients():
         for exchange_id in EXCHANGES:
             if exchange_id in config and "api_key" in config[exchange_id] and config[exchange_id]["api_key"]:
                 try:
-                    # 尝试创建客户端
-                    exchange_class = getattr(ccxt, exchange_id)
-                    
                     # 获取API密钥配置
                     api_key = config[exchange_id]["api_key"]
                     secret_key = config[exchange_id]["secret_key"]
                     password = config[exchange_id].get("password", "")
                     
-                    # 创建客户端
-                    client = exchange_class({
+                    # 准备配置
+                    client_config = {
                         'apiKey': api_key,
                         'secret': secret_key,
                         'password': password,
                         'enableRateLimit': True,
                         'sandbox': False  # 确保使用生产环境
-                    })
+                    }
                     
                     # 设置代理（如果配置）
                     if "proxy" in config and config["proxy"]:
-                        client.proxies = {
+                        client_config['proxies'] = {
                             'http': config["proxy"],
                             'https': config["proxy"]
                         }
                     
+                    # 使用连接管理器获取客户端
+                    client = connection_manager.get_client(exchange_id, client_config)
+                    
                     # 测试API连接
-                    try:
-                        print(f"测试 {exchange_id} API连接...")
-                        # 测试获取价格数据（不需要账户权限）
-                        test_ticker = client.fetch_ticker('BTC/USDT')
-                        print(f"初始化 {exchange_id} API客户端成功 - BTC价格: {test_ticker['last']}")
-                        exchange_clients[exchange_id] = client
-                    except Exception as e:
-                        print(f"API连接测试失败 {exchange_id}: {e}")
-                        # 即使测试失败也添加客户端，可能是权限问题但价格数据仍可获取
-                        exchange_clients[exchange_id] = client
-                        print(f"强制添加 {exchange_id} 客户端用于价格数据获取")
+                    if client:
+                        try:
+                            print(f"测试 {exchange_id} API连接...")
+                            # 测试获取价格数据（不需要账户权限）
+                            test_ticker = client.fetch_ticker('BTC/USDT')
+                            print(f"初始化 {exchange_id} API客户端成功 - BTC价格: {test_ticker['last']}")
+                            exchange_clients[exchange_id] = client
+                        except Exception as e:
+                            print(f"API连接测试失败 {exchange_id}: {e}")
+                            # 即使测试失败也添加客户端，可能是权限问题但价格数据仍可获取
+                            exchange_clients[exchange_id] = client
+                            print(f"强制添加 {exchange_id} 客户端用于价格数据获取")
+                    else:
+                        print(f"无法创建 {exchange_id} 客户端")
                 except Exception as e:
                     print(f"初始化 {exchange_id} API客户端失败: {e}")
             else:
@@ -681,16 +686,16 @@ def get_exchange_prices():
     return prices
 
 def monitor_thread(interval=5):
-    """监控线程函数 - 优化内存使用，降低调用频率"""
+    """监控线程函数"""
     global prices_data, diff_data, balances_data, status
-    
-    # 使用更长的间隔来减少内存使用，同时保持功能
-    optimized_interval = max(interval, 60)  # 最少60秒间隔
-    print(f"监控线程启动，优化间隔: {optimized_interval}秒（原{interval}秒）")
     
     while True:
         try:
             if status["running"]:
+                # 检查是否需要清理全局变量
+                if should_cleanup():
+                    cleanup_global_variables()
+                
                 # 强制使用真实API连接获取价格数据
                 prices = get_exchange_prices()
                 prices_data = prices
@@ -724,7 +729,7 @@ def monitor_thread(interval=5):
         except Exception as e:
             print(f"监控线程错误: {e}")
         
-        time.sleep(optimized_interval)
+        time.sleep(interval)
 
 # 路由
 @app.route('/')
@@ -2236,10 +2241,9 @@ def main():
         except Exception as e:
             print(f"❌ 量化交易服务启动失败: {e}")
     
-    # 启动监控线程 - 使用优化间隔以减少内存使用
+    # 启动监控线程
     monitor = threading.Thread(target=monitor_thread, daemon=True)
     monitor.start()
-    print("监控线程已启动，使用优化的60秒间隔")
     
     # 初始化套利系统
     if args.arbitrage and ARBITRAGE_ENABLED:
@@ -2258,7 +2262,12 @@ def main():
             logger.error(f"套利系统初始化失败: {e}")
     
     # 启动Web服务器
-    app.run(host='0.0.0.0', port=args.port)
+    try:
+        app.run(host='0.0.0.0', port=args.port)
+    finally:
+        # 程序退出时清理连接
+        connection_manager.close_all()
+        print("已清理所有ccxt连接")
 
 @app.route('/api/quantitative/account-info', methods=['GET'])
 def get_account_info():
@@ -2286,6 +2295,111 @@ def get_account_info():
             'message': f'获取失败: {str(e)}',
             'data': {}
         })
+
+# 全局变量清理配置
+GLOBAL_CLEANUP_INTERVAL = 3600  # 1小时清理一次
+ARBITRAGE_HISTORY_MAX_AGE = 86400  # 24小时
+last_cleanup_time = datetime.now()
+
+# ccxt连接池管理
+class CCXTConnectionManager:
+    def __init__(self):
+        self._connections = {}
+        self._last_used = {}
+        self._max_idle_time = 300  # 5分钟空闲后关闭连接
+    
+    def get_client(self, exchange_id, config):
+        """获取或创建ccxt客户端"""
+        current_time = datetime.now()
+        
+        # 检查是否有现有连接且未过期
+        if exchange_id in self._connections:
+            last_used = self._last_used.get(exchange_id, current_time)
+            if (current_time - last_used).total_seconds() < self._max_idle_time:
+                self._last_used[exchange_id] = current_time
+                return self._connections[exchange_id]
+            else:
+                # 连接过期，关闭并删除
+                self._close_connection(exchange_id)
+        
+        # 创建新连接
+        try:
+            exchange_class = getattr(ccxt, exchange_id)
+            client = exchange_class(config)
+            self._connections[exchange_id] = client
+            self._last_used[exchange_id] = current_time
+            return client
+        except Exception as e:
+            print(f"创建{exchange_id}连接失败: {e}")
+            return None
+    
+    def _close_connection(self, exchange_id):
+        """关闭特定连接"""
+        if exchange_id in self._connections:
+            try:
+                client = self._connections[exchange_id]
+                if hasattr(client, 'close'):
+                    client.close()
+            except:
+                pass
+            finally:
+                del self._connections[exchange_id]
+                if exchange_id in self._last_used:
+                    del self._last_used[exchange_id]
+    
+    def cleanup_idle_connections(self):
+        """清理空闲连接"""
+        current_time = datetime.now()
+        to_remove = []
+        
+        for exchange_id, last_used in self._last_used.items():
+            if (current_time - last_used).total_seconds() > self._max_idle_time:
+                to_remove.append(exchange_id)
+        
+        for exchange_id in to_remove:
+            self._close_connection(exchange_id)
+            print(f"清理空闲连接: {exchange_id}")
+    
+    def close_all(self):
+        """关闭所有连接"""
+        for exchange_id in list(self._connections.keys()):
+            self._close_connection(exchange_id)
+
+# 全局连接管理器
+connection_manager = CCXTConnectionManager()
+
+def cleanup_global_variables():
+    """定期清理全局变量"""
+    global arbitrage_history, prices_data, diff_data, balances_data, last_cleanup_time
+    
+    current_time = datetime.now()
+    cutoff_time = current_time - timedelta(seconds=ARBITRAGE_HISTORY_MAX_AGE)
+    
+    # 清理套利历史数据
+    if arbitrage_history:
+        for key in list(arbitrage_history.keys()):
+            if key in arbitrage_history:
+                arbitrage_history[key] = [
+                    record for record in arbitrage_history[key]
+                    if datetime.strptime(record["time"], "%Y-%m-%d %H:%M:%S") > cutoff_time
+                ]
+                # 如果列表为空，删除整个key
+                if not arbitrage_history[key]:
+                    del arbitrage_history[key]
+    
+    # 清理连接池
+    connection_manager.cleanup_idle_connections()
+    
+    # 强制垃圾回收
+    gc.collect()
+    
+    last_cleanup_time = current_time
+    print(f"全局变量清理完成，当前套利历史记录数: {sum(len(v) for v in arbitrage_history.values())}")
+
+def should_cleanup():
+    """检查是否需要执行清理"""
+    global last_cleanup_time
+    return (datetime.now() - last_cleanup_time).total_seconds() > GLOBAL_CLEANUP_INTERVAL
 
 if __name__ == "__main__":
     main() 
