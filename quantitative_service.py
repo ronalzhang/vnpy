@@ -3614,6 +3614,42 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 获取价格失败: {e}")
             return 1.0
+    
+    def _save_signal_to_db(self, signal):
+        """保存交易信号到数据库"""
+        try:
+            # 确保signal是字典类型
+            if not isinstance(signal, dict):
+                print(f"❌ 信号格式错误: {type(signal)}")
+                return False
+            
+            # 使用数据库管理器保存信号
+            query = '''
+                INSERT INTO trading_signals 
+                (id, strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed, priority)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            '''
+            
+            params = (
+                signal.get('id'),
+                signal.get('strategy_id'),
+                signal.get('symbol'),
+                signal.get('signal_type'),
+                signal.get('price', 0.0),
+                signal.get('quantity', 0.0),
+                signal.get('confidence', 0.0),
+                signal.get('timestamp'),
+                signal.get('executed', 0),
+                signal.get('priority', 'normal')
+            )
+            
+            self.db_manager.execute_query(query, params)
+            return True
+            
+        except Exception as e:
+            print(f"❌ 保存信号失败: {e}")
+            return False
+    
     def invalidate_balance_cache(self, trigger='manual_refresh'):
         """使余额缓存失效 - 在特定事件时调用"""
         print(f"🔄 触发余额缓存刷新: {trigger}")
@@ -4414,7 +4450,12 @@ class QuantitativeService:
                         
                         # 记录当前状态到数据库
                         current_balance = self._get_current_balance()
-                        self.db_manager.record_balance_history(current_balance)
+                        # 记录余额历史（使用正确的方法调用）
+                        self.db_manager.record_balance_history(
+                            total_balance=current_balance,
+                            available_balance=current_balance,
+                            frozen_balance=0.0
+                        )
                     
                     time.sleep(60)  # 1分钟
                     
@@ -4861,50 +4902,48 @@ class QuantitativeService:
     def get_system_status_from_db(self):
         """从数据库获取系统状态"""
         try:
-            # 确保数据库连接正常并清理事务状态
-            try:
-                if self.conn.closed:
-                    self.conn = psycopg2.connect(**self.db_config)
-                    
-                # 清理任何未完成的事务
-                self.conn.rollback()
-                self.conn.autocommit = True
-                
-            except Exception as conn_error:
-                print(f"重置数据库连接: {conn_error}")
-                try:
-                    self.conn = psycopg2.connect(**self.db_config)
-                    self.conn.autocommit = True
-                except Exception as reconnect_error:
-                    print(f"重连数据库失败: {reconnect_error}")
-                    return self._get_default_system_status(f'数据库连接失败: {str(reconnect_error)}')
-            
-            cursor = self.conn.cursor()
-            cursor.execute('''
+            # 使用数据库管理器而不是直接连接
+            query = '''
                 SELECT quantitative_running, auto_trading_enabled, total_strategies,
                        running_strategies, selected_strategies, current_generation,
                        evolution_enabled, last_evolution_time, last_update_time,
                        system_health, notes
                 FROM system_status WHERE id = 1
-            ''')
+            '''
             
-            row = cursor.fetchone()
-            cursor.close()
+            row = self.db_manager.execute_query(query, fetch_one=True)
             
             if row:
-                return {
-                    'quantitative_running': bool(row[0]),
-                    'auto_trading_enabled': bool(row[1]),
-                    'total_strategies': row[2],
-                    'running_strategies': row[3],
-                    'selected_strategies': row[4],
-                    'current_generation': row[5],
-                    'evolution_enabled': bool(row[6]),
-                    'last_evolution_time': row[7],
-                    'last_update_time': row[8],
-                    'system_health': row[9],
-                    'notes': row[10]
-                }
+                # 处理字典或元组类型的返回数据
+                if isinstance(row, dict):
+                    return {
+                        'quantitative_running': bool(row.get('quantitative_running', False)),
+                        'auto_trading_enabled': bool(row.get('auto_trading_enabled', False)),
+                        'total_strategies': row.get('total_strategies', 0),
+                        'running_strategies': row.get('running_strategies', 0),
+                        'selected_strategies': row.get('selected_strategies', 0),
+                        'current_generation': row.get('current_generation', 0),
+                        'evolution_enabled': bool(row.get('evolution_enabled', True)),
+                        'last_evolution_time': row.get('last_evolution_time'),
+                        'last_update_time': row.get('last_update_time'),
+                        'system_health': row.get('system_health', 'offline'),
+                        'notes': row.get('notes')
+                    }
+                else:
+                    # 元组格式
+                    return {
+                        'quantitative_running': bool(row[0]),
+                        'auto_trading_enabled': bool(row[1]),
+                        'total_strategies': row[2],
+                        'running_strategies': row[3],
+                        'selected_strategies': row[4],
+                        'current_generation': row[5],
+                        'evolution_enabled': bool(row[6]),
+                        'last_evolution_time': row[7],
+                        'last_update_time': row[8],
+                        'system_health': row[9],
+                        'notes': row[10]
+                    }
             else:
                 # 如果没有记录，返回默认状态
                 return self._get_default_system_status()

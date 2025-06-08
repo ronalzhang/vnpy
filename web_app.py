@@ -1640,16 +1640,12 @@ def system_control():
             }), 500
         
         if action == 'start':
-            # 启动量化交易系统
+            # 启动量化交易系统（24/7模式：系统运行但自动交易关闭）
             success = quantitative_service.start()
             if success:
-                quantitative_service.set_auto_trading(True)
-                # 确保状态持久化
-                quantitative_service.update_system_status(
-                    quantitative_running=True,
-                    auto_trading_enabled=True,
-                    system_health='online'
-                )
+                # 不自动开启交易，保持24/7架构
+                quantitative_service.set_auto_trading(False)
+                # start方法内部已经正确更新系统状态，无需重复更新
                 return jsonify({
                     'success': True,
                     'message': '系统启动成功',
@@ -1678,18 +1674,13 @@ def system_control():
             })
         
         elif action == 'restart':
-            # 重启量化交易系统
+            # 重启量化交易系统（24/7模式）
             quantitative_service.stop()
             time.sleep(1)
             success = quantitative_service.start()
             if success:
-                quantitative_service.set_auto_trading(True)
-                # 确保状态持久化
-                quantitative_service.update_system_status(
-                    quantitative_running=True,
-                    auto_trading_enabled=True,
-                    system_health='online'
-                )
+                quantitative_service.set_auto_trading(False)  # 24/7模式：系统运行但自动交易关闭
+                # start方法内部已经正确更新系统状态，无需重复更新
                 return jsonify({
                     'success': True,
                     'message': '系统重启成功',
