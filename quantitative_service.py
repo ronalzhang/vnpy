@@ -198,7 +198,7 @@ class PerformanceMetrics:
 class DatabaseManager:
     """数据库管理类 - 使用PostgreSQL适配器"""
     
-    def __init__(self, db_path: str = "quantitative-- .db (removed)"):
+    def __init__(self, db_path: str = "quantitative.db"):
         self.db_path = db_path  # 保持兼容性
         self.db_adapter = get_db_adapter()
         self.conn = self.db_adapter.connection
@@ -410,7 +410,12 @@ class DatabaseManager:
         for amount, note in milestones:
             if current_balance >= amount:
                 # 检查是否已记录此里程碑
-                conn = -- sqlite3. (removed)connect(self.db_path)
+                conn = psycopg2.connect(
+                    host="localhost",
+                    database="quantitative",
+                    user="quant_user", 
+                    password="chenfei0421"
+                )
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT COUNT(*) FROM account_balance_history WHERE milestone_note = ?", 
@@ -1911,20 +1916,32 @@ class AutomatedStrategyManager:
     
     def _calculate_profit_factor(self, strategy_id: str) -> float:
         """计算盈利因子"""
-        with -- sqlite3. (removed)connect(self.db_manager.db_path) as conn:
+        try:
+            conn = psycopg2.connect(
+                host="localhost",
+                database="quantitative",
+                user="quant_user",
+                password="chenfei0421"
+            )
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as total_profit,
                        SUM(CASE WHEN realized_pnl < 0 THEN ABS(realized_pnl) ELSE 0 END) as total_loss
                 FROM trading_orders 
-                WHERE strategy_id = ? AND status = 'executed'
+                WHERE strategy_id = %s AND status = 'executed'
             """, (strategy_id,))
             
             result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
             if not result or result[1] is None or result[1] == 0:  # 防止除零错误
                 return 1.0
                 
-        return result[0] / result[1] if result[0] and result[1] else 1.0
+            return result[0] / result[1] if result[0] and result[1] else 1.0
+        except Exception as e:
+            print(f"计算盈利因子失败: {e}")
+            return 1.0
     
     def _get_current_allocation(self, strategy_id: str) -> float:
         """获取当前资金分配"""

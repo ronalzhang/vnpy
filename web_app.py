@@ -1448,7 +1448,12 @@ def get_system_status():
             # 如果量化服务未初始化，仍尝试从数据库读取
             try:
                 import sqlite3
-                conn = -- sqlite3. (removed)connect('quantitative-- .db (removed)')
+                conn = psycopg2.connect(
+        host="localhost",
+        database="quantitative",
+        user="quant_user",
+        password="chenfei0421"
+    )
                 cursor = conn.cursor()
                 cursor.execute('''
                     SELECT quantitative_running, auto_trading_enabled, total_strategies,
