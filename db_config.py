@@ -227,20 +227,7 @@ class DatabaseAdapter:
         finally:
             sqlite_conn.close()
     
-    def record_balance_history(self, total_balance: float, available_balance: float = None, 
-                              frozen_balance: float = None, daily_pnl: float = None,
-                              daily_return: float = None, milestone_note: str = None):
-        """记录余额历史"""
-        try:
-            self.execute_query("""
-                INSERT INTO account_balance_history 
-                (total_balance, available_balance, frozen_balance, daily_pnl, daily_return, timestamp, milestone_note)
-                VALUES (%s, %s, %s, %s, %s, NOW(), %s)
-            """, (total_balance, available_balance or 0, frozen_balance or 0, 
-                 daily_pnl or 0, daily_return or 0, milestone_note or ''))
-            print(f"✅ 记录余额历史: {total_balance}")
-        except Exception as e:
-            print(f"❌ 记录余额历史失败: {e}")
+
     
     def close(self):
         """关闭连接"""

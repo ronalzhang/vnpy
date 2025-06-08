@@ -1538,43 +1538,6 @@ def get_balance_history():
         
         if quantitative_service:
             history = quantitative_service.get_balance_history(days)
-            
-            # 如果没有历史数据，生成示例增长曲线
-            if not history:
-                from datetime import datetime, timedelta
-                history = []
-                base_balance = 10.0  # 起始资金
-                current_balance = 15.25  # 当前资金
-                
-                for i in range(days):
-                    date = datetime.now() - timedelta(days=days-1-i)
-                    
-                    # 模拟资产增长曲线（有涨有跌但总体向上）
-                    progress = i / (days - 1.0)
-                    daily_balance = base_balance + (current_balance - base_balance) * progress
-                    
-                    # 添加一些波动
-                    if i > 0:
-                        volatility = 0.1 * (1 + 0.5 * (hash(str(i)) % 100) / 100)
-                        daily_balance *= (1 + volatility * ((hash(str(i*2)) % 100) / 100 - 0.5))
-                    
-                    # 确保最后一天是当前余额
-                    if i == days - 1:
-                        daily_balance = current_balance
-                    
-                    daily_pnl = daily_balance - (daily_balance / (1 + 0.02)) if i > 0 else 0
-                    daily_return = (daily_pnl / daily_balance) * 100 if daily_balance > 0 else 0
-                    
-                    history.append({
-                        'timestamp': date.strftime('%Y-%m-%d'),
-                        'total_balance': round(daily_balance, 2),
-                        'available_balance': round(daily_balance * 0.95, 2),
-                        'frozen_balance': round(daily_balance * 0.05, 2),
-                        'daily_pnl': round(daily_pnl, 2),
-                        'daily_return': round(daily_return, 2),
-                        'cumulative_return': round((daily_balance - base_balance) / base_balance * 100, 2)
-                    })
-            
             return jsonify({
                 'success': True,
                 'data': history
@@ -1595,41 +1558,11 @@ def get_balance_history():
 
 @app.route('/api/quantitative/system-status', methods=['GET'])
 def get_system_status():
-    """获取量化系统状态 - 简化版本，确保状态持久化"""
+    """获取量化系统状态"""
     try:
         if quantitative_service:
-            # 直接从量化服务获取状态
-            strategies = quantitative_service.get_strategies()
-            total_strategies = len(strategies.get('data', []))
-            running_strategies = sum(1 for s in strategies.get('data', []) if s.get('enabled', False))
-            selected_strategies = sum(1 for s in strategies.get('data', []) if s.get('qualified_for_trading', False))
-            
-            # 确保状态同步到数据库
-            quantitative_service.update_system_status(
-                quantitative_running=quantitative_service.running,
-                auto_trading_enabled=quantitative_service.auto_trading_enabled,
-                total_strategies=total_strategies,
-                running_strategies=running_strategies,
-                selected_strategies=selected_strategies,
-                current_generation=1,
-                system_health='online'
-            )
-            
-            return jsonify({
-                'success': True,
-                'running': quantitative_service.running,
-                'auto_trading_enabled': quantitative_service.auto_trading_enabled,
-                'total_strategies': total_strategies,
-                'running_strategies': running_strategies,
-                'selected_strategies': selected_strategies,
-                'current_generation': 1,
-                'evolution_enabled': True,
-                'last_evolution_time': None,
-                'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'system_health': 'online' if quantitative_service.running else 'offline',
-                'notes': '系统正常运行',
-                'data_source': 'service'
-            })
+            # 直接调用量化服务的统一方法
+            return jsonify(quantitative_service.get_system_status_from_db())
         else:
             return jsonify({
                 'success': False,
