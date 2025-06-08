@@ -37,7 +37,7 @@ def safe_module_import(module_name, timeout=10):
 # 预先尝试导入可能问题的模块
 for module in ['ccxt', 'requests', 'pandas', 'numpy']:
     safe_module_import(module)
-import sqlite3
+# sqlite3 - removed for PostgreSQL
 import json
 import time
 import threading

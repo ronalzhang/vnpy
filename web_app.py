@@ -1447,7 +1447,7 @@ def get_system_status():
         else:
             # 如果量化服务未初始化，仍尝试从数据库读取
             try:
-                import sqlite3
+                # sqlite3 - removed for PostgreSQL
                 conn = psycopg2.connect(
         host="localhost",
         database="quantitative",
