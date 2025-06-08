@@ -3072,10 +3072,17 @@ class QuantitativeService:
             self.running = True
             self.auto_trading_enabled = False  # 默认不开启自动交易，由用户控制
             
-            # ⭐ 更新数据库状态 - 分离系统运行和自动交易
+            # ⭐ 更新数据库状态 - 分离系统运行和自动交易，包含策略计数
+            strategies_response = self.get_strategies()
+            strategies = strategies_response.get('data', []) if strategies_response.get('success', False) else []
+            enabled_strategies = [s for s in strategies if s.get('enabled', False)]
+            
             self.update_system_status(
                 quantitative_running=True,
                 auto_trading_enabled=False,  # 明确设置自动交易关闭
+                total_strategies=len(strategies),
+                running_strategies=len(enabled_strategies),
+                selected_strategies=len([s for s in enabled_strategies if s.get('final_score', 0) >= 65]),
                 system_health='online',
                 notes='量化系统已启动，策略正在进化，自动交易待开启'
             )
@@ -3112,10 +3119,13 @@ class QuantitativeService:
             self.running = False
             self.auto_trading_enabled = False
             
-            # ⭐ 更新数据库状态 - 后台服务停止
+            # ⭐ 更新数据库状态 - 后台服务停止，重置策略计数
             self.update_system_status(
                 quantitative_running=False,
                 auto_trading_enabled=False,
+                total_strategies=0,
+                running_strategies=0,
+                selected_strategies=0,
                 system_health='offline',
                 notes='后台量化服务已停止'
             )
@@ -3137,10 +3147,13 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 停止量化系统失败: {e}")
             
-            # ⭐ 更新异常状态到数据库，但不设为error
+            # ⭐ 更新异常状态到数据库，但不设为error，重置策略计数
             self.update_system_status(
                 quantitative_running=False,
                 auto_trading_enabled=False,
+                total_strategies=0,
+                running_strategies=0,
+                selected_strategies=0,
                 system_health='offline',  # 改为offline
                 notes=f'停止过程中出现异常: {str(e)}'
             )
