@@ -17,7 +17,7 @@ def get_db_connection():
             port=5432,
             database='quantitative',
             user='quant_user',
-            password='quant_password_2024',
+            password='chenfei0421',
             cursor_factory=RealDictCursor
         )
         
