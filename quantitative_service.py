@@ -3038,10 +3038,18 @@ class QuantitativeService:
         try:
             generated_signals = 0
             current_balance = self._get_current_balance()
-            positions = self.get_positions()
+            positions_response = self.get_positions()
+            
+            # 🔧 统一处理positions数据格式
+            if isinstance(positions_response, dict):
+                positions_data = positions_response.get('data', [])
+            elif isinstance(positions_response, list):
+                positions_data = positions_response
+            else:
+                positions_data = []
             
             print(f"📊 当前余额: {current_balance} USDT")
-            print(f"📦 当前持仓数量: {len(positions.get('data', []))}")
+            print(f"📦 当前持仓数量: {len(positions_data)}")
             
             # 🎯 获取策略数据 - 统一使用get_strategies() API
             strategies_response = self.get_strategies()
@@ -3064,7 +3072,7 @@ class QuantitativeService:
             
             # 🔄 智能信号生成策略
             buy_signals_needed = max(3, len(enabled_strategies) // 3)  # 至少3个买入信号
-            sell_signals_allowed = len([p for p in positions.get('data', []) if float(p.get('quantity', 0)) > 0])
+            sell_signals_allowed = len([p for p in positions_data if float(p.get('quantity', 0)) > 0])
             
             print(f"🎯 计划生成: {buy_signals_needed}个买入信号, 最多{sell_signals_allowed}个卖出信号")
             
@@ -3093,7 +3101,7 @@ class QuantitativeService:
                     has_position = any(
                         p.get('symbol', '').replace('/', '') == symbol.replace('/', '') and 
                         float(p.get('quantity', 0)) > 0 
-                        for p in positions.get('data', [])
+                        for p in positions_data
                     )
                     
                     # 🎲 智能信号类型决策
