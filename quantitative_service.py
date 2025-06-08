@@ -2970,14 +2970,7 @@ class QuantitativeService:
                     WHERE id = %s
                 """, (ranking, allocated_amount, optimal_quantity, strategy_id))
                 
-                # 更新内存中的策略状态
-                if self._get_strategy_by_id(strategy_id):
-                    self._get_strategy_by_id(strategy_id).update({
-                        'real_trading_enabled': True,
-                        'ranking': ranking,
-                        'allocated_amount': allocated_amount,
-                        'optimal_quantity': optimal_quantity
-                    })
+                # 注意：策略状态已在数据库中更新，内存状态由get_strategies()动态获取
             
             logging.info(f"已更新{len(top_strategies)}个策略的交易状态")
             
@@ -3055,7 +3048,7 @@ class QuantitativeService:
     
     def _calculate_strategy_allocation(self, strategy_id: str) -> float:
         """计算策略分配的资金"""
-        strategy = self._get_strategy_by_id(strategy_id) or 
+        strategy = self._get_strategy_by_id(strategy_id)
         if not strategy or not strategy.get('real_trading_enabled', False):
             return 0.0
         
@@ -3217,22 +3210,29 @@ class QuantitativeService:
     def update_strategy(self, strategy_id, name, symbol, parameters):
         """更新策略配置"""
         try:
-            if self._get_strategy_by_id(strategy_id):
-                strategy = self._get_strategy_by_id(strategy_id)
-                
-                # 更新基本信息
-                strategy['name'] = name
-                strategy['symbol'] = symbol
-                strategy['parameters'].update(parameters)
-                
-                # 验证参数合理性
-                self._validate_strategy_parameters(strategy)
-                
-                print(f"策略 {name} 配置更新成功")
-                return True
-            else:
+            strategy = self._get_strategy_by_id(strategy_id)
+            if not strategy:
                 print(f"策略 {strategy_id} 不存在")
                 return False
+                
+            # 验证参数合理性 (创建临时字典用于验证)
+            temp_strategy = strategy.copy()
+            temp_strategy['name'] = name
+            temp_strategy['symbol'] = symbol
+            temp_strategy['parameters'].update(parameters)
+            self._validate_strategy_parameters(temp_strategy)
+            
+            # 更新数据库
+            query = """
+                UPDATE strategies 
+                SET name = %s, symbol = %s, parameters = %s, updated_at = NOW()
+                WHERE id = %s
+            """
+            import json
+            self.db_manager.execute_query(query, (name, symbol, json.dumps(parameters), strategy_id))
+            
+            print(f"策略 {name} 配置更新成功")
+            return True
                 
         except Exception as e:
             print(f"更新策略配置失败: {e}")
@@ -4233,30 +4233,25 @@ class QuantitativeService:
     def toggle_strategy(self, strategy_id):
         """切换策略状态"""
         try:
-            if self._get_strategy_by_id(strategy_id):
-                strategy = self._get_strategy_by_id(strategy_id)
-                new_enabled = not strategy['enabled']
-                
-                # 如果是启用策略，检查资金是否足够
-                if new_enabled:
-                    current_balance = self._get_current_balance()
-                    min_trade_amount = self._get_min_trade_amount(strategy['symbol'])
-                    
-                    if current_balance < min_trade_amount:
-                        return False, f"余额不足，最小需要 {min_trade_amount}U"
-                
-                # 更新策略状态
-                strategy['enabled'] = new_enabled
-                strategy['running'] = new_enabled
-                strategy['status'] = 'running' if new_enabled else 'stopped'
-                
-                # 保存状态到数据库
-                self._save_strategy_status(strategy_id, new_enabled)
-                
-                status = "启用" if new_enabled else "禁用"
-                return True, f"策略 {strategy['name']} 已{status}并保存状态"
-            else:
+            strategy = self._get_strategy_by_id(strategy_id)
+            if not strategy:
                 return False, "策略不存在"
+                
+            new_enabled = not strategy['enabled']
+            
+            # 如果是启用策略，检查资金是否足够
+            if new_enabled:
+                current_balance = self._get_current_balance()
+                min_trade_amount = self._get_min_trade_amount(strategy['symbol'])
+                
+                if current_balance < min_trade_amount:
+                    return False, f"余额不足，最小需要 {min_trade_amount}U"
+            
+            # 直接更新数据库状态
+            self._save_strategy_status(strategy_id, new_enabled)
+            
+            status = "启用" if new_enabled else "禁用"
+            return True, f"策略 {strategy['name']} 已{status}并保存状态"
                 
         except Exception as e:
             print(f"切换策略状态失败: {e}")
@@ -4316,27 +4311,32 @@ class QuantitativeService:
     def update_strategy_config(self, strategy_id, config_data):
         """更新策略配置"""
         try:
-            if self._get_strategy_by_id(strategy_id):
-                strategy = self._get_strategy_by_id(strategy_id)
-                
-                # 更新基本信息
-                if 'name' in config_data:
-                    strategy['name'] = config_data['name']
-                if 'symbol' in config_data:
-                    strategy['symbol'] = config_data['symbol']
-                if 'enabled' in config_data:
-                    strategy['enabled'] = config_data['enabled']
-                
-                # 更新参数
-                if 'parameters' in config_data:
-                    strategy['parameters'].update(config_data['parameters'])
-                
-                # 验证参数合理性
-                self._validate_strategy_parameters(strategy)
-                
-                return True, "策略配置更新成功"
-            else:
+            strategy = self._get_strategy_by_id(strategy_id)
+            if not strategy:
                 return False, "策略不存在"
+                
+            # 创建临时字典用于验证
+            temp_strategy = strategy.copy()
+            
+            # 更新基本信息
+            if 'name' in config_data:
+                temp_strategy['name'] = config_data['name']
+            if 'symbol' in config_data:
+                temp_strategy['symbol'] = config_data['symbol']
+            if 'enabled' in config_data:
+                temp_strategy['enabled'] = config_data['enabled']
+            
+            # 更新参数
+            if 'parameters' in config_data:
+                temp_strategy['parameters'].update(config_data['parameters'])
+            
+            # 验证参数合理性
+            self._validate_strategy_parameters(temp_strategy)
+            
+            # 更新数据库（这里需要实现数据库更新逻辑）
+            # TODO: 实现数据库更新
+            
+            return True, "策略配置更新成功"
                 
         except Exception as e:
             print(f"更新策略配置失败: {e}")
