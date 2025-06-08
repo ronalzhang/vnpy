@@ -4665,46 +4665,44 @@ class QuantitativeService:
                            evolution_enabled=None, system_health=None, notes=None):
         """更新系统状态到数据库 - 解决前后端状态同步问题"""
         try:
-            cursor = self.conn.cursor()
-            
             # 构建更新语句
             updates = []
             params = []
             
             if quantitative_running is not None:
-                updates.append("quantitative_running = ?")
+                updates.append("quantitative_running = %s")
                 params.append(quantitative_running)
             
             if auto_trading_enabled is not None:
-                updates.append("auto_trading_enabled = ?")
+                updates.append("auto_trading_enabled = %s")
                 params.append(auto_trading_enabled)
                 
             if total_strategies is not None:
-                updates.append("total_strategies = ?")
+                updates.append("total_strategies = %s")
                 params.append(total_strategies)
                 
             if running_strategies is not None:
-                updates.append("running_strategies = ?")
+                updates.append("running_strategies = %s")
                 params.append(running_strategies)
                 
             if selected_strategies is not None:
-                updates.append("selected_strategies = ?")
+                updates.append("selected_strategies = %s")
                 params.append(selected_strategies)
                 
             if current_generation is not None:
-                updates.append("current_generation = ?")
+                updates.append("current_generation = %s")
                 params.append(current_generation)
                 
             if evolution_enabled is not None:
-                updates.append("evolution_enabled = ?")
+                updates.append("evolution_enabled = %s")
                 params.append(evolution_enabled)
                 
             if system_health is not None:
-                updates.append("system_health = ?")
+                updates.append("system_health = %s")
                 params.append(system_health)
                 
             if notes is not None:
-                updates.append("notes = ?")
+                updates.append("notes = %s")
                 params.append(notes)
             
             # 总是更新最后更新时间
@@ -4712,8 +4710,7 @@ class QuantitativeService:
             
             if updates:
                 sql = f"UPDATE system_status SET {', '.join(updates)} WHERE id = 1"
-                cursor.execute(sql, params)
-                self.conn.commit()
+                self.db_manager.execute_query(sql, tuple(params))
                 
         except Exception as e:
             print(f"更新系统状态失败: {e}")
