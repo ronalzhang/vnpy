@@ -4848,6 +4848,24 @@ class QuantitativeService:
     def get_system_status_from_db(self):
         """从数据库获取系统状态"""
         try:
+            # 确保数据库连接正常并清理事务状态
+            try:
+                if self.conn.closed:
+                    self.conn = psycopg2.connect(**DB_CONFIG)
+                    
+                # 清理任何未完成的事务
+                self.conn.rollback()
+                self.conn.autocommit = True
+                
+            except Exception as conn_error:
+                print(f"重置数据库连接: {conn_error}")
+                try:
+                    self.conn = psycopg2.connect(**DB_CONFIG)
+                    self.conn.autocommit = True
+                except Exception as reconnect_error:
+                    print(f"重连数据库失败: {reconnect_error}")
+                    return self._get_default_system_status(f'数据库连接失败: {str(reconnect_error)}')
+            
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT quantitative_running, auto_trading_enabled, total_strategies,
@@ -4858,6 +4876,8 @@ class QuantitativeService:
             ''')
             
             row = cursor.fetchone()
+            cursor.close()
+            
             if row:
                 return {
                     'quantitative_running': bool(row[0]),
@@ -4874,36 +4894,27 @@ class QuantitativeService:
                 }
             else:
                 # 如果没有记录，返回默认状态
-                return {
-                    'quantitative_running': False,
-                    'auto_trading_enabled': False,
-                    'total_strategies': 0,
-                    'running_strategies': 0,
-                    'selected_strategies': 0,
-                    'current_generation': 0,
-                    'evolution_enabled': True,
-                    'last_evolution_time': None,
-                    'last_update_time': None,
-                    'system_health': 'offline',
-                    'notes': None
-                }
+                return self._get_default_system_status()
                 
         except Exception as e:
             print(f"获取系统状态失败: {e}")
-            # ⭐ 改善异常处理，不直接返回error状态
-            return {
-                'quantitative_running': False,
-                'auto_trading_enabled': False,
-                'total_strategies': 0,
-                'running_strategies': 0,
-                'selected_strategies': 0,
-                'current_generation': 0,
-                'evolution_enabled': True,
-                'last_evolution_time': None,
-                'last_update_time': None,
-                'system_health': 'offline',  # 改为offline而不是error
-                'notes': f'数据库查询异常: {str(e)}'
-            }
+            return self._get_default_system_status(f'数据库查询异常: {str(e)}')
+            
+    def _get_default_system_status(self, error_msg: str = None):
+        """获取默认系统状态"""
+        return {
+            'quantitative_running': False,
+            'auto_trading_enabled': False,
+            'total_strategies': 0,
+            'running_strategies': 0,
+            'selected_strategies': 0,
+            'current_generation': 0,
+            'evolution_enabled': True,
+            'last_evolution_time': None,
+            'last_update_time': None,
+            'system_health': 'offline',
+            'notes': error_msg
+        }
 
     def _ensure_initial_balance_history(self):
         """确保有初始的余额历史数据"""

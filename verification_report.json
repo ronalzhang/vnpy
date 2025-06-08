@@ -1,0 +1,97 @@
+{
+  "timestamp": "2025-06-09T03:05:23.132159",
+  "overall_score": 14.5,
+  "total_checks": 18,
+  "score_percentage": 80.55555555555556,
+  "grade": "⭐ 良好",
+  "detailed_results": {
+    "code_quality": {
+      "old_version_cleanup": {
+        "status": "✅",
+        "message": "所有旧版本引用已清理"
+      },
+      "strategy_templates": {
+        "status": "✅",
+        "message": "策略模板配置完善(12种策略)"
+      },
+      "parameter_optimization": {
+        "status": "✅",
+        "message": "参数优化机制完善"
+      },
+      "exception_handling": {
+        "status": "✅",
+        "message": "异常处理已修复"
+      }
+    },
+    "server_connection": {
+      "server_connection": {
+        "status": "✅",
+        "message": "服务器连接正常"
+      }
+    },
+    "system_status": {
+      "status_api_format": {
+        "status": "✅",
+        "message": "系统状态API格式正确"
+      },
+      "system_running": {
+        "status": "⚠️",
+        "message": "量化系统未运行"
+      },
+      "auto_trading_status": {
+        "status": "✅",
+        "message": "自动交易已关闭"
+      }
+    },
+    "strategy_configuration": {
+      "strategies_loading": {
+        "status": "❌",
+        "message": "策略加载失败"
+      }
+    },
+    "auto_trading_control": {
+      "auto_trading_api": {
+        "status": "✅",
+        "message": "自动交易API正常(当前已关闭)"
+      },
+      "auto_trading_toggle": {
+        "status": "✅",
+        "message": "自动交易开关功能正常"
+      }
+    },
+    "parameter_optimization": {
+      "optimization_logs": {
+        "status": "✅",
+        "message": "参数优化日志正常(0条记录)"
+      },
+      "parameter_complexity": {
+        "status": "⚠️",
+        "message": "策略参数有待优化(40.0%)"
+      }
+    },
+    "evolution_system": {
+      "evolution_enabled": {
+        "status": "⚠️",
+        "message": "策略进化未启用"
+      },
+      "evolution_history": {
+        "status": "⚠️",
+        "message": "暂无进化历史"
+      },
+      "evolution_schedule": {
+        "status": "⚠️",
+        "message": "进化时间未设置"
+      }
+    },
+    "frontend_functionality": {
+      "frontend_loading": {
+        "status": "✅",
+        "message": "前端页面加载正常"
+      },
+      "frontend_errors": {
+        "status": "✅",
+        "message": "前端无明显错误"
+      }
+    }
+  }
+}
