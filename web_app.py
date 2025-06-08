@@ -1532,6 +1532,45 @@ def get_system_status():
             'message': f'控制失败: {str(e)}'
         })
 
+@app.route('/api/quantitative/system-control', methods=['POST'])
+def system_control():
+    """系统启停控制"""
+    try:
+        data = request.get_json() or {}
+        action = data.get('action', '')
+        
+        if not quantitative_service:
+            return jsonify({
+                'success': False,
+                'message': '量化服务未初始化'
+            })
+        
+        if action == 'start':
+            quantitative_service.start()
+            message = "系统已启动"
+            running = True
+        elif action == 'stop':
+            quantitative_service.stop()
+            message = "系统已停止"
+            running = False
+        else:
+            return jsonify({
+                'success': False,
+                'message': '无效的操作'
+            })
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'running': running
+        })
+    except Exception as e:
+        print(f"系统控制失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'系统控制失败: {str(e)}'
+        })
+
 @app.route('/api/quantitative/toggle-auto-trading', methods=['POST'])
 def toggle_auto_trading():
     """切换自动交易状态"""
