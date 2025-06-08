@@ -336,7 +336,9 @@ class DatabaseManager:
             
             # 插入初始资产记录（如果没有的话）
             cursor.execute('SELECT COUNT(*) FROM account_balance_history')
-            if cursor.fetchone()[0] == 0:
+            count_result = cursor.fetchone()
+            count = count_result[0] if count_result else 0
+            if count == 0:
                 current_balance = self._get_current_balance()
                 self.record_balance_history(
                     total_balance=current_balance,
@@ -365,8 +367,9 @@ class DatabaseManager:
             cumulative_return = ((total_balance - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
             
             # 获取总交易次数
-            cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs WHERE executed = true")
-            total_trades = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs WHERE executed = 1")
+            total_trades_result = cursor.fetchone()
+            total_trades = total_trades_result[0] if total_trades_result else 0
             
             cursor.execute('''
                 INSERT INTO account_balance_history 
@@ -386,7 +389,8 @@ class DatabaseManager:
             ))
             
             conn.commit()
-            conn.close()
+            if conn and not conn.closed:
+                conn.close()
             
             # 检查里程碑
             self._check_balance_milestones(total_balance)
@@ -421,7 +425,9 @@ class DatabaseManager:
                     "SELECT COUNT(*) FROM account_balance_history WHERE milestone_note = %s", 
                     (note,)
                 )
-                if cursor.fetchone()[0] == 0:
+                milestone_result = cursor.fetchone()
+                milestone_count = milestone_result[0] if milestone_result else 0
+                if milestone_count == 0:
                     # 记录里程碑
                     self.record_balance_history(
                         total_balance=current_balance,
@@ -2432,6 +2438,7 @@ class QuantitativeService:
             'password': 'chenfei0421'
         }
         self.conn = psycopg2.connect(**self.db_config)
+        self.conn.autocommit = True  # 避免事务阻塞问题
         print("✅ 已连接到PostgreSQL数据库: quantitative")
         
         # ⭐ 初始化数据库管理器
@@ -2447,6 +2454,9 @@ class QuantitativeService:
             db_manager.init_database()
         
         self.init_strategies()
+        
+        # ⭐ 初始化strategies属性（兼容旧代码）
+        self.strategies = {}  # 保持向后兼容性
         
         # ⭐ 初始化模拟器和策略管理器
         self.simulator = StrategySimulator(self)
@@ -5030,7 +5040,8 @@ class QuantitativeService:
             
             # 检查现有记录数量
             cursor.execute('SELECT COUNT(*) FROM account_balance_history')
-            count = cursor.fetchone()[0]
+            count_result = cursor.fetchone()
+            count = count_result[0] if count_result else 0
             
             if count < 30:  # 如果少于30条记录，补充数据
                 print(f"📊 当前余额历史记录: {count}条，正在补充至30条...")
@@ -5084,7 +5095,8 @@ class QuantitativeService:
                 
                 # 验证插入结果
                 cursor.execute('SELECT COUNT(*) FROM account_balance_history')
-                new_count = cursor.fetchone()[0]
+                new_count_result = cursor.fetchone()
+                new_count = new_count_result[0] if new_count_result else 0
                 print(f"✅ 已生成 {new_count} 条资产历史记录")
             else:
                 print(f"✅ 已有 {count} 条资产历史记录")
