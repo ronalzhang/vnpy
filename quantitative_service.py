@@ -2880,9 +2880,13 @@ class QuantitativeService:
                 notes='后台量化服务已停止'
             )
             
-            # 停止所有策略
-            for strategy_id in self.strategies:
-                self.stop_strategy(strategy_id)
+            # ⭐ 停止所有策略 - 使用统一API
+            strategies_response = self.get_strategies()
+            if strategies_response.get('success', False):
+                strategies = strategies_response.get('data', [])
+                for strategy in strategies:
+                    if strategy.get('enabled', False):
+                        self.stop_strategy(strategy.get('id'))
             
             # 记录操作日志
             self._log_operation("系统停止", "量化交易系统停止成功", "success")
@@ -2999,9 +3003,7 @@ class QuantitativeService:
             query = "UPDATE strategies SET enabled = 1 WHERE id = %s"
             self.db_manager.execute_query(query, (strategy_id,))
             
-            # 更新内存中的策略状态
-            if strategy_id in self.strategies:
-                self.strategies[strategy_id]['enabled'] = True
+            # ⭐ 策略状态已在数据库中更新，无需更新内存状态
             
             print(f"✅ 策略 {strategy['name']} ({strategy_id}) 启动成功")
             self._log_operation("start_strategy", f"启动策略 {strategy['name']}", "成功")
@@ -3015,16 +3017,14 @@ class QuantitativeService:
     def stop_strategy(self, strategy_id):
         """停止单个策略"""
         try:
-            if strategy_id in self.strategies:
-                strategy = self.strategies[strategy_id]
-                strategy['enabled'] = False
-                strategy['running'] = False
-                strategy['status'] = 'stopped'
+            # ⭐ 使用统一API获取策略信息
+            strategy_response = self.get_strategy(strategy_id)
+            if strategy_response:
+                # 更新数据库中的状态
+                query = "UPDATE strategies SET enabled = 0 WHERE id = %s"
+                self.db_manager.execute_query(query, (strategy_id,))
                 
-                # 保存状态到数据库
-                self._save_strategy_status(strategy_id, False)
-                
-                print(f"⏹️ 策略 {strategy['name']} 已停止并保存状态")
+                print(f"⏹️ 策略 {strategy_response.get('name', strategy_id)} 已停止并保存状态")
                 return True
             else:
                 print(f"❌ 策略 {strategy_id} 不存在")

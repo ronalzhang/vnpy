@@ -1582,8 +1582,26 @@ def get_system_status():
     """获取量化系统状态"""
     try:
         if quantitative_service:
-            # 直接调用量化服务的统一方法
-            return jsonify(quantitative_service.get_system_status_from_db())
+            # 获取数据库中的系统状态
+            db_status = quantitative_service.get_system_status_from_db()
+            
+            # 包装成前端期望的格式
+            response = {
+                'success': True,
+                'running': db_status.get('quantitative_running', False),
+                'auto_trading_enabled': db_status.get('auto_trading_enabled', False),
+                'total_strategies': db_status.get('total_strategies', 0),
+                'running_strategies': db_status.get('running_strategies', 0),
+                'selected_strategies': db_status.get('selected_strategies', 0),
+                'current_generation': db_status.get('current_generation', 0),
+                'evolution_enabled': db_status.get('evolution_enabled', False),
+                'last_evolution_time': db_status.get('last_evolution_time'),
+                'last_update_time': db_status.get('last_update_time'),
+                'system_health': db_status.get('system_health', 'offline'),
+                'notes': db_status.get('notes')
+            }
+            
+            return jsonify(response)
         else:
             return jsonify({
                 'success': False,
@@ -1603,6 +1621,8 @@ def get_system_status():
         print(f"获取系统状态失败: {e}")
         return jsonify({
             'success': False,
+            'running': False,
+            'auto_trading_enabled': False,
             'message': f'获取状态失败: {str(e)}'
         })
 
