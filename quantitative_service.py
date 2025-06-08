@@ -3179,7 +3179,12 @@ class QuantitativeService:
                 quantity = trade_amount / current_price
             else:
                 # 卖出时使用策略参数
-                quantity = strategy['parameters'].get('quantity', 0.5)
+                parameters = strategy.get('parameters', {})
+                if isinstance(parameters, dict):
+                    quantity = parameters.get('quantity', 0.5)
+                else:
+                    # 如果parameters不是字典，使用默认值
+                    quantity = 0.5
             
             # 🎯 计算置信度（优化版本）
             base_confidence = 0.7
