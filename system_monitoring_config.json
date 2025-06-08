@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "check_interval": 60,
+  "alert_thresholds": {
+    "cpu_usage": 80,
+    "memory_usage": 85,
+    "error_rate": 0.05
+  },
+  "notifications": {
+    "email_enabled": false,
+    "webhook_enabled": false
+  }
+}

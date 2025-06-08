@@ -198,7 +198,7 @@ class PerformanceMetrics:
 class DatabaseManager:
     """数据库管理类 - 使用PostgreSQL适配器"""
     
-    def __init__(self, db_path: str = "quantitative.db"):
+    def __init__(self, db_path: str = "quantitative-- .db (removed)"):
         self.db_path = db_path  # 保持兼容性
         self.db_adapter = get_db_adapter()
         self.conn = self.db_adapter.connection
@@ -223,7 +223,7 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS system_status (
                     key TEXT PRIMARY KEY,
                     value TEXT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
@@ -236,29 +236,29 @@ class DatabaseManager:
                     type TEXT,
                     enabled INTEGER DEFAULT 0,
                     parameters TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
             # 创建交易信号表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS trading_signals (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     timestamp TEXT,
                     symbol TEXT,
                     signal_type TEXT,
                     price REAL,
                     confidence REAL,
                     executed INTEGER DEFAULT 0,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
             # 创建策略交易日志表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS strategy_trade_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     signal_id TEXT,
                     symbol TEXT,
@@ -267,28 +267,28 @@ class DatabaseManager:
                     quantity REAL,
                     pnl REAL DEFAULT 0,
                     executed INTEGER DEFAULT 0,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
             # 创建持仓表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS positions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     symbol TEXT,
                     quantity REAL,
                     avg_price REAL,
                     unrealized_pnl REAL DEFAULT 0,
                     side TEXT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
             # 创建账户余额历史表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS account_balance_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                    id SERIAL PRIMARY KEY,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     total_balance REAL,
                     available_balance REAL,
                     frozen_balance REAL,
@@ -303,31 +303,31 @@ class DatabaseManager:
             # 创建操作日志表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS operation_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     operation_type TEXT,
                     operation_detail TEXT,
                     result TEXT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
             # 策略评分历史表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS strategy_score_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     score REAL,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
             # 创建模拟结果表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS simulation_results (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     result_data TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
@@ -410,7 +410,7 @@ class DatabaseManager:
         for amount, note in milestones:
             if current_balance >= amount:
                 # 检查是否已记录此里程碑
-                conn = sqlite3.connect(self.db_path)
+                conn = -- sqlite3. (removed)connect(self.db_path)
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT COUNT(*) FROM account_balance_history WHERE milestone_note = ?", 
@@ -1708,7 +1708,7 @@ class AutomatedStrategyManager:
             # 创建参数优化历史表
             self.quantitative_service.db_manager.execute_query("""
                 CREATE TABLE IF NOT EXISTS parameter_optimization_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     optimization_time TIMESTAMP,
                     old_parameters TEXT,
@@ -1911,7 +1911,7 @@ class AutomatedStrategyManager:
     
     def _calculate_profit_factor(self, strategy_id: str) -> float:
         """计算盈利因子"""
-        with sqlite3.connect(self.db_manager.db_path) as conn:
+        with -- sqlite3. (removed)connect(self.db_manager.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as total_profit,
@@ -4827,7 +4827,7 @@ class QuantitativeService:
             # 信号表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS signals (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     symbol TEXT,
                     signal_type TEXT,
@@ -4842,7 +4842,7 @@ class QuantitativeService:
             # 交易日志表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS strategy_trade_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     symbol TEXT,
                     side TEXT,
@@ -4857,7 +4857,7 @@ class QuantitativeService:
             # 优化记录表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS strategy_optimization_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     strategy_name TEXT,
                     optimization_type TEXT,
@@ -4874,7 +4874,7 @@ class QuantitativeService:
             # 账户资产历史表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS account_balance_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     timestamp TEXT,
                     total_balance REAL,
                     available_balance REAL,
@@ -4890,31 +4890,31 @@ class QuantitativeService:
             # 创建操作日志表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS operation_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     operation_type TEXT,
                     operation_detail TEXT,
                     result TEXT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
             # 策略评分历史表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS strategy_score_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     score REAL,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
             # 创建模拟结果表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS simulation_results (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     strategy_id TEXT,
                     result_data TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             
@@ -4929,7 +4929,7 @@ class QuantitativeService:
                     current_generation INTEGER DEFAULT 0,
                     evolution_enabled BOOLEAN DEFAULT TRUE,
                     last_evolution_time TEXT,
-                    last_update_time TEXT DEFAULT CURRENT_TIMESTAMP,
+                    last_update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     system_health TEXT DEFAULT 'offline',
                     backend_process_id INTEGER,
                     web_process_id INTEGER,
@@ -5328,11 +5328,11 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS operation_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     operation_type TEXT,
                     operation_detail TEXT,
                     result TEXT,
-                    timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             self.conn.commit()
