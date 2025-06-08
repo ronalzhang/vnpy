@@ -4416,12 +4416,13 @@ class QuantitativeService:
             print(f"记录策略交易日志失败: {e}")
     
     def init_strategies(self):
-        """初始化策略 - 从数据库加载或触发进化生成"""
+        """初始化策略 - 新版本：直接使用数据库，无需内存字典"""
         try:
-            # 首先尝试从数据库加载现有策略
-            self._load_strategies_from_db()
+            # 检查数据库中是否有策略
+            strategies_response = self.get_strategies()
+            existing_strategies = strategies_response.get('data', []) if strategies_response.get('success') else []
             
-            if not self.strategies:
+            if not existing_strategies:
                 print("🧬 数据库中无策略，启动进化引擎生成初始策略...")
                 
                 # 启动进化引擎进行初始种群创建
@@ -4433,15 +4434,16 @@ class QuantitativeService:
                     print("🔬 运行策略模拟评估...")
                     simulation_results = self.run_all_strategy_simulations()
                     
-                    # 重新从数据库加载更新后的策略
-                    self._load_strategies_from_db()
+                    # 重新检查策略数量
+                    strategies_response = self.get_strategies()
+                    final_strategies = strategies_response.get('data', []) if strategies_response.get('success') else []
                     
-                    print(f"🎯 进化生成了 {len(self.strategies)} 个策略")
+                    print(f"🎯 进化生成了 {len(final_strategies)} 个策略")
                 else:
                     print("⚠️ 进化引擎未启动，创建默认策略...")
                     self._create_default_strategies()
             else:
-                print(f"✅ 从数据库加载了 {len(self.strategies)} 个策略")
+                print(f"✅ 数据库中已有 {len(existing_strategies)} 个策略")
                 
         except Exception as e:
             print(f"❌ 策略初始化失败: {e}")
@@ -4449,30 +4451,53 @@ class QuantitativeService:
             self._create_default_strategies()
     
     def _create_default_strategies(self):
-        """创建默认策略（仅作为后备方案）"""
-        self.strategies = {
-            'DOGE_momentum_default': {
+        """创建默认策略（仅作为后备方案）- 新版本：直接写入数据库"""
+        try:
+            import json
+            
+            # 默认策略配置
+            default_strategy = {
                 'id': 'DOGE_momentum_default',
                 'name': 'DOGE动量策略',
                 'symbol': 'DOGE/USDT',
                 'type': 'momentum',
                 'enabled': True,
-                'parameters': {
+                'parameters': json.dumps({
                     'lookback_period': 15,
                     'threshold': 0.015,
                     'quantity': 1.0
-            },
+                }),
                 'final_score': 50.0,
                 'win_rate': 0.6,
                 'total_return': 0.0,
-                'total_trades': 0,
-                'qualified_for_trading': False
+                'total_trades': 0
             }
-        }
-        
-        # 保存到数据库
-        self._save_strategies_to_db()
-        print(f"📝 创建了 {len(self.strategies)} 个默认策略")
+            
+            # 直接插入数据库
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT INTO strategies 
+                (id, name, symbol, type, enabled, parameters, final_score, win_rate, total_return, total_trades, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+                ON CONFLICT (id) DO NOTHING
+            ''', (
+                default_strategy['id'],
+                default_strategy['name'],
+                default_strategy['symbol'],
+                default_strategy['type'],
+                default_strategy['enabled'],
+                default_strategy['parameters'],
+                default_strategy['final_score'],
+                default_strategy['win_rate'],
+                default_strategy['total_return'],
+                default_strategy['total_trades']
+            ))
+            
+            self.conn.commit()
+            print("📝 创建了 1 个默认策略")
+            
+        except Exception as e:
+            print(f"❌ 创建默认策略失败: {e}")
 
     
     # ⭐ 新增：系统状态同步方法
