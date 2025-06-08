@@ -1096,47 +1096,7 @@ def quantitative_strategies():
                 "message": f"创建策略失败: {str(e)}"
             }), 500
 
-@app.route('/api/quantitative/strategies/<strategy_id>/toggle', methods=['POST'])
-def toggle_quantitative_strategy(strategy_id):
-    """切换策略状态"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
-    
-    try:
-        strategy = quantitative_service.get_strategy(strategy_id)
-        if not strategy:
-            return jsonify({
-                "status": "error",
-                "message": "策略不存在"
-            }), 404
-        
-        if strategy.get('enabled', False):
-            success = quantitative_service.stop_strategy(strategy_id)
-            message = "策略停止成功" if success else "策略停止失败"
-        else:
-            success = quantitative_service.start_strategy(strategy_id)
-            message = "策略启动成功" if success else "策略启动失败"
-        
-        if success:
-            return jsonify({
-                "status": "success",
-                "message": message
-            })
-        else:
-            return jsonify({
-                "status": "error",
-                "message": message
-            }), 400
-            
-    except Exception as e:
-        logger.error(f"切换策略状态失败: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"切换策略状态失败: {str(e)}"
-        }), 500
+# 策略启停功能已删除 - 全自动系统不需要手动启停
 
 @app.route('/api/quantitative/strategies/<strategy_id>', methods=['DELETE'])
 def delete_quantitative_strategy(strategy_id):
@@ -1860,63 +1820,7 @@ def force_start_all_strategies():
             'message': f'启动失败: {str(e)}'
         })
 
-@app.route('/api/quantitative/strategies/<strategy_id>/start', methods=['POST'])
-def start_strategy(strategy_id):
-    """启动单个策略"""
-    try:
-        if quantitative_service:
-            result = quantitative_service.start_strategy(strategy_id)
-            
-            if result:
-                return jsonify({
-                    'success': True,
-                    'message': f'策略 {strategy_id} 已启动'
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': f'启动策略 {strategy_id} 失败'
-                })
-        else:
-            return jsonify({
-                'success': False,
-                'message': '量化服务未初始化'
-            })
-    except Exception as e:
-        print(f"启动策略失败: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'启动失败: {str(e)}'
-        })
-
-@app.route('/api/quantitative/strategies/<strategy_id>/stop', methods=['POST'])
-def stop_strategy(strategy_id):
-    """停止单个策略"""
-    try:
-        if quantitative_service:
-            result = quantitative_service.stop_strategy(strategy_id)
-            
-            if result:
-                return jsonify({
-                    'success': True,
-                    'message': f'策略 {strategy_id} 已停止'
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': f'停止策略 {strategy_id} 失败'
-                })
-        else:
-            return jsonify({
-                'success': False,
-                'message': '量化服务未初始化'
-            })
-    except Exception as e:
-        print(f"停止策略失败: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'停止失败: {str(e)}'
-        })
+# 策略启停路由已删除 - 全自动系统无需手动启停
 
 # ========== 操作日志API ==========
 

@@ -3552,6 +3552,33 @@ class QuantitativeService:
             print(f"加载自动交易状态失败: {e}")
             self.auto_trading_enabled = False
     
+    def _get_strategy_evolution_display(self, strategy_id: str) -> str:
+        """获取策略演化信息显示"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT generation, round, evolution_type 
+                FROM strategy_evolution_info 
+                WHERE strategy_id = %s
+            ''', (strategy_id,))
+            
+            result = cursor.fetchone()
+            if result:
+                generation = result[0] if isinstance(result, tuple) else result.get('generation', 1)
+                round_num = result[1] if isinstance(result, tuple) else result.get('round', 1)
+                evolution_type = result[2] if isinstance(result, tuple) else result.get('evolution_type', 'initial')
+                
+                if evolution_type == 'initial':
+                    return f"初代策略"
+                else:
+                    return f"第{generation}代第{round_num}轮"
+            else:
+                return "初代策略"
+                
+        except Exception as e:
+            print(f"获取策略演化信息失败: {e}")
+            return "未知代数"
+
     def get_strategies(self):
         """获取前20个高分策略 - 直接从PostgreSQL查询"""
         try:
@@ -3617,7 +3644,7 @@ class QuantitativeService:
                             'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,  # 65分以上可真实交易
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
-                            'data_source': 'PostgreSQL数据库'
+                            'data_source': self._get_strategy_evolution_display(row['id'])
                         }
                     else:
                         # SQLite兼容格式
@@ -3635,7 +3662,7 @@ class QuantitativeService:
                             'qualified_for_trading': float(row[6]) >= 65.0 if len(row) > 6 else False,
                             'created_time': row[10] if len(row) > 10 else '',
                             'last_updated': row[11] if len(row) > 11 else '',
-                            'data_source': 'PostgreSQL数据库'
+                            'data_source': self._get_strategy_evolution_display(row[0])
                         }
                     
                     strategies_list.append(strategy_data)
