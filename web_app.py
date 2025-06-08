@@ -1534,42 +1534,113 @@ def get_system_status():
 
 @app.route('/api/quantitative/system-control', methods=['POST'])
 def system_control():
-    """系统启停控制"""
+    """系统控制接口 - 启动/停止/重启系统"""
     try:
-        data = request.get_json() or {}
-        action = data.get('action', '')
-        
-        if not quantitative_service:
-            return jsonify({
-                'success': False,
-                'message': '量化服务未初始化'
-            })
+        data = request.get_json()
+        action = data.get('action')
         
         if action == 'start':
+            # 启动量化交易系统
             quantitative_service.start()
-            message = "系统已启动"
-            running = True
+            quantitative_service.set_auto_trading(True)
+            return jsonify({
+                'success': True,
+                'message': '系统启动成功',
+                'status': 'running'
+            })
+        
         elif action == 'stop':
+            # 停止量化交易系统
+            quantitative_service.set_auto_trading(False)
             quantitative_service.stop()
-            message = "系统已停止"
-            running = False
+            return jsonify({
+                'success': True,
+                'message': '系统停止成功',
+                'status': 'stopped'
+            })
+        
+        elif action == 'restart':
+            # 重启量化交易系统
+            quantitative_service.stop()
+            time.sleep(2)
+            quantitative_service.start()
+            quantitative_service.set_auto_trading(True)
+            return jsonify({
+                'success': True,
+                'message': '系统重启成功',
+                'status': 'running'
+            })
+        
         else:
             return jsonify({
                 'success': False,
-                'message': '无效的操作'
-            })
-        
-        return jsonify({
-            'success': True,
-            'message': message,
-            'running': running
-        })
+                'message': f'不支持的操作: {action}'
+            }), 400
+    
     except Exception as e:
         print(f"系统控制失败: {e}")
         return jsonify({
             'success': False,
             'message': f'系统控制失败: {str(e)}'
+        }), 500
+
+@app.route('/api/quantitative/system-health', methods=['GET'])
+def system_health():
+    """系统健康检查接口"""
+    try:
+        # 获取系统状态
+        status_response = quantitative_service.get_system_status_from_db()
+        
+        # 获取余额信息
+        balance_info = quantitative_service.get_account_info()
+        
+        # 获取策略统计
+        strategies_response = quantitative_service.get_strategies()
+        strategies = strategies_response.get('data', [])
+        
+        enabled_strategies = [s for s in strategies if s.get('enabled', False)]
+        active_strategies = [s for s in enabled_strategies if s.get('final_score', 0) >= 80]
+        
+        # 检查最近的交易信号
+        signals_response = quantitative_service.get_signals(limit=10)
+        recent_signals = signals_response.get('data', [])
+        
+        health_status = {
+            'overall_health': 'healthy',
+            'system_status': status_response,
+            'balance': balance_info.get('data', {}),
+            'strategies': {
+                'total': len(strategies),
+                'enabled': len(enabled_strategies),
+                'active': len(active_strategies)
+            },
+            'signals': {
+                'recent_count': len(recent_signals),
+                'last_signal_time': recent_signals[0].get('timestamp') if recent_signals else None
+            },
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # 检查健康状态
+        if balance_info.get('data', {}).get('total_balance', 0) < 1.0:
+            health_status['overall_health'] = 'warning'
+            health_status['warnings'] = ['余额过低']
+        
+        if len(enabled_strategies) == 0:
+            health_status['overall_health'] = 'critical'
+            health_status['errors'] = ['没有启用的策略']
+        
+        return jsonify({
+            'success': True,
+            'data': health_status
         })
+    
+    except Exception as e:
+        print(f"健康检查失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'健康检查失败: {str(e)}'
+        }), 500
 
 @app.route('/api/quantitative/toggle-auto-trading', methods=['POST'])
 def toggle_auto_trading():
