@@ -3617,18 +3617,28 @@ class QuantitativeService:
             
             print(f"💰 计算交易金额: {trade_amount:.3f} USDT (余额: {current_balance:.2f}, 置信度: {confidence:.2f})")
             
+            # 🎯 智能交易所选择机制
+            # 根据交易金额和交易所特点选择最适合的交易所
+            selected_exchanges = self._select_optimal_exchanges(symbol, trade_amount, signal_type)
+            
+            print(f"🔍 选择交易所: {selected_exchanges} (金额: {trade_amount:.3f} USDT)")
+            
             # 🎯 执行交易
-            for client_name, client in self.exchange_clients.items():
+            for client_name in selected_exchanges:
+                if client_name not in self.exchange_clients:
+                    continue
+                client = self.exchange_clients[client_name]
                 try:
                     if client_name == 'bitget':
-                        # Bitget特殊处理
+                        # Bitget特殊处理 - 修复API调用参数
                         try:
                             ticker = client.fetch_ticker(symbol)
                             current_price = ticker['last']
                             
                             if signal_type == 'buy':
-                                # Bitget买单：指定花费金额
-                                order = client.create_market_buy_order(symbol, trade_amount, current_price, None, {'cost': trade_amount})
+                                # Bitget买单：计算数量并指定成本
+                                quantity = trade_amount / current_price
+                                order = client.create_market_buy_order(symbol, quantity, None, {'cost': trade_amount})
                             else:
                                 # Bitget卖单：检查持仓后指定数量
                                 positions = self.get_positions()
@@ -3645,8 +3655,23 @@ class QuantitativeService:
                     else:
                         # 标准交易所处理
                         if signal_type == 'buy':
-                            # 市价买入
-                            order = client.create_market_buy_order(symbol, trade_amount / price)
+                            # 市价买入 - 检查最小交易限制
+                            if client_name == 'binance':
+                                # Binance需要检查最小名义价值
+                                if trade_amount < 10.0 and symbol in ['BTC/USDT', 'ETH/USDT']:
+                                    print(f"⚠️ {client_name} {symbol} 最小交易额10U，当前{trade_amount:.3f}U，跳过")
+                                    continue
+                                # 使用quoteOrderQty参数指定花费金额
+                                order = client.create_market_buy_order(symbol, trade_amount / price, None, None, {'quoteOrderQty': trade_amount})
+                            elif client_name == 'okx':
+                                # OKX检查最小交易额
+                                if trade_amount < 1.0 and symbol in ['BTC/USDT', 'ETH/USDT']:
+                                    print(f"⚠️ {client_name} {symbol} 最小交易额1U，当前{trade_amount:.3f}U，跳过")
+                                    continue
+                                order = client.create_market_buy_order(symbol, trade_amount / price)
+                            else:
+                                # 其他交易所标准处理
+                                order = client.create_market_buy_order(symbol, trade_amount / price)
                         elif signal_type == 'sell':
                             # 市价卖出（需要检查持仓）
                             positions = self.get_positions()
@@ -3681,6 +3706,57 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 执行交易信号失败: {e}")
             return False
+
+    def _select_optimal_exchanges(self, symbol, trade_amount, signal_type):
+        """智能选择最适合的交易所"""
+        try:
+            available_exchanges = list(self.exchange_clients.keys())
+            
+            # 交易所最小交易限制 (USDT)
+            exchange_limits = {
+                'binance': {'BTC/USDT': 10.0, 'ETH/USDT': 10.0, 'DOGE/USDT': 1.0, 'XRP/USDT': 1.0, 'ADA/USDT': 1.0},
+                'okx': {'BTC/USDT': 1.0, 'ETH/USDT': 1.0, 'DOGE/USDT': 0.1, 'XRP/USDT': 0.1, 'ADA/USDT': 0.1},
+                'bitget': {'BTC/USDT': 0.1, 'ETH/USDT': 0.1, 'DOGE/USDT': 0.05, 'XRP/USDT': 0.05, 'ADA/USDT': 0.05}
+            }
+            
+            # 根据交易金额筛选可用交易所
+            suitable_exchanges = []
+            for exchange in available_exchanges:
+                min_limit = exchange_limits.get(exchange, {}).get(symbol, 1.0)
+                if trade_amount >= min_limit:
+                    suitable_exchanges.append(exchange)
+                    print(f"✅ {exchange} 适合 (限制: {min_limit}, 金额: {trade_amount:.3f})")
+                else:
+                    print(f"❌ {exchange} 不适合 (限制: {min_limit}, 金额: {trade_amount:.3f})")
+            
+            # 如果没有合适的交易所，降低交易金额后重新选择小币种
+            if not suitable_exchanges:
+                print("⚠️ 没有合适的交易所，尝试小币种交易...")
+                small_coin_symbols = ['DOGE/USDT', 'XRP/USDT', 'ADA/USDT', 'SHIB/USDT']
+                for small_symbol in small_coin_symbols:
+                    for exchange in available_exchanges:
+                        min_limit = exchange_limits.get(exchange, {}).get(small_symbol, 0.1)
+                        if trade_amount >= min_limit:
+                            suitable_exchanges.append(exchange)
+                            print(f"🎯 改用小币种 {small_symbol} 在 {exchange}")
+                            break
+                    if suitable_exchanges:
+                        break
+            
+            # 优先级排序：Bitget > OKX > Binance (小资金优先低手续费)
+            priority_order = ['bitget', 'okx', 'binance']
+            sorted_exchanges = [ex for ex in priority_order if ex in suitable_exchanges]
+            
+            # 如果还是没有，至少返回一个可用的
+            if not sorted_exchanges and available_exchanges:
+                sorted_exchanges = [available_exchanges[0]]
+                print(f"⚠️ 强制使用 {sorted_exchanges[0]}，可能会失败")
+            
+            return sorted_exchanges
+            
+        except Exception as e:
+            print(f"选择交易所失败: {e}")
+            return list(self.exchange_clients.keys())[:1]  # 返回第一个
 
     def _record_executed_trade(self, signal, order, trade_amount):
         """记录已执行的交易"""
