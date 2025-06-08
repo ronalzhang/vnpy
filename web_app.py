@@ -53,22 +53,40 @@ def cache_with_ttl(ttl_seconds):
 
 # 在文件开头初始化量化服务
 quantitative_service = None
+QUANTITATIVE_ENABLED = False
 
-try:
-    from quantitative_service import QuantitativeService, StrategyType
-    # 创建量化服务实例
-    quantitative_service = QuantitativeService()
-    QUANTITATIVE_ENABLED = True
-    logger.info("量化交易模块加载成功")
-    print("✅ 量化交易服务初始化成功")
-except ImportError as e:
-    logger.warning(f"量化交易模块未找到，量化功能将被禁用: {e}")
-    QUANTITATIVE_ENABLED = False
-    quantitative_service = None
-except Exception as e:
-    print(f"❌ 量化交易服务初始化失败: {e}")
-    QUANTITATIVE_ENABLED = False
-    quantitative_service = None
+def init_quantitative_service():
+    """初始化量化服务"""
+    global quantitative_service, QUANTITATIVE_ENABLED
+    try:
+        from quantitative_service import QuantitativeService, StrategyType
+        
+        if quantitative_service is None:
+            # 创建量化服务实例
+            quantitative_service = QuantitativeService()
+            QUANTITATIVE_ENABLED = True
+            logger.info("量化交易模块加载成功")
+            print("✅ 量化交易服务初始化成功")
+            return True
+        else:
+            print("📋 量化交易服务已存在")
+            return True
+            
+    except ImportError as e:
+        logger.warning(f"量化交易模块未找到，量化功能将被禁用: {e}")
+        QUANTITATIVE_ENABLED = False
+        quantitative_service = None
+        return False
+    except Exception as e:
+        print(f"❌ 量化交易服务初始化失败: {e}")
+        import traceback
+        traceback.print_exc()
+        QUANTITATIVE_ENABLED = False
+        quantitative_service = None
+        return False
+
+# 尝试初始化量化服务
+init_quantitative_service()
 
 # 导入套利系统模块
 try:
@@ -1084,11 +1102,14 @@ def operations_log():
 @app.route('/api/quantitative/strategies', methods=['GET', 'POST'])
 def quantitative_strategies():
     """获取策略列表或创建新策略"""
-    if not QUANTITATIVE_ENABLED:
-        return jsonify({
-            "status": "error",
-            "message": "量化交易模块未启用"
-        }), 500
+    # 检查并重新初始化量化服务
+    if not quantitative_service:
+        init_success = init_quantitative_service()
+        if not init_success:
+            return jsonify({
+                "status": "error",
+                "message": "量化交易模块未启用"
+            }), 500
     
     if request.method == 'GET':
         try:
@@ -1577,38 +1598,12 @@ def get_system_status():
                 'system_health': 'service_unavailable',
                 'message': '量化服务未初始化'
             })
-        
-        if action == 'start':
-            success = quantitative_service.start()
-            if success:
-                # 启动时初始化小资金优化
-                quantitative_service._init_small_fund_optimization()
-                return jsonify({
-                    'success': True,
-                    'message': '系统已启动，已启用小资金优化模式'
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': '系统启动失败'
-                })
-        elif action == 'stop':
-            success = quantitative_service.stop()
-            return jsonify({
-                'success': success,
-                'message': '系统已停止' if success else '系统停止失败'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': '无效的操作'
-            })
             
     except Exception as e:
-        print(f"系统控制失败: {e}")
+        print(f"获取系统状态失败: {e}")
         return jsonify({
             'success': False,
-            'message': f'控制失败: {str(e)}'
+            'message': f'获取状态失败: {str(e)}'
         })
 
 @app.route('/api/quantitative/system-control', methods=['POST'])
