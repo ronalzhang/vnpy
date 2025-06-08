@@ -1,8 +1,8 @@
 {
-  "timestamp": "2025-06-09T03:05:23.132159",
-  "overall_score": 14.5,
-  "total_checks": 18,
-  "score_percentage": 80.55555555555556,
+  "timestamp": "2025-06-09T03:14:06.044316",
+  "overall_score": 13.0,
+  "total_checks": 17,
+  "score_percentage": 76.47058823529412,
   "grade": "⭐ 良好",
   "detailed_results": {
     "code_quality": {
@@ -61,12 +61,8 @@
     },
     "parameter_optimization": {
       "optimization_logs": {
-        "status": "✅",
-        "message": "参数优化日志正常(0条记录)"
-      },
-      "parameter_complexity": {
-        "status": "⚠️",
-        "message": "策略参数有待优化(40.0%)"
+        "status": "❌",
+        "message": "无策略数据"
       }
     },
     "evolution_system": {

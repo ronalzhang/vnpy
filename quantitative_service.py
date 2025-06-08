@@ -2614,7 +2614,7 @@ class QuantitativeService:
         return strategy_config
     
     def _get_strategy_by_id(self, strategy_id: str) -> Dict:
-        """统一的策略获取方法 - 替代老版本的self.strategies[strategy_id]"""
+        """统一的策略获取方法 - 替代老版本的self._get_strategy_by_id(strategy_id)"""
         try:
             strategies_response = self.get_strategies()
             if not strategies_response.get('success', False):
@@ -2787,7 +2787,7 @@ class QuantitativeService:
         
         evaluation_results = {}
         
-        for strategy_id, strategy in self.strategies.items():
+        for strategy_id, strategy in self._get_all_strategies_dict().items():
             print(f"\n🔍 正在评估策略: {strategy['name']}")
             
             # 基于真实交易数据评估
@@ -2846,7 +2846,7 @@ class QuantitativeService:
             qualified_strategies = []
             for strategy_id, result in simulation_results.items():
                 if result.get('qualified_for_live_trading', False):
-                    strategy = self.strategies.get(strategy_id, {})
+                    strategy = self._get_strategy_by_id(strategy_id) or {}
                     
                     # 计算资金适配性评分
                     fund_fitness = self._calculate_fund_fitness(strategy, current_balance)
@@ -2941,7 +2941,7 @@ class QuantitativeService:
         """更新策略的交易状态"""
         try:
             # 首先关闭所有策略的真实交易
-            for strategy_id in self.strategies:
+            for strategy_id in self._get_all_strategies_dict().keys():
                 self.db_manager.execute_query(
                     "UPDATE strategies SET real_trading_enabled = 0, ranking = NULL WHERE id = %s",
                     (strategy_id,)
@@ -2971,8 +2971,8 @@ class QuantitativeService:
                 """, (ranking, allocated_amount, optimal_quantity, strategy_id))
                 
                 # 更新内存中的策略状态
-                if strategy_id in self.strategies:
-                    self.strategies[strategy_id].update({
+                if self._get_strategy_by_id(strategy_id):
+                    self._get_strategy_by_id(strategy_id).update({
                         'real_trading_enabled': True,
                         'ranking': ranking,
                         'allocated_amount': allocated_amount,
@@ -2986,7 +2986,7 @@ class QuantitativeService:
     
     def _calculate_optimal_quantity(self, strategy_id: str, allocated_amount: float, simulation_result: Dict) -> float:
         """根据分配资金和模拟结果计算最优交易量"""
-        strategy = self.strategies[strategy_id]
+        strategy = self._get_strategy_by_id(strategy_id)
         strategy_type = strategy['type']
         
         # 基础交易量计算
@@ -3017,7 +3017,7 @@ class QuantitativeService:
     def get_trading_status_summary(self):
         """获取交易状态摘要"""
         summary = {
-            'total_strategies': len(self.strategies),
+            'total_strategies': len(self._get_all_strategies_dict()),
             'simulated_strategies': 0,
             'qualified_strategies': 0,
             'active_trading_strategies': 0,
@@ -3026,7 +3026,7 @@ class QuantitativeService:
             'strategy_details': []
         }
         
-        for strategy_id, strategy in self.strategies.items():
+        for strategy_id, strategy in self._get_all_strategies_dict().items():
             # 统计模拟策略
             if hasattr(strategy, 'simulation_score'):
                 summary['simulated_strategies'] += 1
@@ -3055,7 +3055,7 @@ class QuantitativeService:
     
     def _calculate_strategy_allocation(self, strategy_id: str) -> float:
         """计算策略分配的资金"""
-        strategy = self.strategies.get(strategy_id)
+        strategy = self._get_strategy_by_id(strategy_id) or 
         if not strategy or not strategy.get('real_trading_enabled', False):
             return 0.0
         
@@ -3217,8 +3217,8 @@ class QuantitativeService:
     def update_strategy(self, strategy_id, name, symbol, parameters):
         """更新策略配置"""
         try:
-            if strategy_id in self.strategies:
-                strategy = self.strategies[strategy_id]
+            if self._get_strategy_by_id(strategy_id):
+                strategy = self._get_strategy_by_id(strategy_id)
                 
                 # 更新基本信息
                 strategy['name'] = name
@@ -3682,7 +3682,7 @@ class QuantitativeService:
         try:
             current_balance = self._get_current_balance()
             
-            for strategy_id, strategy in self.strategies.items():
+            for strategy_id, strategy in self._get_all_strategies_dict().items():
                 if not strategy.get('enabled', False):
                     continue
                 
@@ -4233,8 +4233,8 @@ class QuantitativeService:
     def toggle_strategy(self, strategy_id):
         """切换策略状态"""
         try:
-            if strategy_id in self.strategies:
-                strategy = self.strategies[strategy_id]
+            if self._get_strategy_by_id(strategy_id):
+                strategy = self._get_strategy_by_id(strategy_id)
                 new_enabled = not strategy['enabled']
                 
                 # 如果是启用策略，检查资金是否足够
@@ -4316,8 +4316,8 @@ class QuantitativeService:
     def update_strategy_config(self, strategy_id, config_data):
         """更新策略配置"""
         try:
-            if strategy_id in self.strategies:
-                strategy = self.strategies[strategy_id]
+            if self._get_strategy_by_id(strategy_id):
+                strategy = self._get_strategy_by_id(strategy_id)
                 
                 # 更新基本信息
                 if 'name' in config_data:
@@ -5026,7 +5026,7 @@ class QuantitativeService:
         """强制启动所有策略"""
         try:
             started_count = 0
-            for strategy_id, strategy in self.strategies.items():
+            for strategy_id, strategy in self._get_all_strategies_dict().items():
                 if not strategy.get('enabled', False):
                     strategy['enabled'] = True
                     strategy['running'] = True
@@ -5042,7 +5042,7 @@ class QuantitativeService:
                 print(f"🚀 已强制启动 {started_count} 个策略")
                 return True
             else:
-                print(f"⚠️ 所有策略已经在运行中 (共{len(self.strategies)}个)")
+                print(f"⚠️ 所有策略已经在运行中 (共{len(self._get_all_strategies_dict())}个)")
                 return True
                 
         except Exception as e:
@@ -6580,7 +6580,7 @@ class EvolutionaryStrategyEngine:
             # 检查关键组件
             checks = [
                 ("数据库连接", lambda: hasattr(self, 'conn') and self.conn is not None),
-                ("策略字典", lambda: hasattr(self, 'strategies') and isinstance(self.strategies, dict)),
+                ("策略字典", lambda: len(self._get_all_strategies_dict()) >= 0),
                 ("配置加载", lambda: hasattr(self, 'config') and self.config is not None),
                 ("余额缓存", lambda: hasattr(self, 'balance_cache') and isinstance(self.balance_cache, dict))
             ]
