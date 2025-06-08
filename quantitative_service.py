@@ -3511,13 +3511,14 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT INTO trading_signals 
-                (timestamp, symbol, signal_type, price, confidence, executed, strategy_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (timestamp, symbol, signal_type, price, quantity, confidence, executed, strategy_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ''', (
                 signal['timestamp'],
                 signal['symbol'],
                 signal['signal_type'],
                 signal['price'],
+                signal.get('quantity', 1.0),  # 默认数量为1.0
                 signal['confidence'],
                 signal['executed'],
                 signal.get('strategy_id', 'UNKNOWN')
@@ -3537,7 +3538,7 @@ class QuantitativeService:
             # 🔍 获取未执行的高置信度信号
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT rowid, timestamp, symbol, signal_type, price, confidence, strategy_id
+                SELECT id, timestamp, symbol, signal_type, price, confidence, strategy_id
                 FROM trading_signals 
                 WHERE executed = 0 AND confidence >= 0.7
                 ORDER BY confidence DESC, timestamp DESC
@@ -3565,7 +3566,7 @@ class QuantitativeService:
                         cursor.execute('''
                             UPDATE trading_signals 
                             SET executed = 1 
-                            WHERE rowid = ?
+                            WHERE id = %s
                         ''', (signal_id,))
                         self.conn.commit()
                         executed_count += 1
