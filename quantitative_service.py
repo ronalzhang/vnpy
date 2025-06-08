@@ -3043,16 +3043,24 @@ class QuantitativeService:
             print(f"📊 当前余额: {current_balance} USDT")
             print(f"📦 当前持仓数量: {len(positions.get('data', []))}")
             
-            # 🎯 获取策略数据
+            # 🎯 获取策略数据 - 统一使用get_strategies() API
             strategies_response = self.get_strategies()
             if not strategies_response.get('success', False):
                 print("❌ 无法获取策略数据，信号生成失败")
                 return 0
             
             strategies_data = strategies_response.get('data', [])
-            enabled_strategies = [s for s in strategies_data if s.get('enabled', False)]
+            if not isinstance(strategies_data, list):
+                print("❌ 策略数据格式错误，期望列表")
+                return 0
+                
+            enabled_strategies = [s for s in strategies_data if isinstance(s, dict) and s.get('enabled', False)]
             
             print(f"📈 启用策略数量: {len(enabled_strategies)}")
+            
+            if not enabled_strategies:
+                print("⚠️ 没有启用的策略，无法生成信号")
+                return 0
             
             # 🔄 智能信号生成策略
             buy_signals_needed = max(3, len(enabled_strategies) // 3)  # 至少3个买入信号
@@ -3069,9 +3077,17 @@ class QuantitativeService:
             
             for strategy in sorted_strategies[:10]:  # 限制处理数量
                 try:
-                    strategy_id = strategy['id']
+                    if not isinstance(strategy, dict):
+                        print(f"⚠️ 跳过无效策略数据: {strategy}")
+                        continue
+                        
+                    strategy_id = strategy.get('id', '')
                     symbol = strategy.get('symbol', 'DOGE/USDT')
                     score = strategy.get('final_score', 0)
+                    
+                    if not strategy_id:
+                        print("⚠️ 跳过无ID的策略")
+                        continue
                     
                     # 🔍 检查是否有该交易对的持仓
                     has_position = any(
@@ -3108,7 +3124,9 @@ class QuantitativeService:
                             break
                 
                 except Exception as e:
-                    print(f"❌ 策略 {strategy_id} 信号生成失败: {e}")
+                    print(f"❌ 策略 {strategy.get('id', 'unknown')} 信号生成失败: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             print(f"✅ 信号生成完成: 总共 {generated_signals} 个 (买入: {buy_generated}, 卖出: {sell_generated})")
             
@@ -3120,7 +3138,9 @@ class QuantitativeService:
             return generated_signals
             
         except Exception as e:
-            print(f"生成交易信号失败: {e}")
+            print(f"❌ 生成交易信号失败: {e}")
+            import traceback
+            traceback.print_exc()
             return 0
     
     def _determine_signal_type(self, strategy, has_position, buy_generated, sell_generated, 
@@ -3578,13 +3598,27 @@ class QuantitativeService:
                     else:
                         # 备用处理（不应该执行到这里，因为只使用PostgreSQL）
                         print("⚠️ 意外的数据格式，使用备用处理")
+                        
+                        # 🔧 确保parameters是字典类型
+                        raw_parameters = row.get('parameters', '{}')
+                        if isinstance(raw_parameters, str):
+                            try:
+                                parsed_parameters = json.loads(raw_parameters)
+                            except (json.JSONDecodeError, ValueError):
+                                print(f"⚠️ 策略 {row.get('id', 'unknown')} 参数解析失败，使用默认参数")
+                                parsed_parameters = {}
+                        elif isinstance(raw_parameters, dict):
+                            parsed_parameters = raw_parameters
+                        else:
+                            parsed_parameters = {}
+                        
                         strategy_data = {
                             'id': str(row.get('id', '')),
                             'name': str(row.get('name', '')),
                             'symbol': str(row.get('symbol', '')),
                             'type': str(row.get('type', '')),
                             'enabled': bool(row.get('enabled', 0)),
-                            'parameters': row.get('parameters', '{}'),
+                            'parameters': parsed_parameters,  # 确保是字典类型
                             'final_score': float(row.get('final_score', 0)),
                             'win_rate': float(row.get('win_rate', 0)),
                             'total_return': float(row.get('total_return', 0)),
