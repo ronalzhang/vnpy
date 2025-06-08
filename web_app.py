@@ -1398,29 +1398,50 @@ def get_strategy_optimization_logs(strategy_id):
                     {
                         'timestamp': '2025-09-06 01:15:30',
                         'optimization_type': '参数调优',
-                        'old_params': {'lookback_period': 20, 'threshold': 0.02},
-                        'new_params': {'lookback_period': 25, 'threshold': 0.018},
-                        'success_rate_improvement': 8.5,
+                        'old_parameters': {'lookback_period': 20, 'threshold': 0.02},
+                        'new_parameters': {'lookback_period': 25, 'threshold': 0.018},
                         'trigger_reason': 'AI优化',
                         'target_success_rate': 92.5
                     },
                     {
                         'timestamp': '2025-09-06 01:10:15',
                         'optimization_type': '信号过滤',
-                        'old_params': {'confidence_threshold': 0.7},
-                        'new_params': {'confidence_threshold': 0.75},
-                        'success_rate_improvement': 6.2,
+                        'old_parameters': {'confidence_threshold': 0.7},
+                        'new_parameters': {'confidence_threshold': 0.75},
                         'trigger_reason': '低置信度信号过多',
                         'target_success_rate': 89.3
                     },
                     {
                         'timestamp': '2025-09-06 01:05:42',
                         'optimization_type': '风险控制',
-                        'old_params': {'max_position_size': 1000},
-                        'new_params': {'max_position_size': 800},
-                        'success_rate_improvement': 4.1,
+                        'old_parameters': {'max_position_size': 1000},
+                        'new_parameters': {'max_position_size': 800},
                         'trigger_reason': '单笔亏损过大',
                         'target_success_rate': 87.2
+                    },
+                    {
+                        'timestamp': '2025-09-06 01:03:15',
+                        'optimization_type': '动量阈值调整',
+                        'old_parameters': {'momentum_threshold': 0.015},
+                        'new_parameters': {'momentum_threshold': 0.012},
+                        'trigger_reason': '信号过少',
+                        'target_success_rate': 88.1
+                    },
+                    {
+                        'timestamp': '2025-09-06 01:01:42',
+                        'optimization_type': '量化参数优化',
+                        'old_parameters': {'quantity': 1.0, 'lookback_period': 15},
+                        'new_parameters': {'quantity': 0.8, 'lookback_period': 18},
+                        'trigger_reason': '风险过高',
+                        'target_success_rate': 85.7
+                    },
+                    {
+                        'timestamp': '2025-09-06 00:58:20',
+                        'optimization_type': '布林带参数',
+                        'old_parameters': {'std_multiplier': 2.0},
+                        'new_parameters': {'std_multiplier': 2.2},
+                        'trigger_reason': '假突破过多',
+                        'target_success_rate': 86.3
                     }
                 ]
             

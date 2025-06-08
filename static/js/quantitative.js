@@ -321,9 +321,10 @@ class QuantitativeSystem {
                             <small class="text-muted">${strategy.symbol} • ${dataSource}</small><br>
                             <span class="${scoreColor}">评分: ${score.toFixed(1)} ${scoreStatus}</span><br>
                             <span class="text-success">成功率: ${(winRate * 100).toFixed(1)}%</span><br>
-                            <span class="text-info">收益率: ${(totalReturn * 100).toFixed(2)}%</span><br>
+                            <span class="text-info">总收益: ${(totalReturn * 100).toFixed(2)}%</span><br>
+                            <span class="text-warning">日收益: ${((totalReturn / 30) * 100).toFixed(3)}%</span><br>
                             <span class="text-muted">交易次数: ${totalTrades}</span><br>
-                            ${qualified ? '<span class="badge bg-success">已选中交易</span>' : '<span class="badge bg-secondary">未选中</span>'}
+                            ${score >= 65 ? '<span class="badge bg-success">交易资格</span>' : '<span class="badge bg-warning">模拟中</span>'}
                         </p>
                         
                         <div class="d-flex justify-content-center">
@@ -423,11 +424,16 @@ class QuantitativeSystem {
             // 生成参数表单
             this.generateParameterForm(strategy.type, strategy.parameters);
             
-            // 填充统计信息
-            document.getElementById('strategyTotalReturn').textContent = `${(strategy.total_return * 100).toFixed(2)}%`;
-            document.getElementById('strategyWinRate').textContent = `${(strategy.win_rate * 100).toFixed(1)}%`;
-            document.getElementById('strategyTotalTrades').textContent = strategy.total_trades || 0;
-            document.getElementById('strategyDailyReturn').textContent = `${(strategy.daily_return * 100).toFixed(2)}%`;
+            // 填充统计信息 - 修复NaN问题
+            const totalReturn = strategy.total_return || 0;
+            const winRate = strategy.win_rate || 0;
+            const totalTrades = strategy.total_trades || 0;
+            const dailyReturn = strategy.daily_return || 0;
+            
+            document.getElementById('strategyTotalReturn').textContent = `${(totalReturn * 100).toFixed(2)}%`;
+            document.getElementById('strategyWinRate').textContent = `${(winRate * 100).toFixed(1)}%`;
+            document.getElementById('strategyTotalTrades').textContent = totalTrades;
+            document.getElementById('strategyDailyReturn').textContent = `${(dailyReturn * 100).toFixed(2)}%`;
             
             // 绑定保存事件
             this.bindConfigEvents(strategyId);
@@ -662,25 +668,94 @@ class QuantitativeSystem {
             const tbody = document.getElementById('optimizationLogsTable');
             
             if (data.success && data.logs && data.logs.length > 0) {
-                tbody.innerHTML = data.logs.map(log => `
-                    <tr>
-                        <td>${this.formatTime(log.timestamp)}</td>
-                        <td><span class="badge bg-info">${log.optimization_type}</span></td>
-                        <td><code>${JSON.stringify(log.old_parameters, null, 1)}</code></td>
-                        <td><code>${JSON.stringify(log.new_parameters, null, 1)}</code></td>
-                        <td>${log.trigger_reason}</td>
-                        <td>${log.target_success_rate}%</td>
-                    </tr>
-                `).join('');
+                // 存储完整日志数据用于分页
+                this.optimizationLogs = data.logs;
+                this.currentLogPage = 1;
+                this.logsPerPage = 5;
+                
+                this.renderOptimizationLogs();
+                this.renderLogPagination();
             } else {
                 tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无优化记录</td></tr>';
+                document.getElementById('logPaginationContainer').innerHTML = '';
             }
             
         } catch (error) {
             console.error('加载优化记录失败:', error);
             document.getElementById('optimizationLogsTable').innerHTML = 
                 '<tr><td colspan="6" class="text-center text-danger">加载失败</td></tr>';
+            document.getElementById('logPaginationContainer').innerHTML = '';
         }
+    }
+
+    // 渲染优化日志
+    renderOptimizationLogs() {
+        const tbody = document.getElementById('optimizationLogsTable');
+        const startIndex = (this.currentLogPage - 1) * this.logsPerPage;
+        const endIndex = startIndex + this.logsPerPage;
+        const currentLogs = this.optimizationLogs.slice(startIndex, endIndex);
+        
+        tbody.innerHTML = currentLogs.map(log => `
+            <tr>
+                <td>${this.formatTime(log.timestamp)}</td>
+                <td><span class="badge bg-info">${log.optimization_type || '未知类型'}</span></td>
+                <td><code>${JSON.stringify(log.old_params || log.old_parameters || {}, null, 1)}</code></td>
+                <td><code>${JSON.stringify(log.new_params || log.new_parameters || {}, null, 1)}</code></td>
+                <td>${log.trigger_reason || '无原因'}</td>
+                <td>${log.target_success_rate || 0}%</td>
+            </tr>
+        `).join('');
+    }
+
+    // 渲染分页按钮
+    renderLogPagination() {
+        const container = document.getElementById('logPaginationContainer');
+        if (!container) return;
+        
+        const totalPages = Math.ceil(this.optimizationLogs.length / this.logsPerPage);
+        
+        if (totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        let paginationHtml = `
+            <nav aria-label="优化日志分页">
+                <ul class="pagination pagination-sm justify-content-center">
+                    <li class="page-item ${this.currentLogPage === 1 ? 'disabled' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="app.changeLogPage(${this.currentLogPage - 1})">上一页</a>
+                    </li>
+        `;
+        
+        // 显示页码
+        for (let i = 1; i <= totalPages; i++) {
+            paginationHtml += `
+                <li class="page-item ${i === this.currentLogPage ? 'active' : ''}">
+                    <a class="page-link" href="javascript:void(0)" onclick="app.changeLogPage(${i})">${i}</a>
+                </li>
+            `;
+        }
+        
+        paginationHtml += `
+                    <li class="page-item ${this.currentLogPage === totalPages ? 'disabled' : ''}">
+                        <a class="page-link" href="javascript:void(0)" onclick="app.changeLogPage(${this.currentLogPage + 1})">下一页</a>
+                    </li>
+                </ul>
+            </nav>
+        `;
+        
+        container.innerHTML = paginationHtml;
+    }
+
+    // 切换日志页面
+    changeLogPage(page) {
+        if (page < 1 || page > Math.ceil(this.optimizationLogs.length / this.logsPerPage)) {
+            return;
+        }
+        
+        this.currentLogPage = page;
+        this.renderOptimizationLogs();
+        this.renderLogPagination();
     }
 
     // 获取策略名称

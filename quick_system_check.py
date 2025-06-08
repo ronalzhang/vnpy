@@ -18,11 +18,10 @@ def check_system():
         if response.status_code == 200:
             data = response.json()
             if data.get('success'):
-                status = data.get('data', {})
-                print(f"   ✅ 系统运行: {status.get('quantitative_running', False)}")
-                print(f"   ✅ 自动交易: {status.get('auto_trading_enabled', False)}")
-                print(f"   ✅ 策略总数: {status.get('total_strategies', 0)}")
-                print(f"   ✅ 运行策略: {status.get('running_strategies', 0)}")
+                print(f"   ✅ 系统运行: {data.get('running', False)}")
+                print(f"   ✅ 自动交易: {data.get('auto_trading_enabled', False)}")
+                print(f"   ✅ 策略总数: {data.get('total_strategies', 0)}")
+                print(f"   ✅ 运行策略: {data.get('running_strategies', 0)}")
             else:
                 print("   ❌ 系统状态API返回失败")
         else:
