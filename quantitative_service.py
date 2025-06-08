@@ -4956,9 +4956,9 @@ class QuantitativeService:
             
             # 插入初始系统状态记录（如果不存在）
             cursor.execute('''
-                INSERT OR IGNORE INTO system_status (
+                INSERT INTO system_status (
                     id, quantitative_running, system_health, last_update_time
-                ) VALUES (1, FALSE, 'initializing', datetime('now'))
+                ) VALUES (1, FALSE, 'initializing', NOW()) ON CONFLICT (id) DO NOTHING
             ''')
             
             self.conn.commit()
@@ -5120,9 +5120,9 @@ class QuantitativeService:
                     daily_return = 0.0
                     
                     cursor.execute('''
-                        INSERT OR IGNORE INTO account_balance_history 
+                        INSERT INTO account_balance_history 
                         (total_balance, available_balance, frozen_balance, daily_pnl, daily_return, timestamp)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                     ''', (
                         round(historical_balance, 2),
                         round(historical_balance * 0.95, 2),  # 95%可用
@@ -5134,9 +5134,10 @@ class QuantitativeService:
                 
                 # 插入今天的实际数据
                 cursor.execute('''
-                    INSERT OR REPLACE INTO account_balance_history 
+                    INSERT INTO account_balance_history 
                     (total_balance, available_balance, frozen_balance, daily_pnl, daily_return, timestamp)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (timestamp) DO UPDATE SET
+                    total_balance = EXCLUDED.total_balance
                 ''', (
                     15.24,
                     14.48,  # 95%可用
@@ -5223,9 +5224,11 @@ class QuantitativeService:
             
             for strategy_id, strategy in self.strategies.items():
                 cursor.execute('''
-                    INSERT OR REPLACE INTO strategies 
+                    INSERT INTO strategies 
                     (id, name, symbol, type, enabled, parameters, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP) 
+                    ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name, enabled = EXCLUDED.enabled, parameters = EXCLUDED.parameters
                 ''', (
                     strategy_id,
                     strategy['name'],
@@ -5257,8 +5260,8 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 UPDATE strategies 
-                SET enabled = ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE id = ?
+                SET enabled = %s, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = %s
             ''', (1 if enabled else 0, strategy_id))
             self.conn.commit()
             return True
