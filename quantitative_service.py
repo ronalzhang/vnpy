@@ -3077,6 +3077,10 @@ class QuantitativeService:
                 self.conn.rollback()
             except:
                 pass
+            try:
+                self.conn.rollback()
+            except:
+                pass
 
     def generate_trading_signals(self):
         """生成交易信号 - 优化版本，专注90+分策略"""
@@ -3530,6 +3534,10 @@ class QuantitativeService:
                 self.conn.rollback()
             except:
                 pass
+            try:
+                self.conn.rollback()
+            except:
+                pass
 
     def _execute_pending_signals(self):
         """执行待处理的交易信号"""
@@ -3759,10 +3767,10 @@ class QuantitativeService:
             
             # 更新缓存
             self.balance_cache.update({
-                'usdt_balance': balance_data['usdt_balance'],
-                'position_value': balance_data['position_value'],
-                'total_value': balance_data['total_value'],
-                'available_balance': balance_data['usdt_balance'],
+                'usdt_balance': float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('usdt_balance', 0.0) if isinstance(balance_data, dict) else 0.0),
+                'position_value': 0.0,
+                'total_value': float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('total_value', 0.0) if isinstance(balance_data, dict) else 0.0),
+                'available_balance': float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('usdt_balance', 0.0) if isinstance(balance_data, dict) else 0.0),
                 'frozen_balance': 0.0,
                 'last_update': datetime.datetime.now(),
                 'cache_valid': True
@@ -3770,12 +3778,12 @@ class QuantitativeService:
             
             # 记录余额历史
             self.db_manager.record_balance_history(
-                balance_data['total_value'],
-                balance_data['usdt_balance'],
-                balance_data['position_value']
+                float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('total_value', 0.0) if isinstance(balance_data, dict) else 0.0),
+                float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('usdt_balance', 0.0) if isinstance(balance_data, dict) else 0.0),
+                0.0
             )
             
-            return balance_data['usdt_balance']
+            return float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('usdt_balance', 0.0) if isinstance(balance_data, dict) else 0.0)
             
         except Exception as e:
             print(f"获取余额失败: {e}")
@@ -5514,10 +5522,10 @@ class QuantitativeService:
             
             # 更新缓存
             self.balance_cache.update({
-                'usdt_balance': balance_data['usdt_balance'],
-                'position_value': balance_data['position_value'],
-                'total_value': balance_data['total_value'],
-                'available_balance': balance_data['usdt_balance'],
+                'usdt_balance': float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('usdt_balance', 0.0) if isinstance(balance_data, dict) else 0.0),
+                'position_value': 0.0,
+                'total_value': float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('total_value', 0.0) if isinstance(balance_data, dict) else 0.0),
+                'available_balance': float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('usdt_balance', 0.0) if isinstance(balance_data, dict) else 0.0),
                 'frozen_balance': 0.0,
                 'last_update': datetime.datetime.now(),
                 'cache_valid': True
@@ -5525,12 +5533,12 @@ class QuantitativeService:
             
             # 记录余额历史
             self.db_manager.record_balance_history(
-                balance_data['total_value'],
-                balance_data['usdt_balance'],
-                balance_data['position_value']
+                float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('total_value', 0.0) if isinstance(balance_data, dict) else 0.0),
+                float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('usdt_balance', 0.0) if isinstance(balance_data, dict) else 0.0),
+                0.0
             )
             
-            return balance_data['usdt_balance']
+            return float(balance_data) if isinstance(balance_data, (int, float)) else (balance_data.get('usdt_balance', 0.0) if isinstance(balance_data, dict) else 0.0)
             
         except Exception as e:
             print(f"获取余额失败: {e}")
