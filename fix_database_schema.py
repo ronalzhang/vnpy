@@ -11,17 +11,13 @@ import json
 def get_db_connection():
     """获取数据库连接"""
     try:
-        # 读取配置
-        with open('crypto_config.json', 'r') as f:
-            config = json.load(f)
-        
-        # 连接PostgreSQL
+        # 使用硬编码的PostgreSQL配置
         conn = psycopg2.connect(
-            host=config['database']['host'],
-            port=config['database']['port'],
-            database=config['database']['database'],
-            user=config['database']['user'],
-            password=config['database']['password'],
+            host='localhost',
+            port=5432,
+            database='quantitative',
+            user='quant_user',
+            password='quant_password_2024',
             cursor_factory=RealDictCursor
         )
         
