@@ -595,7 +595,7 @@ class MomentumStrategy(QuantitativeStrategy):
             quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=datetime.now(),
-            executed=False
+            executed=0
         )
         
         return signal
@@ -755,7 +755,7 @@ class MeanReversionStrategy(QuantitativeStrategy):
             quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=datetime.now(),
-            executed=False
+            executed=0
         )
         
         return signal
@@ -918,7 +918,7 @@ class BreakoutStrategy(QuantitativeStrategy):
             quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=datetime.now(),
-            executed=False
+            executed=0
         )
         
         return signal
@@ -1047,7 +1047,7 @@ class GridTradingStrategy(QuantitativeStrategy):
             quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=datetime.now(),
-            executed=False
+            executed=0
         )
         
         return signal
@@ -1172,7 +1172,7 @@ class HighFrequencyStrategy(QuantitativeStrategy):
             quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=current_time,
-            executed=False
+            executed=0
         )
         
         return signal
@@ -1326,7 +1326,7 @@ class TrendFollowingStrategy(QuantitativeStrategy):
             quantity=adjusted_quantity,
             confidence=confidence,
             timestamp=datetime.now(),
-            executed=False
+            executed=0
         )
         
         return signal
@@ -3284,7 +3284,7 @@ class QuantitativeService:
                     'quantity': quantity,
                     'confidence': min(momentum / threshold, 1.0),
                     'timestamp': datetime.now().isoformat(),
-                    'executed': False
+                    'executed': 0
                 }
             elif momentum < -threshold:
                 return {
@@ -3296,7 +3296,7 @@ class QuantitativeService:
                     'quantity': quantity,
                     'confidence': min(abs(momentum) / threshold, 1.0),
                     'timestamp': datetime.now().isoformat(),
-                    'executed': False
+                    'executed': 0
                 }
         
         return None
@@ -3330,7 +3330,7 @@ class QuantitativeService:
                 'quantity': quantity,
                 'confidence': 0.8,
                 'timestamp': datetime.now().isoformat(),
-                'executed': False
+                'executed': 0
             }
         elif current_price > upper_band:
             return {
@@ -3342,7 +3342,7 @@ class QuantitativeService:
                 'quantity': quantity,
                 'confidence': 0.8,
                 'timestamp': datetime.now().isoformat(),
-                'executed': False
+                'executed': 0
             }
         
         return None
@@ -3370,7 +3370,7 @@ class QuantitativeService:
                 'quantity': quantity,
                 'confidence': 0.9,
                 'timestamp': datetime.now().isoformat(),
-                'executed': False
+                'executed': 0
             }
         elif current_price < support * (1 - threshold):
             return {
@@ -3382,7 +3382,7 @@ class QuantitativeService:
                 'quantity': quantity,
                 'confidence': 0.9,
                 'timestamp': datetime.now().isoformat(),
-                'executed': False
+                'executed': 0
             }
         
         return None
@@ -3423,7 +3423,7 @@ class QuantitativeService:
                         'quantity': quantity,
                         'confidence': 0.8,
                         'timestamp': datetime.now().isoformat(),
-                        'executed': False
+                        'executed': 0
                     }
                 else:
                     # 价格高于中心，卖出
@@ -3436,7 +3436,7 @@ class QuantitativeService:
                         'quantity': quantity,
                         'confidence': 0.8,
                         'timestamp': datetime.now().isoformat(),
-                        'executed': False
+                        'executed': 0
                     }
         
         return None
@@ -3464,7 +3464,7 @@ class QuantitativeService:
                 'quantity': quantity,
                 'confidence': min(abs(price_change) / min_profit, 1.0),
                 'timestamp': datetime.now().isoformat(),
-                'executed': False
+                'executed': 0
             }
         
         return None
@@ -3492,7 +3492,7 @@ class QuantitativeService:
                 'quantity': quantity,
                 'confidence': min(trend / threshold, 1.0),
                 'timestamp': datetime.now().isoformat(),
-                'executed': False
+                'executed': 0
             }
         elif trend < -threshold:
             return {
@@ -3504,7 +3504,7 @@ class QuantitativeService:
                 'quantity': quantity,
                 'confidence': min(abs(trend) / threshold, 1.0),
                 'timestamp': datetime.now().isoformat(),
-                'executed': False
+                'executed': 0
             }
         
         return None
@@ -3668,7 +3668,7 @@ class QuantitativeService:
                 price=signal['price'],
                 quantity=trade_amount,
                 confidence=signal['confidence'],
-                executed=True,
+                executed=1,
                 pnl=estimated_pnl
             )
             
@@ -4763,7 +4763,7 @@ class QuantitativeService:
             
             # 统计交易次数
             try:
-                query = "SELECT COUNT(*) as count FROM strategy_trade_logs WHERE executed = true"
+                query = "SELECT COUNT(*) as count FROM strategy_trade_logs WHERE executed = 1"
                 result = self.db_manager.execute_query(query, fetch_one=True)
                 total_trades = result.get('count', 0) if result else 0
             except Exception as e:
@@ -4872,7 +4872,7 @@ class QuantitativeService:
             print(f"获取策略优化日志失败: {e}")
             return []
     
-    def log_strategy_trade(self, strategy_id, signal_type, price, quantity, confidence, executed=False, pnl=0.0):
+    def log_strategy_trade(self, strategy_id, signal_type, price, quantity, confidence, executed=0, pnl=0.0):
         """记录策略交易日志"""
         try:
             cursor = self.conn.cursor()
