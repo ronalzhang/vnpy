@@ -4864,7 +4864,7 @@ class QuantitativeService:
             # 确保数据库连接正常并清理事务状态
             try:
                 if self.conn.closed:
-                    self.conn = psycopg2.connect(**DB_CONFIG)
+                    self.conn = psycopg2.connect(**self.db_config)
                     
                 # 清理任何未完成的事务
                 self.conn.rollback()
@@ -4873,7 +4873,7 @@ class QuantitativeService:
             except Exception as conn_error:
                 print(f"重置数据库连接: {conn_error}")
                 try:
-                    self.conn = psycopg2.connect(**DB_CONFIG)
+                    self.conn = psycopg2.connect(**self.db_config)
                     self.conn.autocommit = True
                 except Exception as reconnect_error:
                     print(f"重连数据库失败: {reconnect_error}")
