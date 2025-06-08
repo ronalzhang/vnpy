@@ -215,8 +215,7 @@ class DatabaseManager:
     def init_database(self):
         """初始化数据库表"""
         try:
-            # 确保连接已建立
-            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            # 确保PostgreSQL连接已建立
             cursor = self.conn.cursor()
             
             # 创建系统状态表
@@ -355,7 +354,7 @@ class DatabaseManager:
                              daily_return: float = None, milestone_note: str = None):
         """记录账户资产历史"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self.conn
             cursor = conn.cursor()
             
             # 计算累计收益率
@@ -427,23 +426,19 @@ class DatabaseManager:
                 conn.close()
 
     def get_balance_history(self, days: int = 30) -> List[Dict[str, Any]]:
-        """获取账户资产历史"""
+        """获取账户资产历史 - 使用PostgreSQL"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 获取指定天数的历史记录
-            start_date = (datetime.now() - timedelta(days=days)).isoformat()
-            cursor.execute('''
+            # 使用PostgreSQL适配器
+            result = self.db_adapter.execute_query('''
                 SELECT timestamp, total_balance, available_balance, daily_pnl, 
                        daily_return, cumulative_return, total_trades, milestone_note
                 FROM account_balance_history 
-                WHERE timestamp >= ?
+                WHERE timestamp >= %s
                 ORDER BY timestamp ASC
-            ''', (start_date,))
+            ''', ((datetime.now() - timedelta(days=days)).isoformat(),), fetch_all=True)
             
             records = []
-            for row in cursor.fetchall():
+            for row in result:
                 records.append({
                     'timestamp': row[0],
                     'total_balance': row[1],
@@ -455,7 +450,6 @@ class DatabaseManager:
                     'milestone_note': row[7]
                 })
             
-            conn.close()
             return records
             
         except Exception as e:
@@ -2300,9 +2294,16 @@ class QuantitativeService:
         # 加载配置和初始化
         self.load_config()
         
-        # ⭐ 在init_database之前初始化数据库连接
-        import sqlite3
-        self.conn = sqlite3.connect("quantitative.db", check_same_thread=False)
+        # ⭐ PostgreSQL连接配置 - 移除SQLite
+        import psycopg2
+        self.db_config = {
+            'host': 'localhost',
+            'database': 'quantitative',
+            'user': 'postgres',
+            'password': 'chenfei0421'
+        }
+        self.conn = psycopg2.connect(**self.db_config)
+        print("✅ 已连接到PostgreSQL数据库: quantitative")
         
         # ⭐ 初始化数据库管理器
         from db_config import DatabaseAdapter

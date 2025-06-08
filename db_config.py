@@ -14,7 +14,7 @@ from typing import Union, Dict, Any, List, Tuple
 
 # 数据库配置
 DATABASE_CONFIG = {
-    'type': 'postgresql',  # 'postgresql' 或 'sqlite' - 已修复为使用真实数据
+    'type': 'postgresql',  # 仅支持PostgreSQL
     'postgresql': {
         'host': 'localhost',
         'port': 5432,
@@ -22,9 +22,7 @@ DATABASE_CONFIG = {
         'user': 'quant_user',
         'password': 'quant_password_2025'
     },
-    'sqlite': {
-        'path': 'quantitative.db'
-    }
+
 }
 
 class DatabaseAdapter:
@@ -52,10 +50,7 @@ class DatabaseAdapter:
                 self.connection.autocommit = True
                 print(f"✅ 已连接到PostgreSQL数据库: {pg_config['database']}")
             else:
-                sqlite_path = self.config['sqlite']['path']
-                self.connection = sqlite3.connect(sqlite_path, check_same_thread=False)
-                self.connection.row_factory = sqlite3.Row
-                print(f"✅ 已连接到SQLite数据库: {sqlite_path}")
+                raise ValueError("仅支持PostgreSQL数据库，请检查配置")
         except Exception as e:
             print(f"❌ 数据库连接失败: {e}")
             raise
