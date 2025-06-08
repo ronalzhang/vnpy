@@ -2237,9 +2237,10 @@ def main():
         except Exception as e:
             print(f"❌ 量化交易服务启动失败: {e}")
     
-    # 启动监控线程
-    monitor = threading.Thread(target=monitor_thread, daemon=True)
-    monitor.start()
+    # 启动监控线程 - 已禁用以减少内存使用
+    # monitor = threading.Thread(target=monitor_thread, daemon=True)
+    # monitor.start()
+    print("监控线程已禁用，数据将通过API按需获取")
     
     # 初始化套利系统
     if args.arbitrage and ARBITRAGE_ENABLED:
