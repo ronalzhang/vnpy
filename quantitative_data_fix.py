@@ -19,16 +19,17 @@ def connect_to_database():
     try:
         # 从db_config.py获取数据库配置
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-        from db_config import get_db_adapter
+        from db_config import DATABASE_CONFIG
         
-        adapter = get_db_adapter()
+        # 直接使用配置字典
+        pg_config = DATABASE_CONFIG['postgresql']
         
         conn = psycopg2.connect(
-            host=adapter.host,
-            port=adapter.port,
-            database=adapter.database,
-            user=adapter.user,
-            password=adapter.password,
+            host=pg_config['host'],
+            port=pg_config['port'],
+            database=pg_config['database'],
+            user=pg_config['user'],
+            password=pg_config['password'],
             cursor_factory=RealDictCursor
         )
         
