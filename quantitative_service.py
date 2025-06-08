@@ -3068,7 +3068,7 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT INTO operation_logs (operation_type, operation_detail, result, timestamp)
-                VALUES (?, ?, ?, datetime('now'))
+                VALUES (%s, %s, %s, NOW())
             ''', (operation_type, detail, result))
             self.conn.commit()
         except Exception as e:
@@ -3508,7 +3508,7 @@ class QuantitativeService:
             cursor.execute('''
                 INSERT INTO trading_signals 
                 (timestamp, symbol, signal_type, price, confidence, executed, strategy_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             ''', (
                 signal['timestamp'],
                 signal['symbol'],
@@ -4533,13 +4533,15 @@ class QuantitativeService:
         if 'lookback_period' in params:
             params['lookback_period'] = max(5, min(100, params['lookback_period']))  # 限制在5-100
     
-    def _save_system_status(self):
+            def _save_system_status(self):
         """保存系统状态到数据库"""
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                INSERT OR REPLACE INTO system_status (key, value, timestamp)
-                VALUES ('running', ?, datetime('now'))
+                INSERT INTO system_status (key, value, timestamp)
+                VALUES ('running', %s, NOW())
+                ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value, timestamp = EXCLUDED.timestamp
             ''', (str(self.running),))
             self.conn.commit()
         except Exception as e:
@@ -4550,8 +4552,10 @@ class QuantitativeService:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                INSERT OR REPLACE INTO system_status (key, value, timestamp)
-                VALUES ('auto_trading_enabled', ?, datetime('now'))
+                INSERT INTO system_status (key, value, timestamp)
+                VALUES ('auto_trading_enabled', %s, NOW())
+                ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value, timestamp = EXCLUDED.timestamp
             ''', (str(self.auto_trading_enabled),))
             self.conn.commit()
         except Exception as e:
@@ -4768,7 +4772,7 @@ class QuantitativeService:
             cursor.execute('''
                 INSERT INTO strategy_optimization_logs 
                 (strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
             ''', (
                 strategy_id,
                 optimization_type,
@@ -4851,7 +4855,7 @@ class QuantitativeService:
             cursor.execute('''
                 INSERT INTO strategy_trade_logs 
                 (strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
             ''', (
                 strategy_id,
                 signal_type,
@@ -5564,13 +5568,13 @@ class QuantitativeService:
         try:
             if hasattr(self, 'db_manager') and self.db_manager:
                 self.db_manager.execute_query(
-                    "INSERT INTO strategy_score_history (strategy_id, score) VALUES (?, ?)",
+                    "INSERT INTO strategy_score_history (strategy_id, score) VALUES (%s, %s)",
                     (strategy_id, score)
                 )
             else:
                 cursor = self.conn.cursor()
                 cursor.execute(
-                    "INSERT INTO strategy_score_history (strategy_id, score, timestamp) VALUES (?, ?, ?)",
+                    "INSERT INTO strategy_score_history (strategy_id, score, timestamp) VALUES (%s, %s, %s)",
                     (strategy_id, score, datetime.now().isoformat())
                 )
                 self.conn.commit()
@@ -6007,7 +6011,7 @@ class EvolutionaryStrategyEngine:
                 """INSERT INTO strategy_evolution_history 
                 (strategy_id, generation, cycle, evolution_type, new_parameters, 
                  parent_strategy_id, new_score, created_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())""",
                 (strategy_id, generation, cycle, evolution_type, 
                  new_params_json, parent_strategy_id or '', new_score or 0.0)
             )
