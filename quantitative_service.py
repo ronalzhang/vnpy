@@ -365,7 +365,7 @@ class DatabaseManager:
             cumulative_return = ((total_balance - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
             
             # 获取总交易次数
-            cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs WHERE executed = 1")
+            cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs WHERE executed = true")
             total_trades = cursor.fetchone()[0]
             
             cursor.execute('''
@@ -3009,17 +3009,16 @@ class QuantitativeService:
     def _calculate_real_win_rate(self, strategy_id):
         """计算真实胜率"""
         try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
+            query = '''
                 SELECT COUNT(*) as total, 
                        SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins
                 FROM strategy_trade_logs 
-                WHERE strategy_id = %s AND executed = 1
-            ''', (strategy_id,))
+                WHERE strategy_id = %s AND executed = true
+            '''
+            result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             
-            result = cursor.fetchone()
-            if result and result[0] > 0:
-                return result[1] / result[0]
+            if result and result.get('total', 0) > 0:
+                return result.get('wins', 0) / result.get('total', 1)
             else:
                 return 0.5  # 默认50%
                 
@@ -3030,14 +3029,12 @@ class QuantitativeService:
     def _count_real_strategy_trades(self, strategy_id):
         """计算真实交易次数"""
         try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT COUNT(*) FROM strategy_trade_logs 
-                WHERE strategy_id = %s AND executed = 1
-            ''', (strategy_id,))
-            
-            result = cursor.fetchone()
-            return result[0] if result else 0
+            query = '''
+                SELECT COUNT(*) as count FROM strategy_trade_logs 
+                WHERE strategy_id = %s AND executed = true
+            '''
+            result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+            return result.get('count', 0) if result else 0
             
         except Exception as e:
             print(f"计算交易次数失败: {e}")
@@ -3046,17 +3043,15 @@ class QuantitativeService:
     def _calculate_real_strategy_return(self, strategy_id):
         """计算真实策略收益率"""
         try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT SUM(pnl) FROM strategy_trade_logs 
-                WHERE strategy_id = %s AND executed = 1
-            ''', (strategy_id,))
-            
-            result = cursor.fetchone()
-            total_pnl = result[0] if result and result[0] else 0.0
+            query = '''
+                SELECT SUM(pnl) as total_pnl FROM strategy_trade_logs 
+                WHERE strategy_id = %s AND executed = true
+            '''
+            result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+            total_pnl = result.get('total_pnl', 0.0) if result else 0.0
             
             # 计算收益率（假设初始资金为100）
-            return total_pnl / 100.0
+            return total_pnl / 100.0 if total_pnl else 0.0
             
         except Exception as e:
             print(f"计算策略收益率失败: {e}")
@@ -4178,7 +4173,7 @@ class QuantitativeService:
                 cursor.execute('''
                     SELECT timestamp, symbol, signal_type, price, confidence, executed
                     FROM trading_signals 
-                    WHERE executed = 1
+                    WHERE executed = true
                     ORDER BY timestamp DESC 
                     LIMIT %s
                 ''', (limit,))
@@ -4268,12 +4263,12 @@ class QuantitativeService:
                             return float(usdt_balance)
             
             # 从数据库获取
-            with self.get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT balance FROM account_info ORDER BY timestamp DESC LIMIT 1")
-                result = cursor.fetchone()
-                if result:
-                    return float(result[0])
+            result = self.db_manager.execute_query(
+                "SELECT balance FROM account_info ORDER BY timestamp DESC LIMIT 1", 
+                fetch_one=True
+            )
+            if result:
+                return float(result.get('balance', 15.25))
             
             return 15.25  # 默认余额
         except Exception as e:
@@ -4304,7 +4299,7 @@ class QuantitativeService:
             
             # 统计交易次数
             try:
-                query = "SELECT COUNT(*) as count FROM strategy_trade_logs WHERE executed = 1"
+                query = "SELECT COUNT(*) as count FROM strategy_trade_logs WHERE executed = true"
                 result = self.db_manager.execute_query(query, fetch_one=True)
                 total_trades = result.get('count', 0) if result else 0
             except Exception as e:
