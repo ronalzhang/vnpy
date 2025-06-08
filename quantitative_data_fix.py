@@ -139,7 +139,7 @@ def fix_trading_signals_data(conn):
                     price = round(random.uniform(500, 700), 2)
                 
                 confidence = round(random.uniform(0.6, 0.9), 2)
-                executed = random.choice([0, 1]) if random.random() > 0.3 else 0  # 70%未执行
+                executed = random.choice([True, False]) if random.random() > 0.3 else False  # 70%未执行
                 quantity = round(random.uniform(1, 10), 2)
                 
                 # 随机时间戳（最近24小时）
@@ -217,7 +217,7 @@ def fix_strategy_trade_logs(conn):
                     else:
                         pnl = round(random.uniform(-0.3, 1.5), 3)
                     
-                    executed = random.choice([0, 1])
+                    executed = random.choice([True, False])
                     confidence = round(random.uniform(0.6, 0.9), 2)
                     
                     # 随机时间戳
