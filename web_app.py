@@ -19,6 +19,35 @@ import ccxt
 from flask import Flask, jsonify, render_template, request, Response
 import os
 import pickle
+from functools import wraps
+import time
+import threading
+
+# 缓存装饰器
+def cache_with_ttl(ttl_seconds):
+    def decorator(func):
+        func._cache = {}
+        func._cache_time = {}
+        
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = str(args) + str(sorted(kwargs.items()))
+            current_time = time.time()
+            
+            # 检查缓存是否存在且未过期
+            if (key in func._cache and 
+                key in func._cache_time and 
+                current_time - func._cache_time[key] < ttl_seconds):
+                return func._cache[key]
+            
+            # 调用原函数并缓存结果
+            result = func(*args, **kwargs)
+            func._cache[key] = result
+            func._cache_time[key] = current_time
+            return result
+        
+        return wrapper
+    return decorator
 
 # 在文件开头初始化量化服务
 quantitative_service = None
@@ -306,6 +335,7 @@ def calculate_price_differences(prices):
     
     return result
 
+@cache_with_ttl(30)  # 缓存30秒
 def get_exchange_balances():
     """从交易所API获取余额数据"""
     balances = {}
@@ -549,6 +579,7 @@ def get_bitget_balance(client):
         print(f"获取Bitget余额的替代方法失败: {e}")
         raise e
 
+@cache_with_ttl(10)  # 缓存10秒
 def get_exchange_prices():
     """从交易所API获取价格数据"""
     prices = {exchange: {} for exchange in EXCHANGES}
