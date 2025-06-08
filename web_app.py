@@ -1815,24 +1815,122 @@ def toggle_auto_trading():
 def force_close_position(position_id):
     """强制平仓"""
     try:
-        # 如果是真实交易，调用交易引擎平仓
-        if quantitative_service.trading_engine:
-            # 这里需要实现根据position_id找到对应持仓并平仓的逻辑
-            # 简化实现
+        if not quantitative_service:
+            return jsonify({
+                'success': False,
+                'message': '量化服务未初始化'
+            })
+        
+        # 获取持仓信息
+        positions = quantitative_service.get_positions()
+        target_position = None
+        
+        for pos in positions:
+            if str(pos.get('symbol', '')) == str(position_id):
+                target_position = pos
+                break
+        
+        if not target_position:
+            return jsonify({
+                'success': False,
+                'message': f'未找到持仓: {position_id}'
+            })
+        
+        # 生成平仓信号
+        close_signal = {
+            'id': f"force_close_{int(time.time() * 1000)}",
+            'strategy_id': 'manual_close',
+            'symbol': target_position['symbol'],
+            'signal_type': 'sell',
+            'price': target_position.get('current_price', 0),
+            'quantity': target_position.get('quantity', 0),
+            'confidence': 1.0,
+            'timestamp': datetime.now().isoformat(),
+            'executed': 0,
+            'priority': 'emergency'
+        }
+        
+        # 保存强制平仓信号
+        success = quantitative_service._save_signal_to_db(close_signal)
+        
+        if success:
+            # 立即执行强制平仓
+            quantitative_service._execute_pending_signals()
+            
+            # 记录操作日志
+            quantitative_service._log_operation(
+                'force_close',
+                f'强制平仓 {position_id}',
+                'success'
+            )
+            
             return jsonify({
                 'success': True,
-                'message': '平仓指令已发送'
+                'message': f'强制平仓指令已执行: {position_id}'
             })
         else:
             return jsonify({
                 'success': False,
-                'message': '自动交易引擎未启用'
+                'message': '强制平仓指令生成失败'
             })
+            
     except Exception as e:
         logger.error(f"强制平仓失败: {e}")
         return jsonify({
             'success': False,
-            'message': str(e)
+            'message': f'强制平仓失败: {str(e)}'
+        }), 500
+
+@app.route('/api/quantitative/emergency-stop', methods=['POST'])
+def emergency_stop():
+    """紧急停止所有交易"""
+    try:
+        if not quantitative_service:
+            return jsonify({
+                'success': False,
+                'message': '量化服务未初始化'
+            })
+        
+        # 停止自动交易
+        quantitative_service.set_auto_trading(False)
+        
+        # 停止所有策略
+        strategies_response = quantitative_service.get_strategies()
+        if strategies_response.get('success'):
+            strategies = strategies_response.get('data', [])
+            stopped_count = 0
+            
+            for strategy in strategies:
+                if strategy.get('enabled'):
+                    success = quantitative_service.stop_strategy(strategy['id'])
+                    if success:
+                        stopped_count += 1
+        
+        # 记录紧急停止操作
+        quantitative_service._log_operation(
+            'emergency_stop',
+            f'紧急停止系统，停止了{stopped_count}个策略',
+            'success'
+        )
+        
+        # 更新系统状态
+        quantitative_service.update_system_status(
+            auto_trading_enabled=False,
+            running_strategies=0,
+            system_health='emergency_stop',
+            notes='用户触发紧急停止'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'紧急停止成功！已停止{stopped_count}个策略，自动交易已关闭'
+        })
+        
+    except Exception as e:
+        logger.error(f"紧急停止失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'紧急停止失败: {str(e)}'
         }), 500
 
 # ========== 新增的量化交易系统控制API ==========
@@ -1932,16 +2030,16 @@ def quantitative_config():
                     # 根据不同模式调整系统参数
                     if mode == 'manual':
                         # 手动模式：禁用自动交易
-                        quantitative_service.toggle_auto_trading(False)
+                        quantitative_service.set_auto_trading(False)
                         logger.info("切换到手动模式，已禁用自动交易")
                     elif mode == 'auto':
                         # 自动模式：启用自动交易，使用平衡参数
-                        quantitative_service.toggle_auto_trading(True)
+                        quantitative_service.set_auto_trading(True)
                         # 这里可以调整策略参数为平衡型
                         logger.info("切换到自动模式，已启用自动交易")
                     elif mode == 'aggressive':
                         # 激进模式：启用自动交易，调整为激进参数
-                        quantitative_service.toggle_auto_trading(True)
+                        quantitative_service.set_auto_trading(True)
                         # 这里可以调整策略参数为激进型
                         logger.info("切换到激进模式，追求高收益")
                 except Exception as e:
@@ -2047,10 +2145,10 @@ def get_operations_log():
         
         if time_filter:
             time_conditions = {
-                '1h': "timestamp >= datetime('now', '-1 hour')",
-                '24h': "timestamp >= datetime('now', '-1 day')",
-                '7d': "timestamp >= datetime('now', '-7 days')",
-                '30d': "timestamp >= datetime('now', '-30 days')"
+                '1h': "timestamp >= NOW() - INTERVAL '1 hour'",
+                '24h': "timestamp >= NOW() - INTERVAL '1 day'",
+                '7d': "timestamp >= NOW() - INTERVAL '7 days'",
+                '30d': "timestamp >= NOW() - INTERVAL '30 days'"
             }
             if time_filter in time_conditions:
                 where_conditions.append(time_conditions[time_filter])

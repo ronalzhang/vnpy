@@ -3516,6 +3516,61 @@ class QuantitativeService:
         
         return 'skip'
     
+    def _execute_pending_signals(self):
+        """执行待处理的交易信号并记录日志"""
+        try:
+            # 获取未执行的信号
+            query = "SELECT * FROM trading_signals WHERE executed = 0 ORDER BY timestamp DESC LIMIT 10"
+            signals = self.db_manager.execute_query(query, fetch_all=True)
+            
+            if not signals:
+                return 0
+            
+            executed_count = 0
+            for signal in signals:
+                try:
+                    # 模拟执行交易
+                    strategy_id = signal['strategy_id'] if isinstance(signal, dict) else signal[1]
+                    signal_type = signal['signal_type'] if isinstance(signal, dict) else signal[3]
+                    price = signal['price'] if isinstance(signal, dict) else signal[4]
+                    quantity = signal['quantity'] if isinstance(signal, dict) else signal[5]
+                    confidence = signal['confidence'] if isinstance(signal, dict) else signal[6]
+                    signal_id = signal['id'] if isinstance(signal, dict) else signal[0]
+                    
+                    # 计算模拟盈亏
+                    if signal_type == 'buy':
+                        estimated_pnl = quantity * price * 0.02  # 假设2%收益
+                    else:
+                        estimated_pnl = quantity * price * 0.015  # 假设1.5%收益
+                    
+                    # 记录交易日志
+                    self.log_strategy_trade(
+                        strategy_id=strategy_id,
+                        signal_type=signal_type,
+                        price=price,
+                        quantity=quantity,
+                        confidence=confidence,
+                        executed=1,  # 标记为已执行
+                        pnl=estimated_pnl
+                    )
+                    
+                    # 更新信号状态为已执行
+                    update_query = "UPDATE trading_signals SET executed = 1 WHERE id = %s"
+                    self.db_manager.execute_query(update_query, (signal_id,))
+                    
+                    executed_count += 1
+                    print(f"✅ 执行信号: {strategy_id} | {signal_type} | 价格: {price} | 数量: {quantity}")
+                    
+                except Exception as e:
+                    print(f"❌ 执行信号失败: {e}")
+                    continue
+            
+            return executed_count
+            
+        except Exception as e:
+            print(f"❌ 执行待处理信号失败: {e}")
+            return 0
+    
     def _generate_optimized_signal(self, strategy_id, strategy, signal_type, current_balance):
         """生成优化的交易信号"""
         try:
@@ -5788,7 +5843,20 @@ class EvolutionaryStrategyEngine:
             'elite_ratio': 0.15,  # 保留最好的15%
             'elimination_threshold': 45.0,  # 低于45分的策略将被淘汰
             'trading_threshold': 65.0,  # 65分开始小额交易 (新增)
-            'precision_threshold': 80.0  # 80分开始精细化优化 (新增)
+            'precision_threshold': 80.0,  # 80分开始精细化优化 (新增)
+            
+            # 🧬 分值差异化优化增强配置 (在现有基础上添加)
+            'low_score_threshold': 60.0,        # 低分策略阈值
+            'medium_score_threshold': 80.0,     # 中分策略阈值  
+            'high_score_threshold': 90.0,       # 高分策略阈值
+            'low_score_mutation_rate': 0.4,     # 低分策略变异率（在现有0.25基础上增强）
+            'medium_score_mutation_rate': 0.25, # 中分策略变异率（保持原有默认值）
+            'high_score_mutation_rate': 0.15,   # 高分策略变异率（在现有基础上降低）
+            
+            # 📈 代数追踪增强配置 (增强现有generation功能)
+            'show_generation_in_name': True,    # 在策略名称中显示代数
+            'track_lineage_depth': True,        # 追踪血统深度
+            'preserve_evolution_history': True  # 保留进化历史
         }
         
         # 初始化世代和轮次信息
@@ -6177,16 +6245,46 @@ class EvolutionaryStrategyEngine:
         try:
             mutated = parent.copy()
             mutated['id'] = str(uuid.uuid4())[:8]
-            mutated['name'] = f"{parent.get('name', 'Unknown')}_突变_{mutated['id']}"
+            # 🧬 增强的策略命名 (在现有基础上添加代数信息)
+            parent_generation = parent.get('generation', self.current_generation)
+            new_generation = parent_generation + 1
             
-            # 🧬 智能突变强度 - 高分策略小幅调整，低分策略大幅调整
-            parent_score = parent.get('fitness', 50.0)
-            if parent_score >= 90.0:
-                mutation_rate = 0.05  # 90+分策略轻微调整
-            elif parent_score >= 80.0:
-                mutation_rate = 0.10  # 80-90分策略适度调整
+            if self.evolution_config.get('show_generation_in_name', True):
+                mutated['name'] = f"{parent.get('name', 'Unknown')}_G{new_generation}C{self.current_cycle}_{mutation_intensity[:3]}"
             else:
-                mutation_rate = 0.20  # <80分策略大幅调整
+                mutated['name'] = f"{parent.get('name', 'Unknown')}_突变_{mutated['id']}"
+            
+            # 增强的代数信息记录
+            mutated['generation'] = new_generation
+            mutated['cycle'] = self.current_cycle
+            mutated['parent_id'] = parent.get('id', 'unknown')
+            mutated['evolution_type'] = 'mutation'
+            
+            # 血统深度追踪
+            if self.evolution_config.get('track_lineage_depth', True):
+                parent_lineage = parent.get('lineage_depth', 0)
+                mutated['lineage_depth'] = parent_lineage + 1
+            
+            # 🧬 增强的分值差异化突变强度 (基于新配置的优化)
+            parent_score = parent.get('fitness', parent.get('final_score', 50.0))
+            
+            # 使用配置中的阈值和变异率
+            if parent_score < self.evolution_config['low_score_threshold']:
+                mutation_rate = self.evolution_config['low_score_mutation_rate']
+                mutation_intensity = 'aggressive'
+                print(f"🔥 低分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 激进优化")
+            elif parent_score < self.evolution_config['medium_score_threshold']:
+                mutation_rate = self.evolution_config['medium_score_mutation_rate'] 
+                mutation_intensity = 'moderate'
+                print(f"⚡ 中分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 适度优化")
+            elif parent_score < self.evolution_config['high_score_threshold']:
+                mutation_rate = self.evolution_config['high_score_mutation_rate']
+                mutation_intensity = 'precision'
+                print(f"🎯 高分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 精细优化")
+            else:
+                mutation_rate = 0.05  # 超高分策略极低变异率
+                mutation_intensity = 'ultra_precision'
+                print(f"💎 超高分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 极精细优化")
             
             # 🛡️ 安全获取parameters，确保是字典类型
             original_params = parent.get('parameters', {})
@@ -6196,26 +6294,60 @@ class EvolutionaryStrategyEngine:
             
             params = original_params.copy()
             
-            # 🎯 针对性参数突变
-            if 'threshold' in params:
-                if parent_score >= 85.0:
-                    # 高分策略：精细调整阈值
-                    params['threshold'] *= random.uniform(0.95, 1.05)
-                else:
-                    # 低分策略：大幅调整阈值
-                    params['threshold'] *= random.uniform(0.5, 1.5)
+            # 🎯 增强的差异化参数突变 (基于mutation_intensity)
+            mutated_count = 0
             
+            # 阈值参数调整
+            if 'threshold' in params:
+                if mutation_intensity == 'aggressive':
+                    params['threshold'] *= random.uniform(0.3, 2.0)  # 大幅调整：30%-200%
+                elif mutation_intensity == 'moderate':
+                    params['threshold'] *= random.uniform(0.7, 1.4)  # 适度调整：70%-140%
+                elif mutation_intensity == 'precision':
+                    params['threshold'] *= random.uniform(0.9, 1.1)  # 精细调整：90%-110%
+                else:  # ultra_precision
+                    params['threshold'] *= random.uniform(0.95, 1.05)  # 极精细：95%-105%
+                mutated_count += 1
+            
+            # 回看周期调整
             if 'lookback_period' in params:
                 old_period = params['lookback_period']
-                if parent_score >= 85.0:
-                    # 高分策略：小幅调整周期
-                    params['lookback_period'] = max(5, min(50, old_period + random.randint(-2, 2)))
-                else:
-                    # 低分策略：大幅调整周期
-                    params['lookback_period'] = max(5, min(50, old_period + random.randint(-10, 10)))
+                if mutation_intensity == 'aggressive':
+                    change = random.randint(-15, 15)  # ±15周期
+                elif mutation_intensity == 'moderate':
+                    change = random.randint(-5, 5)   # ±5周期
+                elif mutation_intensity == 'precision':
+                    change = random.randint(-2, 2)   # ±2周期
+                else:  # ultra_precision
+                    change = random.randint(-1, 1)   # ±1周期
+                
+                params['lookback_period'] = max(5, min(100, old_period + change))
+                mutated_count += 1
             
+            # 交易数量调整
             if 'quantity' in params:
-                params['quantity'] *= random.uniform(1 - mutation_rate, 1 + mutation_rate)
+                if mutation_intensity == 'aggressive':
+                    params['quantity'] *= random.uniform(0.5, 2.0)
+                elif mutation_intensity == 'moderate':
+                    params['quantity'] *= random.uniform(0.8, 1.3)
+                elif mutation_intensity == 'precision':
+                    params['quantity'] *= random.uniform(0.9, 1.1)
+                else:  # ultra_precision
+                    params['quantity'] *= random.uniform(0.95, 1.05)
+                mutated_count += 1
+            
+            # 其他关键参数的智能调整
+            for param_name in ['std_multiplier', 'grid_spacing', 'volume_threshold', 'momentum_threshold']:
+                if param_name in params and random.random() < mutation_rate:
+                    if mutation_intensity == 'aggressive':
+                        params[param_name] *= random.uniform(0.4, 2.5)
+                    elif mutation_intensity == 'moderate':
+                        params[param_name] *= random.uniform(0.7, 1.4)
+                    elif mutation_intensity == 'precision':
+                        params[param_name] *= random.uniform(0.9, 1.1)
+                    else:  # ultra_precision
+                        params[param_name] *= random.uniform(0.97, 1.03)
+                    mutated_count += 1
             
             # 🔄 策略类型变异 (低分策略可能改变类型)
             if parent_score < 70.0 and random.random() < 0.3:
@@ -6225,6 +6357,10 @@ class EvolutionaryStrategyEngine:
             
             mutated['parameters'] = params
             mutated['created_time'] = datetime.now().isoformat()
+            
+            # 输出变异完成信息
+            lineage_info = f", 血统深度: {mutated.get('lineage_depth', 0)}" if mutated.get('lineage_depth') else ""
+            print(f"✅ 策略变异完成: {mutated_count}个参数变异, 第{mutated.get('generation', 0)}代{lineage_info}")
             
             return mutated
             
@@ -6308,15 +6444,33 @@ class EvolutionaryStrategyEngine:
         
         strategy_id = f"{strategy_type}_{symbol.replace('/', '_')}_{random.randint(1000, 9999)}"
         
-        return {
+        # 增强的随机策略创建 (在现有基础上添加代数信息)
+        new_generation = self.current_generation + 1
+        
+        strategy_config = {
             'id': strategy_id,
-            'name': f"{template['name_prefix']}-随机代{self.generation+1}",
             'type': strategy_type,
             'symbol': symbol,
             'parameters': new_params,
-            'generation': self.generation + 1,
-            'creation_method': 'random'
+            'generation': new_generation,
+            'cycle': self.current_cycle,
+            'creation_method': 'random',
+            'created_time': datetime.now().isoformat(),
+            'parent_id': None,
+            'evolution_type': 'random_creation'
         }
+        
+        # 增强的命名策略
+        if self.evolution_config.get('show_generation_in_name', True):
+            strategy_config['name'] = f"{template['name_prefix']}-G{new_generation}C{self.current_cycle}-随机"
+        else:
+            strategy_config['name'] = f"{template['name_prefix']}-随机代{new_generation}"
+        
+        # 初始化血统深度
+        if self.evolution_config.get('track_lineage_depth', True):
+            strategy_config['lineage_depth'] = 0  # 随机策略血统深度为0
+        
+        return strategy_config
     
     def _evolve_strategy_parameters(self, elites: List[Dict]):
         """进化精英策略的参数"""
@@ -6334,12 +6488,27 @@ class EvolutionaryStrategyEngine:
             return 0
     
     def should_run_evolution(self) -> bool:
-        """判断是否应该运行进化"""
+        """判断是否应该运行进化 - 24小时自动进化"""
         if not self.last_evolution_time:
+            print("🧬 首次运行，需要进化")
             return True
         
         time_since_last = (datetime.now() - self.last_evolution_time).total_seconds()
-        return time_since_last >= self.evolution_config['evolution_interval']
+        evolution_interval = self.evolution_config.get('evolution_interval', 600)  # 默认10分钟
+        
+        if time_since_last >= evolution_interval:
+            if evolution_interval < 3600:
+                print(f"🕐 距离上次进化已过 {time_since_last/60:.1f} 分钟，需要进化")
+            else:
+                print(f"🕐 距离上次进化已过 {time_since_last/3600:.1f} 小时，需要进化")
+            return True
+        else:
+            next_evolution_minutes = (evolution_interval - time_since_last) / 60
+            if next_evolution_minutes < 1:
+                print(f"⏰ 下次进化还需 {(evolution_interval - time_since_last):.0f} 秒")
+            else:
+                print(f"⏰ 下次进化还需 {next_evolution_minutes:.1f} 分钟")
+            return False
     
     def get_evolution_status(self) -> Dict:
         """获取进化状态"""
