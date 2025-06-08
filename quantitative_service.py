@@ -3711,12 +3711,12 @@ class QuantitativeService:
                                                            win_rate=real_win_rate, 
                                                            total_trades=real_total_trades)
             qualified = final_score >= self.fund_allocation_config.get('min_score_for_trading', 60.0)
-            data_source = '真实交易数据'
+            data_source = self._get_strategy_evolution_display(strategy_id)
         else:
             # 没有真实交易数据，评分为0
             final_score = 0.0
             qualified = False
-            data_source = '等待真实交易数据'
+            data_source = self._get_strategy_evolution_display(strategy_id)
         
         return {
             'id': strategy_id,
@@ -3762,7 +3762,7 @@ class QuantitativeService:
             'win_rate': real_win_rate,
             'total_return': real_total_return,
             'total_trades': real_total_trades,
-            'data_source': '真实交易',
+            'data_source': self._get_strategy_evolution_display(strategy_id),
             'qualified_for_trading': current_score >= self.fund_allocation_config.get('min_score_for_trading', 60.0),
             'created_time': strategy.get('created_time', datetime.now().isoformat()),
             'last_updated': datetime.now().isoformat()
@@ -4009,7 +4009,7 @@ class QuantitativeService:
                 'daily_return': float(result.get('total_return', 0)) / 30 if result.get('total_return') else 0,  # 估算日收益
                 'created_time': result.get('created_at', ''),
                 'updated_time': result.get('updated_at', ''),
-                'data_source': 'PostgreSQL数据库'
+                'data_source': self._get_strategy_evolution_display(strategy_id)
             }
             
             print(f"✅ 获取策略 {strategy_id} 详情: {strategy_detail['name']} ({strategy_detail['final_score']:.1f}分)")
