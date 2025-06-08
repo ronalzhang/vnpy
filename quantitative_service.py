@@ -3073,6 +3073,10 @@ class QuantitativeService:
             self.conn.commit()
         except Exception as e:
             print(f"记录操作日志失败: {e}")
+            try:
+                self.conn.rollback()
+            except:
+                pass
 
     def generate_trading_signals(self):
         """生成交易信号 - 优化版本，专注90+分策略"""
@@ -3521,6 +3525,10 @@ class QuantitativeService:
             self.conn.commit()
         except Exception as e:
             print(f"保存信号到数据库失败: {e}")
+            try:
+                self.conn.rollback()
+            except:
+                pass
 
     def _execute_pending_signals(self):
         """执行待处理的交易信号"""
@@ -3775,17 +3783,24 @@ class QuantitativeService:
     def _fetch_fresh_balance(self):
         """获取最新余额"""
         try:
-            # 尝试从auto_trading_engine获取真实余额
-            if hasattr(self, 'auto_trading_engine') and self.auto_trading_engine:
-                balance = self.auto_trading_engine.fetch_balance()
-                if balance and 'USDT' in balance:
-                    return float(balance['USDT']['total'])
+            # 🔗 尝试从exchange_clients获取真实余额
+            if hasattr(self, 'exchange_clients') and self.exchange_clients:
+                for client_name, client in self.exchange_clients.items():
+                    try:
+                        balance = client.fetch_balance()
+                        if balance and 'USDT' in balance:
+                            total_balance = float(balance['USDT']['total'])
+                            print(f"✅ 从 {client_name} 获取余额: {total_balance} USDT")
+                            return total_balance
+                    except Exception as e:
+                        print(f"⚠️ 从 {client_name} 获取余额失败: {e}")
             
-            # 如果没有auto_trading_engine，返回None表示API失败
+            # 如果没有exchange_clients，返回None表示API失败
+            print("❌ 无可用的交易所客户端")
             return None
             
         except Exception as e:
-            print(f"获取余额失败: {e}")
+            print(f"❌ 获取余额失败: {e}")
             return None
     def invalidate_balance_cache(self, trigger='manual_refresh'):
         """使余额缓存失效 - 在特定事件时调用"""
