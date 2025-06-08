@@ -2308,7 +2308,14 @@ class QuantitativeService:
         from db_config import DatabaseAdapter
         self.db_manager = DatabaseAdapter()
         
-        self.init_database()
+        # ⭐ 使用DatabaseManager初始化数据库
+        if hasattr(self, 'db_manager') and hasattr(self.db_manager, 'init_database'):
+            self.db_manager.init_database()
+        else:
+            # 如果没有db_manager，使用传统方式
+            db_manager = DatabaseManager()
+            db_manager.init_database()
+        
         self.init_strategies()
         
         # ⭐ 初始化模拟器和策略管理器
