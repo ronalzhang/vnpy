@@ -3851,32 +3851,31 @@ class QuantitativeService:
         """获取最新持仓数据 - 仅使用真实API"""
         try:
             # 🔗 直接调用真实API获取持仓
-            if hasattr(self, 'binance_client') and self.binance_client:
+            if hasattr(self, 'exchange_clients') and self.exchange_clients and 'binance' in self.exchange_clients:
                 print("🔗 正在从Binance API获取真实持仓数据...")
-                account_info = self.binance_client.get_account()
+                binance_client = self.exchange_clients['binance']
+                account_info = binance_client.fetch_balance()
                 
                 positions = []
-                for balance in account_info.get('balances', []):
-                    asset = balance.get('asset', '')
-                    free = float(balance.get('free', 0))
-                    locked = float(balance.get('locked', 0))
-                    total = free + locked
-                    
-                    # 只显示有持仓的资产
-                    if total > 0.0001:  # 避免显示极小余额
-                        positions.append({
-                            'symbol': asset,
-                            'quantity': total,
-                            'avg_price': 0,
-                            'current_price': 0,
-                            'unrealized_pnl': 0,
-                            'realized_pnl': 0
-                        })
+                for asset, balance_info in account_info.items():
+                    if isinstance(balance_info, dict):
+                        total = float(balance_info.get('total', 0))
+                        
+                        # 只显示有持仓的资产
+                        if total > 0.0001:  # 避免显示极小余额
+                            positions.append({
+                                'symbol': asset,
+                                'quantity': total,
+                                'avg_price': 0,
+                                'current_price': 0,
+                                'unrealized_pnl': 0,
+                                'realized_pnl': 0
+                            })
                 
                 print(f"✅ 从Binance获取到 {len(positions)} 个真实持仓")
                 return positions
             else:
-                print("❌ Binance客户端未初始化")
+                print("❌ 交易所客户端未初始化")
                 return []
                 
         except Exception as e:
