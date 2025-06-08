@@ -1083,7 +1083,7 @@
     async function updateSystemStatus() {
         try {
             // 获取系统状态
-            const statusResponse = await fetch('/api/status');
+            const statusResponse = await fetch('/api/quantitative/system-status');
             const statusData = await statusResponse.json();
             
             // 获取套利系统状态
@@ -1099,14 +1099,24 @@
             }
             
             // 更新状态显示
-            if (statusData.mode) {
-                currentMode = statusData.mode;
-                localStorage.setItem('tradingMode', statusData.mode);
+            const isRunning = statusData.success && statusData.running;
+            updateStatus(isRunning, currentMode, 0, arbitrageRunning);
+            
+            // 更新导航栏状态指示器
+            const statusIndicator = document.getElementById('system-status-indicator');
+            const statusText = document.getElementById('system-status-text');
+            if (statusIndicator && statusText) {
+                if (isRunning) {
+                    statusIndicator.className = 'status-indicator status-running';
+                    statusText.textContent = '运行中';
+                } else {
+                    statusIndicator.className = 'status-indicator status-offline';
+                    statusText.textContent = '离线';
+                }
             }
-            updateStatus(statusData.running, currentMode, statusData.arbitrage_count, arbitrageRunning);
             
             // 如果系统在运行，获取套利数据并更新统计
-            if (statusData.running) {
+            if (isRunning) {
                 const diffResponse = await fetch('/api/diff');
                 const opportunities = await diffResponse.json();
                 

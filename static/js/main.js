@@ -491,7 +491,7 @@ function formatDisplayValue(value, decimals = 2, isPrivate = false) {
 
 // 更新系统状态
 function updateSystemStatus() {
-    fetch(window.API_BASE_URL + '/api/status')
+    fetch(window.API_BASE_URL + '/api/quantitative/system-status')
         .then(response => response.json())
         .then(data => {
             // 更新主要状态显示
@@ -504,7 +504,7 @@ function updateSystemStatus() {
             const statusIndicator = document.getElementById('system-status-indicator');
             const statusText = document.getElementById('system-status-text');
             
-            const isRunning = data.running || false;
+            const isRunning = data.success && data.running;
             
             // 更新导航栏状态指示器
             if (statusIndicator && statusText) {

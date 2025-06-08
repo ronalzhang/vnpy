@@ -760,10 +760,11 @@ def arbitrage():
     """套利分析页面"""
     return render_template('arbitrage.html')
 
-@app.route('/api/status', methods=['GET'])
-def get_status():
-    """获取服务器状态"""
-    return jsonify(status)
+# 注释：此端点已废弃，请使用 /api/quantitative/system-status
+# @app.route('/api/status', methods=['GET'])
+# def get_status():
+#     """获取服务器状态"""
+#     return jsonify(status)
 
 @app.route('/api/prices', methods=['GET'])
 def get_prices():
