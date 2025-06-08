@@ -1,0 +1,49 @@
+{
+  "timestamp": "2025-06-08T22:56:54.045432",
+  "server_url": "http://47.236.39.134:8888",
+  "passed_tests": 3,
+  "total_tests": 10,
+  "success_rate": 30.0,
+  "detailed_results": {
+    "系统状态检查": {
+      "status": "PASS",
+      "details": true
+    },
+    "API连通性测试": {
+      "status": "FAIL",
+      "details": false
+    },
+    "余额信息验证": {
+      "status": "FAIL",
+      "details": false
+    },
+    "策略列表检查": {
+      "status": "FAIL",
+      "details": false
+    },
+    "信号生成测试": {
+      "status": "FAIL",
+      "details": false
+    },
+    "持仓信息检查": {
+      "status": "FAIL",
+      "details": false
+    },
+    "交易历史验证": {
+      "status": "PASS",
+      "details": true
+    },
+    "Web界面可用性": {
+      "status": "PASS",
+      "details": true
+    },
+    "小币种支持验证": {
+      "status": "FAIL",
+      "details": false
+    },
+    "优化效果评估": {
+      "status": "FAIL",
+      "details": false
+    }
+  }
+}

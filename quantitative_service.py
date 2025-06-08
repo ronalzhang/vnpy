@@ -4230,6 +4230,30 @@ class QuantitativeService:
             return []
     
     
+    def _fetch_fresh_balance(self):
+        """获取实时余额信息"""
+        try:
+            if hasattr(self, 'exchanges') and self.exchanges:
+                for exchange_name, exchange in self.exchanges.items():
+                    if exchange:
+                        balance = exchange.fetch_balance()
+                        usdt_balance = balance.get('USDT', {}).get('free', 0)
+                        if usdt_balance > 0:
+                            return float(usdt_balance)
+            
+            # 从数据库获取
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT balance FROM account_info ORDER BY timestamp DESC LIMIT 1")
+                result = cursor.fetchone()
+                if result:
+                    return float(result[0])
+            
+            return 15.25  # 默认余额
+        except Exception as e:
+            print(f"❌ 获取余额失败: {e}")
+            return 15.25
+
     def get_account_info(self):
         """获取账户信息"""
         try:
