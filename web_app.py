@@ -1160,28 +1160,30 @@ def quantitative_strategies():
                 
                 win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
                 
-                # 🔥 从进化历史表获取最新代数（修复代数显示问题）
+                # 🔥 修复：使用数据库中真实的代数，不要人为放大
                 try:
                     cursor.execute("""
-                        SELECT MAX(generation), MAX(cycle) 
+                        SELECT generation, cycle 
                         FROM strategy_evolution_history 
                         WHERE strategy_id = %s
+                        ORDER BY timestamp DESC 
+                        LIMIT 1
                     """, (sid,))
                     latest_gen = cursor.fetchone()
                     if latest_gen and latest_gen[0]:
                         latest_generation = latest_gen[0]
                         latest_cycle = latest_gen[1] or 1
                         evolution_display = f"第{latest_generation}代第{latest_cycle}轮"
-                    elif generation is None or generation == 0:
-                        evolution_display = "初代策略"
-                    else:
+                    elif generation and generation > 0:
                         evolution_display = f"第{generation}代第{cycle or 1}轮"
+                    else:
+                        evolution_display = "初代策略"
                 except Exception as e:
                     print(f"获取策略{sid}进化历史失败: {e}")
-                    if generation is None or generation == 0:
-                        evolution_display = "初代策略"
-                    else:
+                    if generation and generation > 0:
                         evolution_display = f"第{generation}代第{cycle or 1}轮"
+                    else:
+                        evolution_display = "初代策略"
                 
                 strategy = {
                     'id': sid,

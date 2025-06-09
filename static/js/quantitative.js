@@ -601,8 +601,24 @@ class QuantitativeSystem {
         
         const configs = parameterConfigs[strategyType] || [];
         
+        // 🔥 修复参数键名映射问题：前端键 -> 后端键  
+        const parameterMapping = {
+            'stop_loss': 'stop_loss_pct',
+            'take_profit': 'take_profit_pct',
+            'max_position_size': 'position_sizing',
+            'ma_short': 'ema_fast_period',
+            'ma_long': 'ema_slow_period',
+            'ema_short': 'ema_fast_period',
+            'ema_long': 'ema_slow_period',
+            'rsi_upper': 'rsi_overbought',
+            'rsi_lower': 'rsi_oversold'
+        };
+        
         configs.forEach(config => {
-            const value = parameters[config.key] || '';
+            // 使用映射获取正确的参数值
+            const backendKey = parameterMapping[config.key] || config.key;
+            const value = parameters[backendKey] || parameters[config.key] || '';
+            
             parametersHtml += `
                 <div class="row mb-2">
                     <div class="col-6">
