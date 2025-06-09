@@ -88,6 +88,17 @@ def init_quantitative_service():
 # 尝试初始化量化服务
 init_quantitative_service()
 
+# 数据库连接函数
+def get_db_connection():
+    """获取数据库连接"""
+    import psycopg2
+    return psycopg2.connect(
+        host='localhost',
+        database='quantitative', 
+        user='quant_user',
+        password='chenfei0421'
+    )
+
 # 导入套利系统模块
 try:
     from integrate_arbitrage import init_arbitrage_system
@@ -2318,7 +2329,7 @@ def select_top_strategies():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 获取符合真实交易条件的策略（至少5次交易，50%+胜率，正盈利）
+        # 🔥 提高真实交易标准：至少10次交易，65%+胜率，盈利≥10U
         cursor.execute('''
             SELECT s.id, s.name, s.final_score,
                    COUNT(t.id) as actual_trades,
@@ -2328,10 +2339,10 @@ def select_top_strategies():
             LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
             WHERE s.enabled = 1
             GROUP BY s.id, s.name, s.final_score
-            HAVING COUNT(t.id) >= 5 
-                AND COUNT(CASE WHEN t.pnl > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 50
-                AND COALESCE(SUM(t.pnl), 0) > 0
-            ORDER BY s.final_score DESC, SUM(t.pnl) DESC
+            HAVING COUNT(t.id) >= 10 
+                AND COUNT(CASE WHEN t.pnl > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 65
+                AND COALESCE(SUM(t.pnl), 0) >= 10.0
+            ORDER BY SUM(t.pnl) DESC, s.final_score DESC
             LIMIT %s
         ''', (max_strategies,))
         
@@ -2912,69 +2923,39 @@ def get_real_trading_status():
 
 @app.route('/api/trading_statistics')
 def get_trading_statistics():
-    """获取详细的交易统计数据"""
+    """获取详细交易统计数据"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "量化模块未启用"
+        })
+    
     try:
-        cursor = get_db_cursor()
-        
-        # 获取本周统计
-        cursor.execute("""
-            SELECT 
-                DATE(timestamp) as trade_date,
-                COUNT(CASE WHEN trade_type = 'simulation' THEN 1 END) as sim_trades,
-                COUNT(CASE WHEN trade_type = 'real' THEN 1 END) as real_trades,
-                SUM(CASE WHEN trade_type = 'simulation' THEN pnl ELSE 0 END) as sim_pnl,
-                SUM(CASE WHEN trade_type = 'real' THEN pnl ELSE 0 END) as real_pnl
-            FROM strategy_trade_logs 
-            WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'
-            GROUP BY DATE(timestamp)
-            ORDER BY trade_date DESC
-        """)
-        
-        daily_stats = cursor.fetchall()
-        
-        # 获取最佳策略
-        cursor.execute("""
-            SELECT 
-                s.name, s.final_score,
-                COUNT(t.id) as total_trades,
-                SUM(t.pnl) as total_pnl,
-                COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as winning_trades
-            FROM strategies s
-            JOIN strategy_trade_logs t ON s.id = t.strategy_id
-            WHERE s.enabled = 1 AND t.timestamp >= CURRENT_DATE - INTERVAL '7 days'
-            GROUP BY s.id, s.name, s.final_score
-            HAVING COUNT(t.id) >= 5
-            ORDER BY SUM(t.pnl) DESC
-            LIMIT 5
-        """)
-        
-        top_strategies = cursor.fetchall()
+        # 使用 real_trading_manager 获取统计数据
+        from real_trading_manager import generate_profit_loss_summary
+        stats = generate_profit_loss_summary()
         
         return jsonify({
-            'success': True,
-            'data': {
-                'daily_stats': [{
-                    'date': str(row[0]),
-                    'sim_trades': row[1],
-                    'real_trades': row[2],
-                    'sim_pnl': float(row[3] or 0),
-                    'real_pnl': float(row[4] or 0)
-                } for row in daily_stats],
-                'top_strategies': [{
-                    'name': row[0],
-                    'score': float(row[1]),
-                    'trades': row[2],
-                    'pnl': float(row[3] or 0),
-                    'win_rate': round((row[4] / row[2] * 100) if row[2] > 0 else 0, 1)
-                } for row in top_strategies]
-            }
+            "status": "success",
+            "data": stats
         })
         
     except Exception as e:
         return jsonify({
-            'success': False,
-            'message': f'获取统计失败: {str(e)}'
+            "status": "error", 
+            "message": f"获取统计失败: {str(e)}"
         })
 
-if __name__ == "__main__":
+# 添加兼容性API路由
+@app.route('/api/auto-trading-status', methods=['GET'])
+def get_auto_trading_status():
+    """获取自动交易状态 - 兼容API"""
+    return manage_auto_trading()
+
+@app.route('/api/strategies', methods=['GET'])  
+def get_strategies_compat():
+    """策略列表API - 兼容路径"""
+    return quantitative_strategies()
+
+if __name__ == '__main__':
     main() 
