@@ -133,8 +133,38 @@ class DatabaseAdapter:
                 self.execute_query(schema_sql)
                 print(f"✅ 表 {table} 初始化完成")
     
-
-    
+    def record_balance_history(self, total_balance: float, available_balance: float = None,
+                             frozen_balance: float = 0.0, strategy_id: str = None, 
+                             change_type: str = 'balance_update'):
+        """记录余额历史"""
+        try:
+            # 创建余额历史表（如果不存在）
+            create_table_sql = """
+                CREATE TABLE IF NOT EXISTS balance_history (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    total_balance REAL,
+                    available_balance REAL,
+                    frozen_balance REAL DEFAULT 0.0,
+                    strategy_id TEXT,
+                    change_type TEXT DEFAULT 'balance_update'
+                )
+            """
+            self.execute_query(create_table_sql)
+            
+            # 插入余额记录
+            if available_balance is None:
+                available_balance = total_balance
+                
+            insert_sql = """
+                INSERT INTO balance_history 
+                (total_balance, available_balance, frozen_balance, strategy_id, change_type)
+                VALUES (%s, %s, %s, %s, %s)
+            """
+            self.execute_query(insert_sql, (total_balance, available_balance, frozen_balance, strategy_id, change_type))
+            
+        except Exception as e:
+            print(f"⚠️ 记录余额历史失败: {e}")
 
     
     def close(self):
