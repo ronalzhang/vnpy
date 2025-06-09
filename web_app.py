@@ -401,6 +401,17 @@ def calculate_price_differences(prices):
 @cache_with_ttl(30)  # 缓存30秒
 def get_exchange_balances():
     """从交易所API获取余额数据"""
+    global exchange_clients
+    
+    # 🔧 懒加载：如果exchange_clients为空，尝试初始化
+    if not exchange_clients:
+        print("🔄 检测到exchange_clients为空，正在初始化...")
+        try:
+            init_api_clients()
+            print(f"✅ 懒加载成功，已初始化 {len(exchange_clients)} 个交易所")
+        except Exception as e:
+            print(f"❌ 懒加载失败: {e}")
+    
     balances = {}
     
     for exchange_id, client in exchange_clients.items():
