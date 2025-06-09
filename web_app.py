@@ -3453,14 +3453,15 @@ def get_evolution_log():
             )
         """)
         
-        # 🔥 从真实的策略进化历史表获取数据
+        # 🔥 从真实的策略进化历史表获取数据 - 扩大时间范围
         cursor.execute("""
             SELECT action_type, COALESCE(notes, '策略进化操作'), strategy_id, 
                    COALESCE(notes, '策略进化'), timestamp
             FROM strategy_evolution_history 
             WHERE action_type IS NOT NULL
+              AND timestamp >= NOW() - INTERVAL '3 days'
             ORDER BY timestamp DESC
-            LIMIT 50
+            LIMIT 100
         """)
         
         rows = cursor.fetchall()
