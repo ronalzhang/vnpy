@@ -681,8 +681,10 @@ def get_exchange_prices():
                     # 价格获取成功，静默处理
                     pass
             except Exception as e:
-                # 只在日志级别记录失败，避免控制台垃圾信息
-                pass
+                # 对OKX显示详细错误信息，其他交易所保持静默
+                if exchange_id == 'okx':
+                    print(f"⚠️ OKX获取 {symbol} 价格失败: {e}")
+                # 其他交易所静默处理，避免控制台垃圾信息
     
     return prices
 
