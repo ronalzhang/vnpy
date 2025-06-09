@@ -9,6 +9,20 @@ let refreshTimer = null;
 let systemRunning = false;
 let autoTradingEnabled = false;
 let performanceChart = null;
+let evolutionLogTimer = null;
+let managementConfig = {
+    evolutionInterval: 10,
+    maxStrategies: 20,
+    minTrades: 10,
+    minWinRate: 65,
+    minProfit: 0,
+    maxDrawdown: 10,
+    minSharpeRatio: 1.0,
+    maxPositionSize: 100,
+    stopLossPercent: 5,
+    eliminationDays: 7,
+    minScore: 50
+};
 
 // 系统状态管理类
 class QuantitativeSystem {
@@ -25,6 +39,8 @@ class QuantitativeSystem {
         this.initChart();
         this.loadSystemStatus(); // 加载真实系统状态
         this.startAutoRefresh();
+        this.initEvolutionLog(); // 初始化进化日志
+        this.loadManagementConfig(); // 加载管理配置
     }
 
     bindEvents() {
@@ -1169,6 +1185,228 @@ class QuantitativeSystem {
             }
         }
     }
+
+    // ==================== 策略管理配置功能 ====================
+    
+    // 加载管理配置
+    async loadManagementConfig() {
+        try {
+            const response = await fetch('/api/quantitative/management-config');
+            const data = await response.json();
+            
+            if (data.success && data.config) {
+                Object.assign(managementConfig, data.config);
+                this.updateManagementForm();
+            }
+        } catch (error) {
+            console.error('加载管理配置失败:', error);
+        }
+    }
+
+    // 更新管理配置表单
+    updateManagementForm() {
+        const form = document.getElementById('strategyManagementForm');
+        if (!form) return;
+
+        Object.keys(managementConfig).forEach(key => {
+            const input = form.querySelector(`#${this.camelToKebab(key)}`);
+            if (input) {
+                input.value = managementConfig[key];
+            }
+        });
+    }
+
+    // 驼峰转连字符
+    camelToKebab(str) {
+        return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+    }
+
+    // 保存管理配置
+    async saveManagementConfig() {
+        try {
+            const form = document.getElementById('strategyManagementForm');
+            if (!form) return;
+
+            // 收集表单数据
+            const formData = new FormData(form);
+            const newConfig = {};
+            
+            // 手动获取所有输入值
+            ['evolutionInterval', 'maxStrategies', 'minTrades', 'minWinRate', 'minProfit',
+             'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 'stopLossPercent', 
+             'eliminationDays', 'minScore'].forEach(key => {
+                const input = form.querySelector(`#${this.camelToKebab(key)}`);
+                if (input) {
+                    newConfig[key] = parseFloat(input.value) || 0;
+                }
+            });
+
+            const response = await fetch('/api/quantitative/management-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: newConfig })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                Object.assign(managementConfig, newConfig);
+                this.showMessage('配置保存成功', 'success');
+                
+                // 关闭弹窗
+                const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
+                if (modal) modal.hide();
+            } else {
+                this.showMessage(data.message || '保存失败', 'error');
+            }
+        } catch (error) {
+            console.error('保存配置失败:', error);
+            this.showMessage('保存配置失败', 'error');
+        }
+    }
+
+    // 重置管理配置
+    resetManagementConfig() {
+        const defaultConfig = {
+            evolutionInterval: 10,
+            maxStrategies: 20,
+            minTrades: 10,
+            minWinRate: 65,
+            minProfit: 0,
+            maxDrawdown: 10,
+            minSharpeRatio: 1.0,
+            maxPositionSize: 100,
+            stopLossPercent: 5,
+            eliminationDays: 7,
+            minScore: 50
+        };
+
+        Object.assign(managementConfig, defaultConfig);
+        this.updateManagementForm();
+        this.showMessage('已恢复默认配置', 'info');
+    }
+
+    // ==================== 策略进化日志功能 ====================
+    
+    // 初始化进化日志
+    initEvolutionLog() {
+        this.startEvolutionLogPolling();
+        
+        // 绑定管理配置事件
+        this.bindManagementEvents();
+    }
+
+    // 绑定管理配置事件
+    bindManagementEvents() {
+        // 保存配置按钮
+        document.getElementById('saveManagementConfig')?.addEventListener('click', () => {
+            this.saveManagementConfig();
+        });
+
+        // 重置配置按钮
+        document.getElementById('resetManagementConfig')?.addEventListener('click', () => {
+            this.resetManagementConfig();
+        });
+    }
+
+    // 开始轮询进化日志
+    startEvolutionLogPolling() {
+        // 立即加载一次
+        this.loadEvolutionLog();
+        
+        // 每10秒更新一次进化日志
+        evolutionLogTimer = setInterval(() => {
+            this.loadEvolutionLog();
+        }, 10000);
+    }
+
+    // 停止进化日志轮询
+    stopEvolutionLogPolling() {
+        if (evolutionLogTimer) {
+            clearInterval(evolutionLogTimer);
+            evolutionLogTimer = null;
+        }
+    }
+
+    // 加载进化日志
+    async loadEvolutionLog() {
+        try {
+            const response = await fetch('/api/quantitative/evolution-log');
+            const data = await response.json();
+            
+            if (data.success && data.logs) {
+                this.renderEvolutionLog(data.logs);
+            }
+        } catch (error) {
+            console.error('加载进化日志失败:', error);
+        }
+    }
+
+    // 渲染进化日志
+    renderEvolutionLog(logs) {
+        const container = document.getElementById('evolutionLog');
+        if (!container) return;
+
+        // 保存当前滚动位置
+        const wasAtBottom = container.scrollTop >= container.scrollHeight - container.clientHeight - 5;
+
+        // 清空并重新渲染最新的10条日志
+        container.innerHTML = logs.slice(-10).map(log => {
+            const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            let actionClass = 'text-success';
+            let actionText = '新增';
+            
+            switch(log.action) {
+                case 'created':
+                    actionClass = 'text-success';
+                    actionText = '新增';
+                    break;
+                case 'eliminated':
+                    actionClass = 'text-danger';
+                    actionText = '淘汰';
+                    break;
+                case 'optimized':
+                    actionClass = 'text-info';
+                    actionText = '优化';
+                    break;
+                case 'evolved':
+                    actionClass = 'text-warning';
+                    actionText = '进化';
+                    break;
+                default:
+                    actionClass = 'text-secondary';
+                    actionText = '更新';
+            }
+
+            return `
+                <div class="evolution-log-item">
+                    <span class="log-time">${time}</span>
+                    <span class="log-action ${actionClass}">${actionText}</span>
+                    <span class="log-detail">${log.details}</span>
+                </div>
+            `;
+        }).join('');
+
+        // 如果之前在底部，自动滚动到新的底部
+        if (wasAtBottom) {
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 为新的日志项添加动画效果
+        const newItems = container.querySelectorAll('.evolution-log-item');
+        if (newItems.length > 0) {
+            const lastItem = newItems[newItems.length - 1];
+            lastItem.classList.add('pulse');
+            setTimeout(() => {
+                lastItem.classList.remove('pulse');
+            }, 1000);
+        }
+    }
 }
 
 // 全局函数
@@ -1187,6 +1425,14 @@ function toggleAutoTrading() {
 function refreshStrategies() {
     if (app) {
         app.loadStrategies();
+    }
+}
+
+function showStrategyManagement() {
+    if (app) {
+        app.loadManagementConfig();
+        const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
+        modal.show();
     }
 }
 

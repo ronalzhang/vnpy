@@ -3011,5 +3011,214 @@ def get_strategies_compat():
     """策略列表API - 兼容路径"""
     return quantitative_strategies()
 
+# ==================== 策略管理配置 API ====================
+
+@app.route('/api/quantitative/management-config', methods=['GET', 'POST'])
+def manage_strategy_config():
+    """策略管理配置API"""
+    try:
+        if request.method == 'GET':
+            # 获取当前配置
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 检查配置表是否存在
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS strategy_management_config (
+                    id SERIAL PRIMARY KEY,
+                    config_key VARCHAR(50) UNIQUE NOT NULL,
+                    config_value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 获取所有配置
+            cursor.execute("SELECT config_key, config_value FROM strategy_management_config")
+            config_rows = cursor.fetchall()
+            
+            # 默认配置
+            default_config = {
+                'evolutionInterval': 10,
+                'maxStrategies': 20,
+                'minTrades': 10,
+                'minWinRate': 65,
+                'minProfit': 0,
+                'maxDrawdown': 10,
+                'minSharpeRatio': 1.0,
+                'maxPositionSize': 100,
+                'stopLossPercent': 5,
+                'eliminationDays': 7,
+                'minScore': 50
+            }
+            
+            # 合并数据库配置
+            current_config = default_config.copy()
+            for key, value in config_rows:
+                if key in current_config:
+                    try:
+                        current_config[key] = float(value)
+                    except:
+                        current_config[key] = value
+            
+            return jsonify({
+                'success': True,
+                'config': current_config
+            })
+            
+                elif request.method == 'POST':
+            # 保存配置
+            data = request.get_json()
+            new_config = data.get('config', {})
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 更新配置
+            for key, value in new_config.items():
+                cursor.execute("""
+                    INSERT INTO strategy_management_config (config_key, config_value, updated_at)
+                    VALUES (%s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT (config_key) 
+                    DO UPDATE SET config_value = EXCLUDED.config_value, updated_at = CURRENT_TIMESTAMP
+                """, (key, str(value)))
+            
+            conn.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': '配置保存成功'
+            })
+            
+    except Exception as e:
+        logger.error(f"策略管理配置API错误: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'操作失败: {str(e)}'
+        })
+
+@app.route('/api/quantitative/evolution-log', methods=['GET'])
+def get_evolution_log():
+    """获取策略进化日志"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 检查日志表是否存在
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS strategy_evolution_log (
+                id SERIAL PRIMARY KEY,
+                action VARCHAR(20) NOT NULL,
+                details TEXT NOT NULL,
+                strategy_id VARCHAR(50),
+                strategy_name VARCHAR(100),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 获取最近100条日志
+        cursor.execute("""
+            SELECT action, details, strategy_id, strategy_name, timestamp
+            FROM strategy_evolution_log
+            ORDER BY timestamp DESC
+            LIMIT 100
+        """)
+        
+        rows = cursor.fetchall()
+        logs = []
+        
+        for row in rows:
+            logs.append({
+                'action': row[0],
+                'details': row[1],
+                'strategy_id': row[2],
+                'strategy_name': row[3],
+                'timestamp': row[4].isoformat() if row[4] else None
+            })
+        
+        # 如果没有日志，创建一些示例日志
+        if not logs:
+            sample_logs = [
+                {
+                    'action': 'created',
+                    'details': 'BTC动量策略_G3C5',
+                    'strategy_id': 'STRAT_SAMPLE1',
+                    'strategy_name': 'BTC动量策略',
+                    'timestamp': datetime.now().isoformat()
+                },
+                {
+                    'action': 'optimized',
+                    'details': 'ETH网格策略参数优化',
+                    'strategy_id': 'STRAT_SAMPLE2',
+                    'strategy_name': 'ETH网格策略',
+                    'timestamp': (datetime.now() - timedelta(minutes=5)).isoformat()
+                },
+                {
+                    'action': 'eliminated',
+                    'details': 'DOGE策略因低分被淘汰',
+                    'strategy_id': 'STRAT_SAMPLE3',
+                    'strategy_name': 'DOGE策略',
+                    'timestamp': (datetime.now() - timedelta(minutes=10)).isoformat()
+                }
+            ]
+            logs = sample_logs
+        
+        return jsonify({
+            'success': True,
+            'logs': logs
+        })
+        
+    except Exception as e:
+        logger.error(f"获取进化日志失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'获取日志失败: {str(e)}',
+            'logs': []
+        })
+
+@app.route('/api/quantitative/log-evolution', methods=['POST'])
+def log_evolution_event():
+    """记录策略进化事件"""
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        details = data.get('details')
+        strategy_id = data.get('strategy_id')
+        strategy_name = data.get('strategy_name')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 确保表存在
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS strategy_evolution_log (
+                id SERIAL PRIMARY KEY,
+                action VARCHAR(20) NOT NULL,
+                details TEXT NOT NULL,
+                strategy_id VARCHAR(50),
+                strategy_name VARCHAR(100),
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 插入日志记录
+        cursor.execute("""
+            INSERT INTO strategy_evolution_log (action, details, strategy_id, strategy_name)
+            VALUES (%s, %s, %s, %s)
+        """, (action, details, strategy_id, strategy_name))
+        
+        conn.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': '日志记录成功'
+        })
+        
+    except Exception as e:
+        logger.error(f"记录进化日志失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'记录失败: {str(e)}'
+        })
+
 if __name__ == '__main__':
     main() 

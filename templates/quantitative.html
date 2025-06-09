@@ -110,15 +110,13 @@
                             </div>
                         </div>
                         
-                        <!-- 运行模式 -->
+                        <!-- 策略管理 -->
                         <div class="mb-3">
                             <div class="d-flex justify-content-between align-items-center">
-                                <span>运行模式</span>
-                                <select id="modeSelect" class="form-select form-select-sm" style="width: auto;">
-                                    <option value="manual">手动模式</option>
-                                    <option value="auto" selected>自动模式</option>
-                                    <option value="aggressive">激进模式</option>
-                                </select>
+                                <span>策略管理</span>
+                                <button class="btn btn-sm btn-outline-light" onclick="showStrategyManagement()">
+                                    <i class="fas fa-cogs"></i> 配置
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -200,9 +198,26 @@
                         <h5 class="mb-0">
                             <i class="fas fa-brain"></i> 量化策略管理
                         </h5>
-                        <button class="btn btn-primary btn-sm" onclick="refreshStrategies()">
-                            <i class="fas fa-sync-alt"></i> 刷新
-                        </button>
+                        <div class="d-flex align-items-center">
+                            <!-- 策略进化滚动日志 -->
+                            <div class="evolution-log-container me-3">
+                                <div class="evolution-log-header">
+                                    <small class="text-muted">
+                                        <i class="fas fa-history"></i> 策略进化日志
+                                    </small>
+                                </div>
+                                <div class="evolution-log-content" id="evolutionLog">
+                                    <div class="evolution-log-item">
+                                        <span class="log-time">17:08:45</span>
+                                        <span class="log-action text-success">新增</span>
+                                        <span class="log-detail">BTC动量策略_G4C2</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="refreshStrategies()">
+                                <i class="fas fa-sync-alt"></i> 刷新
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="row" id="strategiesContainer">
@@ -532,6 +547,137 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
                     <button type="button" class="btn btn-info" id="exportLogs">导出日志</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 策略管理配置弹窗 -->
+    <div class="modal fade" id="strategyManagementModal" tabindex="-1" aria-labelledby="strategyManagementModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="strategyManagementModalLabel">
+                        <i class="fas fa-cogs"></i> 策略管理配置
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="strategyManagementForm">
+                        <!-- 策略进化配置 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-dna"></i> 策略进化配置
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="evolutionInterval" class="form-label">进化更新间隔 (分钟)</label>
+                                        <input type="number" class="form-control" id="evolutionInterval" value="10" min="1" max="60">
+                                        <div class="form-text">策略自动进化和创建新策略的间隔时间</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="maxStrategies" class="form-label">最大策略数量</label>
+                                        <input type="number" class="form-control" id="maxStrategies" value="20" min="5" max="100">
+                                        <div class="form-text">系统同时运行的最大策略数量</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 策略标准配置 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-trophy"></i> 策略交易标准
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label for="minTrades" class="form-label">最少交易次数</label>
+                                        <input type="number" class="form-control" id="minTrades" value="10" min="1" max="100">
+                                        <div class="form-text">策略进入真实交易的最少交易次数</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="minWinRate" class="form-label">最低胜率 (%)</label>
+                                        <input type="number" class="form-control" id="minWinRate" value="65" min="50" max="95" step="0.1">
+                                        <div class="form-text">策略进入真实交易的最低胜率要求</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="minProfit" class="form-label">最低收益 (USDT)</label>
+                                        <input type="number" class="form-control" id="minProfit" value="0" min="0" step="0.01">
+                                        <div class="form-text">策略进入真实交易的最低总收益</div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-6">
+                                        <label for="maxDrawdown" class="form-label">最大回撤 (%)</label>
+                                        <input type="number" class="form-control" id="maxDrawdown" value="10" min="1" max="50" step="0.1">
+                                        <div class="form-text">策略允许的最大回撤率</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="minSharpeRatio" class="form-label">最低夏普比率</label>
+                                        <input type="number" class="form-control" id="minSharpeRatio" value="1.0" min="0" max="5" step="0.1">
+                                        <div class="form-text">策略的最低夏普比率要求</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 风险管理配置 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-shield-alt"></i> 风险管理配置
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="maxPositionSize" class="form-label">最大仓位 (USDT)</label>
+                                        <input type="number" class="form-control" id="maxPositionSize" value="100" min="10" max="10000" step="10">
+                                        <div class="form-text">单个策略的最大仓位金额</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="stopLossPercent" class="form-label">止损百分比 (%)</label>
+                                        <input type="number" class="form-control" id="stopLossPercent" value="5" min="1" max="20" step="0.1">
+                                        <div class="form-text">全局止损触发的亏损百分比</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 策略淘汰配置 -->
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-trash-alt"></i> 策略淘汰配置
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="eliminationDays" class="form-label">淘汰周期 (天)</label>
+                                        <input type="number" class="form-control" id="eliminationDays" value="7" min="1" max="30">
+                                        <div class="form-text">策略表现评估和淘汰的周期</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="minScore" class="form-label">最低评分</label>
+                                        <input type="number" class="form-control" id="minScore" value="50" min="0" max="100" step="0.1">
+                                        <div class="form-text">策略保留的最低评分标准</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-warning" id="resetManagementConfig">恢复默认</button>
+                    <button type="button" class="btn btn-primary" id="saveManagementConfig">保存配置</button>
                 </div>
             </div>
         </div>
