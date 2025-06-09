@@ -200,14 +200,21 @@ def init_api_clients():
                     secret_key = config[exchange_id]["secret_key"]
                     password = config[exchange_id].get("password", "")
                     
+                    # 确保password不为None，OKX需要有效的password
+                    if password is None:
+                        password = ""
+                    
                     # 准备配置
                     client_config = {
                         'apiKey': api_key,
                         'secret': secret_key,
-                        'password': password,
                         'enableRateLimit': True,
                         'sandbox': False  # 确保使用生产环境
                     }
+                    
+                    # 只有当password有值时才添加到配置中（避免空字符串导致错误）
+                    if password and password.strip():
+                        client_config['password'] = password
                     
                     # 设置代理（如果配置）
                     if "proxy" in config and config["proxy"]:
@@ -629,14 +636,20 @@ def get_exchange_prices():
                     with open(CONFIG_PATH, "r") as f:
                         config = json.load(f)
                     
-                    if 'okx' in config and 'api_key' in config['okx'] and 'secret_key' in config['okx'] and 'password' in config['okx']:
+                    if 'okx' in config and 'api_key' in config['okx'] and 'secret_key' in config['okx']:
                         print("尝试重新创建OKX客户端...")
-                        new_client = ccxt.okx({
+                        okx_config = {
                             'apiKey': config['okx']['api_key'],
                             'secret': config['okx']['secret_key'],
-                            'password': config['okx']['password'],  # 确保使用原始密码，包括特殊字符
                             'enableRateLimit': True
-                        })
+                        }
+                        
+                        # 只有当password有值时才添加到配置中
+                        password = config['okx'].get('password')
+                        if password and str(password).strip():
+                            okx_config['password'] = str(password)
+                        
+                        new_client = ccxt.okx(okx_config)
                         exchange_clients['okx'] = new_client
                         client = new_client
                         print("OKX客户端重新创建完成")
