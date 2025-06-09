@@ -4647,12 +4647,12 @@ class QuantitativeService:
                 fetch_one=True
             )
             if result:
-                return float(result.get('balance', 15.25))
+                return float(result.get('balance', 0))
             
-            return 15.25  # 默认余额
+            return 0  # 无法获取余额时返回0，避免使用误导性的硬编码值
         except Exception as e:
             print(f"❌ 获取余额失败: {e}")
-            return 15.25
+            return 0
 
     def get_account_info(self):
         """获取账户信息"""
@@ -4671,8 +4671,18 @@ class QuantitativeService:
                     'error': 'API连接失败'
                 }
             
-            # 计算今日盈亏
-            today_start_balance = 10.0  # 假设今日起始余额
+            # 计算今日盈亏 - 从数据库获取今日起始余额
+            try:
+                # 获取今日起始余额（一天前的最后一条记录）
+                result = self.db_manager.execute_query(
+                    "SELECT balance FROM balance_history WHERE DATE(timestamp) = CURRENT_DATE - INTERVAL '1 day' ORDER BY timestamp DESC LIMIT 1",
+                    fetch_one=True
+                )
+                today_start_balance = float(result.get('balance', current_balance)) if result else current_balance
+            except Exception as e:
+                print(f"获取起始余额失败，使用当前余额: {e}")
+                today_start_balance = current_balance
+            
             daily_pnl = current_balance - today_start_balance
             daily_return = (daily_pnl / today_start_balance) if today_start_balance > 0 else 0
             
@@ -6025,7 +6035,7 @@ class EvolutionaryStrategyEngine:
         try:
             self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
-                SET generation = %s, cycle = ?, last_evolution_time = CURRENT_TIMESTAMP,
+                SET generation = %s, cycle = %s, last_evolution_time = CURRENT_TIMESTAMP,
                     evolution_count = evolution_count + 1,
                     is_persistent = 1
                 WHERE enabled = 1
@@ -6830,8 +6840,8 @@ class EvolutionaryStrategyEngine:
             self.db_manager.execute_query("""
                 UPDATE strategies 
                 SET 
-                    generation = COALESCE(generation, ?),
-                    cycle = COALESCE(cycle, ?),
+                    generation = COALESCE(generation, %s),
+                    cycle = COALESCE(cycle, %s),
                     last_evolution_time = CURRENT_TIMESTAMP,
                     is_persistent = 1
                 WHERE generation IS NULL OR generation = 0

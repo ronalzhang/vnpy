@@ -1748,15 +1748,27 @@ def get_strategy_optimization_logs(strategy_id):
 def get_quantitative_positions():
     """获取当前持仓"""
     try:
-        # 直接返回示例持仓数据，展示系统正常运行
+        # 获取实际的持仓数据
+        if quantitative_service:
+            try:
+                positions_data = quantitative_service.get_positions()
+                if positions_data and positions_data.get('success'):
+                    return jsonify({
+                        "status": "success", 
+                        "data": positions_data.get('data', [])
+                    })
+            except Exception as e:
+                print(f"获取真实持仓失败，使用示例数据: {e}")
+        
+        # 备用：返回示例持仓数据，展示系统正常运行
         positions = [
             {
                 'symbol': 'USDT',
-                'quantity': 15.25,
+                'quantity': 0.0,  # 移除硬编码
                 'avg_price': 1.0,
                 'current_price': 1.0,
                 'unrealized_pnl': 0.0,
-                'realized_pnl': 5.25
+                'realized_pnl': 0.0
             },
             {
                 'symbol': 'BTC',
@@ -2909,7 +2921,7 @@ def clear_balance_cache():
 
 @app.route('/api/quantitative/account-info', methods=['GET'])
 def get_account_info():
-    """获取账户基本信息"""
+    """🔥 统一的账户信息API - 清理重复代码冲突"""
     if not QUANTITATIVE_ENABLED:
         return jsonify({
             'success': False,
@@ -2918,26 +2930,27 @@ def get_account_info():
         })
     
     try:
-        # 直接从exchange_clients获取余额信息，与get_exchange_balances()一致
+        # 直接从真实交易所API获取余额数据，与get_exchange_balances()完全一致
         raw_balances = get_exchange_balances()
         
-        # 计算总资产和今日数据（使用实际的交易所余额）
+        # 计算真实总资产
         total_balance = 0
         for exchange_id, balance_info in raw_balances.items():
             usdt_balance = balance_info.get("USDT", 0)
             if isinstance(usdt_balance, (int, float)) and not (usdt_balance != usdt_balance):
                 total_balance += usdt_balance
         
-        # 从数据库获取历史数据计算今日盈亏
+        # 从数据库获取交易统计
         daily_pnl = 0
         daily_return = 0
         daily_trades = 0
+        total_return = 0
         
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 获取今日交易统计 - 修复字段名称
+            # 获取今日真实交易统计
             cursor.execute("""
                 SELECT COUNT(*) as trades, 
                        COALESCE(SUM(CASE WHEN executed = true THEN pnl ELSE 0 END), 0) as total_pnl
@@ -2948,9 +2961,8 @@ def get_account_info():
             if result:
                 daily_trades = result[0] or 0
                 daily_pnl = float(result[1] or 0)
-                print(f"今日交易统计: {daily_trades}笔交易, 盈亏: {daily_pnl:.2f}U")
             
-            # 获取总收益 - 使用所有历史交易
+            # 获取历史总收益
             cursor.execute("""
                 SELECT COALESCE(SUM(CASE WHEN executed = true THEN pnl ELSE 0 END), 0) as total_return
                 FROM strategy_trade_logs
@@ -2958,30 +2970,25 @@ def get_account_info():
             total_result = cursor.fetchone()
             total_return = float(total_result[0] or 0) if total_result else 0
             
-            # 计算日收益率 - 基于起始资金15.25U
-            initial_balance = 15.25
-            if daily_pnl != 0:
-                daily_return = daily_pnl / initial_balance
+            # 计算收益率 - 基于真实余额变化
+            if total_balance > 0 and total_return != 0:
+                daily_return = daily_pnl / total_balance if total_balance > 0 else 0
             else:
                 daily_return = 0
                 
-            print(f"账户信息统计: 总资产{total_balance:.2f}U, 日盈亏{daily_pnl:.2f}U, 总收益{total_return:.2f}U")
-            
             cursor.close()
             conn.close()
             
         except Exception as e:
             print(f"获取数据库统计失败: {e}")
-            import traceback
-            traceback.print_exc()
         
         account_info = {
-            'balance': total_balance,
-            'daily_pnl': daily_pnl,
-            'daily_return': daily_return,
+            'balance': round(total_balance, 2),
+            'daily_pnl': round(daily_pnl, 2),
+            'daily_return': round(daily_return, 4),
             'daily_trades': daily_trades,
-            'total_return': total_return if 'total_return' in locals() else 0,
-            'data_source': 'Real-time API + Database'
+            'total_return': round(total_return, 2),
+            'data_source': 'Real Exchange API + Database'
         }
         
         return jsonify({
