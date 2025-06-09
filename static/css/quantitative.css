@@ -799,7 +799,7 @@
 
 .evolution-log-ticker {
     white-space: nowrap;
-    animation: scroll-left 60s linear infinite; /* 减慢滚动速度，从30s改为60s */
+    animation: scroll-left 45s linear infinite; /* 适中的滚动速度 */
     color: #666; /* 文字颜色 */
     font-size: 14px;
     line-height: 32px; /* 与容器高度一致 */
@@ -874,7 +874,7 @@
     }
     
     .evolution-log-ticker {
-        animation-duration: 50s; /* 中等屏幕稍快一点 */
+        animation-duration: 38s; /* 中等屏幕适中速度 */
         font-size: 13px;
     }
 }
@@ -885,7 +885,7 @@
     }
     
     .evolution-log-ticker {
-        animation-duration: 45s; /* 小屏幕再快一点 */
+        animation-duration: 32s; /* 小屏幕较快速度 */
         font-size: 12px;
         line-height: 30px;
     }
