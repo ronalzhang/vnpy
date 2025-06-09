@@ -1737,24 +1737,39 @@ def get_system_status():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 获取系统状态
+        # 获取系统状态 - 直接从表字段获取
         cursor.execute("""
-            SELECT status_key, status_value, updated_at 
+            SELECT quantitative_running, auto_trading_enabled, total_strategies, 
+                   running_strategies, selected_strategies, current_generation,
+                   evolution_enabled, system_health, last_updated, notes,
+                   last_update_time, last_evolution_time
             FROM system_status 
-            ORDER BY updated_at DESC
+            ORDER BY last_updated DESC LIMIT 1
         """)
-        status_rows = cursor.fetchall()
+        status_row = cursor.fetchone()
         
         # 构建状态字典
         db_status = {}
-        for row in status_rows:
-            key, value, updated_at = row
-            # 尝试解析JSON值
-            try:
-                import json
-                db_status[key] = json.loads(value) if value else None
-            except:
-                db_status[key] = value
+        if status_row:
+            (quantitative_running, auto_trading_enabled, total_strategies,
+             running_strategies, selected_strategies, current_generation,
+             evolution_enabled, system_health, last_updated, notes,
+             last_update_time, last_evolution_time) = status_row
+            
+            db_status = {
+                'quantitative_running': quantitative_running,
+                'auto_trading_enabled': auto_trading_enabled,
+                'total_strategies': total_strategies,
+                'running_strategies': running_strategies,
+                'selected_strategies': selected_strategies,
+                'current_generation': current_generation,
+                'evolution_enabled': evolution_enabled,
+                'system_health': system_health,
+                'last_updated': last_updated,
+                'notes': notes,
+                'last_update_time': last_update_time,
+                'last_evolution_time': last_evolution_time
+            }
         
         cursor.close()
         conn.close()
