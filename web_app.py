@@ -1160,10 +1160,8 @@ def quantitative_strategies():
                 
                 win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
                 
-                # 策略代数显示逻辑（恢复原本实现）
-                gen = generation or 1
-                cyc = cycle or 1
-                evolution_display = f"第{gen}代第{cyc}轮"
+                # 使用quantitative_service中的正确策略代数显示逻辑
+                evolution_display = quantitative_service._get_strategy_evolution_display(sid)
                 
                 strategy = {
                     'id': sid,
@@ -2926,7 +2924,7 @@ def clear_balance_cache():
 
 @app.route('/api/quantitative/account-info', methods=['GET'])
 def get_account_info():
-    """🔥 统一的账户信息API - 清理重复代码冲突"""
+    """🔥 账户信息API - 只使用币安余额进行量化交易"""
     if not QUANTITATIVE_ENABLED:
         return jsonify({
             'success': False,
@@ -2935,71 +2933,20 @@ def get_account_info():
         })
     
     try:
-        # 直接从真实交易所API获取余额数据，与get_exchange_balances()完全一致
-        raw_balances = get_exchange_balances()
+        # 直接使用quantitative_service中的正确实现（只用币安余额）
+        account_info = quantitative_service.get_account_info()
         
-        # 计算真实总资产
-        total_balance = 0
-        for exchange_id, balance_info in raw_balances.items():
-            usdt_balance = balance_info.get("USDT", 0)
-            if isinstance(usdt_balance, (int, float)) and not (usdt_balance != usdt_balance):
-                total_balance += usdt_balance
-        
-        # 从数据库获取交易统计
-        daily_pnl = 0
-        daily_return = 0
-        daily_trades = 0
-        total_return = 0
-        
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            # 获取今日真实交易统计
-            cursor.execute("""
-                SELECT COUNT(*) as trades, 
-                       COALESCE(SUM(CASE WHEN executed = true THEN pnl ELSE 0 END), 0) as total_pnl
-                FROM strategy_trade_logs 
-                WHERE DATE(timestamp) = CURRENT_DATE
-            """)
-            result = cursor.fetchone()
-            if result:
-                daily_trades = result[0] or 0
-                daily_pnl = float(result[1] or 0)
-            
-            # 获取历史总收益
-            cursor.execute("""
-                SELECT COALESCE(SUM(CASE WHEN executed = true THEN pnl ELSE 0 END), 0) as total_return
-                FROM strategy_trade_logs
-            """)
-            total_result = cursor.fetchone()
-            total_return = float(total_result[0] or 0) if total_result else 0
-            
-            # 计算收益率 - 基于真实余额变化
-            if total_balance > 0 and total_return != 0:
-                daily_return = daily_pnl / total_balance if total_balance > 0 else 0
-            else:
-                daily_return = 0
-                
-            cursor.close()
-            conn.close()
-            
-        except Exception as e:
-            print(f"获取数据库统计失败: {e}")
-        
-        account_info = {
-            'balance': round(total_balance, 2),
-            'daily_pnl': round(daily_pnl, 2),
-            'daily_return': round(daily_return, 4),
-            'daily_trades': daily_trades,
-            'total_return': round(total_return, 2),
-            'data_source': 'Real Exchange API + Database'
-        }
-        
-        return jsonify({
-            'success': True,
-            'data': account_info
-        })
+        if account_info and account_info.get('balance') is not None:
+            return jsonify({
+                'success': True,
+                'data': account_info
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': '获取币安余额失败',
+                'data': {}
+            })
         
     except Exception as e:
         print(f"获取账户信息失败: {e}")
