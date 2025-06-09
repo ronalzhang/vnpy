@@ -3453,13 +3453,12 @@ def get_evolution_log():
             )
         """)
         
-        # 🔥 从真实的策略进化历史表获取数据 - 扩大时间范围
+        # 🔥 从策略优化日志表聚合所有策略的进化数据（与策略卡同源）
         cursor.execute("""
-            SELECT action_type, COALESCE(notes, '策略进化操作'), strategy_id, 
-                   COALESCE(notes, '策略进化'), timestamp
-            FROM strategy_evolution_history 
-            WHERE action_type IS NOT NULL
-              AND timestamp >= NOW() - INTERVAL '3 days'
+            SELECT optimization_type, old_parameters, new_parameters, 
+                   trigger_reason, target_success_rate, timestamp, strategy_id, strategy_name
+            FROM strategy_optimization_logs 
+            WHERE timestamp >= NOW() - INTERVAL '2 days'
             ORDER BY timestamp DESC
             LIMIT 100
         """)
@@ -3468,25 +3467,44 @@ def get_evolution_log():
         logs = []
         
         for row in rows:
-            # 将action_type转换为更友好的显示
+            # 处理策略优化日志数据：optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate, timestamp, strategy_id, strategy_name
+            optimization_type, old_params, new_params, trigger_reason, success_rate, timestamp, strategy_id, strategy_name = row
+            
+            # 将optimization_type转换为action
             action_mapping = {
-                'mutation': 'optimized',
-                'crossover': 'created', 
-                'selection': 'executed',
-                'elimination': 'eliminated',
-                'creation': 'created',
-                'optimization': 'optimized'
+                '参数调优': 'optimized',
+                '信号过滤': 'optimized',
+                '风险控制': 'optimized',
+                '动量阈值调整': 'optimized',
+                '量化参数优化': 'optimized',
+                '布林带参数': 'optimized'
             }
             
-            action_display = action_mapping.get(row[0], row[0])
-            details = row[1] or '策略进化操作'
+            action_display = action_mapping.get(optimization_type, 'optimized')
+            
+            # 构建详细描述
+            try:
+                import json
+                old_data = json.loads(old_params) if old_params else {}
+                new_data = json.loads(new_params) if new_params else {}
+                
+                # 生成参数变化描述
+                changes = []
+                for key in new_data:
+                    if key in old_data and old_data[key] != new_data[key]:
+                        changes.append(f"{key}: {old_data[key]}→{new_data[key]}")
+                
+                change_desc = ", ".join(changes[:2])  # 只显示前2个变化
+                details = f"{optimization_type}: {change_desc}" if change_desc else f"{optimization_type}: {trigger_reason}"
+            except:
+                details = f"{optimization_type}: {trigger_reason}"
             
             logs.append({
                 'action': action_display,
                 'details': details,
-                'strategy_id': row[2],
-                'strategy_name': details.split('策略')[0] + '策略' if '策略' in details else '进化策略',
-                'timestamp': row[4].isoformat() if row[4] else None
+                'strategy_id': strategy_id,
+                'strategy_name': strategy_name or '策略进化',
+                'timestamp': timestamp.isoformat() if timestamp else None
             })
         
         # 🔥 修复：创建真实的时间线分布进化日志（覆盖最近3小时）
