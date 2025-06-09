@@ -54,7 +54,7 @@ class SafeStartup:
         # 检查关键文件
         critical_files = [
             "quantitative_service.py",
-            "enhanced_strategy_evolution.py"
+            "web_app.py"
         ]
         
         for file_path in critical_files:

@@ -1147,6 +1147,21 @@ def quantitative_strategies():
                 
                 win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
                 
+                # 修复策略代数显示逻辑
+                gen = generation or 1
+                cyc = cycle or 1
+                
+                # 正确的代数显示逻辑：初始化阶段(第1代前3轮)显示特殊标签
+                if gen == 1 and cyc <= 3:
+                    if cyc == 1:
+                        evolution_display = "初代策略"
+                    elif cyc == 2:
+                        evolution_display = "初代策略(优化中)"
+                    else:  # cyc == 3
+                        evolution_display = "初代策略(验证中)"
+                else:
+                    evolution_display = f"第{gen}代第{cyc}轮"
+                
                 strategy = {
                     'id': sid,
                     'name': name,
@@ -1156,14 +1171,14 @@ def quantitative_strategies():
                     'enabled': bool(enabled),
                     'final_score': float(score) if score else 0.0,
                     'created_at': created_at.isoformat() if created_at else '',
-                    'generation': generation or 1,
-                    'cycle': cycle or 1,
+                    'generation': gen,
+                    'cycle': cyc,
                     'total_trades': total_trades or 0,
                     'win_rate': round(win_rate, 2),
                     'total_pnl': float(total_pnl) if total_pnl else 0.0,
                     'avg_pnl': float(avg_pnl) if avg_pnl else 0.0,
-                    'evolution_display': f"第{generation or 1}代第{cycle or 1}轮",
-                    'trade_mode': '实际交易' if enabled else '模拟中'
+                    'evolution_display': evolution_display,
+                    'trade_mode': '真实交易' if enabled else '模拟中'
                 }
                 
                 strategies.append(strategy)
@@ -2922,39 +2937,51 @@ def get_account_info():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 获取今日交易统计
+            # 获取今日交易统计 - 修复字段名称
             cursor.execute("""
                 SELECT COUNT(*) as trades, 
-                       COALESCE(SUM(profit), 0) as total_profit
+                       COALESCE(SUM(CASE WHEN executed = true THEN pnl ELSE 0 END), 0) as total_pnl
                 FROM strategy_trade_logs 
                 WHERE DATE(timestamp) = CURRENT_DATE
             """)
             result = cursor.fetchone()
             if result:
                 daily_trades = result[0] or 0
-                daily_pnl = result[1] or 0
+                daily_pnl = float(result[1] or 0)
+                print(f"今日交易统计: {daily_trades}笔交易, 盈亏: {daily_pnl:.2f}U")
             
-            # 获取昨日余额计算收益率
+            # 获取总收益 - 使用所有历史交易
             cursor.execute("""
-                SELECT balance FROM account_balance_history 
-                WHERE DATE(timestamp) = CURRENT_DATE - INTERVAL '1 day'
-                ORDER BY timestamp DESC LIMIT 1
+                SELECT COALESCE(SUM(CASE WHEN executed = true THEN pnl ELSE 0 END), 0) as total_return
+                FROM strategy_trade_logs
             """)
-            yesterday_balance = cursor.fetchone()
-            if yesterday_balance and yesterday_balance[0] > 0:
-                daily_return = daily_pnl / yesterday_balance[0]
+            total_result = cursor.fetchone()
+            total_return = float(total_result[0] or 0) if total_result else 0
+            
+            # 计算日收益率 - 基于起始资金15.25U
+            initial_balance = 15.25
+            if daily_pnl != 0:
+                daily_return = daily_pnl / initial_balance
+            else:
+                daily_return = 0
+                
+            print(f"账户信息统计: 总资产{total_balance:.2f}U, 日盈亏{daily_pnl:.2f}U, 总收益{total_return:.2f}U")
             
             cursor.close()
             conn.close()
             
         except Exception as e:
             print(f"获取数据库统计失败: {e}")
+            import traceback
+            traceback.print_exc()
         
         account_info = {
             'balance': total_balance,
             'daily_pnl': daily_pnl,
             'daily_return': daily_return,
-            'daily_trades': daily_trades
+            'daily_trades': daily_trades,
+            'total_return': total_return if 'total_return' in locals() else 0,
+            'data_source': 'Real-time API + Database'
         }
         
         return jsonify({
