@@ -40,7 +40,7 @@ def check_trading_status():
     print(f"📊 最近30分钟交易日志: {very_recent_trades}条")
     
     # 3. 检查策略状态
-    cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = true")
+    cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
     enabled_strategies = cursor.fetchone()[0]
     print(f"🎯 启用的策略数量: {enabled_strategies}个")
     
@@ -70,7 +70,7 @@ def check_trading_status():
     
     cursor.execute("""
         UPDATE strategies 
-        SET enabled = true, updated_at = CURRENT_TIMESTAMP
+        SET enabled = 1, updated_at = CURRENT_TIMESTAMP
         WHERE final_score >= 50
     """)
     
