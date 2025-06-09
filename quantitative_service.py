@@ -418,7 +418,7 @@ class DatabaseManager:
                     host="localhost",
                     database="quantitative",
                     user="quant_user", 
-                    password="chenfei0421"
+                    password="123abc74531"
                 )
                 cursor = conn.cursor()
                 cursor.execute(
@@ -1928,7 +1928,7 @@ class AutomatedStrategyManager:
                 host="localhost",
                 database="quantitative",
                 user="quant_user",
-                password="chenfei0421"
+                password="123abc74531"
             )
             cursor = conn.cursor()
             cursor.execute("""

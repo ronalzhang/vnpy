@@ -6,7 +6,7 @@ try:
         host='localhost',
         database='quantitative', 
         user='quant_user',
-        password='quant123'
+        password='123abc74531'
     )
     cursor = conn.cursor()
     

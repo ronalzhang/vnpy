@@ -96,7 +96,7 @@ def get_db_connection():
         host='localhost',
         database='quantitative', 
         user='quant_user',
-        password='chenfei0421'
+        password='123abc74531'
     )
 
 # 导入套利系统模块
