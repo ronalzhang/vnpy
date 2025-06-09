@@ -754,13 +754,13 @@
 
 /* ==================== 策略进化日志样式 ==================== */
 .evolution-log-container {
-    background: transparent; /* 透明背景，融入页面 */
-    border-radius: 6px;
-    padding: 0.5rem 0.75rem;
-    min-width: 400px; /* 增加最小宽度 */
-    max-width: 450px; /* 增加最大宽度 */
-    border: 1px solid rgba(255, 255, 255, 0.2); /* 半透明边框 */
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* 减淡阴影 */
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(51, 65, 85, 0.95)); /* 深色背景提高对比度 */
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    min-width: 500px; /* 增加最小宽度 */
+    max-width: 600px; /* 增加最大宽度 */
+    border: 2px solid rgba(59, 130, 246, 0.3); /* 蓝色边框增强可见性 */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* 增强阴影 */
     overflow: hidden;
     position: relative;
 }
@@ -770,19 +770,21 @@
 }
 
 .evolution-log-content {
-    height: 28px; /* 固定单行高度 */
+    height: 56px; /* 增加为两倍高度 */
     overflow: hidden;
     position: relative;
     white-space: nowrap;
 }
 
-/* CNN新闻滚动效果 - 放慢速度 */
+/* CNN新闻滚动效果 - 大幅放慢速度 */
 .evolution-log-ticker {
     display: inline-block;
-    animation: scroll-left 35s linear infinite; /* 从20s改为35s，放慢滚动 */
+    animation: scroll-left 50s linear infinite; /* 从35s改为50s，进一步放慢滚动 */
     white-space: nowrap;
-    line-height: 28px;
-    color: rgba(255, 255, 255, 0.9); /* 保持文字清晰可见 */
+    line-height: 56px; /* 匹配容器高度 */
+    color: #f1f5f9; /* 明亮的白色文字 */
+    font-size: 16px; /* 增加字体大小，原来可能是14px */
+    font-weight: 500; /* 稍微加粗字体 */
 }
 
 @keyframes scroll-left {
@@ -802,34 +804,41 @@
 /* 日志项样式 */
 .log-item {
     display: inline;
-    margin-right: 3rem; /* 增加间距让内容更清晰 */
+    margin-right: 4rem; /* 增加间距让内容更清晰 */
     white-space: nowrap;
 }
 
 .log-time {
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: 500;
+    color: #cbd5e1; /* 浅灰色，保持可读性 */
+    font-weight: 600;
+    font-size: 15px; /* 稍微加大时间字体 */
 }
 
 .log-action {
-    font-weight: 600;
-    margin: 0 0.5rem;
+    font-weight: 700; /* 加粗动作文字 */
+    margin: 0 0.75rem;
+    font-size: 16px;
 }
 
 .log-action.created {
-    color: #4ade80; /* 绿色 - 新增 */
+    color: #22c55e; /* 鲜绿色 - 新增 */
+    text-shadow: 0 0 8px rgba(34, 197, 94, 0.3); /* 发光效果 */
 }
 
 .log-action.eliminated {
-    color: #f87171; /* 红色 - 淘汰 */
+    color: #ef4444; /* 鲜红色 - 淘汰 */
+    text-shadow: 0 0 8px rgba(239, 68, 68, 0.3); /* 发光效果 */
 }
 
 .log-action.optimized {
-    color: #60a5fa; /* 蓝色 - 优化 */
+    color: #3b82f6; /* 鲜蓝色 - 优化 */
+    text-shadow: 0 0 8px rgba(59, 130, 246, 0.3); /* 发光效果 */
 }
 
 .log-details {
-    color: rgba(255, 255, 255, 0.85);
+    color: #e2e8f0; /* 明亮的浅灰色 */
+    font-size: 15px;
+    font-weight: 500;
 }
 
 /* 渐变遮罩效果，让边缘更自然 */
@@ -838,7 +847,7 @@
     content: '';
     position: absolute;
     top: 0;
-    width: 20px;
+    width: 30px; /* 增加遮罩宽度 */
     height: 100%;
     pointer-events: none;
     z-index: 2;
@@ -846,12 +855,12 @@
 
 .evolution-log-content::before {
     left: 0;
-    background: linear-gradient(to right, rgba(30, 41, 59, 0.8), transparent); /* 使用页面背景色渐变 */
+    background: linear-gradient(to right, rgba(30, 41, 59, 1), rgba(30, 41, 59, 0.8), transparent);
 }
 
 .evolution-log-content::after {
     right: 0;
-    background: linear-gradient(to left, rgba(30, 41, 59, 0.8), transparent); /* 使用页面背景色渐变 */
+    background: linear-gradient(to left, rgba(30, 41, 59, 1), rgba(30, 41, 59, 0.8), transparent);
 }
 
 /* 移除旧的样式 */
@@ -869,23 +878,41 @@
 
 @media (max-width: 1200px) {
     .evolution-log-container {
-        min-width: 220px;
-        max-width: 260px;
+        min-width: 300px;
+        max-width: 350px;
     }
     
     .evolution-log-ticker {
-        animation-duration: 15s; /* 小屏幕时稍快一点 */
+        animation-duration: 25s; /* 小屏幕时稍快一点 */
+        font-size: 14px;
+    }
+    
+    .evolution-log-content {
+        height: 42px;
+    }
+    
+    .evolution-log-ticker {
+        line-height: 42px;
     }
 }
 
 @media (max-width: 992px) {
     .evolution-log-container {
-        min-width: 180px;
-        max-width: 200px;
+        min-width: 250px;
+        max-width: 280px;
     }
     
     .evolution-log-ticker {
-        animation-duration: 12s; /* 更小屏幕时更快 */
+        animation-duration: 20s; /* 更小屏幕时更快 */
+        font-size: 13px;
+    }
+    
+    .evolution-log-content {
+        height: 36px;
+    }
+    
+    .evolution-log-ticker {
+        line-height: 36px;
     }
 }
 
