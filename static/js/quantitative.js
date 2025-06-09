@@ -298,20 +298,21 @@ class QuantitativeSystem {
         container.innerHTML = sortedStrategies.map(strategy => {
             // 生成评分显示 - 使用正确的字段名
             const score = strategy.final_score || 0;
-            const winRate = strategy.win_rate || 0;
+            // 修复成功率超过100%的问题 - 限制在0-100%之间
+            const winRate = Math.min(Math.max(strategy.win_rate || 0, 0), 1);
             const totalReturn = strategy.total_return || 0;
             const totalTrades = strategy.total_trades || 0;
             const generation = strategy.generation || 1;
             const round = strategy.optimization_round || 1;
             const qualified = strategy.qualified_for_trading || false;
             
-            // 评分状态显示 - 使用6.5分合格线
+            // 评分状态显示 - 使用65分合格线
             let scoreColor = 'text-secondary';
             let scoreStatus = '';
             if (score >= 70) {
                 scoreColor = 'text-success';
                 scoreStatus = '🏆 优秀';
-            } else if (score >= 6.5) {
+            } else if (score >= 65) {
                 scoreColor = 'text-warning';
                 scoreStatus = '✅ 合格';
             } else {
@@ -319,38 +320,79 @@ class QuantitativeSystem {
                 scoreStatus = '⚠️ 待优化';
             }
             
+            // 交易状态 - 根据合格线和交易次数判断
+            const isSimulation = score < 65 || totalTrades < 10;
+            const tradingStatus = isSimulation ? '模拟中' : '真实交易';
+            const tradingBadgeClass = isSimulation ? 'bg-warning' : 'bg-success';
+            
             return `
             <div class="col-md-4 mb-3">
                 <div class="card strategy-card ${strategy.enabled ? 'strategy-running' : 'strategy-stopped'}">
                     <div class="card-body">
+                        <!-- 顶部：标题和状态 -->
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h6 class="card-title mb-0">
-                                <a href="javascript:void(0)" onclick="app.showStrategyConfig('${strategy.id}')" class="text-decoration-none">
-                                    ${strategy.name}
-                                </a>
-                            </h6>
-                            <span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'}">
-                                ${strategy.enabled ? '运行中' : '已停止'}
-                            </span>
+                            <div>
+                                <h6 class="card-title mb-0">
+                                    <a href="javascript:void(0)" onclick="app.showStrategyConfig('${strategy.id}')" class="text-decoration-none">
+                                        ${strategy.name}
+                                    </a>
+                                </h6>
+                                <small class="text-muted">${strategy.symbol} • 第${generation}代第${round}轮</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'} mb-1">
+                                    ${strategy.enabled ? '运行中' : '已停止'}
+                                </span><br>
+                                <span class="badge ${tradingBadgeClass}">
+                                    ${tradingStatus}
+                                </span>
+                            </div>
                         </div>
                         
-                        <p class="card-text">
-                            <small class="text-muted">${strategy.symbol} • 第${generation}代第${round}轮</small><br>
-                            <span class="${scoreColor}">评分: ${score.toFixed(1)} ${scoreStatus}</span><br>
-                            <span class="text-success">成功率: ${(winRate * 100).toFixed(1)}%</span><br>
-                            <span class="text-info">总收益: ${(totalReturn * 100).toFixed(2)}%</span><br>
-                            <span class="text-warning">日收益: ${((totalReturn / 30) * 100).toFixed(3)}%</span><br>
-                            <span class="text-muted">交易次数: ${totalTrades}</span><br>
-                        </p>
-                        
-                        <div class="text-center mb-2">
-                            ${score >= 65 ? '<span class="badge bg-success">真实交易</span>' : '<span class="badge bg-warning">模拟中</span>'}
+                        <!-- 中部：策略指标 -->
+                        <div class="strategy-metrics mb-3">
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="metric-item">
+                                        <div class="${scoreColor} fw-bold">${score.toFixed(1)}</div>
+                                        <small class="text-muted">评分</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="metric-item">
+                                        <div class="text-success fw-bold">${(winRate * 100).toFixed(1)}%</div>
+                                        <small class="text-muted">成功率</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="metric-item">
+                                        <div class="text-info fw-bold">${totalTrades}</div>
+                                        <small class="text-muted">交易次数</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row text-center mt-2">
+                                <div class="col-6">
+                                    <div class="metric-item">
+                                        <div class="text-primary fw-bold">${(totalReturn * 100).toFixed(2)}%</div>
+                                        <small class="text-muted">总收益</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="metric-item">
+                                        <div class="text-warning fw-bold">${((totalReturn / 30) * 100).toFixed(3)}%</div>
+                                        <small class="text-muted">日收益</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
+                        <!-- 底部：操作按钮 -->
                         <div class="d-flex justify-content-center">
                             <button class="btn btn-sm btn-outline-info" 
-                                    onclick="app.showStrategyLogs('${strategy.id}')">
-                                查看日志
+                                    onclick="app.showStrategyLogs('${strategy.id}')"
+                                    title="查看交易和优化日志">
+                                <i class="fas fa-chart-line me-1"></i>日志
                             </button>
                         </div>
                     </div>

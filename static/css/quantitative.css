@@ -701,6 +701,21 @@
     background-color: #fff2f0;
 }
 
+/* 策略指标样式 */
+.strategy-metrics .metric-item {
+    padding: 0.25rem 0;
+}
+
+.strategy-metrics .metric-item div {
+    font-size: 0.9rem;
+    margin-bottom: 0.1rem;
+}
+
+.strategy-metrics .metric-item small {
+    font-size: 0.7rem;
+    color: #999;
+}
+
 /* ==================== Toggle按钮样式 ==================== */
 .btn-toggle {
     position: relative;
@@ -754,37 +769,44 @@
 
 /* ==================== 策略进化日志样式 ==================== */
 .evolution-log-container {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(51, 65, 85, 0.9)); /* 减少不透明度 */
-    border-radius: 6px;
-    padding: 0.4rem 0.8rem; /* 减少内边距 */
-    min-width: 400px; /* 减小最小宽度 */
-    max-width: 500px; /* 减小最大宽度 */
-    border: none; /* 移除边框 */
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); /* 减少阴影 */
+    width: 400px; /* 增加容器宽度 */
+    height: 32px; /* 稍微增加高度 */
     overflow: hidden;
     position: relative;
+    background: transparent; /* 完全透明 */
+    border: none; /* 无边框 */
+    margin: 0;
+    padding: 0;
 }
 
 .evolution-log-header {
-    display: none; /* 隐藏标题 */
+    /* 隐藏标题，只保留滚动内容 */
+    display: none;
 }
 
 .evolution-log-content {
-    height: 32px; /* 减小高度 */
-    overflow: hidden;
+    width: 100%;
+    height: 100%;
     position: relative;
-    white-space: nowrap;
+    background: transparent; /* 完全透明 */
+    border: none; /* 无边框 */
+    border-radius: 0; /* 无圆角 */
+    box-shadow: none; /* 无阴影 */
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
-/* CNN新闻滚动效果 - 统一速度 */
 .evolution-log-ticker {
-    display: inline-block;
-    animation: scroll-left 40s linear infinite; /* 统一40秒滚动速度 */
     white-space: nowrap;
-    line-height: 32px; /* 匹配容器高度 */
-    color: #f1f5f9; /* 明亮的白色文字 */
-    font-size: 14px; /* 减小字体大小 */
-    font-weight: 500; /* 稍微加粗字体 */
+    animation: scroll-left 60s linear infinite; /* 减慢滚动速度，从30s改为60s */
+    color: #666; /* 文字颜色 */
+    font-size: 14px;
+    line-height: 32px; /* 与容器高度一致 */
+    background: transparent; /* 透明背景 */
+    border: none;
+    margin: 0;
+    padding: 0;
 }
 
 @keyframes scroll-left {
@@ -796,123 +818,76 @@
     }
 }
 
-/* 暂停滚动效果 */
 .evolution-log-container:hover .evolution-log-ticker {
     animation-play-state: paused;
 }
 
-/* 日志项样式 */
 .log-item {
-    display: inline;
-    margin-right: 4rem; /* 增加间距让内容更清晰 */
-    white-space: nowrap;
+    margin-right: 40px; /* 增加项目间距 */
+    color: #666;
+    background: transparent;
+    border: none;
+    padding: 0;
 }
 
 .log-time {
-    color: #cbd5e1; /* 浅灰色，保持可读性 */
-    font-weight: 600;
-    font-size: 15px; /* 稍微加大时间字体 */
+    color: #999;
+    margin-right: 8px;
+    background: transparent;
 }
 
 .log-action {
-    font-weight: 700; /* 加粗动作文字 */
-    margin: 0 0.75rem;
-    font-size: 16px;
+    font-weight: 500;
+    margin-right: 8px;
+    background: transparent;
+    border: none;
+    padding: 0;
 }
 
 .log-action.created {
-    color: #22c55e; /* 鲜绿色 - 新增 */
-    text-shadow: 0 0 8px rgba(34, 197, 94, 0.3); /* 发光效果 */
+    color: #52c41a;
 }
 
 .log-action.eliminated {
-    color: #ef4444; /* 鲜红色 - 淘汰 */
-    text-shadow: 0 0 8px rgba(239, 68, 68, 0.3); /* 发光效果 */
+    color: #ff4d4f;
 }
 
 .log-action.optimized {
-    color: #3b82f6; /* 鲜蓝色 - 优化 */
-    text-shadow: 0 0 8px rgba(59, 130, 246, 0.3); /* 发光效果 */
+    color: #1890ff;
 }
 
 .log-details {
-    color: #e2e8f0; /* 明亮的浅灰色 */
-    font-size: 15px;
-    font-weight: 500;
+    color: #666;
+    background: transparent;
 }
 
-/* 渐变遮罩效果，让边缘更自然 */
+/* 移除所有渐变和阴影效果 */
 .evolution-log-content::before,
 .evolution-log-content::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    width: 30px; /* 增加遮罩宽度 */
-    height: 100%;
-    pointer-events: none;
-    z-index: 2;
+    display: none; /* 完全隐藏渐变效果 */
 }
 
-.evolution-log-content::before {
-    left: 0;
-    background: linear-gradient(to right, rgba(30, 41, 59, 1), rgba(30, 41, 59, 0.8), transparent);
-}
-
-.evolution-log-content::after {
-    right: 0;
-    background: linear-gradient(to left, rgba(30, 41, 59, 1), rgba(30, 41, 59, 0.8), transparent);
-}
-
-/* 移除旧的样式 */
-@keyframes slideInLog {
-    /* 删除 */
-}
-
-@keyframes pulseNewLog {
-    /* 删除 */
-}
-
-.evolution-log-item.pulse {
-    /* 删除 */
-}
-
+/* 响应式调整 */
 @media (max-width: 1200px) {
     .evolution-log-container {
-        min-width: 300px;
-        max-width: 350px;
+        width: 350px; /* 中等屏幕宽度 */
     }
     
     .evolution-log-ticker {
-        animation-duration: 40s; /* 统一速度 */
+        animation-duration: 50s; /* 中等屏幕稍快一点 */
         font-size: 13px;
-    }
-    
-    .evolution-log-content {
-        height: 30px;
-    }
-    
-    .evolution-log-ticker {
-        line-height: 30px;
     }
 }
 
 @media (max-width: 992px) {
     .evolution-log-container {
-        min-width: 250px;
-        max-width: 280px;
+        width: 300px; /* 小屏幕宽度 */
     }
     
     .evolution-log-ticker {
-        animation-duration: 40s; /* 统一速度 */
+        animation-duration: 45s; /* 小屏幕再快一点 */
         font-size: 12px;
-    }
-    
-    .evolution-log-content {
-        height: 28px;
-    }
-    
-    .evolution-log-ticker {
-        line-height: 28px;
+        line-height: 30px;
     }
 }
 
