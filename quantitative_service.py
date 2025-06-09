@@ -2435,7 +2435,7 @@ class QuantitativeService:
             'host': 'localhost',
             'database': 'quantitative',
             'user': 'quant_user',
-            'password': 'chenfei0421'
+            'password': '123abc74531'
         }
         self.conn = psycopg2.connect(**self.db_config)
         self.conn.autocommit = True  # 避免事务阻塞问题
