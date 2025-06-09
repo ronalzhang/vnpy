@@ -6850,6 +6850,33 @@ class EvolutionaryStrategyEngine:
         
         next_time = self.last_evolution_time + timedelta(seconds=self.evolution_config['evolution_interval'])
         return next_time.strftime("%H:%M:%S")
+    def _startup_checks(self):
+        """启动时的稳定性检查"""
+        try:
+            # 检查关键组件
+            checks = [
+                ("数据库连接", lambda: hasattr(self, 'conn') and self.conn is not None),
+                ("策略字典", lambda: len(self._get_all_strategies_dict()) >= 0),
+                ("配置加载", lambda: hasattr(self, 'config') and self.config is not None),
+                ("余额缓存", lambda: hasattr(self, 'balance_cache') and isinstance(self.balance_cache, dict))
+            ]
+            
+            failed_checks = []
+            for check_name, check_func in checks:
+                try:
+                    if not check_func():
+                        failed_checks.append(check_name)
+                except Exception as e:
+                    failed_checks.append(f"{check_name} (错误: {e})")
+            
+            if failed_checks:
+                print(f"⚠️ 启动检查失败: {', '.join(failed_checks)}")
+            else:
+                print("✅ 启动稳定性检查通过")
+                
+        except Exception as e:
+            print(f"⚠️ 启动检查异常: {e}")
+
     def verify_and_clean_strategies(self):
         """验证并清理虚假的高分策略"""
         try:
@@ -6897,6 +6924,8 @@ class EvolutionaryStrategyEngine:
                     ''', (new_score, new_trades, new_win_rate, new_return, sid))
                     
                     print(f"  🔧 修正策略 {name}: {score}分 → {new_score}分")
+                
+                self.conn.commit()
             else:
                 print("✅ 所有高分策略验证通过")
             
@@ -6937,6 +6966,10 @@ class EvolutionaryStrategyEngine:
             frontend_strategies = cursor.fetchall()
             
             print(f"📺 前端将显示 {len(frontend_strategies)} 个验证过的优质策略")
+            print("前5名策略:")
+            for i, (sid, name, score, trades, win_rate, return_val, actual_trades, created, updated) in enumerate(frontend_strategies[:5]):
+                real_flag = "✅真实" if actual_trades > 0 else "⚠️模拟"
+                print(f"  {i+1}. {name[:25]}: {score:.1f}分 {real_flag} (实际交易:{actual_trades}次)")
             return frontend_strategies
             
         except Exception as e:
@@ -6991,33 +7024,6 @@ class EvolutionaryStrategyEngine:
         except Exception as e:
             print(f"获取交易策略失败: {e}")
             return []
-
-    def _startup_checks(self):
-        """启动时的稳定性检查"""
-        try:
-            # 检查关键组件
-            checks = [
-                ("数据库连接", lambda: hasattr(self, 'conn') and self.conn is not None),
-                ("策略字典", lambda: len(self._get_all_strategies_dict()) >= 0),
-                ("配置加载", lambda: hasattr(self, 'config') and self.config is not None),
-                ("余额缓存", lambda: hasattr(self, 'balance_cache') and isinstance(self.balance_cache, dict))
-            ]
-            
-            failed_checks = []
-            for check_name, check_func in checks:
-                try:
-                    if not check_func():
-                        failed_checks.append(check_name)
-                except Exception as e:
-                    failed_checks.append(f"{check_name} (错误: {e})")
-            
-            if failed_checks:
-                print(f"⚠️ 启动检查失败: {', '.join(failed_checks)}")
-            else:
-                print("✅ 启动稳定性检查通过")
-                
-        except Exception as e:
-            print(f"⚠️ 启动检查异常: {e}")
 
 
 def main():
