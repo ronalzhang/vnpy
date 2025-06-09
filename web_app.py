@@ -198,11 +198,6 @@ def init_api_clients():
                     # 获取API密钥配置
                     api_key = config[exchange_id]["api_key"]
                     secret_key = config[exchange_id]["secret_key"]
-                    password = config[exchange_id].get("password", "")
-                    
-                    # 确保password不为None，OKX需要有效的password
-                    if password is None:
-                        password = ""
                     
                     # 准备配置
                     client_config = {
@@ -212,9 +207,16 @@ def init_api_clients():
                         'sandbox': False  # 确保使用生产环境
                     }
                     
-                    # 只有当password有值时才添加到配置中（避免空字符串导致错误）
-                    if password and password.strip():
-                        client_config['password'] = password
+                    # OKX特殊处理：使用passphrase字段
+                    if exchange_id == 'okx':
+                        passphrase = config[exchange_id].get("passphrase") or config[exchange_id].get("password", "")
+                        if passphrase and str(passphrase).strip():
+                            client_config['password'] = str(passphrase)
+                    else:
+                        # 其他交易所的password处理
+                        password = config[exchange_id].get("password", "")
+                        if password and str(password).strip():
+                            client_config['password'] = str(password)
                     
                     # 设置代理（如果配置）
                     if "proxy" in config and config["proxy"]:
@@ -644,10 +646,10 @@ def get_exchange_prices():
                             'enableRateLimit': True
                         }
                         
-                        # 只有当password有值时才添加到配置中
-                        password = config['okx'].get('password')
-                        if password and str(password).strip():
-                            okx_config['password'] = str(password)
+                        # OKX使用passphrase字段（不是password）
+                        passphrase = config['okx'].get('passphrase') or config['okx'].get('password')
+                        if passphrase and str(passphrase).strip():
+                            okx_config['password'] = str(passphrase)
                         
                         new_client = ccxt.okx(okx_config)
                         exchange_clients['okx'] = new_client
