@@ -1113,85 +1113,43 @@ def operations_log():
 
 @app.route('/api/quantitative/strategies', methods=['GET', 'POST'])
 def quantitative_strategies():
-    """获取策略列表或创建新策略"""
-    # 检查并重新初始化量化服务
-    if not quantitative_service:
-        init_success = init_quantitative_service()
-        if not init_success:
-            return jsonify({
-                "status": "error",
-                "message": "量化交易模块未启用"
-            }), 500
+    """🔥 统一的策略管理API - 修复重复代码冲突"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"status": "error", "message": "量化模块未启用"})
     
     if request.method == 'GET':
         try:
-            # 获取基于真实交易表现的前20优质策略
-            conn = get_db_connection()
-            cursor = conn.cursor()
+            # 🎯 使用quantitative_service获取真实的策略数据，包含进化信息
+            strategies_response = quantitative_service.get_strategies()
             
-            cursor.execute('''
-                SELECT s.id, s.name, s.final_score, s.enabled, s.symbol, s.type,
-                       COUNT(t.id) as actual_trades,
-                       COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
-                       SUM(t.pnl) as total_pnl,
-                       s.created_at, s.updated_at
-                FROM strategies s
-                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
-                WHERE s.enabled = 1
-                GROUP BY s.id, s.name, s.final_score, s.enabled, s.symbol, s.type, s.created_at, s.updated_at
-                ORDER BY s.final_score DESC
-                LIMIT 20
-            ''')
-            strategies_data = cursor.fetchall()
+            # 确保返回的是正确格式
+            if isinstance(strategies_response, dict) and 'data' in strategies_response:
+                strategies = strategies_response['data']
+            else:
+                strategies = strategies_response
             
-            strategies = []
-            for row in strategies_data:
-                sid, name, score, enabled, symbol, strategy_type, actual_trades, wins, total_pnl, created_at, updated_at = row
+            # ✅ 为每个策略添加真实的进化显示信息（不再硬编码）
+            for strategy in strategies:
+                if 'generation' not in strategy:
+                    strategy['generation'] = 1
+                if 'cycle' not in strategy:
+                    strategy['cycle'] = 1
                 
-                win_rate = (wins / actual_trades * 100) if actual_trades > 0 else 0
-                total_pnl = total_pnl or 0
-                
-                # 状态评估
-                if actual_trades >= 10 and win_rate >= 60 and total_pnl > 0:
-                    status = "ready_for_real"
-                    status_text = "🌟可真实交易"
-                elif actual_trades >= 5 and win_rate >= 50:
-                    status = "continue_verification"  
-                    status_text = "⭐继续验证"
-                elif actual_trades >= 3:
-                    status = "simulation_observation"
-                    status_text = "📊模拟观察"
+                # 🧬 使用quantitative_service的方法获取真实进化信息
+                if quantitative_service and hasattr(quantitative_service, '_get_strategy_evolution_display'):
+                    strategy['evolution_display'] = quantitative_service._get_strategy_evolution_display(strategy.get('id', ''))
                 else:
-                    status = "awaiting_activation"
-                    status_text = "🔍待激活"
+                    strategy['evolution_display'] = f"第{strategy.get('generation', 1)}代第{strategy.get('cycle', 1)}轮"
                 
-                strategy = {
-                    'id': sid,
-                    'name': name,
-                    'final_score': float(score),
-                    'enabled': bool(enabled),
-                    'symbol': symbol or 'BTC/USDT',
-                    'type': strategy_type or 'momentum',
-                    'actual_trades': actual_trades,
-                    'win_rate': round(win_rate, 1),
-                    'total_pnl': round(float(total_pnl), 2),
-                    'status': status,
-                    'status_text': status_text,
-                    'generation': 1,  # 进化代数
-                    'cycle': 1,       # 进化轮次
-                    'evolution_display': f"第1代第1轮",
-                    'created_at': created_at.isoformat() if created_at else None,
-                    'updated_at': updated_at.isoformat() if updated_at else None
-                }
-                strategies.append(strategy)
-            
-            conn.close()
+                # 🔄 确保交易模式显示正确（模拟中 vs 实际交易）
+                if 'trade_mode' not in strategy:
+                    strategy['trade_mode'] = '模拟中'  # 默认为模拟模式
             
             return jsonify({
                 "status": "success",
-                "data": strategies,
-                "message": f"显示前20真实验证策略，合格真实交易策略: {len([s for s in strategies if s['status'] == 'ready_for_real'])}个"
+                "data": strategies
             })
+            
         except Exception as e:
             print(f"获取策略列表失败: {e}")
             return jsonify({
@@ -1311,7 +1269,7 @@ def strategy_detail(strategy_id):
 
 @app.route('/api/quantitative/strategies/<strategy_id>/reset', methods=['POST'])
 def reset_strategy_params(strategy_id):
-    """重置策略参数"""
+    """重置策略参数 - 扩展到十几个参数"""
     try:
         if not quantitative_service:
             return jsonify({'success': False, 'message': '量化服务未启用'})
@@ -1320,49 +1278,151 @@ def reset_strategy_params(strategy_id):
         if not strategy:
             return jsonify({'success': False, 'message': '策略不存在'})
         
-        # 获取默认参数
+        # 📊 扩展的策略参数配置 - 每种策略类型10+个参数
         strategy_type = strategy.get('type', 'momentum')
-        default_params = {
+        expanded_params = {
             'momentum': {
+                # 基础参数
                 'lookback_period': 20,
                 'threshold': 0.02,
                 'quantity': 100,
                 'momentum_threshold': 0.01,
-                'volume_threshold': 2.0
+                'volume_threshold': 2.0,
+                # 技术指标参数
+                'rsi_period': 14,
+                'rsi_oversold': 30,
+                'rsi_overbought': 70,
+                'macd_fast_period': 12,
+                'macd_slow_period': 26,
+                'macd_signal_period': 9,
+                # 风险控制参数
+                'stop_loss_pct': 2.0,
+                'take_profit_pct': 4.0,
+                'max_drawdown_pct': 5.0,
+                'position_sizing': 0.1,
+                # 时间管理参数
+                'min_hold_time': 300,  # 5分钟
+                'max_hold_time': 3600,  # 1小时
+                'trade_start_hour': 0,
+                'trade_end_hour': 24
             },
             'mean_reversion': {
+                # 基础参数
                 'lookback_period': 30,
                 'std_multiplier': 2.0,
                 'quantity': 100,
                 'reversion_threshold': 0.02,
-                'min_deviation': 0.01
+                'min_deviation': 0.01,
+                # 布林带参数
+                'bb_period': 20,
+                'bb_std_dev': 2.0,
+                'bb_squeeze_threshold': 0.1,
+                # 均值回归指标
+                'z_score_threshold': 2.0,
+                'correlation_threshold': 0.7,
+                'volatility_threshold': 0.02,
+                # 风险控制
+                'stop_loss_pct': 1.5,
+                'take_profit_pct': 3.0,
+                'max_positions': 3,
+                'min_profit_target': 0.5,
+                # 时间控制
+                'entry_cooldown': 600,  # 10分钟
+                'max_trade_duration': 7200,  # 2小时
+                'avoid_news_hours': True
             },
             'grid_trading': {
+                # 网格基础参数
                 'grid_spacing': 1.0,
                 'grid_count': 10,
                 'quantity': 1000,
                 'lookback_period': 100,
-                'min_profit': 0.5
+                'min_profit': 0.5,
+                # 网格高级参数
+                'upper_price_limit': 110000,
+                'lower_price_limit': 90000,
+                'grid_density': 0.5,
+                'rebalance_threshold': 5.0,
+                'profit_taking_ratio': 0.8,
+                # 动态调整参数
+                'volatility_adjustment': True,
+                'trend_filter_enabled': True,
+                'volume_weighted': True,
+                # 风险管理
+                'max_grid_exposure': 10000,
+                'emergency_stop_loss': 10.0,
+                'grid_pause_conditions': True,
+                'liquidity_threshold': 1000000
             },
             'breakout': {
+                # 突破基础参数
                 'lookback_period': 20,
                 'breakout_threshold': 1.5,
                 'quantity': 50,
                 'volume_threshold': 2.0,
-                'confirmation_periods': 3
+                'confirmation_periods': 3,
+                # 技术指标确认
+                'atr_period': 14,
+                'atr_multiplier': 2.0,
+                'volume_ma_period': 20,
+                'price_ma_period': 50,
+                'momentum_confirmation': True,
+                # 假突破过滤
+                'false_breakout_filter': True,
+                'pullback_tolerance': 0.3,
+                'breakout_strength_min': 1.2,
+                # 风险控制
+                'stop_loss_atr_multiple': 2.0,
+                'take_profit_atr_multiple': 4.0,
+                'trailing_stop_enabled': True,
+                'max_holding_period': 14400  # 4小时
             },
             'high_frequency': {
+                # 高频基础参数
                 'quantity': 100,
                 'min_profit': 0.05,
                 'volatility_threshold': 0.001,
                 'lookback_period': 10,
-                'signal_interval': 30
+                'signal_interval': 30,
+                # 微观结构参数
+                'bid_ask_spread_threshold': 0.01,
+                'order_book_depth_min': 1000,
+                'tick_size_multiple': 1.0,
+                'latency_threshold': 100,  # 毫秒
+                'market_impact_limit': 0.001,
+                # 风险和执行
+                'max_order_size': 1000,
+                'inventory_limit': 5000,
+                'pnl_stop_loss': 100,
+                'correlation_hedge': True,
+                # 时间控制
+                'trading_session_length': 3600,
+                'cooldown_period': 60,
+                'avoid_rollover': True
             },
             'trend_following': {
+                # 趋势基础参数
                 'lookback_period': 50,
                 'trend_threshold': 1.0,
                 'quantity': 100,
-                'trend_strength_min': 0.3
+                'trend_strength_min': 0.3,
+                # 趋势识别参数
+                'ema_fast_period': 12,
+                'ema_slow_period': 26,
+                'adx_period': 14,
+                'adx_threshold': 25,
+                'slope_threshold': 0.001,
+                # 趋势确认指标
+                'macd_confirmation': True,
+                'volume_confirmation': True,
+                'momentum_confirmation': True,
+                'multi_timeframe': True,
+                # 风险和退出
+                'trailing_stop_pct': 3.0,
+                'trend_reversal_exit': True,
+                'profit_lock_pct': 2.0,
+                'max_adverse_excursion': 4.0,
+                'trend_exhaustion_exit': True
             }
         }.get(strategy_type, {})
         
@@ -1371,7 +1431,7 @@ def reset_strategy_params(strategy_id):
             strategy_id=strategy_id,
             name=strategy.get('name', ''),
             symbol=strategy.get('symbol', ''),
-            parameters=default_params
+            parameters=expanded_params
         )
         
         if success:
@@ -1381,11 +1441,11 @@ def reset_strategy_params(strategy_id):
                 strategy_name=strategy.get('name', ''),
                 optimization_type="参数重置",
                 old_params=strategy.get('parameters', {}),
-                new_params=default_params,
+                new_params=expanded_params,
                 trigger_reason="用户手动重置参数",
                 target_success_rate=95.0
             )
-            return jsonify({'success': True, 'message': '策略参数已重置为默认值'})
+            return jsonify({'success': True, 'message': f'策略参数已重置为扩展配置({len(expanded_params)}个参数)'})
         else:
             return jsonify({'success': False, 'message': '重置失败'})
         
@@ -1844,31 +1904,7 @@ def system_health():
             'message': f'健康检查失败: {str(e)}'
         }), 500
 
-@app.route('/api/quantitative/toggle-auto-trading', methods=['POST'])
-def toggle_auto_trading():
-    """切换自动交易状态"""
-    try:
-        data = request.json
-        enabled = data.get('enabled', False)
-        
-        if not quantitative_service:
-            return jsonify({
-                'success': False,
-                'message': '量化服务未初始化'
-            })
-        
-        success = quantitative_service.set_auto_trading(enabled)
-        return jsonify({
-            'success': success,
-            'message': f'自动交易已{"启用" if enabled else "禁用"}' if success else '设置失败'
-        })
-        
-    except Exception as e:
-        print(f"切换自动交易失败: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'切换失败: {str(e)}'
-        })
+# ⚠️ 重复的toggle-auto-trading路由已移除，统一使用 /api/quantitative/auto-trading
 
 @app.route('/api/quantitative/force-close/<position_id>', methods=['POST'])
 def force_close_position(position_id):
@@ -2547,7 +2583,7 @@ def create_strategy():
 
 @app.route('/api/quantitative/auto-trading', methods=['GET', 'POST'])
 def manage_auto_trading():
-    """管理自动交易开关 - 增强数据库状态同步"""
+    """🔥 统一的自动交易管理API - 移除重复定义"""
     try:
         if request.method == 'POST':
             data = request.get_json()
