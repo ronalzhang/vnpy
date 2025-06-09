@@ -50,14 +50,14 @@ def execute_pending_signals():
             pnl = quantity * price * 0.012  # 1.2%利润
         
         # 更新信号为已执行
-        cursor.execute("UPDATE trading_signals SET executed = 1 WHERE id = %s", (sid,))
+        cursor.execute("UPDATE trading_signals SET executed = TRUE WHERE id = %s", (sid,))
         
         # 创建交易日志
         cursor.execute("""
             INSERT INTO strategy_trade_logs 
             (strategy_id, signal_type, price, quantity, confidence, pnl, executed, timestamp, trade_type, is_real_money)
             VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
-        """, (strategy_id, signal_type, price, quantity, confidence, pnl, 1, 'simulation', False))
+        """, (strategy_id, signal_type, price, quantity, confidence, pnl, True, 'simulation', False))
         
         executed_count += 1
         print(f"✅ 执行信号: {strategy_id[:20]} | {signal_type.upper()} | {quantity:.1f} @ ${price:.3f} = +{pnl:.2f}U")
