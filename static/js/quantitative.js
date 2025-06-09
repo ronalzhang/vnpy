@@ -1347,54 +1347,53 @@ class QuantitativeSystem {
         const ticker = document.getElementById('evolutionTicker');
         if (!ticker) return;
 
-        // 生成滚动内容
-        const tickerContent = logs.slice(-10).map(log => {
+        // 生成滚动内容 - 增加更多日志项，确保有足够长度
+        const tickerContent = logs.slice(-20).map(log => { // 从10条增加到20条
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
+                second: '2-digit' // 增加秒数显示
             });
 
-            let actionClass = 'text-success';
+            let actionClass = 'created';
             let actionText = '新增';
             
             switch(log.action) {
                 case 'created':
-                    actionClass = 'text-success';
+                    actionClass = 'created';
                     actionText = '新增';
                     break;
                 case 'eliminated':
-                    actionClass = 'text-danger';
+                    actionClass = 'eliminated';
                     actionText = '淘汰';
                     break;
                 case 'optimized':
-                    actionClass = 'text-info';
+                    actionClass = 'optimized';
                     actionText = '优化';
                     break;
-                case 'evolved':
-                    actionClass = 'text-warning';
-                    actionText = '进化';
+                case 'updated':
+                    actionClass = 'optimized';
+                    actionText = '更新';
                     break;
                 default:
-                    actionClass = 'text-secondary';
-                    actionText = '更新';
+                    actionClass = 'created';
+                    actionText = '变更';
             }
 
-            return `<span class="evolution-log-item">
-                        <span class="log-time">${time}</span>
-                        <span class="log-action ${actionClass}">${actionText}</span>
-                        <span class="log-detail">${log.details}</span>
-                    </span>`;
+            return `
+                <span class="log-item">
+                    <span class="log-time">${time}</span>
+                    <span class="log-action ${actionClass}">${actionText}</span>
+                    <span class="log-details">${log.details}</span>
+                </span>
+            `;
         }).join('');
 
-        // 如果内容有变化，更新ticker
-        if (ticker.innerHTML !== tickerContent) {
-            ticker.innerHTML = tickerContent;
-            
-            // 重新启动动画
-            ticker.style.animation = 'none';
-            ticker.offsetHeight; // 触发重排
-            ticker.style.animation = 'scroll-left 20s linear infinite';
-        }
+        // 如果日志内容较少，重复显示以确保滚动效果
+        const repeatedContent = tickerContent.length < 500 ? 
+            Array(3).fill(tickerContent).join('') : tickerContent;
+
+        ticker.innerHTML = repeatedContent;
     }
 }
 
