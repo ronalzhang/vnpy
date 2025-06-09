@@ -622,34 +622,7 @@ def get_exchange_prices():
     prices = {exchange: {} for exchange in EXCHANGES}
     
     for exchange_id, client in exchange_clients.items():
-        # OKX特殊处理：在连接失败时尝试重新创建客户端
-        if exchange_id == 'okx':
-            try:
-                # 先尝试获取一个数据，看是否正常工作
-                test_ticker = client.fetch_ticker("BTC/USDT")
-            except Exception as e:
-                # 静默处理连接问题，尝试重新创建客户端
-                try:
-                    with open(CONFIG_PATH, "r") as f:
-                        config = json.load(f)
-                    
-                    if 'okx' in config and 'api_key' in config['okx'] and 'secret_key' in config['okx']:
-                        okx_config = {
-                            'apiKey': config['okx']['api_key'],
-                            'secret': config['okx']['secret_key'],
-                            'enableRateLimit': True
-                        }
-                        
-                        # OKX使用passphrase字段（不是password）
-                        passphrase = config['okx'].get('passphrase') or config['okx'].get('password')
-                        if passphrase and str(passphrase).strip():
-                            okx_config['password'] = str(passphrase)
-                        
-                        new_client = ccxt.okx(okx_config)
-                        exchange_clients['okx'] = new_client
-                        client = new_client
-                except Exception:
-                    pass  # 静默处理重新创建失败
+        # 删除重复的OKX客户端创建逻辑，统一使用init_api_clients()创建的客户端
         
         for symbol in SYMBOLS:
             try:
