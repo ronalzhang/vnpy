@@ -754,13 +754,13 @@
 
 /* ==================== 策略进化日志样式 ==================== */
 .evolution-log-container {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(51, 65, 85, 0.95)); /* 深色背景提高对比度 */
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    min-width: 500px; /* 增加最小宽度 */
-    max-width: 600px; /* 增加最大宽度 */
-    border: 2px solid rgba(59, 130, 246, 0.3); /* 蓝色边框增强可见性 */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* 增强阴影 */
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(51, 65, 85, 0.9)); /* 减少不透明度 */
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem; /* 减少内边距 */
+    min-width: 400px; /* 减小最小宽度 */
+    max-width: 500px; /* 减小最大宽度 */
+    border: none; /* 移除边框 */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); /* 减少阴影 */
     overflow: hidden;
     position: relative;
 }
@@ -770,20 +770,20 @@
 }
 
 .evolution-log-content {
-    height: 56px; /* 增加为两倍高度 */
+    height: 32px; /* 减小高度 */
     overflow: hidden;
     position: relative;
     white-space: nowrap;
 }
 
-/* CNN新闻滚动效果 - 大幅放慢速度 */
+/* CNN新闻滚动效果 - 统一速度 */
 .evolution-log-ticker {
     display: inline-block;
-    animation: scroll-left 50s linear infinite; /* 从35s改为50s，进一步放慢滚动 */
+    animation: scroll-left 40s linear infinite; /* 统一40秒滚动速度 */
     white-space: nowrap;
-    line-height: 56px; /* 匹配容器高度 */
+    line-height: 32px; /* 匹配容器高度 */
     color: #f1f5f9; /* 明亮的白色文字 */
-    font-size: 16px; /* 增加字体大小，原来可能是14px */
+    font-size: 14px; /* 减小字体大小 */
     font-weight: 500; /* 稍微加粗字体 */
 }
 
@@ -883,16 +883,16 @@
     }
     
     .evolution-log-ticker {
-        animation-duration: 25s; /* 小屏幕时稍快一点 */
-        font-size: 14px;
+        animation-duration: 40s; /* 统一速度 */
+        font-size: 13px;
     }
     
     .evolution-log-content {
-        height: 42px;
+        height: 30px;
     }
     
     .evolution-log-ticker {
-        line-height: 42px;
+        line-height: 30px;
     }
 }
 
@@ -903,16 +903,16 @@
     }
     
     .evolution-log-ticker {
-        animation-duration: 20s; /* 更小屏幕时更快 */
-        font-size: 13px;
+        animation-duration: 40s; /* 统一速度 */
+        font-size: 12px;
     }
     
     .evolution-log-content {
-        height: 36px;
+        height: 28px;
     }
     
     .evolution-log-ticker {
-        line-height: 36px;
+        line-height: 28px;
     }
 }
 

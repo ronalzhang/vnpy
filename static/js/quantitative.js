@@ -1342,17 +1342,22 @@ class QuantitativeSystem {
         }
     }
 
-    // 渲染进化日志 - CNN滚动新闻样式
+    // 渲染进化日志 - CNN滚动新闻样式（只显示最新10条）
     renderEvolutionLog(logs) {
         const ticker = document.getElementById('evolutionTicker');
         if (!ticker) return;
 
-        // 生成滚动内容 - 增加更多日志项，确保有足够长度
-        const tickerContent = logs.slice(-20).map(log => { // 从10条增加到20条
+        // 保存所有日志到全局变量供全部日志页面使用
+        this.allEvolutionLogs = logs || [];
+
+        // 只取最新的10条日志用于滚动显示
+        const recentLogs = this.allEvolutionLogs.slice(-10);
+        
+        const tickerContent = recentLogs.map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
                 minute: '2-digit',
-                second: '2-digit' // 增加秒数显示
+                second: '2-digit'
             });
 
             let actionClass = 'created';
@@ -1390,7 +1395,7 @@ class QuantitativeSystem {
         }).join('');
 
         // 如果日志内容较少，重复显示以确保滚动效果
-        const repeatedContent = tickerContent.length < 500 ? 
+        const repeatedContent = tickerContent.length < 300 ? 
             Array(3).fill(tickerContent).join('') : tickerContent;
 
         ticker.innerHTML = repeatedContent;
@@ -1421,6 +1426,97 @@ function showStrategyManagement() {
         app.loadManagementConfig();
         const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
         modal.show();
+    }
+}
+
+function showAllLogs() {
+    if (app && app.allEvolutionLogs) {
+        // 创建一个新的模态框显示所有日志
+        const modalHtml = `
+            <div class="modal fade" id="allLogsModal" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-list me-2"></i>所有策略进化日志
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 20%">时间</th>
+                                            <th style="width: 15%">操作</th>
+                                            <th style="width: 65%">详情</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="allLogsTableBody">
+                                        <!-- 日志内容 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 删除已存在的模态框
+        const existingModal = document.getElementById('allLogsModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // 添加新模态框
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // 填充数据
+        const tbody = document.getElementById('allLogsTableBody');
+        const allLogs = [...app.allEvolutionLogs].reverse(); // 最新的在前
+        
+        tbody.innerHTML = allLogs.map(log => {
+            const time = new Date(log.timestamp).toLocaleString('zh-CN');
+            let actionClass = 'secondary';
+            let actionText = '变更';
+            
+            switch(log.action) {
+                case 'created':
+                    actionClass = 'success';
+                    actionText = '新增';
+                    break;
+                case 'eliminated':
+                    actionClass = 'danger';
+                    actionText = '淘汰';
+                    break;
+                case 'optimized':
+                    actionClass = 'primary';
+                    actionText = '优化';
+                    break;
+                case 'updated':
+                    actionClass = 'info';
+                    actionText = '更新';
+                    break;
+            }
+            
+            return `
+                <tr>
+                    <td class="text-muted">${time}</td>
+                    <td><span class="badge bg-${actionClass}">${actionText}</span></td>
+                    <td>${log.details}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('allLogsModal'));
+        modal.show();
+    } else {
+        console.log('暂无日志数据');
     }
 }
 
