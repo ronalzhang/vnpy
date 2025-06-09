@@ -622,27 +622,18 @@ def get_exchange_prices():
     prices = {exchange: {} for exchange in EXCHANGES}
     
     for exchange_id, client in exchange_clients.items():
-        # 检查客户端配置
+        # OKX特殊处理：在连接失败时尝试重新创建客户端
         if exchange_id == 'okx':
-            # 因为OKX可能需要特殊处理密码中的特殊字符
-            # 打印一些调试信息，不包含敏感信息
-            print(f"获取 {exchange_id} 价格数据，客户端配置：apiKey长度={len(client.apiKey) if hasattr(client, 'apiKey') and client.apiKey else 0}, password长度={len(client.password) if hasattr(client, 'password') and client.password else 0}")
-            
-            # 可以检查并尝试重新初始化OKX客户端
             try:
                 # 先尝试获取一个数据，看是否正常工作
                 test_ticker = client.fetch_ticker("BTC/USDT")
-                print(f"OKX API连接正常: 能够获取BTC/USDT行情")
             except Exception as e:
-                print(f"OKX API连接问题: {e}")
-                
-                # 尝试读取配置文件并重新创建客户端
+                # 静默处理连接问题，尝试重新创建客户端
                 try:
                     with open(CONFIG_PATH, "r") as f:
                         config = json.load(f)
                     
                     if 'okx' in config and 'api_key' in config['okx'] and 'secret_key' in config['okx']:
-                        print("尝试重新创建OKX客户端...")
                         okx_config = {
                             'apiKey': config['okx']['api_key'],
                             'secret': config['okx']['secret_key'],
@@ -657,11 +648,8 @@ def get_exchange_prices():
                         new_client = ccxt.okx(okx_config)
                         exchange_clients['okx'] = new_client
                         client = new_client
-                        print("OKX客户端重新创建完成")
-                    else:
-                        print("OKX配置不完整，无法重新创建客户端")
-                except Exception as e:
-                    print(f"重新创建OKX客户端失败: {e}")
+                except Exception:
+                    pass  # 静默处理重新创建失败
         
         for symbol in SYMBOLS:
             try:
@@ -717,9 +705,11 @@ def get_exchange_prices():
                         "volume": round(volume, 1)
                     }
                     
-                    print(f"获取 {exchange_id} {symbol} 价格成功: 买:{bid_price}, 卖:{ask_price}")
+                    # 价格获取成功，静默处理
+                    pass
             except Exception as e:
-                print(f"获取 {exchange_id} {symbol} 价格失败: {e}")
+                # 只在日志级别记录失败，避免控制台垃圾信息
+                pass
     
     return prices
 
