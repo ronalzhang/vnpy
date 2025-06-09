@@ -50,7 +50,7 @@ def execute_pending_signals():
             pnl = quantity * price * 0.012  # 1.2%利润
         
         # 更新信号为已执行
-        cursor.execute("UPDATE trading_signals SET executed = TRUE WHERE id = %s", (sid,))
+        cursor.execute("UPDATE trading_signals SET executed = 1 WHERE id = %s", (sid,))
         
         # 创建交易日志
         cursor.execute("""
