@@ -1123,7 +1123,7 @@ def quantitative_strategies():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 获取策略基本信息和交易统计
+            # 获取前20个优质策略（按评分排序）
             cursor.execute('''
                 SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
                        s.created_at, s.generation, s.cycle,
@@ -1133,9 +1133,11 @@ def quantitative_strategies():
                        AVG(t.pnl) as avg_pnl
                 FROM strategies s
                 LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+                WHERE s.final_score >= 40
                 GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
                          s.final_score, s.created_at, s.generation, s.cycle
                 ORDER BY s.final_score DESC, s.created_at DESC
+                LIMIT 20
             ''')
             
             rows = cursor.fetchall()
@@ -1147,20 +1149,10 @@ def quantitative_strategies():
                 
                 win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
                 
-                # 修复策略代数显示逻辑
+                # 策略代数显示逻辑（恢复原本实现）
                 gen = generation or 1
                 cyc = cycle or 1
-                
-                # 正确的代数显示逻辑：初始化阶段(第1代前3轮)显示特殊标签
-                if gen == 1 and cyc <= 3:
-                    if cyc == 1:
-                        evolution_display = "初代策略"
-                    elif cyc == 2:
-                        evolution_display = "初代策略(优化中)"
-                    else:  # cyc == 3
-                        evolution_display = "初代策略(验证中)"
-                else:
-                    evolution_display = f"第{gen}代第{cyc}轮"
+                evolution_display = f"第{gen}代第{cyc}轮"
                 
                 strategy = {
                     'id': sid,
