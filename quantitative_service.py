@@ -135,7 +135,7 @@ class OrderStatus(Enum):
 @dataclass
 class StrategyConfig:
     """策略配置"""
-    id: str
+    id: int
     name: str
     strategy_type: StrategyType
     symbol: str
@@ -147,8 +147,8 @@ class StrategyConfig:
 @dataclass
 class TradingSignal:
     """交易信号"""
-    id: str
-    strategy_id: str
+    id: int
+    strategy_id: int
     symbol: str
     signal_type: SignalType
     price: float
@@ -160,9 +160,9 @@ class TradingSignal:
 @dataclass
 class TradingOrder:
     """交易订单"""
-    id: str
-    strategy_id: str
-    signal_id: str
+    id: int
+    strategy_id: int
+    signal_id: int
     symbol: str
     side: str  # buy/sell
     quantity: float
@@ -564,7 +564,7 @@ class MomentumStrategy(QuantitativeStrategy):
             return None
             
         signal = TradingSignal(
-            id=f"signal_{int(time.time() * 1000)}",
+            id=int(time.time() * 1000),
             strategy_id=self.config.id,
             symbol=self.config.symbol,
             signal_type=signal_type,
@@ -724,7 +724,7 @@ class MeanReversionStrategy(QuantitativeStrategy):
             return None
             
         signal = TradingSignal(
-            id=f"signal_{int(time.time() * 1000)}",
+            id=int(time.time() * 1000),
             strategy_id=self.config.id,
             symbol=self.config.symbol,
             signal_type=signal_type,
@@ -887,7 +887,7 @@ class BreakoutStrategy(QuantitativeStrategy):
             return None
             
         signal = TradingSignal(
-            id=f"signal_{int(time.time() * 1000)}",
+            id=int(time.time() * 1000),
             strategy_id=self.config.id,
             symbol=self.config.symbol,
             signal_type=signal_type,
@@ -1016,7 +1016,7 @@ class GridTradingStrategy(QuantitativeStrategy):
         adjusted_quantity = quantity * min(1 + abs(self.position_count) * 0.1, 3.0)  # 最多放大3倍
         
         signal = TradingSignal(
-            id=f"signal_{int(time.time() * 1000)}",
+            id=int(time.time() * 1000),
             strategy_id=self.config.id,
             symbol=self.config.symbol,
             signal_type=signal_type,
@@ -1141,7 +1141,7 @@ class HighFrequencyStrategy(QuantitativeStrategy):
         adjusted_quantity = quantity * (1 + confidence * 2)
         
         signal = TradingSignal(
-            id=f"signal_{int(time.time() * 1000)}",
+            id=int(time.time() * 1000),
             strategy_id=self.config.id,
             symbol=self.config.symbol,
             signal_type=signal_type,
@@ -1295,7 +1295,7 @@ class TrendFollowingStrategy(QuantitativeStrategy):
         adjusted_quantity = quantity * (1 + trend_multiplier + confidence)
         
         signal = TradingSignal(
-            id=f"signal_{int(time.time() * 1000)}",
+            id=int(time.time() * 1000),
             strategy_id=self.config.id,
             symbol=self.config.symbol,
             signal_type=signal_type,
@@ -1659,7 +1659,7 @@ class AutomatedStrategyManager:
             # ⭐ 所有策略都保存优化结果
             self._save_optimized_parameters(strategy_id, performance)
     
-    def _save_optimized_parameters(self, strategy_id: str, performance: Dict):
+    def _save_optimized_parameters(self, strategy_id: int, performance: Dict):
         """⭐ 保存优化后的策略参数到数据库"""
         try:
             # ⭐ 使用统一API获取当前策略参数
@@ -1701,7 +1701,7 @@ class AutomatedStrategyManager:
         except Exception as e:
             print(f"❌ 保存策略参数失败 {strategy_id}: {e}")
     
-    def _record_parameter_optimization(self, strategy_id: str, parameters: Dict, new_score: float):
+    def _record_parameter_optimization(self, strategy_id: int, parameters: Dict, new_score: float):
         """记录参数优化历史"""
         try:
             # 创建参数优化历史表
@@ -1887,7 +1887,7 @@ class AutomatedStrategyManager:
         else:
             print("🌱 初始阶段：优先发展60+分潜力策略")
     
-    def _calculate_sharpe_ratio(self, strategy_id: str) -> float:
+    def _calculate_sharpe_ratio(self, strategy_id: int) -> float:
         """计算夏普比率"""
         returns = self._get_strategy_daily_returns(strategy_id)
         if not returns or len(returns) < 2:
@@ -1903,7 +1903,7 @@ class AutomatedStrategyManager:
             
         return avg_return / std_return * (365 ** 0.5)  # 年化夏普比率
     
-    def _calculate_max_drawdown(self, strategy_id: str) -> float:
+    def _calculate_max_drawdown(self, strategy_id: int) -> float:
         """计算最大回撤"""
         returns = self._get_strategy_cumulative_returns(strategy_id)
         if not returns:
@@ -1921,7 +1921,7 @@ class AutomatedStrategyManager:
                 
         return max_drawdown
     
-    def _calculate_profit_factor(self, strategy_id: str) -> float:
+    def _calculate_profit_factor(self, strategy_id: int) -> float:
         """计算盈利因子"""
         try:
             conn = psycopg2.connect(
@@ -1950,7 +1950,7 @@ class AutomatedStrategyManager:
             print(f"计算盈利因子失败: {e}")
             return 1.0
     
-    def _get_current_allocation(self, strategy_id: str) -> float:
+    def _get_current_allocation(self, strategy_id: int) -> float:
         """获取当前资金分配"""
         # 简化实现，返回平均分配
         return self.initial_capital / len(self.quantitative_service.strategies) if self.quantitative_service.strategies else 0
@@ -1997,7 +1997,7 @@ class AutomatedStrategyManager:
         
         return total
     
-    def _calculate_strategy_risk(self, strategy_id: str) -> float:
+    def _calculate_strategy_risk(self, strategy_id: int) -> float:
         """计算单一策略风险"""
         # ⭐ 使用统一方法获取策略
         strategy = self.quantitative_service._get_strategy_by_id(strategy_id)
@@ -2027,7 +2027,7 @@ class AutomatedStrategyManager:
                 new_params
             )
     
-    def _limit_strategy_position(self, strategy_id: str):
+    def _limit_strategy_position(self, strategy_id: int):
         """限制单一策略仓位"""
         # ⭐ 使用统一API获取策略信息
         strategy_response = self.quantitative_service.get_strategy(strategy_id)
@@ -2043,12 +2043,12 @@ class AutomatedStrategyManager:
                 new_params
             )
     
-    def _get_strategy_daily_returns(self, strategy_id: str) -> List[float]:
+    def _get_strategy_daily_returns(self, strategy_id: int) -> List[float]:
         """获取策略日收益序列"""
         # 简化实现
         return [0.01, 0.02, -0.005, 0.015, 0.008]  # 示例数据
     
-    def _get_strategy_cumulative_returns(self, strategy_id: str) -> List[float]:
+    def _get_strategy_cumulative_returns(self, strategy_id: int) -> List[float]:
         """获取策略累计收益序列"""
         # 简化实现
         daily_returns = self._get_strategy_daily_returns(strategy_id)
@@ -2120,7 +2120,7 @@ class AutomatedStrategyManager:
             import traceback
             logger.error(traceback.format_exc())
     
-    def _quick_parameter_adjustment(self, strategy_id: str, performance: Dict):
+    def _quick_parameter_adjustment(self, strategy_id: int, performance: Dict):
         """快速参数调整 - 小幅度优化"""
         # ⭐ 使用统一API获取策略信息
         strategy_response = self.quantitative_service.get_strategy(strategy_id)
@@ -2158,7 +2158,7 @@ class AutomatedStrategyManager:
             )
             logger.info(f"快速调优策略: {performance['name']}")
     
-    def _advanced_parameter_optimization(self, strategy_id: str, performance: Dict):
+    def _advanced_parameter_optimization(self, strategy_id: int, performance: Dict):
         """高级参数优化 - 目标100%成功率"""
         # ⭐ 使用统一API获取策略信息
         strategy_response = self.quantitative_service.get_strategy(strategy_id)
@@ -2200,7 +2200,7 @@ class AutomatedStrategyManager:
         
         logger.info(f"高级优化策略参数: {performance['name']}, 目标成功率: 95%+")
     
-    def _optimize_threshold(self, strategy_id: str, current_threshold: float) -> float:
+    def _optimize_threshold(self, strategy_id: int, current_threshold: float) -> float:
         """优化阈值参数"""
         # 基于历史表现调整阈值
         win_rate = self.quantitative_service._calculate_real_win_rate(strategy_id)
@@ -2211,7 +2211,7 @@ class AutomatedStrategyManager:
         else:
             return current_threshold * 0.98  # 略微降低，增加交易机会
     
-    def _optimize_lookback(self, strategy_id: str, current_lookback: int) -> int:
+    def _optimize_lookback(self, strategy_id: int, current_lookback: int) -> int:
         """优化回看周期"""
         total_trades = self.quantitative_service._count_real_strategy_trades(strategy_id)
         if total_trades < 5:  # 交易次数太少
@@ -2220,7 +2220,7 @@ class AutomatedStrategyManager:
             return min(100, int(current_lookback * 1.2))  # 延长周期
         return current_lookback
     
-    def _optimize_std_multiplier(self, strategy_id: str, current_multiplier: float) -> float:
+    def _optimize_std_multiplier(self, strategy_id: int, current_multiplier: float) -> float:
         """优化标准差倍数"""
         max_drawdown = self._calculate_max_drawdown(strategy_id)
         if max_drawdown > 0.1:  # 回撤过大
@@ -2229,7 +2229,7 @@ class AutomatedStrategyManager:
             return current_multiplier * 0.95  # 缩小布林带
         return current_multiplier
     
-    def _optimize_grid_spacing(self, strategy_id: str, current_spacing: float) -> float:
+    def _optimize_grid_spacing(self, strategy_id: int, current_spacing: float) -> float:
         """优化网格间距"""
         total_return = self.quantitative_service._calculate_real_strategy_return(strategy_id)
         if total_return < 0.01:  # 收益过低
@@ -2238,14 +2238,14 @@ class AutomatedStrategyManager:
             return current_spacing  # 保持不变
         return current_spacing * 1.05  # 略微扩大
     
-    def _optimize_grid_count(self, strategy_id: str, current_count: int) -> int:
+    def _optimize_grid_count(self, strategy_id: int, current_count: int) -> int:
         """优化网格数量"""
         win_rate = self.quantitative_service._calculate_real_win_rate(strategy_id)
         if win_rate < 0.9:
             return min(20, current_count + 2)  # 增加网格密度
         return current_count
     
-    def _moderate_parameter_optimization(self, strategy_id: str, performance: Dict):
+    def _moderate_parameter_optimization(self, strategy_id: int, performance: Dict):
         """⭐ 中分策略适度参数优化"""
         try:
             strategy_response = self.quantitative_service.get_strategy(strategy_id)
@@ -2274,7 +2274,7 @@ class AutomatedStrategyManager:
         except Exception as e:
             print(f"❌ 中分策略优化失败 {strategy_id}: {e}")
     
-    def _fine_tune_high_score_strategy(self, strategy_id: str, performance: Dict):
+    def _fine_tune_high_score_strategy(self, strategy_id: int, performance: Dict):
         """⭐ 高分策略精细调优"""
         try:
             strategy_response = self.quantitative_service.get_strategy(strategy_id)
@@ -2303,7 +2303,7 @@ class AutomatedStrategyManager:
         except Exception as e:
             print(f"❌ 高分策略调优失败 {strategy_id}: {e}")
     
-    def _preserve_elite_strategy(self, strategy_id: str, performance: Dict):
+    def _preserve_elite_strategy(self, strategy_id: int, performance: Dict):
         """⭐ 顶级策略微调保持"""
         try:
             strategy_response = self.quantitative_service.get_strategy(strategy_id)
@@ -2623,7 +2623,7 @@ class QuantitativeService:
         print(f"✅ 从模板生成新策略: {strategy_config['name']} ({len(parameters)}个参数)")
         return strategy_config
     
-    def _get_strategy_by_id(self, strategy_id: str) -> Dict:
+    def _get_strategy_by_id(self, strategy_id: int) -> Dict:
         """统一的策略获取方法 - 替代老版本的self._get_strategy_by_id(strategy_id)"""
         try:
             strategies_response = self.get_strategies()
@@ -2987,7 +2987,7 @@ class QuantitativeService:
         except Exception as e:
             logging.error(f"更新策略交易状态失败: {e}")
     
-    def _calculate_optimal_quantity(self, strategy_id: str, allocated_amount: float, simulation_result: Dict) -> float:
+    def _calculate_optimal_quantity(self, strategy_id: int, allocated_amount: float, simulation_result: Dict) -> float:
         """根据分配资金和模拟结果计算最优交易量"""
         strategy = self._get_strategy_by_id(strategy_id)
         strategy_type = strategy['type']
@@ -3056,7 +3056,7 @@ class QuantitativeService:
         
         return summary
     
-    def _calculate_strategy_allocation(self, strategy_id: str) -> float:
+    def _calculate_strategy_allocation(self, strategy_id: int) -> float:
         """计算策略分配的资金"""
         strategy = self._get_strategy_by_id(strategy_id)
         if not strategy or not strategy.get('real_trading_enabled', False):
@@ -3622,7 +3622,7 @@ class QuantitativeService:
                 confidence += 0.1  # 小币种加成
             
             signal = {
-                'id': f"signal_{int(time.time() * 1000)}",
+                'id': int(time.time() * 1000),
                 'strategy_id': strategy_id,
                 'symbol': symbol,
                 'signal_type': signal_type,
@@ -3943,7 +3943,7 @@ class QuantitativeService:
 
 
     
-    def _get_strategy_evolution_display(self, strategy_id: str) -> str:
+    def _get_strategy_evolution_display(self, strategy_id: int) -> str:
         """获取策略演化信息显示"""
         try:
             query = """
@@ -4086,7 +4086,7 @@ class QuantitativeService:
             import traceback
             traceback.print_exc()
             return {'success': False, 'error': str(e), 'data': []}
-    def _is_strategy_initialized(self, strategy_id: str) -> bool:
+    def _is_strategy_initialized(self, strategy_id: int) -> bool:
         """检查策略是否已完成初始化"""
         try:
             query = """
@@ -4099,7 +4099,7 @@ class QuantitativeService:
             print(f"检查策略初始化状态失败: {e}")
             return False
     
-    def _get_strategy_with_simulation_data(self, strategy_id: str, strategy: Dict) -> Dict:
+    def _get_strategy_with_simulation_data(self, strategy_id: int, strategy: Dict) -> Dict:
         """获取策略信息 - 仅使用真实交易数据"""
         
         # 🔗 直接使用真实交易数据，不再依赖任何模拟数据
@@ -4141,7 +4141,7 @@ class QuantitativeService:
             'last_updated': datetime.now().isoformat()
         }
     
-    def _get_strategy_with_real_data(self, strategy_id: str, strategy: Dict) -> Dict:
+    def _get_strategy_with_real_data(self, strategy_id: int, strategy: Dict) -> Dict:
         """获取基于真实交易数据的策略信息"""
         # 计算真实交易数据
         real_win_rate = self._calculate_real_win_rate(strategy_id)
@@ -4174,7 +4174,7 @@ class QuantitativeService:
             'last_updated': datetime.now().isoformat()
         }
     
-    def _mark_strategy_initialized(self, strategy_id: str, initial_data: Dict):
+    def _mark_strategy_initialized(self, strategy_id: int, initial_data: Dict):
         """标记策略完成初始化并保存初始数据"""
         try:
             # 创建初始化记录表（如果不存在）
@@ -4214,7 +4214,7 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 标记策略初始化失败: {e}")
     
-    def _get_initial_strategy_score(self, strategy_id: str) -> float:
+    def _get_initial_strategy_score(self, strategy_id: int) -> float:
         """获取策略的初始评分 - 基于真实数据库配置"""
         try:
             # 🔗 从数据库获取已配置的初始评分
@@ -4284,7 +4284,7 @@ class QuantitativeService:
         # 现在系统默认仅使用真实数据，不再需要配置检查
         return True
     
-    def _calculate_strategy_score_with_real_data(self, strategy_id: str, 
+    def _calculate_strategy_score_with_real_data(self, strategy_id: int, 
                                                real_return: float, real_win_rate: float, 
                                                real_trades: int, initial_score: float) -> float:
         """基于真实交易数据计算当前评分"""
@@ -4327,7 +4327,7 @@ class QuantitativeService:
         # 限制评分范围 [0, 100]
         return max(0, min(100, adjusted_score))
 
-    def _get_latest_simulation_result(self, strategy_id: str) -> Dict:
+    def _get_latest_simulation_result(self, strategy_id: int) -> Dict:
         """获取策略的最新模拟结果"""
         try:
             if hasattr(self, 'db_manager') and self.db_manager:
@@ -5326,7 +5326,7 @@ class QuantitativeService:
             'trend_color': 'gold' if change_direction == 'up' else 'gray' if change_direction == 'down' else 'blue'
         }
 
-    def _get_previous_strategy_score(self, strategy_id: str) -> float:
+    def _get_previous_strategy_score(self, strategy_id: int) -> float:
         """获取策略的上一次评分"""
         try:
             cursor = self.conn.cursor()
@@ -5344,7 +5344,7 @@ class QuantitativeService:
             print(f"获取历史评分失败: {e}")
             return 0.0
 
-    def _save_strategy_score_history(self, strategy_id: str, score: float):
+    def _save_strategy_score_history(self, strategy_id: int, score: float):
         """保存策略评分历史"""
         try:
             if hasattr(self, 'db_manager') and self.db_manager:
@@ -5472,7 +5472,7 @@ class StrategySimulator:
         self.initial_simulation_capital = 100.0  # 回测基准资金100U
         self.simulation_results = {}
         
-    def run_strategy_simulation(self, strategy_id: str, days: int = 7) -> Dict:
+    def run_strategy_simulation(self, strategy_id: int, days: int = 7) -> Dict:
         """运行策略模拟交易"""
         try:
             # ⭐ 使用统一API获取策略信息
@@ -5589,7 +5589,7 @@ class StrategySimulator:
             'note': '基于真实实时交易数据'
         }
     
-    def _get_real_historical_trades(self, strategy_id: str, days: int) -> List[Dict]:
+    def _get_real_historical_trades(self, strategy_id: int, days: int) -> List[Dict]:
         """获取策略的真实历史交易数据"""
         try:
             query = """
@@ -5619,7 +5619,7 @@ class StrategySimulator:
             print(f"获取策略 {strategy_id} 历史交易数据失败: {e}")
             return []
     
-    def _get_recent_real_trades(self, strategy_id: str, days: int) -> List[Dict]:
+    def _get_recent_real_trades(self, strategy_id: int, days: int) -> List[Dict]:
         """获取策略的最近真实交易数据"""
         try:
             query = """
@@ -5654,7 +5654,7 @@ class StrategySimulator:
         # 这个方法已废弃，现在只用真实交易数据评分
         return 0.0
     
-    def _combine_simulation_results(self, strategy_id: str, backtest: Dict, live_sim: Dict) -> Dict:
+    def _combine_simulation_results(self, strategy_id: int, backtest: Dict, live_sim: Dict) -> Dict:
         """综合回测和实时模拟结果"""
         
         # 加权计算最终指标 (回测70%, 实时模拟30%)
@@ -5756,7 +5756,7 @@ class StrategySimulator:
         
         return max(min(total_score, 100), 0)  # 限制在0-100
     
-    def _save_simulation_result(self, strategy_id: str, result: Dict):
+    def _save_simulation_result(self, strategy_id: int, result: Dict):
         """保存回测结果到数据库"""
         try:
             cursor = self.quantitative_service.conn.cursor()
@@ -5778,10 +5778,10 @@ class StrategySimulator:
             print(f"保存模拟结果失败: {e}")
 
 class EvolutionaryStrategyEngine:
-    def _save_evolution_history_fixed(self, strategy_id: str, generation: int, cycle: int, 
+    def _save_evolution_history_fixed(self, strategy_id: int, generation: int, cycle: int, 
                                      evolution_type: str = 'mutation', 
                                      new_parameters: dict = None, 
-                                     parent_strategy_id: str = None,
+                                     parent_strategy_id: int = None,
                                      new_score: float = None):
         """安全保存演化历史"""
         try:
@@ -6192,7 +6192,7 @@ class EvolutionaryStrategyEngine:
             logger.error(f"策略淘汰过程出错: {e}")
             return strategies  # 出错时保持所有策略
     
-    def _mark_strategy_protected(self, strategy_id: str, protection_level: int, reason: str):
+    def _mark_strategy_protected(self, strategy_id: int, protection_level: int, reason: str):
         """标记策略为保护状态"""
         try:
             self.quantitative_service.db_manager.execute_query("""
@@ -6212,7 +6212,7 @@ class EvolutionaryStrategyEngine:
         except Exception as e:
             logger.error(f"标记策略保护失败: {e}")
     
-    def _record_strategy_elimination(self, strategy_id: str, final_score: float, reason: str):
+    def _record_strategy_elimination(self, strategy_id: int, final_score: float, reason: str):
         """记录策略淘汰信息（但不实际删除）"""
         try:
             # 只记录，不删除，以备将来恢复
@@ -6593,7 +6593,7 @@ class EvolutionaryStrategyEngine:
             'target_achieved': best_fitness >= 95.0 and len(perfect_strategies) > 0
         }
 
-    def _remove_strategy(self, strategy_id: str):
+    def _remove_strategy(self, strategy_id: int):
         """删除策略"""
         try:
             # 从内存中删除
