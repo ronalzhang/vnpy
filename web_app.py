@@ -1498,11 +1498,11 @@ def get_strategy_trade_logs(strategy_id):
                 }
             ]
         
-        return jsonify({'success': True, 'logs': logs})
+        return jsonify({'status': 'success', 'data': logs})
         
     except Exception as e:
         print(f"获取交易日志错误: {e}")
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({'status': 'error', 'message': str(e)})
 
 @app.route('/api/quantitative/strategies/<strategy_id>/optimization-logs', methods=['GET'])
 def get_strategy_optimization_logs(strategy_id):
