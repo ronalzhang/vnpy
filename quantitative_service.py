@@ -4801,13 +4801,41 @@ class QuantitativeService:
             return []
     
     def log_strategy_trade(self, strategy_id, signal_type, price, quantity, confidence, executed=0, pnl=0.0):
-        """记录策略交易日志"""
+        """记录策略交易日志 - 区分模拟交易和真实交易"""
         try:
             cursor = self.conn.cursor()
+            
+            # 判断交易类型：目前都是模拟交易，真实交易需要明确标记
+            trade_type = 'simulation'  # 默认模拟交易
+            is_real_money = False
+            exchange_order_id = None
+            
+            # 获取策略评分，高分策略且开启自动交易时可能使用真实交易
+            cursor.execute("SELECT final_score FROM strategies WHERE id = %s", (strategy_id,))
+            strategy_result = cursor.fetchone()
+            strategy_score = strategy_result[0] if strategy_result else 0
+            
+            # 检查是否开启真实交易模式
+            cursor.execute("SELECT auto_trading_enabled FROM system_status ORDER BY updated_at DESC LIMIT 1")
+            auto_trading_result = cursor.fetchone()
+            auto_trading_enabled = auto_trading_result[0] if auto_trading_result else False
+            
+            # 真实交易条件：自动交易开启 + 策略评分≥85 + 手动启用真实交易模式
+            if auto_trading_enabled and strategy_score >= 85:
+                # 检查是否手动启用了真实交易（需要用户明确确认）
+                cursor.execute("SELECT real_trading_enabled FROM system_status ORDER BY updated_at DESC LIMIT 1")
+                real_trading_result = cursor.fetchone()
+                if real_trading_result and real_trading_result[0]:
+                    trade_type = 'real'
+                    is_real_money = True
+                    # 生成真实交易所订单ID，暂时使用模拟格式
+                    exchange_order_id = f"REAL_{strategy_id}_{int(time.time())}"
+            
             cursor.execute('''
                 INSERT INTO strategy_trade_logs 
-                (strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                (strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp, 
+                 trade_type, is_real_money, exchange_order_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s)
             ''', (
                 strategy_id,
                 signal_type,
@@ -4815,9 +4843,16 @@ class QuantitativeService:
                 quantity,
                 confidence,
                 executed,
-                pnl
+                pnl,
+                trade_type,
+                is_real_money,
+                exchange_order_id
             ))
             self.conn.commit()
+            
+            # 记录交易类型日志
+            trade_status = "💰真实交易" if is_real_money else "🎯模拟交易"
+            print(f"{trade_status} | 策略:{strategy_id} | {signal_type} | 价格:{price} | 数量:{quantity} | 盈亏:{pnl} | 置信度:{confidence}")
             
         except Exception as e:
             print(f"记录策略交易日志失败: {e}")
