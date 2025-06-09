@@ -1342,20 +1342,16 @@ class QuantitativeSystem {
         }
     }
 
-    // 渲染进化日志
+    // 渲染进化日志 - CNN滚动新闻样式
     renderEvolutionLog(logs) {
-        const container = document.getElementById('evolutionLog');
-        if (!container) return;
+        const ticker = document.getElementById('evolutionTicker');
+        if (!ticker) return;
 
-        // 保存当前滚动位置
-        const wasAtBottom = container.scrollTop >= container.scrollHeight - container.clientHeight - 5;
-
-        // 清空并重新渲染最新的10条日志
-        container.innerHTML = logs.slice(-10).map(log => {
+        // 生成滚动内容
+        const tickerContent = logs.slice(-10).map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
+                minute: '2-digit'
             });
 
             let actionClass = 'text-success';
@@ -1383,28 +1379,21 @@ class QuantitativeSystem {
                     actionText = '更新';
             }
 
-            return `
-                <div class="evolution-log-item">
-                    <span class="log-time">${time}</span>
-                    <span class="log-action ${actionClass}">${actionText}</span>
-                    <span class="log-detail">${log.details}</span>
-                </div>
-            `;
+            return `<span class="evolution-log-item">
+                        <span class="log-time">${time}</span>
+                        <span class="log-action ${actionClass}">${actionText}</span>
+                        <span class="log-detail">${log.details}</span>
+                    </span>`;
         }).join('');
 
-        // 如果之前在底部，自动滚动到新的底部
-        if (wasAtBottom) {
-            container.scrollTop = container.scrollHeight;
-        }
-
-        // 为新的日志项添加动画效果
-        const newItems = container.querySelectorAll('.evolution-log-item');
-        if (newItems.length > 0) {
-            const lastItem = newItems[newItems.length - 1];
-            lastItem.classList.add('pulse');
-            setTimeout(() => {
-                lastItem.classList.remove('pulse');
-            }, 1000);
+        // 如果内容有变化，更新ticker
+        if (ticker.innerHTML !== tickerContent) {
+            ticker.innerHTML = tickerContent;
+            
+            // 重新启动动画
+            ticker.style.animation = 'none';
+            ticker.offsetHeight; // 触发重排
+            ticker.style.animation = 'scroll-left 20s linear infinite';
         }
     }
 }

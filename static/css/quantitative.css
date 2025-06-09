@@ -754,161 +754,167 @@
 
 /* ==================== 策略进化日志样式 ==================== */
 .evolution-log-container {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 8px;
-    padding: 0.75rem;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
     min-width: 280px;
     max-width: 320px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    position: relative;
 }
 
 .evolution-log-header {
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.25rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    display: none; /* 隐藏标题 */
 }
 
 .evolution-log-content {
-    max-height: 150px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    height: 28px; /* 固定单行高度 */
+    overflow: hidden;
+    position: relative;
+    white-space: nowrap;
 }
 
-.evolution-log-content::-webkit-scrollbar {
-    width: 4px;
+/* CNN新闻滚动效果 */
+.evolution-log-ticker {
+    display: inline-block;
+    animation: scroll-left 20s linear infinite;
+    white-space: nowrap;
+    line-height: 28px;
 }
 
-.evolution-log-content::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.evolution-log-content::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 2px;
-}
-
-.evolution-log-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.3);
+@keyframes scroll-left {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
 }
 
 .evolution-log-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0;
+    display: inline-block;
+    color: #ffffff;
     font-size: 0.8rem;
-    line-height: 1.3;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    animation: slideInLog 0.3s ease-out;
+    font-weight: 500;
+    margin-right: 3rem; /* 项目间距 */
+    padding: 0;
+    border: none;
+    background: none;
+    vertical-align: middle;
 }
 
 .evolution-log-item:last-child {
-    border-bottom: none;
+    margin-right: 0;
 }
 
 .evolution-log-item.new {
-    background: rgba(40, 167, 69, 0.1);
-    border-radius: 4px;
-    padding: 0.25rem 0.5rem;
-    margin: 0.1rem 0;
+    animation: none; /* 移除新项目动画 */
 }
 
 .log-time {
-    color: #6c757d;
-    font-family: 'Courier New', monospace;
-    font-size: 0.7rem;
-    white-space: nowrap;
-    min-width: 50px;
+    color: #ffd700;
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
 }
 
 .log-action {
+    color: #ffffff;
     font-weight: 600;
-    padding: 0.1rem 0.4rem;
-    border-radius: 12px;
+    margin-right: 0.5rem;
+    padding: 2px 6px;
+    border-radius: 3px;
     font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
-    min-width: 40px;
-    text-align: center;
-    white-space: nowrap;
 }
 
 .log-action.text-success {
-    background: rgba(40, 167, 69, 0.15);
-    color: #28a745;
+    background: rgba(34, 197, 94, 0.8);
+    color: #ffffff;
 }
 
 .log-action.text-warning {
-    background: rgba(255, 193, 7, 0.15);
-    color: #ffc107;
+    background: rgba(251, 191, 36, 0.8);
+    color: #ffffff;
 }
 
 .log-action.text-danger {
-    background: rgba(220, 53, 69, 0.15);
-    color: #dc3545;
+    background: rgba(239, 68, 68, 0.8);
+    color: #ffffff;
 }
 
 .log-action.text-info {
-    background: rgba(23, 162, 184, 0.15);
-    color: #17a2b8;
+    background: rgba(59, 130, 246, 0.8);
+    color: #ffffff;
 }
 
 .log-detail {
-    color: #495057;
+    color: #e5e5e5;
     font-size: 0.75rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
+    font-weight: 400;
 }
 
+/* 暂停滚动效果 */
+.evolution-log-container:hover .evolution-log-ticker {
+    animation-play-state: paused;
+}
+
+/* 渐变边缘效果 */
+.evolution-log-content::before,
+.evolution-log-content::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.evolution-log-content::before {
+    left: 0;
+    background: linear-gradient(to right, rgba(30, 60, 114, 0.8), transparent);
+}
+
+.evolution-log-content::after {
+    right: 0;
+    background: linear-gradient(to left, rgba(30, 60, 114, 0.8), transparent);
+}
+
+/* 移除旧的样式 */
 @keyframes slideInLog {
-    from {
-        opacity: 0;
-        transform: translateX(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+    /* 删除 */
 }
 
 @keyframes pulseNewLog {
-    0% {
-        background: rgba(40, 167, 69, 0.2);
-        transform: scale(1);
-    }
-    50% {
-        background: rgba(40, 167, 69, 0.3);
-        transform: scale(1.02);
-    }
-    100% {
-        background: rgba(40, 167, 69, 0.1);
-        transform: scale(1);
-    }
+    /* 删除 */
 }
 
 .evolution-log-item.pulse {
-    animation: pulseNewLog 1s ease-in-out;
+    /* 删除 */
 }
 
-/* 响应式调整 */
 @media (max-width: 1200px) {
     .evolution-log-container {
-        min-width: 240px;
-        max-width: 280px;
+        min-width: 220px;
+        max-width: 260px;
     }
     
-    .log-detail {
-        font-size: 0.7rem;
+    .evolution-log-ticker {
+        animation-duration: 15s; /* 小屏幕时稍快一点 */
     }
 }
 
 @media (max-width: 992px) {
     .evolution-log-container {
-        display: none;
+        min-width: 180px;
+        max-width: 200px;
+    }
+    
+    .evolution-log-ticker {
+        animation-duration: 12s; /* 更小屏幕时更快 */
     }
 }
 

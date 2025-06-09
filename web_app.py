@@ -3065,7 +3065,7 @@ def manage_strategy_config():
                 'config': current_config
             })
             
-                elif request.method == 'POST':
+        elif request.method == 'POST':
             # 保存配置
             data = request.get_json()
             new_config = data.get('config', {})
