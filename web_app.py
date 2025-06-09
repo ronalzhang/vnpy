@@ -1683,9 +1683,38 @@ def get_strategy_optimization_logs(strategy_id):
                 'target_success_rate': float(row[4]) if row[4] else 0.0
             })
         
+        # 🔥 如果该策略没有优化记录，尝试从strategy_evolution_history获取进化记录
+        if not logs:
+            cursor.execute("""
+                SELECT action_type, evolution_type, generation, cycle, 
+                       score_before, score_after, timestamp, notes
+                FROM strategy_evolution_history 
+                WHERE strategy_id = %s
+                ORDER BY timestamp DESC
+                LIMIT 5
+            """, (strategy_id,))
+            
+            evolution_logs = cursor.fetchall()
+            
+            for row in evolution_logs:
+                action_type, evolution_type, generation, cycle, score_before, score_after, timestamp, notes = row
+                
+                # 模拟优化记录格式
+                optimization_type = '进化调优' if evolution_type == 'mutation' else '精英选择'
+                trigger_reason = f'第{generation}代第{cycle}轮进化' if generation and cycle else '自动进化'
+                
+                logs.append({
+                    'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else '',
+                    'optimization_type': optimization_type,
+                    'old_parameters': {'score': float(score_before) if score_before else 0},
+                    'new_parameters': {'score': float(score_after) if score_after else 0},
+                    'trigger_reason': trigger_reason,
+                    'target_success_rate': float(score_after) if score_after else 0
+                })
+        
         conn.close()
         
-        # 如果没有优化记录，返回示例记录
+        # 🔥 最后才使用示例记录（只有在完全没有任何真实数据时）
         if not logs:
             from datetime import datetime, timedelta
             logs = [
@@ -1704,38 +1733,6 @@ def get_strategy_optimization_logs(strategy_id):
                     'new_parameters': {'confidence_threshold': 0.75},
                     'trigger_reason': '低置信度信号过多',
                     'target_success_rate': 89.3
-                },
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'optimization_type': '风险控制',
-                    'old_parameters': {'max_position_size': 1000},
-                    'new_parameters': {'max_position_size': 800},
-                    'trigger_reason': '单笔亏损过大',
-                    'target_success_rate': 87.2
-                },
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=22)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'optimization_type': '动量阈值调整',
-                    'old_parameters': {'momentum_threshold': 0.015},
-                    'new_parameters': {'momentum_threshold': 0.012},
-                    'trigger_reason': '信号过少',
-                    'target_success_rate': 88.1
-                },
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=24)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'optimization_type': '量化参数优化',
-                    'old_parameters': {'quantity': 1.0, 'lookback_period': 15},
-                    'new_parameters': {'quantity': 0.8, 'lookback_period': 18},
-                    'trigger_reason': '风险过高',
-                    'target_success_rate': 85.7
-                },
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=27)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'optimization_type': '布林带参数',
-                    'old_parameters': {'std_multiplier': 2.0},
-                    'new_parameters': {'std_multiplier': 2.2},
-                    'trigger_reason': '假突破过多',
-                    'target_success_rate': 86.3
                 }
             ]
         
@@ -3436,144 +3433,113 @@ def manage_strategy_config():
 
 @app.route('/api/quantitative/evolution-log', methods=['GET'])
 def get_evolution_log():
-    """获取策略进化日志"""
+    """🔥 获取策略进化日志 - 直接从真实数据库获取"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 检查日志表是否存在
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS strategy_evolution_log (
-                id SERIAL PRIMARY KEY,
-                action VARCHAR(20) NOT NULL,
-                details TEXT NOT NULL,
-                strategy_id VARCHAR(50),
-                strategy_name VARCHAR(100),
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # 🔥 聚合所有策略的optimization-logs（与策略卡同源）
-        # 先获取策略列表（修复字段名）
-        cursor.execute("SELECT id FROM strategies LIMIT 20")
-        strategy_ids = [row[0] for row in cursor.fetchall()]
-        
         logs = []
         
-        # 为每个策略获取optimization logs，模拟策略卡的逻辑
-        for strategy_id in strategy_ids[:10]:  # 限制10个策略避免太多数据
-            # 查询该策略的真实优化记录
-            cursor.execute("""
-                SELECT optimization_type, old_parameters, new_parameters, 
-                       trigger_reason, target_success_rate, timestamp
-                FROM strategy_optimization_logs 
-                WHERE strategy_id = %s
-                ORDER BY timestamp DESC
-                LIMIT 3
-            """, (strategy_id,))
-            
-            strategy_logs = cursor.fetchall()
-            
-            # 如果没有真实记录，为该策略生成2条示例记录（与策略卡相同逻辑）
-            if not strategy_logs:
-                from datetime import datetime, timedelta
-                base_time = datetime.now()
-                
-                sample_opts = [
-                    {
-                        'optimization_type': '参数调优',
-                        'trigger_reason': 'AI优化',
-                        'timestamp': base_time - timedelta(minutes=15 + len(logs) * 3)
-                    },
-                    {
-                        'optimization_type': '风险控制',
-                        'trigger_reason': '风险过高',
-                        'timestamp': base_time - timedelta(minutes=25 + len(logs) * 5)
-                    }
-                ]
-                
-                for opt in sample_opts:
-                    logs.append({
-                        'action': 'optimized',
-                        'details': f"{strategy_id[-4:]}策略{opt['optimization_type']}: {opt['trigger_reason']}",
-                        'strategy_id': strategy_id,
-                        'strategy_name': f"策略{strategy_id[-4:]}",
-                        'timestamp': opt['timestamp'].isoformat()
-                    })
-            else:
-                # 处理真实记录
-                for row in strategy_logs:
-                    optimization_type, old_params, new_params, trigger_reason, success_rate, timestamp = row
-                    
-                    logs.append({
-                        'action': 'optimized',
-                        'details': f"{strategy_id[-4:]}策略{optimization_type}: {trigger_reason}",
-                        'strategy_id': strategy_id,
-                        'strategy_name': f"策略{strategy_id[-4:]}",
-                        'timestamp': timestamp.isoformat() if timestamp else None
-                    })
+        # 🔥 步骤1：从strategy_evolution_history获取大量真实进化数据
+        cursor.execute("""
+            SELECT strategy_id, action_type, evolution_type, generation, cycle, 
+                   score_before, score_after, timestamp, notes
+            FROM strategy_evolution_history 
+            ORDER BY timestamp DESC 
+            LIMIT 15
+        """)
         
-        # 🔥 修复：创建真实的时间线分布进化日志（覆盖最近3小时）
-        if not logs:
-            from datetime import datetime, timedelta
-            now = datetime.now()
+        evolution_records = cursor.fetchall()
+        print(f"🔍 获取到 {len(evolution_records)} 条进化历史记录")
+        
+        # 处理进化历史记录
+        for record in evolution_records:
+            strategy_id, action_type, evolution_type, generation, cycle, score_before, score_after, timestamp, notes = record
             
-            # 创建30条时间分布的进化日志
-            sample_logs = []
+            # 构造详细描述
+            if evolution_type == 'mutation':
+                details = f"策略{strategy_id[-4:]}变异进化: 第{generation}代第{cycle}轮"
+                action = 'optimized'
+            elif evolution_type == 'elite_selected':
+                details = f"精英策略{strategy_id[-4:]}晋级: 评分{score_after:.1f}"
+                action = 'promoted'
+            elif 'protection' in evolution_type:
+                details = f"策略{strategy_id[-4:]}保护机制激活"
+                action = 'protected'
+            else:
+                details = f"策略{strategy_id[-4:]}进化: {evolution_type}"
+                action = 'evolved'
             
-            # 按时间逆序创建日志（最新的在前面）
-            time_intervals = [
-                (0, 5),      # 最近5分钟
-                (5, 15),     # 5-15分钟前
-                (15, 30),    # 15-30分钟前
-                (30, 60),    # 30分钟-1小时前
-                (60, 120),   # 1-2小时前
-                (120, 180)   # 2-3小时前
-            ]
+            logs.append({
+                'action': action,
+                'details': details,
+                'strategy_id': strategy_id,
+                'strategy_name': f"策略{strategy_id[-4:]}",
+                'timestamp': timestamp.isoformat() if timestamp else None
+            })
+        
+        # 🔥 步骤2：从strategy_optimization_logs获取优化记录
+        cursor.execute("""
+            SELECT strategy_id, optimization_type, trigger_reason, timestamp
+            FROM strategy_optimization_logs 
+            ORDER BY timestamp DESC 
+            LIMIT 5
+        """)
+        
+        optimization_records = cursor.fetchall()
+        print(f"🔍 获取到 {len(optimization_records)} 条优化记录")
+        
+        # 处理优化记录
+        for record in optimization_records:
+            strategy_id, optimization_type, trigger_reason, timestamp = record
             
-            actions_pool = [
-                ('optimized', ['BTC动量策略参数优化: lookback_period 20->22', 'ETH网格策略风险调整: stop_loss 2%->1.8%', 'SOL突破策略量化调优完成', 'BNB策略参数微调: threshold 0.02->0.018', 'ADA策略风险控制升级']),
-                ('created', ['新策略BTC趋势跟踪_G2C8已创建', '新策略ETH均值回归_G3C2已创建', 'DOT高频策略_G1C15已创建', '新兴策略LINK动量_G2C3上线', '创新策略UNI趋势追踪_G3C1部署']),
-                ('executed', ['DOGE策略执行买入信号，价格0.152', 'BTC策略执行卖出信号，盈利+8.5U', 'ETH策略成功套利，收益+12.3U', 'SOL策略触发止盈，锁定利润+6.8U', 'AVAX策略执行买入，预期收益+4.2U']),
-                ('eliminated', ['低效策略XRP_GRID_001已淘汰', '表现不佳的SHIB策略已移除', '过时策略OLD_GRID_BNBUSDT移除', '表现不佳的LTC策略已淘汰', '低效网格策略DOGE_G1已移除'])
-            ]
+            logs.append({
+                'action': 'optimized',
+                'details': f"策略{strategy_id[-4:]}优化: {optimization_type} - {trigger_reason}",
+                'strategy_id': strategy_id,
+                'strategy_name': f"策略{strategy_id[-4:]}",
+                'timestamp': timestamp.isoformat() if timestamp else None
+            })
+        
+        # 🔥 步骤3：从strategy_evolution_log获取手动记录
+        cursor.execute("""
+            SELECT action, details, strategy_id, strategy_name, timestamp
+            FROM strategy_evolution_log 
+            ORDER BY timestamp DESC 
+            LIMIT 5
+        """)
+        
+        manual_logs = cursor.fetchall()
+        print(f"🔍 获取到 {len(manual_logs)} 条手动日志")
+        
+        # 处理手动日志
+        for record in manual_logs:
+            action, details, strategy_id, strategy_name, timestamp = record
             
-            import random
-            log_id = 1
-            
-            for start_min, end_min in time_intervals:
-                # 每个时间段生成3-6条日志
-                logs_in_period = random.randint(3, 6)
-                
-                for _ in range(logs_in_period):
-                    # 随机选择动作类型和具体动作
-                    action_type, action_list = random.choice(actions_pool)
-                    details = random.choice(action_list)
-                    
-                    # 在时间段内随机分布
-                    minutes_ago = random.randint(start_min, end_min)
-                    timestamp = now - timedelta(minutes=minutes_ago, seconds=random.randint(0, 59))
-                    
-                    sample_logs.append({
-                        'action': action_type,
-                        'details': details,
-                        'strategy_id': f'STRAT_{log_id:04d}',
-                        'strategy_name': details.split('策略')[0] + '策略' if '策略' in details else '系统策略',
-                        'timestamp': timestamp.isoformat()
-                    })
-                    log_id += 1
-            
-            # 按时间倒序排列（最新的在前面）
-            sample_logs.sort(key=lambda x: x['timestamp'], reverse=True)
-            logs = sample_logs[:25]  # 取前25条
+            logs.append({
+                'action': action,
+                'details': details,
+                'strategy_id': strategy_id,
+                'strategy_name': strategy_name or f"策略{strategy_id[-4:] if strategy_id else 'XXXX'}",
+                'timestamp': timestamp.isoformat() if timestamp else None
+            })
+        
+        # 按时间倒序排序
+        logs.sort(key=lambda x: x['timestamp'] or '1970-01-01', reverse=True)
+        
+        conn.close()
+        
+        print(f"✅ 总共返回 {len(logs)} 条真实进化日志")
         
         return jsonify({
             'success': True,
-            'logs': logs
+            'logs': logs[:20]  # 返回前20条
         })
         
     except Exception as e:
         logger.error(f"获取进化日志失败: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': f'获取日志失败: {str(e)}',
