@@ -218,12 +218,15 @@ def init_api_clients():
                         if password and str(password).strip():
                             client_config['password'] = str(password)
                     
-                    # 设置代理（如果配置）
-                    if "proxy" in config and config["proxy"]:
-                        client_config['proxies'] = {
-                            'http': config["proxy"],
-                            'https': config["proxy"]
-                        }
+                    # 设置代理（如果配置且有效）
+                    proxy = config.get("proxy")
+                    if proxy and proxy not in ["null", "None", "", "undefined"]:
+                        # 确保是有效的URL格式
+                        if proxy.startswith(('http://', 'https://', 'socks5://')):
+                            client_config['proxies'] = {
+                                'http': proxy,
+                                'https': proxy
+                            }
                     
                     # 使用连接管理器获取客户端
                     client = connection_manager.get_client(exchange_id, client_config)
