@@ -6637,7 +6637,7 @@ class EvolutionaryStrategyEngine:
                 strategy_config['name'],
                 strategy_config['symbol'],
                 strategy_config['type'],
-                False,  # enabled
+                0,  # enabled (PostgreSQL integer type)
                 json.dumps(strategy_config['parameters']),
                 strategy_config.get('generation', self.current_generation),
                 strategy_config.get('cycle', self.current_cycle),
