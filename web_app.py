@@ -2483,10 +2483,18 @@ def get_operations_log():
             cursor.execute(count_query, params)
             total_count = cursor.fetchone()[0]
             
+            # 检查并添加缺失的字段
+            try:
+                cursor.execute("ALTER TABLE operation_logs ADD COLUMN IF NOT EXISTS user_id VARCHAR(50) DEFAULT 'system'")
+                conn.commit()
+            except Exception as alter_error:
+                print(f"添加user_id字段失败: {alter_error}")
+            
             # 获取分页数据
             offset = (page - 1) * per_page
             query = f"""
-                SELECT operation_type, operation_detail, result, timestamp, user_id
+                SELECT operation_type, operation_detail, result, timestamp, 
+                       COALESCE(user_id, 'system') as user_id
                 FROM operation_logs 
                 {where_clause}
                 ORDER BY timestamp DESC 
