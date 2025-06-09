@@ -1160,8 +1160,11 @@ def quantitative_strategies():
                 
                 win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
                 
-                # 使用quantitative_service中的正确策略代数显示逻辑
-                evolution_display = quantitative_service._get_strategy_evolution_display(sid)
+                # 直接实现策略代数显示逻辑（前端不依赖后端服务）
+                if generation is None or generation == 0:
+                    evolution_display = "初代策略"
+                else:
+                    evolution_display = f"第{generation}代第{cycle or 1}轮"
                 
                 strategy = {
                     'id': sid,
@@ -1172,8 +1175,8 @@ def quantitative_strategies():
                     'enabled': bool(enabled),
                     'final_score': float(score) if score else 0.0,
                     'created_at': created_at.isoformat() if created_at else '',
-                    'generation': gen,
-                    'cycle': cyc,
+                    'generation': generation,
+                    'cycle': cycle,
                     'total_trades': total_trades or 0,
                     'win_rate': round(win_rate, 2),
                     'total_pnl': float(total_pnl) if total_pnl else 0.0,
@@ -2933,18 +2936,37 @@ def get_account_info():
         })
     
     try:
-        # 直接使用quantitative_service中的正确实现（只用币安余额）
-        account_info = quantitative_service.get_account_info()
-        
-        if account_info and account_info.get('balance') is not None:
-            return jsonify({
-                'success': True,
-                'data': account_info
-            })
+        # 直接从币安获取余额（前端不依赖后端服务）
+        if 'binance' in exchange_clients:
+            try:
+                binance_client = exchange_clients['binance']
+                balance_data = binance_client.fetch_balance()
+                
+                usdt_balance = balance_data.get('total', {}).get('USDT', 0.0)
+                usdt_available = balance_data.get('free', {}).get('USDT', 0.0)
+                
+                account_info = {
+                    'balance': round(float(usdt_balance), 2),
+                    'available_balance': round(float(usdt_available), 2),
+                    'exchange': 'binance',
+                    'currency': 'USDT'
+                }
+                
+                return jsonify({
+                    'success': True,
+                    'data': account_info
+                })
+            except Exception as e:
+                print(f"从币安获取余额失败: {e}")
+                return jsonify({
+                    'success': False,
+                    'message': f'获取币安余额失败: {str(e)}',
+                    'data': {}
+                })
         else:
             return jsonify({
                 'success': False,
-                'message': '获取币安余额失败',
+                'message': '币安客户端未初始化',
                 'data': {}
             })
         
