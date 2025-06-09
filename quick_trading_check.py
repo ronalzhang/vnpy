@@ -49,7 +49,7 @@ def check_trading_status():
     print(f"⭐ 80分以上策略: {high_score_strategies}个")
     
     # 4. 检查系统状态
-    cursor.execute("SELECT auto_trading_enabled, quantitative_running FROM system_status ORDER BY updated_at DESC LIMIT 1")
+    cursor.execute("SELECT auto_trading_enabled, quantitative_running FROM system_status LIMIT 1")
     system_status = cursor.fetchone()
     if system_status:
         auto_trading, quant_running = system_status
@@ -64,13 +64,12 @@ def check_trading_status():
         SET 
             auto_trading_enabled = TRUE,
             quantitative_running = TRUE,
-            system_health = 'good',
-            updated_at = CURRENT_TIMESTAMP
+            system_health = 'good'
     """)
     
     cursor.execute("""
         UPDATE strategies 
-        SET enabled = 1, updated_at = CURRENT_TIMESTAMP
+        SET enabled = 1
         WHERE final_score >= 50
     """)
     
