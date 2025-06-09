@@ -19,7 +19,7 @@ DATABASE_CONFIG = {
         'port': 5432,
         'database': 'quantitative',
         'user': 'quant_user',
-        'password': 'chenfei0421'
+        'password': '123abc74531'
     },
 
 }
