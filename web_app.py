@@ -2375,12 +2375,16 @@ def select_top_strategies():
             sid, name, score, trades, wins, total_pnl = strategy
             selected_strategy_ids.append(sid)
             
-            # 更新策略为真实交易状态
-            cursor.execute('''
-                UPDATE strategies 
-                SET notes = %s
-                WHERE id = %s
-            ''', (f'已选中用于真实交易 - {selection_mode}', sid))
+            # 标记策略为真实交易状态（如果有notes字段的话）
+            try:
+                cursor.execute('''
+                    UPDATE strategies 
+                    SET notes = %s
+                    WHERE id = %s
+                ''', (f'已选中用于真实交易 - {selection_mode}', sid))
+            except Exception:
+                # 如果notes字段不存在，跳过标记
+                pass
         
         conn.commit()
         conn.close()
