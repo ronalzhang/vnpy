@@ -2634,5 +2634,206 @@ def should_cleanup():
     global last_cleanup_time
     return (datetime.now() - last_cleanup_time).total_seconds() > GLOBAL_CLEANUP_INTERVAL
 
+@app.route('/api/enable_real_trading', methods=['POST'])
+def enable_real_trading():
+    """启用真实交易API"""
+    try:
+        data = request.get_json()
+        confirmation = data.get('confirmation', False)
+        
+        if not confirmation:
+            return jsonify({
+                'success': False,
+                'message': '需要明确确认启用真实交易'
+            })
+        
+        # 检查合格策略数量
+        cursor = get_db_cursor()
+        cursor.execute("""
+            SELECT COUNT(*) FROM strategies 
+            WHERE enabled = 1 AND final_score >= 85
+        """)
+        qualified_count = cursor.fetchone()[0]
+        
+        if qualified_count < 3:
+            return jsonify({
+                'success': False,
+                'message': f'合格策略不足，当前仅{qualified_count}个，需要至少3个85分以上策略'
+            })
+        
+        # 启用真实交易
+        cursor.execute("""
+            ALTER TABLE system_status 
+            ADD COLUMN IF NOT EXISTS real_trading_enabled BOOLEAN DEFAULT FALSE
+        """)
+        
+        cursor.execute("""
+            UPDATE system_status 
+            SET real_trading_enabled = TRUE
+        """)
+        
+        # 记录启用日志
+        cursor.execute("""
+            INSERT INTO operation_logs 
+            (operation, detail, result, timestamp)
+            VALUES (%s, %s, %s, NOW())
+        """, (
+            'enable_real_trading',
+            f'用户启用真实交易，当前有{qualified_count}个合格策略',
+            'success'
+        ))
+        
+        return jsonify({
+            'success': True,
+            'message': f'真实交易已启用！当前有{qualified_count}个合格策略将进行真实交易',
+            'qualified_strategies': qualified_count
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'启用真实交易失败: {str(e)}'
+        })
+
+@app.route('/api/disable_real_trading', methods=['POST'])
+def disable_real_trading():
+    """禁用真实交易API"""
+    try:
+        cursor = get_db_cursor()
+        cursor.execute("""
+            UPDATE system_status 
+            SET real_trading_enabled = FALSE
+        """)
+        
+        return jsonify({
+            'success': True,
+            'message': '真实交易已禁用，所有交易将转为模拟模式'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'禁用真实交易失败: {str(e)}'
+        })
+
+@app.route('/api/real_trading_status')
+def get_real_trading_status():
+    """获取真实交易状态"""
+    try:
+        cursor = get_db_cursor()
+        
+        # 检查真实交易开关状态
+        cursor.execute("SELECT real_trading_enabled FROM system_status LIMIT 1")
+        status_result = cursor.fetchone()
+        real_trading_enabled = status_result[0] if status_result else False
+        
+        # 统计合格策略
+        cursor.execute("""
+            SELECT COUNT(*) FROM strategies 
+            WHERE enabled = 1 AND final_score >= 85
+        """)
+        qualified_strategies = cursor.fetchone()[0]
+        
+        # 统计今日盈亏
+        cursor.execute("""
+            SELECT 
+                COUNT(CASE WHEN trade_type = 'simulation' THEN 1 END) as sim_trades,
+                COUNT(CASE WHEN trade_type = 'real' THEN 1 END) as real_trades,
+                SUM(CASE WHEN trade_type = 'simulation' THEN pnl ELSE 0 END) as sim_pnl,
+                SUM(CASE WHEN trade_type = 'real' THEN pnl ELSE 0 END) as real_pnl
+            FROM strategy_trade_logs 
+            WHERE DATE(timestamp) = CURRENT_DATE
+        """)
+        
+        stats = cursor.fetchone()
+        sim_trades, real_trades, sim_pnl, real_pnl = stats if stats else (0, 0, 0, 0)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'real_trading_enabled': real_trading_enabled,
+                'qualified_strategies': qualified_strategies,
+                'today_stats': {
+                    'simulation_trades': sim_trades or 0,
+                    'real_trades': real_trades or 0,
+                    'simulation_pnl': float(sim_pnl or 0),
+                    'real_pnl': float(real_pnl or 0)
+                },
+                'ready_for_real': qualified_strategies >= 3
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取状态失败: {str(e)}'
+        })
+
+@app.route('/api/trading_statistics')
+def get_trading_statistics():
+    """获取详细的交易统计数据"""
+    try:
+        cursor = get_db_cursor()
+        
+        # 获取本周统计
+        cursor.execute("""
+            SELECT 
+                DATE(timestamp) as trade_date,
+                COUNT(CASE WHEN trade_type = 'simulation' THEN 1 END) as sim_trades,
+                COUNT(CASE WHEN trade_type = 'real' THEN 1 END) as real_trades,
+                SUM(CASE WHEN trade_type = 'simulation' THEN pnl ELSE 0 END) as sim_pnl,
+                SUM(CASE WHEN trade_type = 'real' THEN pnl ELSE 0 END) as real_pnl
+            FROM strategy_trade_logs 
+            WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'
+            GROUP BY DATE(timestamp)
+            ORDER BY trade_date DESC
+        """)
+        
+        daily_stats = cursor.fetchall()
+        
+        # 获取最佳策略
+        cursor.execute("""
+            SELECT 
+                s.name, s.final_score,
+                COUNT(t.id) as total_trades,
+                SUM(t.pnl) as total_pnl,
+                COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as winning_trades
+            FROM strategies s
+            JOIN strategy_trade_logs t ON s.id = t.strategy_id
+            WHERE s.enabled = 1 AND t.timestamp >= CURRENT_DATE - INTERVAL '7 days'
+            GROUP BY s.id, s.name, s.final_score
+            HAVING COUNT(t.id) >= 5
+            ORDER BY SUM(t.pnl) DESC
+            LIMIT 5
+        """)
+        
+        top_strategies = cursor.fetchall()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'daily_stats': [{
+                    'date': str(row[0]),
+                    'sim_trades': row[1],
+                    'real_trades': row[2],
+                    'sim_pnl': float(row[3] or 0),
+                    'real_pnl': float(row[4] or 0)
+                } for row in daily_stats],
+                'top_strategies': [{
+                    'name': row[0],
+                    'score': float(row[1]),
+                    'trades': row[2],
+                    'pnl': float(row[3] or 0),
+                    'win_rate': round((row[4] / row[2] * 100) if row[2] > 0 else 0, 1)
+                } for row in top_strategies]
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'获取统计失败: {str(e)}'
+        })
+
 if __name__ == "__main__":
     main() 
