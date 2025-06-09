@@ -49,6 +49,12 @@ def cache_with_ttl(ttl_seconds):
             func._cache_time[key] = current_time
             return result
         
+        # 添加清除缓存的方法
+        def clear_cache():
+            func._cache.clear()
+            func._cache_time.clear()
+        wrapper.clear_cache = clear_cache
+        
         return wrapper
     return decorator
 
@@ -2682,6 +2688,12 @@ def trigger_evolution():
         return jsonify({"status": "error", "message": "量化模块未启用"})
     
     try:
+        if quantitative_service is None:
+            return jsonify({"status": "error", "message": "量化服务未初始化"})
+        
+        if not hasattr(quantitative_service, 'manual_evolution'):
+            return jsonify({"status": "error", "message": "量化服务不支持手动进化功能"})
+        
         result = quantitative_service.manual_evolution()
         return jsonify(result)
     except Exception as e:
@@ -2864,6 +2876,21 @@ def main():
         # 程序退出时清理连接
         connection_manager.close_all()
         print("已清理所有ccxt连接")
+
+@app.route('/api/quantitative/clear-balance-cache', methods=['POST'])
+def clear_balance_cache():
+    """清除余额缓存，强制重新获取"""
+    try:
+        get_exchange_balances.clear_cache()
+        return jsonify({
+            'success': True,
+            'message': '余额缓存已清除'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'清除缓存失败: {str(e)}'
+        })
 
 @app.route('/api/quantitative/account-info', methods=['GET'])
 def get_account_info():
