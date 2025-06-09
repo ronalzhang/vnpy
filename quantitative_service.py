@@ -6240,7 +6240,12 @@ class EvolutionaryStrategyEngine:
                 new_strategy['generation'] = 0
                 print(f"🎲 创建全新随机策略")
             
-            new_strategies.append(new_strategy)
+            # 🔥 关键修复：立即保存新策略到数据库
+            if self._create_strategy_in_system(new_strategy):
+                new_strategies.append(new_strategy)
+                print(f"✅ 新策略已保存: {new_strategy['name']} (ID: {new_strategy['id']})")
+            else:
+                print(f"❌ 新策略保存失败: {new_strategy['name']}")
         
         return new_strategies
         
