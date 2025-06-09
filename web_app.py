@@ -56,29 +56,19 @@ quantitative_service = None
 QUANTITATIVE_ENABLED = False
 
 def init_quantitative_service():
-    """初始化量化服务"""
+    """初始化量化服务 - 前端使用HTTP通信模式"""
     global quantitative_service, QUANTITATIVE_ENABLED
     try:
-        from quantitative_service import QuantitativeService, StrategyType
-        
-        if quantitative_service is None:
-            # 创建量化服务实例
-            quantitative_service = QuantitativeService()
-            QUANTITATIVE_ENABLED = True
-            logger.info("量化交易模块加载成功")
-            print("✅ 量化交易服务初始化成功")
-            return True
-        else:
-            print("📋 量化交易服务已存在")
-            return True
+        # 前端和后端分离架构，直接启用量化功能
+        # 前端通过HTTP API与后端quantitative_service通信
+        QUANTITATIVE_ENABLED = True
+        quantitative_service = None  # 前端不直接创建服务实例
+        logger.info("量化交易前端模块初始化成功 - HTTP API模式")
+        print("✅ 量化交易前端服务初始化成功 - 通过HTTP API与后端通信")
+        return True
             
-    except ImportError as e:
-        logger.warning(f"量化交易模块未找到，量化功能将被禁用: {e}")
-        QUANTITATIVE_ENABLED = False
-        quantitative_service = None
-        return False
     except Exception as e:
-        print(f"❌ 量化交易服务初始化失败: {e}")
+        print(f"❌ 量化交易前端服务初始化失败: {e}")
         import traceback
         traceback.print_exc()
         QUANTITATIVE_ENABLED = False
