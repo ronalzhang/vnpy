@@ -41,6 +41,7 @@ class QuantitativeSystem {
         this.startAutoRefresh();
         this.initEvolutionLog(); // 初始化进化日志
         this.loadManagementConfig(); // 加载管理配置
+        this.bindManagementEvents(); // 🔥 确保事件绑定在DOM加载后执行
     }
 
     bindEvents() {
@@ -1320,21 +1321,27 @@ class QuantitativeSystem {
     async saveManagementConfig() {
         try {
             const form = document.getElementById('strategyManagementForm');
-            if (!form) return;
+            if (!form) {
+                console.error('策略管理表单不存在');
+                return;
+            }
 
             // 收集表单数据
-            const formData = new FormData(form);
             const newConfig = {};
             
-            // 手动获取所有输入值
+            // 🔥 手动获取所有输入值（修复自动保存问题）
             ['evolutionInterval', 'maxStrategies', 'minTrades', 'minWinRate', 'minProfit',
              'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 'stopLossPercent', 
              'eliminationDays', 'minScore'].forEach(key => {
                 const input = form.querySelector(`#${key}`);
                 if (input) {
-                    newConfig[key] = parseFloat(input.value) || 0;
+                    const value = parseFloat(input.value);
+                    newConfig[key] = isNaN(value) ? 0 : value;
+                    console.log(`收集配置 ${key}: ${newConfig[key]}`);
                 }
             });
+
+            console.log('准备保存的配置:', newConfig);
 
             const response = await fetch('/api/quantitative/management-config', {
                 method: 'POST',
@@ -1343,20 +1350,24 @@ class QuantitativeSystem {
             });
 
             const data = await response.json();
+            console.log('服务器响应:', data);
             
             if (data.success) {
+                // 🔥 立即更新本地配置
                 Object.assign(managementConfig, newConfig);
-                this.showMessage('配置保存成功', 'success');
+                console.log('本地配置已更新:', managementConfig);
                 
-                // 关闭弹窗
-                const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
-                if (modal) modal.hide();
+                this.showMessage('配置保存成功并同步到后端', 'success');
+                
+                // 不关闭弹窗，让用户看到配置已保存
+                // const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
+                // if (modal) modal.hide();
             } else {
                 this.showMessage(data.message || '保存失败', 'error');
             }
         } catch (error) {
             console.error('保存配置失败:', error);
-            this.showMessage('保存配置失败', 'error');
+            this.showMessage('保存配置失败: ' + error.message, 'error');
         }
     }
 
@@ -1394,14 +1405,42 @@ class QuantitativeSystem {
     // 绑定管理配置事件
     bindManagementEvents() {
         // 保存配置按钮
-        document.getElementById('saveManagementConfig')?.addEventListener('click', () => {
-            this.saveManagementConfig();
-        });
+        const saveBtn = document.getElementById('saveManagementConfig');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                console.log('保存配置按钮被点击');
+                this.saveManagementConfig();
+            });
+        }
 
         // 重置配置按钮
-        document.getElementById('resetManagementConfig')?.addEventListener('click', () => {
-            this.resetManagementConfig();
-        });
+        const resetBtn = document.getElementById('resetManagementConfig');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                console.log('重置配置按钮被点击');
+                this.resetManagementConfig();
+            });
+        }
+
+        // 🔥 添加实时保存功能 - 当输入框失去焦点时自动保存
+        const form = document.getElementById('strategyManagementForm');
+        if (form) {
+            ['evolutionInterval', 'maxStrategies', 'minTrades', 'minWinRate', 'minProfit',
+             'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 'stopLossPercent', 
+             'eliminationDays', 'minScore'].forEach(key => {
+                const input = form.querySelector(`#${key}`);
+                if (input) {
+                    input.addEventListener('blur', () => {
+                        console.log(`${key} 输入框失去焦点，自动保存配置`);
+                        this.saveManagementConfig();
+                    });
+                    input.addEventListener('change', () => {
+                        console.log(`${key} 输入框值变化，自动保存配置`);
+                        this.saveManagementConfig();
+                    });
+                }
+            });
+        }
     }
 
     // 开始轮询进化日志

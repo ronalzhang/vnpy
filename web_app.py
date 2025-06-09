@@ -1160,11 +1160,28 @@ def quantitative_strategies():
                 
                 win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
                 
-                # 直接实现策略代数显示逻辑（前端不依赖后端服务）
-                if generation is None or generation == 0:
-                    evolution_display = "初代策略"
-                else:
-                    evolution_display = f"第{generation}代第{cycle or 1}轮"
+                # 🔥 从进化历史表获取最新代数（修复代数显示问题）
+                try:
+                    cursor.execute("""
+                        SELECT MAX(generation), MAX(cycle) 
+                        FROM strategy_evolution_history 
+                        WHERE strategy_id = %s
+                    """, (sid,))
+                    latest_gen = cursor.fetchone()
+                    if latest_gen and latest_gen[0]:
+                        latest_generation = latest_gen[0]
+                        latest_cycle = latest_gen[1] or 1
+                        evolution_display = f"第{latest_generation}代第{latest_cycle}轮"
+                    elif generation is None or generation == 0:
+                        evolution_display = "初代策略"
+                    else:
+                        evolution_display = f"第{generation}代第{cycle or 1}轮"
+                except Exception as e:
+                    print(f"获取策略{sid}进化历史失败: {e}")
+                    if generation is None or generation == 0:
+                        evolution_display = "初代策略"
+                    else:
+                        evolution_display = f"第{generation}代第{cycle or 1}轮"
                 
                 strategy = {
                     'id': sid,
@@ -1333,6 +1350,25 @@ def strategy_detail(strategy_id):
             from strategy_parameters_config import get_strategy_default_parameters
             
             strategy_type = row[3]  # type字段
+            
+            # 🔥 修复异常参数值
+            if parameters and isinstance(parameters, dict):
+                for key, value in list(parameters.items()):
+                    if isinstance(value, (int, float)):
+                        # 修复异常的极大值或极小值
+                        if abs(value) > 1e10 or (abs(value) < 1e-10 and value != 0):
+                            print(f"🔧 修复异常参数 {key}: {value}")
+                            if key == 'quantity':
+                                parameters[key] = 100.0  # 重置为合理值
+                            elif 'period' in key:
+                                parameters[key] = 20
+                            elif 'threshold' in key:
+                                parameters[key] = 0.02
+                            elif 'pct' in key:
+                                parameters[key] = 2.0
+                            else:
+                                parameters[key] = 1.0
+            
             if not parameters or len(parameters) < 5:  # 参数太少说明配置不完整
                 # 使用统一配置获取默认参数
                 default_for_type = get_strategy_default_parameters(strategy_type)
@@ -1634,54 +1670,11 @@ def get_strategy_trade_logs(strategy_id):
 def get_strategy_optimization_logs(strategy_id):
     """获取策略优化记录"""
     try:
-        # 直接从数据库获取优化记录
+        # 🔥 由于strategy_optimization_logs表已清理，直接从进化历史获取
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 创建优化日志表（如果不存在）
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS strategy_optimization_logs (
-                id SERIAL PRIMARY KEY,
-                strategy_id VARCHAR(50) NOT NULL,
-                strategy_name VARCHAR(100),
-                optimization_type VARCHAR(50),
-                old_parameters TEXT,
-                new_parameters TEXT,
-                trigger_reason TEXT,
-                target_success_rate REAL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        cursor.execute("""
-            SELECT optimization_type, old_parameters, new_parameters, 
-                   trigger_reason, target_success_rate, timestamp
-            FROM strategy_optimization_logs 
-            WHERE strategy_id = %s
-            ORDER BY timestamp DESC
-            LIMIT 50
-        """, (strategy_id,))
-        
-        rows = cursor.fetchall()
         logs = []
-        
-        for row in rows:
-            import json
-            try:
-                old_params = json.loads(row[1]) if row[1] else {}
-                new_params = json.loads(row[2]) if row[2] else {}
-            except:
-                old_params = {}
-                new_params = {}
-            
-            logs.append({
-                'timestamp': row[5].strftime('%Y-%m-%d %H:%M:%S') if row[5] else '',
-                'optimization_type': row[0],
-                'old_parameters': old_params,
-                'new_parameters': new_params,
-                'trigger_reason': row[3],
-                'target_success_rate': float(row[4]) if row[4] else 0.0
-            })
         
         # 🔥 如果该策略没有优化记录，尝试从strategy_evolution_history获取进化记录
         if not logs:
@@ -3478,51 +3471,9 @@ def get_evolution_log():
                 'timestamp': timestamp.isoformat() if timestamp else None
             })
         
-        # 🔥 步骤2：从strategy_optimization_logs获取优化记录
-        cursor.execute("""
-            SELECT strategy_id, optimization_type, trigger_reason, timestamp
-            FROM strategy_optimization_logs 
-            ORDER BY timestamp DESC 
-            LIMIT 5
-        """)
+        # 🔥 步骤2：由于strategy_optimization_logs表已清理，直接跳过
         
-        optimization_records = cursor.fetchall()
-        print(f"🔍 获取到 {len(optimization_records)} 条优化记录")
-        
-        # 处理优化记录
-        for record in optimization_records:
-            strategy_id, optimization_type, trigger_reason, timestamp = record
-            
-            logs.append({
-                'action': 'optimized',
-                'details': f"策略{strategy_id[-4:]}优化: {optimization_type} - {trigger_reason}",
-                'strategy_id': strategy_id,
-                'strategy_name': f"策略{strategy_id[-4:]}",
-                'timestamp': timestamp.isoformat() if timestamp else None
-            })
-        
-        # 🔥 步骤3：从strategy_evolution_log获取手动记录
-        cursor.execute("""
-            SELECT action, details, strategy_id, strategy_name, timestamp
-            FROM strategy_evolution_log 
-            ORDER BY timestamp DESC 
-            LIMIT 5
-        """)
-        
-        manual_logs = cursor.fetchall()
-        print(f"🔍 获取到 {len(manual_logs)} 条手动日志")
-        
-        # 处理手动日志
-        for record in manual_logs:
-            action, details, strategy_id, strategy_name, timestamp = record
-            
-            logs.append({
-                'action': action,
-                'details': details,
-                'strategy_id': strategy_id,
-                'strategy_name': strategy_name or f"策略{strategy_id[-4:] if strategy_id else 'XXXX'}",
-                'timestamp': timestamp.isoformat() if timestamp else None
-            })
+        # 🔥 步骤3：由于strategy_evolution_log表已清理，直接跳过
         
         # 按时间倒序排序
         logs.sort(key=lambda x: x['timestamp'] or '1970-01-01', reverse=True)
