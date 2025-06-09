@@ -6261,8 +6261,19 @@ class EvolutionaryStrategyEngine:
             parent_generation = parent.get('generation', self.current_generation)
             new_generation = parent_generation + 1
             
+            # 🧬 分值差异化突变强度判断
+            parent_score = parent.get('fitness', parent.get('final_score', 50.0))
+            if parent_score < self.evolution_config.get('low_score_threshold', 60.0):
+                mutation_intensity = 'agg'  # aggressive 激进
+            elif parent_score < self.evolution_config.get('medium_score_threshold', 80.0):
+                mutation_intensity = 'mod'  # moderate 适度
+            elif parent_score < self.evolution_config.get('high_score_threshold', 90.0):
+                mutation_intensity = 'fin'  # fine 精细
+            else:
+                mutation_intensity = 'pre'  # precise 极精细
+            
             if self.evolution_config.get('show_generation_in_name', True):
-                mutated['name'] = f"{parent.get('name', 'Unknown')}_G{new_generation}C{self.current_cycle}_{mutation_intensity[:3]}"
+                mutated['name'] = f"{parent.get('name', 'Unknown')}_G{new_generation}C{self.current_cycle}_{mutation_intensity}"
             else:
                 mutated['name'] = f"{parent.get('name', 'Unknown')}_突变_{mutated['id']}"
             
@@ -6589,7 +6600,7 @@ class EvolutionaryStrategyEngine:
         try:
             strategy_id = strategy_config['id']
             
-            # 添加到内存
+            # 添加到内存（兼容性）
             self.quantitative_service.strategies[strategy_id] = {
                 'id': strategy_id,
                 'name': strategy_config['name'],
@@ -6606,14 +6617,43 @@ class EvolutionaryStrategyEngine:
                 'parent2_id': strategy_config.get('parent2_id')
             }
             
-            # 保存到数据库
-            self.quantitative_service._save_strategies_to_db()
+            # 直接保存到PostgreSQL数据库
+            import json
+            cursor = self.quantitative_service.conn.cursor()
+            cursor.execute('''
+                INSERT INTO strategies 
+                (id, name, symbol, type, enabled, parameters, generation, cycle, parent_id, 
+                 creation_method, final_score, win_rate, total_return, total_trades, 
+                 created_at, updated_at, evolution_type, lineage_depth, is_persistent)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, %s, %s, %s)
+                ON CONFLICT (id) DO NOTHING
+            ''', (
+                strategy_id,
+                strategy_config['name'],
+                strategy_config['symbol'],
+                strategy_config['type'],
+                False,  # enabled
+                json.dumps(strategy_config['parameters']),
+                strategy_config.get('generation', self.current_generation),
+                strategy_config.get('cycle', self.current_cycle),
+                strategy_config.get('parent_id'),
+                strategy_config.get('creation_method', 'evolution'),
+                50.0,  # 初始评分
+                0.0,   # 初始胜率
+                0.0,   # 初始收益
+                0,     # 初始交易数
+                strategy_config.get('evolution_type', 'mutation'),
+                strategy_config.get('lineage_depth', 0),
+                1      # is_persistent
+            ))
             
-            print(f"🆕 策略已创建: {strategy_config['name']}")
+            print(f"🆕 策略已创建并保存到数据库: {strategy_config['name']} (ID: {strategy_id})")
             return True
             
         except Exception as e:
             print(f"❌ 创建策略失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def _update_strategy_allocations(self):
