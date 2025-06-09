@@ -1304,7 +1304,7 @@ class QuantitativeSystem {
         if (!form) return;
 
         Object.keys(managementConfig).forEach(key => {
-            const input = form.querySelector(`#${this.camelToKebab(key)}`);
+            const input = form.querySelector(`#${key}`);
             if (input) {
                 input.value = managementConfig[key];
             }
@@ -1330,7 +1330,7 @@ class QuantitativeSystem {
             ['evolutionInterval', 'maxStrategies', 'minTrades', 'minWinRate', 'minProfit',
              'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 'stopLossPercent', 
              'eliminationDays', 'minScore'].forEach(key => {
-                const input = form.querySelector(`#${this.camelToKebab(key)}`);
+                const input = form.querySelector(`#${key}`);
                 if (input) {
                     newConfig[key] = parseFloat(input.value) || 0;
                 }
