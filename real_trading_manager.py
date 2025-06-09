@@ -405,7 +405,7 @@ class RealTradingManager:
                 cursor.execute("""
                     INSERT INTO trading_signals 
                     (strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed)
-                    VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, FALSE)
+                    VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, 0)
                 """, (sid, symbol or 'DOGE/USDT', signal_type, base_price, quantity, confidence))
                 
                 signals_created += 1
