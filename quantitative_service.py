@@ -6624,8 +6624,8 @@ class EvolutionaryStrategyEngine:
                 INSERT INTO strategies 
                 (id, name, symbol, type, enabled, parameters, generation, cycle, parent_id, 
                  creation_method, final_score, win_rate, total_return, total_trades, 
-                 created_at, updated_at, evolution_type, lineage_depth, is_persistent)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, %s, %s, %s)
+                 created_at, updated_at, is_persistent)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, %s)
                 ON CONFLICT (id) DO NOTHING
             ''', (
                 strategy_id,
@@ -6642,8 +6642,6 @@ class EvolutionaryStrategyEngine:
                 0.0,   # 初始胜率
                 0.0,   # 初始收益
                 0,     # 初始交易数
-                strategy_config.get('evolution_type', 'mutation'),
-                strategy_config.get('lineage_depth', 0),
                 1      # is_persistent
             ))
             
