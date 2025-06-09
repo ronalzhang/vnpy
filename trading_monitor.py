@@ -125,7 +125,7 @@ class TradingMonitor:
             print(f"  {status} {name[:20]:<20}: {score:5.1f}分 | {total_trades:2d}次交易 | 最后交易:{last_trade_str}")
         
         # 3. 检查信号生成情况
-                            cursor.execute("""
+        cursor.execute("""
             SELECT 
                 COUNT(*) as total_signals,
                 COUNT(CASE WHEN executed = true THEN 1 END) as executed_signals,
