@@ -1109,31 +1109,56 @@ def quantitative_strategies():
     
     if request.method == 'GET':
         try:
-            # 🎯 使用quantitative_service获取真实的策略数据，包含进化信息
-            strategies_response = quantitative_service.get_strategies()
+            # 获取策略列表 - 直接从数据库获取
+            conn = get_db_connection()
+            cursor = conn.cursor()
             
-            # 确保返回的是正确格式
-            if isinstance(strategies_response, dict) and 'data' in strategies_response:
-                strategies = strategies_response['data']
-            else:
-                strategies = strategies_response
+            # 获取策略基本信息和交易统计
+            cursor.execute('''
+                SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
+                       s.created_at, s.generation, s.cycle,
+                       COUNT(t.id) as total_trades,
+                       COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
+                       SUM(t.pnl) as total_pnl,
+                       AVG(t.pnl) as avg_pnl
+                FROM strategies s
+                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+                GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
+                         s.final_score, s.created_at, s.generation, s.cycle
+                ORDER BY s.final_score DESC, s.created_at DESC
+            ''')
             
-            # ✅ 为每个策略添加真实的进化显示信息（不再硬编码）
-            for strategy in strategies:
-                if 'generation' not in strategy:
-                    strategy['generation'] = 1
-                if 'cycle' not in strategy:
-                    strategy['cycle'] = 1
+            rows = cursor.fetchall()
+            strategies = []
+            
+            for row in rows:
+                sid, name, symbol, stype, params, enabled, score, created_at, generation, cycle, \
+                total_trades, wins, total_pnl, avg_pnl = row
                 
-                # 🧬 使用quantitative_service的方法获取真实进化信息
-                if quantitative_service and hasattr(quantitative_service, '_get_strategy_evolution_display'):
-                    strategy['evolution_display'] = quantitative_service._get_strategy_evolution_display(strategy.get('id', ''))
-                else:
-                    strategy['evolution_display'] = f"第{strategy.get('generation', 1)}代第{strategy.get('cycle', 1)}轮"
+                win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
                 
-                # 🔄 确保交易模式显示正确（模拟中 vs 实际交易）
-                if 'trade_mode' not in strategy:
-                    strategy['trade_mode'] = '模拟中'  # 默认为模拟模式
+                strategy = {
+                    'id': sid,
+                    'name': name,
+                    'symbol': symbol,
+                    'type': stype,
+                    'parameters': params if isinstance(params, dict) else {},
+                    'enabled': bool(enabled),
+                    'final_score': float(score) if score else 0.0,
+                    'created_at': created_at.isoformat() if created_at else '',
+                    'generation': generation or 1,
+                    'cycle': cycle or 1,
+                    'total_trades': total_trades or 0,
+                    'win_rate': round(win_rate, 2),
+                    'total_pnl': float(total_pnl) if total_pnl else 0.0,
+                    'avg_pnl': float(avg_pnl) if avg_pnl else 0.0,
+                    'evolution_display': f"第{generation or 1}代第{cycle or 1}轮",
+                    'trade_mode': '实际交易' if enabled else '模拟中'
+                }
+                
+                strategies.append(strategy)
+            
+            conn.close()
             
             return jsonify({
                 "status": "success",
