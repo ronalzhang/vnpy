@@ -3454,8 +3454,8 @@ def get_evolution_log():
         """)
         
         # 🔥 聚合所有策略的optimization-logs（与策略卡同源）
-        # 先获取活跃策略列表
-        cursor.execute("SELECT id FROM strategies WHERE active = true LIMIT 20")
+        # 先获取策略列表（修复字段名）
+        cursor.execute("SELECT id FROM strategies LIMIT 20")
         strategy_ids = [row[0] for row in cursor.fetchall()]
         
         logs = []
