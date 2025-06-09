@@ -303,7 +303,7 @@ class QuantitativeSystem {
             const totalReturn = strategy.total_return || 0;
             const totalTrades = strategy.total_trades || 0;
             const generation = strategy.generation || 1;
-            const round = strategy.optimization_round || 1;
+            const round = strategy.cycle || 1;
             const qualified = strategy.qualified_for_trading || false;
             
             // 评分状态显示 - 使用65分合格线
@@ -337,7 +337,7 @@ class QuantitativeSystem {
                                         ${strategy.name}
                                     </a>
                                 </h6>
-                                <small class="text-muted">${strategy.symbol} • 第${generation}代第${round}轮</small>
+                                <small class="text-muted">${strategy.symbol} • ${strategy.evolution_display || `第${generation}代第${round}轮`}</small>
                             </div>
                             <div class="text-end">
                                 <span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'} mb-1">
@@ -515,48 +515,86 @@ class QuantitativeSystem {
         const container = document.getElementById('strategyParameters');
         let parametersHtml = '';
         
-        // 根据策略类型生成对应的参数表单
+        // 根据策略类型生成对应的参数表单（扩展到18个重要参数）
         const parameterConfigs = {
             'momentum': [
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 5, max: 100, step: 1},
                 {key: 'threshold', label: '动量阈值', type: 'number', min: 0.001, max: 0.1, step: 0.001},
                 {key: 'quantity', label: '交易数量', type: 'number', min: 0.001, max: 1000, step: 0.001},
                 {key: 'momentum_threshold', label: '动量确认阈值', type: 'number', min: 0.001, max: 0.1, step: 0.001},
-                {key: 'volume_threshold', label: '成交量倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1}
+                {key: 'volume_threshold', label: '成交量倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
+                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'take_profit', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
+                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
+                {key: 'min_volume', label: '最小成交量', type: 'number', min: 1000, max: 1000000, step: 1000},
+                {key: 'volatility_filter', label: '波动率过滤', type: 'number', min: 0.001, max: 0.1, step: 0.001},
+                {key: 'correlation_threshold', label: '相关性阈值', type: 'number', min: 0.1, max: 0.9, step: 0.1},
+                {key: 'rsi_upper', label: 'RSI超买线', type: 'number', min: 60, max: 90, step: 1},
+                {key: 'rsi_lower', label: 'RSI超卖线', type: 'number', min: 10, max: 40, step: 1},
+                {key: 'ma_short', label: '短期均线', type: 'number', min: 5, max: 50, step: 1},
+                {key: 'ma_long', label: '长期均线', type: 'number', min: 20, max: 200, step: 1},
+                {key: 'signal_strength', label: '信号强度', type: 'number', min: 0.1, max: 1.0, step: 0.1},
+                {key: 'holding_period', label: '持仓周期(分钟)', type: 'number', min: 1, max: 1440, step: 1},
+                {key: 'risk_reward_ratio', label: '风险收益比', type: 'number', min: 1.0, max: 5.0, step: 0.1}
             ],
             'mean_reversion': [
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 10, max: 100, step: 1},
                 {key: 'std_multiplier', label: '标准差倍数', type: 'number', min: 1.0, max: 4.0, step: 0.1},
                 {key: 'quantity', label: '交易数量', type: 'number', min: 0.001, max: 1000, step: 0.001},
                 {key: 'reversion_threshold', label: '回归阈值', type: 'number', min: 0.005, max: 0.05, step: 0.001},
-                {key: 'min_deviation', label: '最小偏离度', type: 'number', min: 0.01, max: 0.1, step: 0.001}
+                {key: 'min_deviation', label: '最小偏离度', type: 'number', min: 0.01, max: 0.1, step: 0.001},
+                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'take_profit', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
+                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
+                {key: 'bollinger_period', label: '布林带周期', type: 'number', min: 10, max: 50, step: 1},
+                {key: 'bollinger_std', label: '布林带标准差', type: 'number', min: 1.5, max: 3.0, step: 0.1},
+                {key: 'entry_threshold', label: '入场阈值', type: 'number', min: 0.8, max: 2.0, step: 0.1},
+                {key: 'exit_threshold', label: '出场阈值', type: 'number', min: 0.2, max: 1.0, step: 0.1}
             ],
             'grid_trading': [
                 {key: 'grid_spacing', label: '网格间距(%)', type: 'number', min: 0.5, max: 5.0, step: 0.1},
                 {key: 'grid_count', label: '网格数量', type: 'number', min: 5, max: 30, step: 1},
                 {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 10000, step: 1},
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 50, max: 200, step: 10},
-                {key: 'min_profit', label: '最小利润(%)', type: 'number', min: 0.1, max: 2.0, step: 0.1}
+                {key: 'min_profit', label: '最小利润(%)', type: 'number', min: 0.1, max: 2.0, step: 0.1},
+                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
+                {key: 'grid_upper_limit', label: '网格上限(%)', type: 'number', min: 5, max: 50, step: 1},
+                {key: 'grid_lower_limit', label: '网格下限(%)', type: 'number', min: 5, max: 50, step: 1}
             ],
             'breakout': [
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 10, max: 100, step: 1},
                 {key: 'breakout_threshold', label: '突破阈值(%)', type: 'number', min: 0.5, max: 3.0, step: 0.1},
                 {key: 'quantity', label: '交易数量', type: 'number', min: 0.1, max: 100, step: 0.1},
                 {key: 'volume_threshold', label: '成交量倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
-                {key: 'confirmation_periods', label: '确认周期', type: 'number', min: 1, max: 10, step: 1}
+                {key: 'confirmation_periods', label: '确认周期', type: 'number', min: 1, max: 10, step: 1},
+                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'take_profit', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
+                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
+                {key: 'atr_multiplier', label: 'ATR倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1}
             ],
             'high_frequency': [
                 {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 1000, step: 1},
                 {key: 'min_profit', label: '最小利润(%)', type: 'number', min: 0.01, max: 0.1, step: 0.01},
                 {key: 'volatility_threshold', label: '波动率阈值', type: 'number', min: 0.0001, max: 0.01, step: 0.0001},
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 5, max: 20, step: 1},
-                {key: 'signal_interval', label: '信号间隔(秒)', type: 'number', min: 10, max: 60, step: 5}
+                {key: 'signal_interval', label: '信号间隔(秒)', type: 'number', min: 10, max: 60, step: 5},
+                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 5.0, step: 0.1},
+                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 50, step: 1},
+                {key: 'spread_threshold', label: '价差阈值', type: 'number', min: 0.0001, max: 0.001, step: 0.0001},
+                {key: 'latency_limit', label: '延迟限制(毫秒)', type: 'number', min: 1, max: 100, step: 1}
             ],
             'trend_following': [
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 20, max: 100, step: 5},
                 {key: 'trend_threshold', label: '趋势阈值(%)', type: 'number', min: 0.5, max: 3.0, step: 0.1},
                 {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 1000, step: 1},
-                {key: 'trend_strength_min', label: '最小趋势强度', type: 'number', min: 0.1, max: 1.0, step: 0.1}
+                {key: 'trend_strength_min', label: '最小趋势强度', type: 'number', min: 0.1, max: 1.0, step: 0.1},
+                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'take_profit', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
+                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
+                {key: 'ema_short', label: '短期EMA', type: 'number', min: 5, max: 50, step: 1},
+                {key: 'ema_long', label: '长期EMA', type: 'number', min: 20, max: 200, step: 1},
+                {key: 'adx_threshold', label: 'ADX趋势阈值', type: 'number', min: 20, max: 50, step: 1}
             ]
         };
         
@@ -1136,7 +1174,18 @@ class QuantitativeSystem {
 
     // 格式化时间
     formatTime(timestamp) {
-        return new Date(timestamp).toLocaleTimeString();
+        if (!timestamp) return '-';
+        const date = new Date(timestamp);
+        // 返回完整的日期时间格式：YYYY-MM-DD HH:mm:ss
+        return date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
     }
 
     // 加载系统状态
