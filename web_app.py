@@ -2876,8 +2876,59 @@ def get_account_info():
         })
     
     try:
-        # 从量化服务获取账户信息
-        account_info = quantitative_service.get_account_info()
+        # 直接从exchange_clients获取余额信息，与get_exchange_balances()一致
+        raw_balances = get_exchange_balances()
+        
+        # 计算总资产和今日数据（使用实际的交易所余额）
+        total_balance = 0
+        for exchange_id, balance_info in raw_balances.items():
+            usdt_balance = balance_info.get("USDT", 0)
+            if isinstance(usdt_balance, (int, float)) and not (usdt_balance != usdt_balance):
+                total_balance += usdt_balance
+        
+        # 从数据库获取历史数据计算今日盈亏
+        daily_pnl = 0
+        daily_return = 0
+        daily_trades = 0
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 获取今日交易统计
+            cursor.execute("""
+                SELECT COUNT(*) as trades, 
+                       COALESCE(SUM(profit), 0) as total_profit
+                FROM strategy_trade_logs 
+                WHERE DATE(timestamp) = CURRENT_DATE
+            """)
+            result = cursor.fetchone()
+            if result:
+                daily_trades = result[0] or 0
+                daily_pnl = result[1] or 0
+            
+            # 获取昨日余额计算收益率
+            cursor.execute("""
+                SELECT balance FROM account_balance_history 
+                WHERE DATE(timestamp) = CURRENT_DATE - INTERVAL '1 day'
+                ORDER BY timestamp DESC LIMIT 1
+            """)
+            yesterday_balance = cursor.fetchone()
+            if yesterday_balance and yesterday_balance[0] > 0:
+                daily_return = daily_pnl / yesterday_balance[0]
+            
+            cursor.close()
+            conn.close()
+            
+        except Exception as e:
+            print(f"获取数据库统计失败: {e}")
+        
+        account_info = {
+            'balance': total_balance,
+            'daily_pnl': daily_pnl,
+            'daily_return': daily_return,
+            'daily_trades': daily_trades
+        }
         
         return jsonify({
             'success': True,
@@ -3011,7 +3062,8 @@ def enable_real_trading():
             })
         
         # 检查合格策略数量
-        cursor = get_db_cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor()
         cursor.execute("""
             SELECT COUNT(*) FROM strategies 
             WHERE enabled = 1 AND final_score >= 85
@@ -3046,6 +3098,9 @@ def enable_real_trading():
             'success'
         ))
         
+        cursor.close()
+        conn.close()
+        
         return jsonify({
             'success': True,
             'message': f'真实交易已启用！当前有{qualified_count}个合格策略将进行真实交易',
@@ -3062,11 +3117,15 @@ def enable_real_trading():
 def disable_real_trading():
     """禁用真实交易API"""
     try:
-        cursor = get_db_cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor()
         cursor.execute("""
             UPDATE system_status 
             SET real_trading_enabled = FALSE
         """)
+        
+        cursor.close()
+        conn.close()
         
         return jsonify({
             'success': True,
@@ -3083,7 +3142,8 @@ def disable_real_trading():
 def get_real_trading_status():
     """获取真实交易状态"""
     try:
-        cursor = get_db_cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
         # 检查真实交易开关状态
         cursor.execute("SELECT real_trading_enabled FROM system_status LIMIT 1")
@@ -3110,6 +3170,9 @@ def get_real_trading_status():
         
         stats = cursor.fetchone()
         sim_trades, real_trades, sim_pnl, real_pnl = stats if stats else (0, 0, 0, 0)
+        
+        cursor.close()
+        conn.close()
         
         return jsonify({
             'success': True,

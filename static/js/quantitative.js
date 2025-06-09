@@ -301,7 +301,8 @@ class QuantitativeSystem {
             const winRate = strategy.win_rate || 0;
             const totalReturn = strategy.total_return || 0;
             const totalTrades = strategy.total_trades || 0;
-            const dataSource = strategy.data_source || '实际交易';
+            const generation = strategy.generation || 1;
+            const round = strategy.optimization_round || 1;
             const qualified = strategy.qualified_for_trading || false;
             
             // 评分状态显示 - 使用6.5分合格线
@@ -334,14 +335,17 @@ class QuantitativeSystem {
                         </div>
                         
                         <p class="card-text">
-                            <small class="text-muted">${strategy.symbol} • ${dataSource}</small><br>
+                            <small class="text-muted">${strategy.symbol} • 第${generation}代第${round}轮</small><br>
                             <span class="${scoreColor}">评分: ${score.toFixed(1)} ${scoreStatus}</span><br>
                             <span class="text-success">成功率: ${(winRate * 100).toFixed(1)}%</span><br>
                             <span class="text-info">总收益: ${(totalReturn * 100).toFixed(2)}%</span><br>
                             <span class="text-warning">日收益: ${((totalReturn / 30) * 100).toFixed(3)}%</span><br>
                             <span class="text-muted">交易次数: ${totalTrades}</span><br>
-                            ${score >= 65 ? '<span class="badge bg-success">交易资格</span>' : '<span class="badge bg-warning">模拟中</span>'}
                         </p>
+                        
+                        <div class="text-center mb-2">
+                            ${score >= 65 ? '<span class="badge bg-success">真实交易</span>' : '<span class="badge bg-warning">模拟中</span>'}
+                        </div>
                         
                         <div class="d-flex justify-content-center">
                             <button class="btn btn-sm btn-outline-info" 
