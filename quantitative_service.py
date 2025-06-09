@@ -6207,7 +6207,7 @@ class EvolutionaryStrategyEngine:
             # 只记录，不删除，以备将来恢复
             self.quantitative_service.db_manager.execute_query("""
                 INSERT INTO strategy_evolution_history 
-                (strategy_id, generation, cycle, evolution_type, old_score, created_time)
+                (strategy_id, generation, cycle, evolution_type, score_before, created_time)
                 VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (strategy_id, self.current_generation, self.current_cycle, 
                   f"eliminated_{reason}", final_score))
