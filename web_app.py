@@ -3453,23 +3453,38 @@ def get_evolution_log():
             )
         """)
         
-        # 获取最近100条日志
+        # 🔥 从真实的策略进化历史表获取数据
         cursor.execute("""
-            SELECT action, details, strategy_id, strategy_name, timestamp
-            FROM strategy_evolution_log
+            SELECT action_type, COALESCE(notes, '策略进化操作'), strategy_id, 
+                   COALESCE(notes, '策略进化'), timestamp
+            FROM strategy_evolution_history 
+            WHERE action_type IS NOT NULL
             ORDER BY timestamp DESC
-            LIMIT 100
+            LIMIT 50
         """)
         
         rows = cursor.fetchall()
         logs = []
         
         for row in rows:
+            # 将action_type转换为更友好的显示
+            action_mapping = {
+                'mutation': 'optimized',
+                'crossover': 'created', 
+                'selection': 'executed',
+                'elimination': 'eliminated',
+                'creation': 'created',
+                'optimization': 'optimized'
+            }
+            
+            action_display = action_mapping.get(row[0], row[0])
+            details = row[1] or '策略进化操作'
+            
             logs.append({
-                'action': row[0],
-                'details': row[1],
+                'action': action_display,
+                'details': details,
                 'strategy_id': row[2],
-                'strategy_name': row[3],
+                'strategy_name': details.split('策略')[0] + '策略' if '策略' in details else '进化策略',
                 'timestamp': row[4].isoformat() if row[4] else None
             })
         
