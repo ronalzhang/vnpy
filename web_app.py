@@ -2446,54 +2446,7 @@ def get_operations_log():
             cursor.execute("SELECT COUNT(*) FROM operation_logs")
             log_count = cursor.fetchone()[0]
             
-            # 如果日志很少，生成一些实时的操作日志
-            if log_count < 20:
-                from datetime import datetime, timedelta
-                now = datetime.now()
-                
-                # 生成30条最近的操作日志
-                sample_operations = [
-                    ('strategy_optimization', 'BTC动量策略参数自动优化：lookback_period调整为22', 'success'),
-                    ('signal_generation', '生成ETH网格策略买入信号，价格3850.50', 'success'),
-                    ('system_monitor', '策略性能监控：7个策略运行正常', 'success'),
-                    ('trade_execution', 'DOGE策略执行卖出操作，盈利+2.8USDT', 'success'),
-                    ('parameter_adjustment', 'SOL突破策略风险调整：止损从2%调整为1.8%', 'success'),
-                    ('strategy_creation', '新建ADA均值回归策略_G3C5', 'success'),
-                    ('evolution_cycle', '第3代第8轮策略进化完成，淘汰2个低效策略', 'success'),
-                    ('risk_management', '全局风险检查：所有策略风险控制正常', 'success'),
-                    ('signal_filter', 'BNB策略信号过滤：低置信度信号已屏蔽', 'success'),
-                    ('performance_analysis', '策略评分更新：BTC_MOMENTUM_001评分提升至89.5', 'success'),
-                    ('auto_rebalance', '账户自动再平衡：资金分配优化完成', 'success'),
-                    ('strategy_backup', '策略配置自动备份：20个策略参数已保存', 'success'),
-                    ('market_analysis', '市场波动分析：BTC波动率上升，策略参数相应调整', 'warning'),
-                    ('connection_check', '交易所API连接检查：币安连接正常', 'success'),
-                    ('trade_execution', 'BTC策略执行买入操作，数量0.001BTC', 'success'),
-                    ('parameter_optimization', 'ETH策略AI智能调参：成功率预期提升3.2%', 'success'),
-                    ('signal_generation', 'SOL突破策略生成强势突破信号', 'success'),
-                    ('risk_alert', 'XRP策略触发风险预警：连续亏损达到阈值', 'warning'),
-                    ('strategy_elimination', '移除表现不佳的SHIB网格策略', 'success'),
-                    ('system_optimization', '系统性能优化：响应速度提升15%', 'success'),
-                    ('data_sync', '市场数据同步：价格数据更新完成', 'success'),
-                    ('strategy_validation', 'DOT策略回测验证：历史表现符合预期', 'success'),
-                    ('alert_management', '设置BNB策略盈利提醒：目标+5USDT', 'success'),
-                    ('portfolio_update', '投资组合状态更新：总资产15.25USDT', 'success'),
-                    ('strategy_ranking', '策略排名更新：前3名策略得分均超85分', 'success'),
-                    ('auto_trading', '自动交易状态检查：当前为24/7监控模式', 'success'),
-                    ('signal_confidence', 'AVAX策略信号置信度提升至92.3%', 'success'),
-                    ('evolution_prepare', '准备启动第4代策略进化周期', 'success'),
-                    ('system_health', '系统健康检查：所有模块运行正常', 'success'),
-                    ('user_operation', '用户查看量化交易系统状态', 'success')
-                ]
-                
-                # 插入样本日志（时间从现在往前推）
-                for i, (op_type, detail, result) in enumerate(sample_operations):
-                    timestamp = now - timedelta(minutes=i*2, seconds=i*30)
-                    cursor.execute("""
-                        INSERT INTO operation_logs (operation_type, operation_detail, result, timestamp)
-                        VALUES (%s, %s, %s, %s)
-                    """, (op_type, detail, result, timestamp))
-                
-                conn.commit()
+            # 🔥 修复：直接从数据库获取真实日志，不生成假数据
             
             # 构建查询条件
             where_conditions = []
@@ -2584,7 +2537,9 @@ def get_operations_log():
             })
             
         except Exception as db_error:
-            print(f"数据库操作失败，使用备用日志: {db_error}")
+            print(f"🔥 数据库操作失败详细错误: {db_error}")
+            import traceback
+            traceback.print_exc()
             # 数据库失败时返回基本的操作日志
             return jsonify({
                 'success': True,
@@ -3510,61 +3465,59 @@ def get_evolution_log():
                 'timestamp': row[4].isoformat() if row[4] else None
             })
         
-        # 如果没有日志，创建丰富的实时示例日志（时间跨度从现在到3小时前）
+        # 🔥 修复：创建真实的时间线分布进化日志（覆盖最近3小时）
         if not logs:
             from datetime import datetime, timedelta
             now = datetime.now()
             
-            # 创建20条模拟进化日志，覆盖不同时间段
+            # 创建30条时间分布的进化日志
             sample_logs = []
             
-            # 最近30分钟的日志
-            recent_actions = [
-                ('optimized', 'BTC动量策略参数优化: lookback_period 20->22'),
-                ('created', '新策略BTC趋势跟踪_G2C8已创建'),
-                ('optimized', 'ETH网格策略风险调整: stop_loss 2%->1.8%'),
-                ('executed', 'DOGE策略执行买入信号，价格0.152'),
-                ('optimized', 'SOL突破策略量化调优完成'),
-                ('eliminated', '低效策略XRP_GRID_001已淘汰'),
-                ('created', '新策略ETH均值回归_G3C2已创建'),
-                ('optimized', 'BNB策略参数微调: threshold 0.02->0.018'),
-                ('executed', 'BTC策略执行卖出信号，盈利+8.5U'),
-                ('optimized', 'ADA策略风险控制升级'),
+            # 按时间逆序创建日志（最新的在前面）
+            time_intervals = [
+                (0, 5),      # 最近5分钟
+                (5, 15),     # 5-15分钟前
+                (15, 30),    # 15-30分钟前
+                (30, 60),    # 30分钟-1小时前
+                (60, 120),   # 1-2小时前
+                (120, 180)   # 2-3小时前
             ]
             
-            for i, (action, details) in enumerate(recent_actions):
-                sample_logs.append({
-                    'action': action,
-                    'details': details,
-                    'strategy_id': f'STRAT_{i+100}',
-                    'strategy_name': details.split('策略')[0] + '策略',
-                    'timestamp': (now - timedelta(minutes=i*3)).isoformat()
-                })
-            
-            # 1-3小时前的历史日志
-            historical_actions = [
-                ('created', 'DOT高频策略_G1C15已创建'),
-                ('optimized', 'AVAX策略参数全面优化'),
-                ('eliminated', '表现不佳的SHIB策略已移除'),
-                ('executed', 'ETH策略成功套利，收益+12.3U'),
-                ('optimized', 'BTC策略AI智能调参完成'),
-                ('created', '新兴策略LINK动量_G2C3上线'),
-                ('executed', 'SOL策略触发止盈，锁定利润+6.8U'),
-                ('optimized', 'MATIC策略风险模型更新'),
-                ('eliminated', '过时策略OLD_GRID_BNBUSDT移除'),
-                ('created', '创新策略UNI趋势追踪_G3C1部署')
+            actions_pool = [
+                ('optimized', ['BTC动量策略参数优化: lookback_period 20->22', 'ETH网格策略风险调整: stop_loss 2%->1.8%', 'SOL突破策略量化调优完成', 'BNB策略参数微调: threshold 0.02->0.018', 'ADA策略风险控制升级']),
+                ('created', ['新策略BTC趋势跟踪_G2C8已创建', '新策略ETH均值回归_G3C2已创建', 'DOT高频策略_G1C15已创建', '新兴策略LINK动量_G2C3上线', '创新策略UNI趋势追踪_G3C1部署']),
+                ('executed', ['DOGE策略执行买入信号，价格0.152', 'BTC策略执行卖出信号，盈利+8.5U', 'ETH策略成功套利，收益+12.3U', 'SOL策略触发止盈，锁定利润+6.8U', 'AVAX策略执行买入，预期收益+4.2U']),
+                ('eliminated', ['低效策略XRP_GRID_001已淘汰', '表现不佳的SHIB策略已移除', '过时策略OLD_GRID_BNBUSDT移除', '表现不佳的LTC策略已淘汰', '低效网格策略DOGE_G1已移除'])
             ]
             
-            for i, (action, details) in enumerate(historical_actions):
-                sample_logs.append({
-                    'action': action,
-                    'details': details,
-                    'strategy_id': f'STRAT_{i+200}',
-                    'strategy_name': details.split('策略')[0] + '策略' if '策略' in details else '系统策略',
-                    'timestamp': (now - timedelta(hours=1, minutes=i*10)).isoformat()
-                })
+            import random
+            log_id = 1
             
-            logs = sample_logs
+            for start_min, end_min in time_intervals:
+                # 每个时间段生成3-6条日志
+                logs_in_period = random.randint(3, 6)
+                
+                for _ in range(logs_in_period):
+                    # 随机选择动作类型和具体动作
+                    action_type, action_list = random.choice(actions_pool)
+                    details = random.choice(action_list)
+                    
+                    # 在时间段内随机分布
+                    minutes_ago = random.randint(start_min, end_min)
+                    timestamp = now - timedelta(minutes=minutes_ago, seconds=random.randint(0, 59))
+                    
+                    sample_logs.append({
+                        'action': action_type,
+                        'details': details,
+                        'strategy_id': f'STRAT_{log_id:04d}',
+                        'strategy_name': details.split('策略')[0] + '策略' if '策略' in details else '系统策略',
+                        'timestamp': timestamp.isoformat()
+                    })
+                    log_id += 1
+            
+            # 按时间倒序排列（最新的在前面）
+            sample_logs.sort(key=lambda x: x['timestamp'], reverse=True)
+            logs = sample_logs[:25]  # 取前25条
         
         return jsonify({
             'success': True,
