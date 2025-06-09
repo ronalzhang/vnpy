@@ -78,6 +78,7 @@ except Exception as e:
 import traceback
 import logging
 from db_config import get_db_adapter
+import psycopg2  # 🔧 全局导入修复，解决"name 'psycopg2' is not defined"错误
 
 # 全局变量用于延迟导入
 pd = None
@@ -2430,7 +2431,6 @@ class QuantitativeService:
         self.exchange_clients = self._init_exchange_clients()
         
         # ⭐ PostgreSQL连接配置 - 移除SQLite
-        import psycopg2
         self.db_config = {
             'host': 'localhost',
             'database': 'quantitative',
