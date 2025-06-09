@@ -1334,44 +1334,113 @@ def strategy_detail(strategy_id):
             if not parameters or len(parameters) < 5:  # 参数太少说明配置不完整
                 default_params = {
                     'momentum': {
+                        # 基础参数
                         'lookback_period': 20, 'threshold': 0.02, 'quantity': 100,
                         'momentum_threshold': 0.01, 'volume_threshold': 2.0,
+                        # 技术指标参数 - RSI
                         'rsi_period': 14, 'rsi_oversold': 30, 'rsi_overbought': 70,
+                        # MACD指标参数
                         'macd_fast_period': 12, 'macd_slow_period': 26, 'macd_signal_period': 9,
+                        # 价格动量参数
+                        'price_momentum_period': 10, 'volume_momentum_period': 20,
+                        # 风险控制参数
                         'stop_loss_pct': 2.0, 'take_profit_pct': 4.0, 'max_drawdown_pct': 5.0,
-                        'position_sizing': 0.1, 'min_hold_time': 300, 'max_hold_time': 3600
+                        'position_sizing': 0.1, 'max_position_risk': 0.05,
+                        # 时间管理参数
+                        'min_hold_time': 300, 'max_hold_time': 3600,
+                        'trade_start_hour': 0, 'trade_end_hour': 24
                     },
                     'mean_reversion': {
+                        # 基础参数
                         'lookback_period': 30, 'std_multiplier': 2.0, 'quantity': 100,
                         'reversion_threshold': 0.02, 'min_deviation': 0.01,
+                        # 布林带参数
                         'bb_period': 20, 'bb_std_dev': 2.0, 'bb_squeeze_threshold': 0.1,
+                        # 均值回归指标
                         'z_score_threshold': 2.0, 'correlation_threshold': 0.7,
-                        'stop_loss_pct': 1.5, 'take_profit_pct': 3.0, 'max_positions': 3
+                        'volatility_threshold': 0.02, 'mean_lookback': 50,
+                        # Bollinger Bands扩展参数
+                        'bb_upper_threshold': 0.9, 'bb_lower_threshold': 0.1,
+                        # 风险控制
+                        'stop_loss_pct': 1.5, 'take_profit_pct': 3.0, 'max_positions': 3,
+                        'min_profit_target': 0.5, 'position_scaling': 0.8,
+                        # 时间控制
+                        'entry_cooldown': 600, 'max_trade_duration': 7200,
+                        'avoid_news_hours': True, 'weekend_trading': False
                     },
                     'grid_trading': {
+                        # 网格基础参数
                         'grid_spacing': 1.0, 'grid_count': 10, 'quantity': 1000,
                         'lookback_period': 100, 'min_profit': 0.5,
+                        # 网格高级参数
                         'upper_price_limit': 110000, 'lower_price_limit': 90000,
                         'grid_density': 0.5, 'rebalance_threshold': 5.0,
-                        'max_grid_exposure': 10000, 'emergency_stop_loss': 10.0
+                        'profit_taking_ratio': 0.8, 'grid_spacing_type': 'arithmetic',
+                        # 动态调整参数
+                        'volatility_adjustment': True, 'trend_filter_enabled': True,
+                        'volume_weighted': True, 'dynamic_spacing': True,
+                        # 网格优化参数
+                        'grid_adaptation_period': 24, 'price_range_buffer': 0.1,
+                        # 风险管理
+                        'max_grid_exposure': 10000, 'emergency_stop_loss': 10.0,
+                        'grid_pause_conditions': True, 'liquidity_threshold': 1000000,
+                        'single_grid_risk': 0.02
                     },
                     'breakout': {
+                        # 突破基础参数
                         'lookback_period': 20, 'breakout_threshold': 1.5, 'quantity': 50,
                         'volume_threshold': 2.0, 'confirmation_periods': 3,
+                        # 技术指标确认
                         'atr_period': 14, 'atr_multiplier': 2.0,
-                        'stop_loss_atr_multiple': 2.0, 'take_profit_atr_multiple': 4.0
+                        'volume_ma_period': 20, 'price_ma_period': 50,
+                        'momentum_confirmation': True, 'volume_confirmation': True,
+                        # 假突破过滤
+                        'false_breakout_filter': True, 'pullback_tolerance': 0.3,
+                        'breakout_strength_min': 1.2, 'minimum_breakout_volume': 1.5,
+                        # 突破确认参数
+                        'breakout_confirmation_candles': 2, 'resistance_support_buffer': 0.1,
+                        # 风险控制
+                        'stop_loss_atr_multiple': 2.0, 'take_profit_atr_multiple': 4.0,
+                        'trailing_stop_enabled': True, 'max_holding_period': 14400,
+                        'position_risk_limit': 0.03
                     },
                     'high_frequency': {
+                        # 高频基础参数
                         'quantity': 100, 'min_profit': 0.05, 'volatility_threshold': 0.001,
                         'lookback_period': 10, 'signal_interval': 30,
+                        # 微观结构参数
                         'bid_ask_spread_threshold': 0.01, 'order_book_depth_min': 1000,
-                        'max_order_size': 1000, 'inventory_limit': 5000
+                        'tick_size_multiple': 1.0, 'latency_threshold': 100,
+                        'market_impact_limit': 0.001, 'slippage_tolerance': 0.002,
+                        # 高频交易优化
+                        'order_book_levels': 5, 'imbalance_threshold': 0.3,
+                        'tick_rule_filter': True, 'momentum_timeframe': 60,
+                        # 风险和执行
+                        'max_order_size': 1000, 'inventory_limit': 5000,
+                        'pnl_stop_loss': 100, 'correlation_hedge': True,
+                        'max_drawdown_hf': 2.0, 'daily_loss_limit': 500,
+                        # 时间控制
+                        'trading_session_length': 3600, 'cooldown_period': 60,
+                        'avoid_rollover': True, 'market_hours_only': True
                     },
                     'trend_following': {
+                        # 趋势基础参数
                         'lookback_period': 50, 'trend_threshold': 1.0, 'quantity': 100,
+                        'trend_strength_min': 0.3, 'trend_duration_min': 30,
+                        # 趋势识别参数
                         'ema_fast_period': 12, 'ema_slow_period': 26,
                         'adx_period': 14, 'adx_threshold': 25,
-                        'trailing_stop_pct': 3.0, 'profit_lock_pct': 2.0
+                        'slope_threshold': 0.001, 'trend_angle_min': 15,
+                        # 趋势确认指标
+                        'macd_confirmation': True, 'volume_confirmation': True,
+                        'momentum_confirmation': True, 'multi_timeframe': True,
+                        'ichimoku_enabled': True, 'parabolic_sar_enabled': True,
+                        # 趋势过滤参数
+                        'noise_filter_enabled': True, 'trend_quality_min': 0.7,
+                        # 风险和退出
+                        'trailing_stop_pct': 3.0, 'trend_reversal_exit': True,
+                        'profit_lock_pct': 2.0, 'max_adverse_excursion': 4.0,
+                        'trend_exhaustion_exit': True, 'position_pyramid': False
                     }
                 }
                 
