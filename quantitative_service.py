@@ -2675,25 +2675,8 @@ class QuantitativeService:
                 except Exception as e:
                     print(f"⚠️ Binance初始化失败: {e}")
             
-            # 初始化OKX - 使用与web_app.py一致的配置逻辑
-            if 'okx' in self.config and self.config['okx'].get('api_key'):
-                try:
-                    okx_config = {
-                        'apiKey': self.config['okx']['api_key'],
-                        'secret': self.config['okx']['secret_key'],  # 统一使用secret_key
-                        'sandbox': False,
-                        'enableRateLimit': True,
-                    }
-                    
-                    # OKX特殊处理：使用passphrase字段，提供password作为fallback
-                    passphrase = self.config['okx'].get('passphrase') or self.config['okx'].get('password', '')
-                    if passphrase and str(passphrase).strip():
-                        okx_config['password'] = str(passphrase)
-                    
-                    clients['okx'] = ccxt.okx(okx_config)
-                    print("✅ OKX客户端初始化成功")
-                except Exception as e:
-                    print(f"⚠️ OKX初始化失败: {e}")
+            # OKX客户端由web_app.py统一管理，这里不重复创建
+            print("🔗 OKX客户端将使用web_app.py统一管理的实例")
             
             # 初始化Bitget
             if 'bitget' in self.config and self.config['bitget'].get('api_key'):

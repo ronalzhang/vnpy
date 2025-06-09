@@ -223,38 +223,8 @@ class CryptoArbitrageEngine:
                 okex_secret = okex_config.get("secret", "")
                 okex_passphrase = okex_config.get("passphrase", "")
                 
-                if okex_key and okex_secret and okex_passphrase:
-                    try:
-                        self.write_log(f"正在连接OKX交易所API...", level="INFO", force=True)
-                        self.exchanges["okex"] = ccxt.okx({
-                            'apiKey': okex_key,
-                            'secret': okex_secret,
-                            'password': okex_passphrase,
-                            'enableRateLimit': True,
-                            'timeout': 10000,  # 10秒超时
-                            'proxies': self.get_proxy(config)
-                        })
-                        # 测试API连接 - 使用简单的公共API测试，而不是加载整个市场
-                        self.write_log(f"OKX API连接成功，正在测试API...", level="INFO", force=True)
-                        
-                        import time
-                        start_time = time.time()
-                        # 只测试一个交易对的行情
-                        test_result = self.exchanges["okex"].fetch_ticker("BTC/USDT")
-                        time_used = time.time() - start_time
-                        self.write_log(f"OKX API请求耗时: {time_used:.2f}秒", level="INFO", force=True)
-                        
-                        if test_result:
-                            self.write_log(f"OKX API测试成功，当前BTC价格: {test_result['last']:.2f} USDT", level="INFO", force=True)
-                            api_ok_count += 1
-                    except Exception as e:
-                        error_msg = f"OKX交易所初始化失败: {str(e)}"
-                        self.write_log(error_msg, level="ERROR", force=True)
-                        connection_errors.append(error_msg)
-                        if "okex" in self.exchanges:
-                            del self.exchanges["okex"]
-                else:
-                    self.write_log("OKX交易所API密钥未完全设置，跳过", level="WARNING", force=True)
+                # OKX客户端由web_app.py统一管理，这里不重复创建
+                self.write_log("OKX客户端将使用web_app.py统一管理的实例", level="INFO", force=True)
             
             # 获取Binance交易所配置
             binance_config = api_keys.get("binance", {})
