@@ -1437,7 +1437,7 @@ class QuantitativeSystem {
         }
     }
 
-    // 渲染进化日志 - CNN滚动新闻样式（只显示最新10条）
+    // 渲染进化日志 - CNN滚动新闻样式（显示最新15条）
     renderEvolutionLog(logs) {
         const ticker = document.getElementById('evolutionTicker');
         if (!ticker) return;
@@ -1445,8 +1445,8 @@ class QuantitativeSystem {
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
 
-        // 只取最新的10条日志用于滚动显示
-        const recentLogs = this.allEvolutionLogs.slice(-10);
+        // 增加滚动显示的日志条数到15条
+        const recentLogs = this.allEvolutionLogs.slice(-15);
         
         const tickerContent = recentLogs.map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
