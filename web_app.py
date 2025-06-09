@@ -1329,9 +1329,32 @@ def strategy_detail(strategy_id):
             except:
                 parameters = {}
             
-            # 🔥 如果参数为空或不完整，使用策略类型的完整默认参数
+            # 🔥 使用统一的策略参数配置
+            from strategy_parameters_config import get_strategy_default_parameters
+            
             strategy_type = row[3]  # type字段
             if not parameters or len(parameters) < 5:  # 参数太少说明配置不完整
+                # 使用统一配置获取默认参数
+                default_for_type = get_strategy_default_parameters(strategy_type)
+                if not default_for_type:  # 如果策略类型不存在，使用基础默认参数
+                    default_for_type = {
+                        'lookback_period': 20, 'threshold': 0.02, 'quantity': 100,
+                        'stop_loss_pct': 2.0, 'take_profit_pct': 4.0
+                    }
+                
+                # 合并参数：优先使用数据库中的现有参数，缺失的用默认值填充
+                for key, default_value in default_for_type.items():
+                    if key not in parameters:
+                        parameters[key] = default_value
+            else:
+                # 即使参数足够，也要确保所有重要参数都存在
+                default_for_type = get_strategy_default_parameters(strategy_type)
+                for key, default_value in default_for_type.items():
+                    if key not in parameters:
+                        parameters[key] = default_value
+            
+            # 兼容性代码开始 - 为了不破坏现有逻辑，保留原有的default_params结构
+            if False:  # 永远不执行，只是为了保持代码结构
                 default_params = {
                     'momentum': {
                         # 基础参数
@@ -1443,17 +1466,6 @@ def strategy_detail(strategy_id):
                         'trend_exhaustion_exit': True, 'position_pyramid': False
                     }
                 }
-                
-                # 使用策略类型的默认参数，并与现有参数合并
-                default_for_type = default_params.get(strategy_type, {
-                    'lookback_period': 20, 'threshold': 0.02, 'quantity': 100,
-                    'stop_loss_pct': 2.0, 'take_profit_pct': 4.0
-                })
-                
-                # 合并参数：优先使用数据库中的现有参数，缺失的用默认值填充
-                for key, default_value in default_for_type.items():
-                    if key not in parameters:
-                        parameters[key] = default_value
             
             strategy = {
                 'id': row[0],
@@ -1533,152 +1545,19 @@ def reset_strategy_params(strategy_id):
         
         strategy_type = row[0]
         
-        # 📊 扩展的策略参数配置 - 每种策略类型10+个参数
-        expanded_params = {
-            'momentum': {
-                # 基础参数
+        # 📊 使用统一配置获取策略参数
+        from strategy_parameters_config import get_strategy_default_parameters
+        expanded_params = get_strategy_default_parameters(strategy_type)
+        
+        if not expanded_params:
+            # 如果策略类型不存在，使用基础默认参数
+            expanded_params = {
                 'lookback_period': 20,
                 'threshold': 0.02,
                 'quantity': 100,
-                'momentum_threshold': 0.01,
-                'volume_threshold': 2.0,
-                # 技术指标参数
-                'rsi_period': 14,
-                'rsi_oversold': 30,
-                'rsi_overbought': 70,
-                'macd_fast_period': 12,
-                'macd_slow_period': 26,
-                'macd_signal_period': 9,
-                # 风险控制参数
                 'stop_loss_pct': 2.0,
-                'take_profit_pct': 4.0,
-                'max_drawdown_pct': 5.0,
-                'position_sizing': 0.1,
-                # 时间管理参数
-                'min_hold_time': 300,  # 5分钟
-                'max_hold_time': 3600,  # 1小时
-                'trade_start_hour': 0,
-                'trade_end_hour': 24
-            },
-            'mean_reversion': {
-                # 基础参数
-                'lookback_period': 30,
-                'std_multiplier': 2.0,
-                'quantity': 100,
-                'reversion_threshold': 0.02,
-                'min_deviation': 0.01,
-                # 布林带参数
-                'bb_period': 20,
-                'bb_std_dev': 2.0,
-                'bb_squeeze_threshold': 0.1,
-                # 均值回归指标
-                'z_score_threshold': 2.0,
-                'correlation_threshold': 0.7,
-                'volatility_threshold': 0.02,
-                # 风险控制
-                'stop_loss_pct': 1.5,
-                'take_profit_pct': 3.0,
-                'max_positions': 3,
-                'min_profit_target': 0.5,
-                # 时间控制
-                'entry_cooldown': 600,  # 10分钟
-                'max_trade_duration': 7200,  # 2小时
-                'avoid_news_hours': True
-            },
-            'grid_trading': {
-                # 网格基础参数
-                'grid_spacing': 1.0,
-                'grid_count': 10,
-                'quantity': 1000,
-                'lookback_period': 100,
-                'min_profit': 0.5,
-                # 网格高级参数
-                'upper_price_limit': 110000,
-                'lower_price_limit': 90000,
-                'grid_density': 0.5,
-                'rebalance_threshold': 5.0,
-                'profit_taking_ratio': 0.8,
-                # 动态调整参数
-                'volatility_adjustment': True,
-                'trend_filter_enabled': True,
-                'volume_weighted': True,
-                # 风险管理
-                'max_grid_exposure': 10000,
-                'emergency_stop_loss': 10.0,
-                'grid_pause_conditions': True,
-                'liquidity_threshold': 1000000
-            },
-            'breakout': {
-                # 突破基础参数
-                'lookback_period': 20,
-                'breakout_threshold': 1.5,
-                'quantity': 50,
-                'volume_threshold': 2.0,
-                'confirmation_periods': 3,
-                # 技术指标确认
-                'atr_period': 14,
-                'atr_multiplier': 2.0,
-                'volume_ma_period': 20,
-                'price_ma_period': 50,
-                'momentum_confirmation': True,
-                # 假突破过滤
-                'false_breakout_filter': True,
-                'pullback_tolerance': 0.3,
-                'breakout_strength_min': 1.2,
-                # 风险控制
-                'stop_loss_atr_multiple': 2.0,
-                'take_profit_atr_multiple': 4.0,
-                'trailing_stop_enabled': True,
-                'max_holding_period': 14400  # 4小时
-            },
-            'high_frequency': {
-                # 高频基础参数
-                'quantity': 100,
-                'min_profit': 0.05,
-                'volatility_threshold': 0.001,
-                'lookback_period': 10,
-                'signal_interval': 30,
-                # 微观结构参数
-                'bid_ask_spread_threshold': 0.01,
-                'order_book_depth_min': 1000,
-                'tick_size_multiple': 1.0,
-                'latency_threshold': 100,  # 毫秒
-                'market_impact_limit': 0.001,
-                # 风险和执行
-                'max_order_size': 1000,
-                'inventory_limit': 5000,
-                'pnl_stop_loss': 100,
-                'correlation_hedge': True,
-                # 时间控制
-                'trading_session_length': 3600,
-                'cooldown_period': 60,
-                'avoid_rollover': True
-            },
-            'trend_following': {
-                # 趋势基础参数
-                'lookback_period': 50,
-                'trend_threshold': 1.0,
-                'quantity': 100,
-                'trend_strength_min': 0.3,
-                # 趋势识别参数
-                'ema_fast_period': 12,
-                'ema_slow_period': 26,
-                'adx_period': 14,
-                'adx_threshold': 25,
-                'slope_threshold': 0.001,
-                # 趋势确认指标
-                'macd_confirmation': True,
-                'volume_confirmation': True,
-                'momentum_confirmation': True,
-                'multi_timeframe': True,
-                # 风险和退出
-                'trailing_stop_pct': 3.0,
-                'trend_reversal_exit': True,
-                'profit_lock_pct': 2.0,
-                'max_adverse_excursion': 4.0,
-                'trend_exhaustion_exit': True
+                'take_profit_pct': 4.0
             }
-        }.get(strategy_type, {})
         
         # 重置参数到数据库
         import json

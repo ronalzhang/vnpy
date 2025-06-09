@@ -2471,117 +2471,45 @@ class QuantitativeService:
         print("✅ QuantitativeService 初始化完成")
     
     def _init_strategy_templates(self):
-        """初始化策略参数模板 - 每种策略类型都有丰富的参数"""
-        self.strategy_templates = {
-            'momentum': {
-                'name_prefix': '动量策略',
-                'symbols': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'ADA/USDT', 'DOT/USDT'],
-                'param_ranges': {
-                    'rsi_period': (10, 30),           # RSI周期
-                    'rsi_oversold': (20, 40),         # RSI超卖线
-                    'rsi_overbought': (60, 80),       # RSI超买线
-                    'macd_fast': (8, 15),             # MACD快线
-                    'macd_slow': (20, 30),            # MACD慢线
-                    'macd_signal': (7, 12),           # MACD信号线
-                    'momentum_period': (5, 25),        # 动量周期
-                    'price_change_threshold': (0.01, 0.05),  # 价格变化阈值
-                    'volume_filter': (0.8, 2.0),      # 成交量过滤器
-                    'stop_loss': (0.02, 0.08),        # 止损比例
-                    'take_profit': (0.03, 0.12),      # 止盈比例
-                    'quantity': (0.5, 2.0)            # 交易数量
-                }
-            },
-            'mean_reversion': {
-                'name_prefix': '均值回归',
-                'symbols': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'LTC/USDT', 'XRP/USDT'],
-                'param_ranges': {
-                    'lookback_period': (10, 50),      # 回望周期
-                    'std_multiplier': (1.5, 3.0),     # 标准差倍数
-                    'bollinger_period': (15, 30),     # 布林带周期
-                    'bollinger_std': (1.8, 2.5),      # 布林带标准差
-                    'volatility_threshold': (0.02, 0.08),  # 波动率阈值
-                    'mean_reversion_strength': (0.1, 0.4),  # 回归强度
-                    'entry_threshold': (0.015, 0.04), # 入场阈值
-                    'exit_threshold': (0.005, 0.02),  # 出场阈值
-                    'max_hold_period': (12, 72),      # 最大持有时间(小时)
-                    'risk_per_trade': (0.01, 0.03),   # 单笔交易风险
-                    'quantity': (0.3, 1.5)            # 交易数量
-                }
-            },
-            'breakout': {
-                'name_prefix': '突破策略',
-                'symbols': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT'],
-                'param_ranges': {
-                    'breakout_period': (15, 40),      # 突破检测周期
-                    'resistance_lookback': (20, 60),  # 阻力位回望
-                    'support_lookback': (20, 60),     # 支撑位回望
-                    'breakout_threshold': (0.008, 0.025),  # 突破阈值
-                    'volume_confirmation': (1.2, 3.0), # 成交量确认倍数
-                    'momentum_confirmation': (0.5, 1.5), # 动量确认
-                    'false_breakout_filter': (0.3, 0.8), # 假突破过滤器
-                    'consolidation_period': (8, 24),   # 整理期检测
-                    'trend_strength_min': (0.4, 0.8),  # 最小趋势强度
-                    'stop_loss': (0.015, 0.06),       # 止损
-                    'trailing_stop': (0.01, 0.04),    # 移动止损
-                    'quantity': (0.4, 1.8)            # 交易数量
-                }
-            },
-            'grid_trading': {
-                'name_prefix': '网格交易',
-                'symbols': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'SHIB/USDT', 'MATIC/USDT'],
-                'param_ranges': {
-                    'grid_spacing': (0.005, 0.025),   # 网格间距
-                    'grid_count': (5, 15),            # 网格数量
-                    'upper_limit': (0.03, 0.10),      # 上限百分比
-                    'lower_limit': (0.03, 0.10),      # 下限百分比
-                    'take_profit_each': (0.008, 0.020), # 单格止盈
-                    'rebalance_threshold': (0.15, 0.35), # 再平衡阈值
-                    'volatility_adjustment': (0.5, 1.5), # 波动率调整
-                    'trend_following_ratio': (0.2, 0.6), # 趋势跟随比例
-                    'max_grid_positions': (3, 8),     # 最大网格仓位
-                    'base_quantity': (0.1, 0.5),      # 基础数量
-                    'quantity_multiplier': (1.0, 2.0), # 数量倍数
-                    'safety_margin': (0.05, 0.15)     # 安全边际
-                }
-            },
-            'high_frequency': {
-                'name_prefix': '高频策略',
-                'symbols': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'LTC/USDT', 'BCH/USDT'],
-                'param_ranges': {
-                    'tick_size': (0.001, 0.005),      # 最小变动单位
-                    'spread_threshold': (0.0005, 0.002), # 价差阈值
-                    'order_book_depth': (3, 10),      # 订单簿深度
-                    'latency_tolerance': (50, 200),   # 延迟容忍度(ms)
-                    'market_impact_limit': (0.001, 0.005), # 市场冲击限制
-                    'inventory_limit': (0.1, 0.4),    # 库存限制
-                    'profit_target': (0.0008, 0.003), # 盈利目标
-                    'max_position_time': (5, 30),     # 最大持仓时间(分钟)
-                    'volatility_scaling': (0.5, 2.0), # 波动率缩放
-                    'risk_limit': (0.005, 0.02),      # 风险限制
-                    'min_volume': (100, 1000),        # 最小成交量
-                    'quantity': (0.1, 0.8)            # 交易数量
-                }
-            },
-            'trend_following': {
-                'name_prefix': '趋势跟踪',
-                'symbols': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT'],
-                'param_ranges': {
-                    'trend_period': (20, 60),         # 趋势检测周期
-                    'ema_fast': (8, 20),              # 快速EMA
-                    'ema_slow': (25, 55),             # 慢速EMA
-                    'adx_period': (10, 25),           # ADX周期
-                    'adx_threshold': (20, 35),        # ADX阈值
-                    'trend_strength_min': (0.3, 0.7), # 最小趋势强度
-                    'pullback_tolerance': (0.02, 0.08), # 回调容忍度
-                    'entry_confirmation': (2, 5),     # 入场确认周期
-                    'exit_signal_period': (3, 10),    # 出场信号周期
-                    'trailing_stop_atr': (1.5, 4.0),  # ATR移动止损
-                    'position_sizing': (0.5, 1.5),    # 仓位大小
-                    'quantity': (0.4, 1.6)            # 交易数量
-                }
+        """初始化策略参数模板 - 使用统一配置"""
+        from strategy_parameters_config import get_strategy_parameter_ranges, get_all_strategy_types
+        
+        # 使用统一配置生成策略模板
+        template_data = {}
+        for strategy_type in get_all_strategy_types():
+            param_ranges = get_strategy_parameter_ranges(strategy_type)
+            template_data[strategy_type] = {
+                'name_prefix': self._get_strategy_name_prefix(strategy_type),
+                'symbols': self._get_strategy_symbols(strategy_type),
+                'param_ranges': param_ranges
             }
+        
+        self.strategy_templates = template_data
+        print(f"✅ 策略参数模板初始化完成，包含{len(template_data)}种策略类型，使用统一参数配置")
+    
+    def _get_strategy_name_prefix(self, strategy_type: str) -> str:
+        """获取策略名称前缀"""
+        name_map = {
+            'momentum': '动量策略',
+            'mean_reversion': '均值回归',
+            'breakout': '突破策略',
+            'grid_trading': '网格交易',
+            'high_frequency': '高频策略',
+            'trend_following': '趋势跟踪'
         }
-        print("✅ 策略参数模板初始化完成，包含6种策略类型，每种策略10-12个参数")
+        return name_map.get(strategy_type, '未知策略')
+    
+    def _get_strategy_symbols(self, strategy_type: str) -> list:
+        """获取策略适用的交易对"""
+        symbol_map = {
+            'momentum': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'ADA/USDT', 'DOT/USDT'],
+            'mean_reversion': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'LTC/USDT', 'XRP/USDT'],
+            'breakout': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'AVAX/USDT'],
+            'grid_trading': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'SHIB/USDT', 'MATIC/USDT'],
+            'high_frequency': ['BTC/USDT', 'ETH/USDT', 'DOGE/USDT', 'LTC/USDT', 'BCH/USDT'],
+            'trend_following': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT']
+        }
+        return symbol_map.get(strategy_type, ['BTC/USDT', 'ETH/USDT'])
     
     def _generate_strategy_from_template(self, strategy_type: str) -> Dict:
         """⭐ 从模板生成具有丰富参数的新策略"""
