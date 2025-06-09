@@ -209,9 +209,17 @@ def init_api_clients():
                     
                     # OKX特殊处理：使用passphrase字段
                     if exchange_id == 'okx':
+                        print(f"🔍 开始OKX初始化...")
+                        print(f"📋 OKX配置检查: api_key长度={len(api_key)}, secret_key长度={len(secret_key)}")
+                        
                         passphrase = config[exchange_id].get("passphrase") or config[exchange_id].get("password", "")
+                        print(f"🔑 passphrase字段: {bool(passphrase)}, 长度={len(str(passphrase)) if passphrase else 0}")
+                        
                         if passphrase and str(passphrase).strip():
                             client_config['password'] = str(passphrase)
+                            print(f"✅ OKX密码字段已设置")
+                        else:
+                            print(f"❌ OKX缺少passphrase/password字段")
                     else:
                         # 其他交易所的password处理
                         password = config[exchange_id].get("password", "")
@@ -229,23 +237,35 @@ def init_api_clients():
                             }
                     
                     # 使用连接管理器获取客户端
+                    if exchange_id == 'okx':
+                        print(f"🚀 开始创建OKX客户端...")
+                        print(f"📦 客户端配置: sandbox={client_config.get('sandbox')}, enableRateLimit={client_config.get('enableRateLimit')}")
+                    
                     client = connection_manager.get_client(exchange_id, client_config)
                     
                     # 测试API连接
                     if client:
+                        if exchange_id == 'okx':
+                            print(f"✅ OKX客户端创建成功！")
                         try:
                             print(f"测试 {exchange_id} API连接...")
                             # 测试获取价格数据（不需要账户权限）
                             test_ticker = client.fetch_ticker('BTC/USDT')
                             print(f"初始化 {exchange_id} API客户端成功 - BTC价格: {test_ticker['last']}")
                             exchange_clients[exchange_id] = client
+                            if exchange_id == 'okx':
+                                print(f"🎉 OKX已成功添加到exchange_clients中！")
                         except Exception as e:
                             print(f"API连接测试失败 {exchange_id}: {e}")
                             # 即使测试失败也添加客户端，可能是权限问题但价格数据仍可获取
                             exchange_clients[exchange_id] = client
                             print(f"强制添加 {exchange_id} 客户端用于价格数据获取")
+                            if exchange_id == 'okx':
+                                print(f"⚠️ OKX虽然测试失败但已强制添加到exchange_clients中")
                     else:
                         print(f"无法创建 {exchange_id} 客户端")
+                        if exchange_id == 'okx':
+                            print(f"❌ OKX客户端创建完全失败！")
                 except Exception as e:
                     print(f"初始化 {exchange_id} API客户端失败: {e}")
             else:
