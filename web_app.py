@@ -1560,7 +1560,7 @@ def get_strategy_trade_logs(strategy_id):
         
         cursor.execute("""
             SELECT timestamp, symbol, signal_type, price, quantity, 
-                   pnl, executed, id, signal_id
+                   pnl, executed, id, strategy_name, action, real_pnl
             FROM strategy_trade_logs 
             WHERE strategy_id = %s
             ORDER BY timestamp DESC
@@ -1573,60 +1573,29 @@ def get_strategy_trade_logs(strategy_id):
         for row in rows:
             logs.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
-                'symbol': row[1],
-                'signal_type': row[2],
+                'symbol': row[1] or '',
+                'signal_type': row[2] or '',
                 'price': float(row[3]) if row[3] else 0.0,
                 'quantity': float(row[4]) if row[4] else 0.0,
                 'pnl': float(row[5]) if row[5] else 0.0,
-                'executed': bool(row[6]),
-                'confidence': 85.0 + (hash(str(row[7])) % 20),  # 模拟置信度 85-95%
+                'executed': bool(row[6]) if row[6] is not None else False,
+                'id': row[7],
+                'strategy_name': row[8] or '',
+                'action': row[9] or '',
+                'real_pnl': float(row[10]) if row[10] else 0.0
             })
         
         conn.close()
-        
-        # 如果没有日志，返回示例日志
-        if not logs:
-            from datetime import datetime, timedelta
-            logs = [
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'symbol': 'BTC/USDT',
-                    'signal_type': 'buy',
-                    'price': 98500.0,
-                    'quantity': 0.02,
-                    'confidence': 85.5,
-                    'executed': True,
-                    'pnl': 12.5
-                },
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'symbol': 'BTC/USDT',
-                    'signal_type': 'sell',
-                    'price': 99200.0,
-                    'quantity': 0.02,
-                    'confidence': 88.2,
-                    'executed': True,
-                    'pnl': 14.0
-                },
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'symbol': 'BTC/USDT',
-                    'signal_type': 'buy',
-                    'price': 98800.0,
-                    'quantity': 0.015,
-                    'confidence': 82.3,
-                    'executed': True,
-                    'pnl': -5.2
-                }
-            ]
-        
-        return jsonify({'status': 'success', 'data': logs})
+        return jsonify({
+            "status": "success",
+            "logs": logs
+        })
         
     except Exception as e:
-        print(f"获取交易日志错误: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'status': 'error', 'message': str(e)})
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 @app.route('/api/quantitative/strategies/<strategy_id>/optimization-logs', methods=['GET'])
 def get_strategy_optimization_logs(strategy_id):
