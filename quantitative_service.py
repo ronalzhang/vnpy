@@ -6482,7 +6482,7 @@ class ParameterOptimizer:
         return changes
     
     def _optimize_entry_parameters(self, params):
-        \"\"\"🎯 优化进场参数提升胜率\"\"\"
+        """🎯 优化进场参数提升胜率"""
         changes = []
         
         # RSI 参数优化
@@ -6500,7 +6500,7 @@ class ParameterOptimizer:
         return changes
     
     def _optimize_profit_parameters(self, params):
-        \"\"\"💰 优化盈利参数提升收益\"\"\"
+        """💰 优化盈利参数提升收益"""
         changes = []
         
         # 止盈参数优化
@@ -6518,7 +6518,7 @@ class ParameterOptimizer:
         return changes
     
     def _optimize_risk_parameters(self, params):
-        \"\"\"🛡️ 优化风险控制参数\"\"\"
+        """🛡️ 优化风险控制参数"""
         changes = []
         
         # 止损参数优化
