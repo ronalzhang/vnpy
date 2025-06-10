@@ -1278,7 +1278,18 @@ def quantitative_strategies():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 获取前20个优质策略（按评分排序）
+            # 🔥 修复：从配置中获取显示的策略数量
+            max_display_strategies = 20  # 默认显示20个
+            try:
+                cursor.execute("SELECT config_value FROM strategy_management_config WHERE config_key = 'maxStrategies'")
+                max_strategies_config = cursor.fetchone()
+                if max_strategies_config:
+                    max_display_strategies = int(float(max_strategies_config[0]))
+                    print(f"🔧 策略显示数量从配置获取: {max_display_strategies}")
+            except Exception as e:
+                print(f"获取maxStrategies配置失败，使用默认值: {e}")
+            
+            # 获取配置数量的优质策略（按评分排序）
             cursor.execute('''
                 SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
                        s.created_at, s.generation, s.cycle,
@@ -1292,8 +1303,8 @@ def quantitative_strategies():
                 GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
                          s.final_score, s.created_at, s.generation, s.cycle
                 ORDER BY s.final_score DESC, s.created_at DESC
-                LIMIT 20
-            ''')
+                LIMIT %s
+            ''', (max_display_strategies,))
             
             rows = cursor.fetchall()
             strategies = []

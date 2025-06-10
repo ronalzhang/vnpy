@@ -7100,7 +7100,10 @@ class EvolutionaryStrategyEngine:
     def _generate_new_strategies(self, elites: List[Dict], all_strategies: List[Dict]) -> List[Dict]:
         """生成新策略 - 针对90+分策略优化"""
         new_strategies = []
-        target_count = max(12 - len(all_strategies), 3)  # 保持12个策略
+        # 🔧 修复：使用配置中的maxStrategies而不是硬编码12
+        max_strategies = self.evolution_config.get('max_strategies', 12)
+        target_count = max(max_strategies - len(all_strategies), 1)  # 保持配置数量的策略
+        print(f"🔧 根据maxStrategies配置={max_strategies}，当前有{len(all_strategies)}个策略，需要生成{target_count}个新策略")
         
         # 🎯 优先生成策略类型的分布
         strategy_types = ['momentum', 'mean_reversion', 'breakout', 'grid_trading', 'high_frequency', 'trend_following']
