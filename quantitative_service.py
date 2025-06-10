@@ -4493,7 +4493,7 @@ class QuantitativeService:
             return False
     
     def get_signals(self, limit=50):
-        """获取交易信号 - 仅返回真实交易信号"""
+        """获取交易信号 - 返回标准格式"""
         try:
             # 🚫 检查是否为真实数据模式
             if self._is_real_data_only_mode():
@@ -4522,7 +4522,10 @@ class QuantitativeService:
                     })
                 
                 print(f"📊 返回 {len(signals)} 个真实交易信号")
-                return signals
+                return {
+                    'success': True,
+                    'data': signals
+                }
             
             # 原有逻辑（非真实数据模式）
             cursor = self.conn.cursor()
@@ -4544,11 +4547,18 @@ class QuantitativeService:
                     'executed': bool(row[5])
                 })
             
-            return signals
+            return {
+                'success': True,
+                'data': signals
+            }
             
         except Exception as e:
             print(f"❌ 获取交易信号失败: {e}")
-            return []
+            return {
+                'success': False,
+                'data': [],
+                'message': str(e)
+            }
     
     def get_balance_history(self, days=30):
         """获取资产历史"""
@@ -6633,7 +6643,7 @@ class EvolutionaryStrategyEngine:
             'target_success_rate': 1.0,  # 100%
             'max_strategies': 50,  # 同时运行的最大策略数 (增加到50个)
             'min_strategies': 10,   # 保持的最小策略数
-            'evolution_interval': 600,  # 10分钟进化一次 (600秒)
+            'evolution_interval': 180,  # 3分钟进化一次 (180秒)
             'mutation_rate': 0.25,  # 降低变异率，提高稳定性
             'crossover_rate': 0.75,  # 提高交叉率
             'elite_ratio': 0.15,  # 保留最好的15%
