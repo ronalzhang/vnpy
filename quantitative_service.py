@@ -7795,6 +7795,15 @@ class EvolutionaryStrategyEngine:
             
             print(f"🚨 策略{strategy_id[-4:]}需要优化: 胜率{strategy_stats['win_rate']:.1f}%, 盈亏{strategy_stats['total_pnl']:.2f}, 夏普{strategy_stats['sharpe_ratio']:.2f}")
             
+            # 🔧 检查最近是否有相同的优化记录 - 避免重复优化
+            recent_optimizations = self.quantitative_service.db_manager.execute_query("""
+                SELECT old_parameters, new_parameters 
+                FROM strategy_optimization_logs 
+                WHERE strategy_id = %s 
+                  AND timestamp > NOW() - INTERVAL '10 minutes'
+                ORDER BY timestamp DESC LIMIT 3
+            """, (strategy_id,), fetch_all=True)
+            
             # 🔧 使用智能参数优化器
             if hasattr(self, 'parameter_optimizer'):
                 optimized_params, changes = self.parameter_optimizer.optimize_parameters_intelligently(
@@ -7805,7 +7814,27 @@ class EvolutionaryStrategyEngine:
                     # 验证参数确实发生了有意义的变化
                     real_changes = []
                     for change in changes:
-                        if abs(change.get('change_pct', 0)) >= 0.5:  # 至少0.5%的变化
+                        # 检查是否是重复的优化
+                        is_duplicate = False
+                        if recent_optimizations:
+                            for old_opt, new_opt in recent_optimizations:
+                                try:
+                                    old_params = json.loads(old_opt) if isinstance(old_opt, str) else old_opt
+                                    new_params = json.loads(new_opt) if isinstance(new_opt, str) else new_opt
+                                    
+                                    # 检查相同参数的相同变化
+                                    param_name = change.get('parameter')
+                                    if (param_name in old_params and param_name in new_params and
+                                        abs(float(old_params[param_name]) - change.get('from', 0)) < 0.001 and
+                                        abs(float(new_params[param_name]) - change.get('to', 0)) < 0.001):
+                                        is_duplicate = True
+                                        print(f"⚠️ 跳过重复优化: {param_name} {change.get('from'):.4f}→{change.get('to'):.4f}")
+                                        break
+                                except:
+                                    continue
+                        
+                        # 只保留非重复且有意义的变化
+                        if not is_duplicate and abs(change.get('change_pct', 0)) >= 0.5:  # 至少0.5%的变化
                             real_changes.append(change)
                     
                     if real_changes:
@@ -7815,7 +7844,7 @@ class EvolutionaryStrategyEngine:
                             (json.dumps(optimized_params), strategy_id)
                         )
                         
-                        # 记录优化历史
+                        # 记录优化历史 - 只记录真实有效的优化
                         for change in real_changes:
                             self._save_evolution_history_fixed(
                                 strategy_id, self.current_generation, self.current_cycle,
@@ -7825,7 +7854,7 @@ class EvolutionaryStrategyEngine:
                         
                         print(f"🎯 策略{strategy_id[-4:]}优化完成: {len(real_changes)}个参数已更新")
                     else:
-                        print(f"⚠️ 策略{strategy_id[-4:]}参数变化太小(<0.5%)，跳过优化")
+                        print(f"⚠️ 策略{strategy_id[-4:]}无有效优化（重复或变化太小）")
                 else:
                     print(f"ℹ️ 策略{strategy_id[-4:]}智能优化器认为无需调整参数")
             else:

@@ -525,19 +525,15 @@ class QuantitativeSystem {
                 {key: 'quantity', label: '交易数量', type: 'number', min: 0.001, max: 1000, step: 0.001},
                 {key: 'momentum_threshold', label: '动量确认阈值', type: 'number', min: 0.001, max: 0.1, step: 0.001},
                 {key: 'volume_threshold', label: '成交量倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
-                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
-                {key: 'take_profit', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
-                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
-                {key: 'min_volume', label: '最小成交量', type: 'number', min: 1000, max: 1000000, step: 1000},
-                {key: 'volatility_filter', label: '波动率过滤', type: 'number', min: 0.001, max: 0.1, step: 0.001},
-                {key: 'correlation_threshold', label: '相关性阈值', type: 'number', min: 0.1, max: 0.9, step: 0.1},
-                {key: 'rsi_upper', label: 'RSI超买线', type: 'number', min: 60, max: 90, step: 1},
-                {key: 'rsi_lower', label: 'RSI超卖线', type: 'number', min: 10, max: 40, step: 1},
-                {key: 'ma_short', label: '短期均线', type: 'number', min: 5, max: 50, step: 1},
-                {key: 'ma_long', label: '长期均线', type: 'number', min: 20, max: 200, step: 1},
-                {key: 'signal_strength', label: '信号强度', type: 'number', min: 0.1, max: 1.0, step: 0.1},
-                {key: 'holding_period', label: '持仓周期(分钟)', type: 'number', min: 1, max: 1440, step: 1},
-                {key: 'risk_reward_ratio', label: '风险收益比', type: 'number', min: 1.0, max: 5.0, step: 0.1}
+                {key: 'stop_loss_pct', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'take_profit_pct', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
+                {key: 'max_position_risk', label: '最大仓位风险(%)', type: 'number', min: 1, max: 100, step: 1},
+                {key: 'min_hold_time', label: '最小持仓时间(分钟)', type: 'number', min: 1, max: 1440, step: 1},
+                {key: 'rsi_period', label: 'RSI周期', type: 'number', min: 10, max: 30, step: 1},
+                {key: 'rsi_overbought', label: 'RSI超买线', type: 'number', min: 60, max: 90, step: 1},
+                {key: 'rsi_oversold', label: 'RSI超卖线', type: 'number', min: 10, max: 40, step: 1},
+                {key: 'macd_fast_period', label: 'MACD快线周期', type: 'number', min: 5, max: 50, step: 1},
+                {key: 'macd_slow_period', label: 'MACD慢线周期', type: 'number', min: 20, max: 200, step: 1}
             ],
             'mean_reversion': [
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 10, max: 100, step: 1},
@@ -549,14 +545,9 @@ class QuantitativeSystem {
                 {key: 'take_profit_pct', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
                 {key: 'bb_period', label: 'BB周期', type: 'number', min: 10, max: 50, step: 1},
                 {key: 'bb_std_dev', label: 'BB标准差', type: 'number', min: 1.5, max: 3.0, step: 0.1},
-                {key: 'bb_squeeze_threshold', label: 'BB挤压阈值', type: 'number', min: 0.05, max: 0.2, step: 0.01},
-                {key: 'correlation_threshold', label: '相关性阈值', type: 'number', min: 0.1, max: 0.9, step: 0.1},
-                {key: 'max_hold_period', label: '最大持仓周期', type: 'number', min: 1, max: 1440, step: 1},
                 {key: 'max_positions', label: '最大持仓数', type: 'number', min: 1, max: 10, step: 1},
-                {key: 'mean_reversion_strength', label: '均值回归强度', type: 'number', min: 0.1, max: 2.0, step: 0.1},
-                {key: 'risk_per_trade', label: '每笔风险(%)', type: 'number', min: 0.1, max: 5.0, step: 0.1},
-                {key: 'volatility_adjustment', label: '波动率调整', type: 'number', min: 0.5, max: 2.0, step: 0.1},
-                {key: 'z_score_threshold', label: 'Z分数阈值', type: 'number', min: 1.0, max: 3.0, step: 0.1}
+                {key: 'entry_cooldown', label: '入场冷却时间', type: 'number', min: 1, max: 60, step: 1},
+                {key: 'lookbook_period', label: '回看周期', type: 'number', min: 10, max: 100, step: 1}
             ],
             'grid_trading': [
                 {key: 'grid_spacing', label: '网格间距(%)', type: 'number', min: 0.5, max: 5.0, step: 0.1},
@@ -564,10 +555,19 @@ class QuantitativeSystem {
                 {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 10000, step: 1},
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 50, max: 200, step: 10},
                 {key: 'min_profit', label: '最小利润(%)', type: 'number', min: 0.1, max: 2.0, step: 0.1},
-                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
-                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
-                {key: 'grid_upper_limit', label: '网格上限(%)', type: 'number', min: 5, max: 50, step: 1},
-                {key: 'grid_lower_limit', label: '网格下限(%)', type: 'number', min: 5, max: 50, step: 1}
+                {key: 'emergency_stop_loss', label: '紧急止损', type: 'checkbox'},
+                {key: 'grid_density', label: '网格密度', type: 'number', min: 0.1, max: 2.0, step: 0.1},
+                {key: 'grid_pause_conditions', label: '网格暂停条件', type: 'checkbox'},
+                {key: 'liquidity_threshold', label: '流动性阈值', type: 'number', min: 1000, max: 100000, step: 1000},
+                {key: 'lower_price_limit', label: '价格下限', type: 'number', min: 0.001, max: 10, step: 0.001},
+                {key: 'max_grid_exposure', label: '最大网格敞口', type: 'number', min: 10, max: 100, step: 5},
+                {key: 'profit_taking_ratio', label: '获利比率', type: 'number', min: 0.1, max: 1.0, step: 0.1},
+                {key: 'rebalance_threshold', label: '再平衡阈值', type: 'number', min: 0.1, max: 5.0, step: 0.1},
+                {key: 'single_grid_risk', label: '单网格风险', type: 'number', min: 0.1, max: 5.0, step: 0.1},
+                {key: 'trend_filter_enabled', label: '趋势过滤', type: 'checkbox'},
+                {key: 'upper_price_limit', label: '价格上限', type: 'number', min: 1, max: 1000, step: 1},
+                {key: 'volatility_adjustment', label: '波动率调整', type: 'checkbox'},
+                {key: 'volume_weighted', label: '成交量权重', type: 'checkbox'}
             ],
             'breakout': [
                 {key: 'lookback_period', label: '观察周期', type: 'number', min: 10, max: 100, step: 1},
@@ -575,10 +575,20 @@ class QuantitativeSystem {
                 {key: 'quantity', label: '交易数量', type: 'number', min: 0.1, max: 100, step: 0.1},
                 {key: 'volume_threshold', label: '成交量倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
                 {key: 'confirmation_periods', label: '确认周期', type: 'number', min: 1, max: 10, step: 1},
-                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
-                {key: 'take_profit', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
-                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
-                {key: 'atr_multiplier', label: 'ATR倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1}
+                {key: 'stop_loss_pct', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'take_profit_pct', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
+                {key: 'atr_multiplier', label: 'ATR倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
+                {key: 'atr_period', label: 'ATR周期', type: 'number', min: 10, max: 50, step: 1},
+                {key: 'breakout_strength_min', label: '最小突破强度', type: 'number', min: 0.1, max: 2.0, step: 0.1},
+                {key: 'false_breakout_filter', label: '假突破过滤', type: 'checkbox'},
+                {key: 'max_holding_period', label: '最大持仓周期', type: 'number', min: 1, max: 1440, step: 1},
+                {key: 'momentum_confirmation', label: '动量确认', type: 'checkbox'},
+                {key: 'price_ma_period', label: '价格均线周期', type: 'number', min: 10, max: 100, step: 1},
+                {key: 'pullback_tolerance', label: '回调容忍度', type: 'number', min: 0.1, max: 2.0, step: 0.1},
+                {key: 'stop_loss_atr_multiple', label: '止损ATR倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
+                {key: 'take_profit_atr_multiple', label: '止盈ATR倍数', type: 'number', min: 1.0, max: 10.0, step: 0.1},
+                {key: 'trailing_stop_enabled', label: '跟踪止损', type: 'checkbox'},
+                {key: 'volume_ma_period', label: '成交量均线周期', type: 'number', min: 10, max: 100, step: 1}
             ],
             'high_frequency': [
                 {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 1000, step: 1},
@@ -596,12 +606,41 @@ class QuantitativeSystem {
                 {key: 'trend_threshold', label: '趋势阈值(%)', type: 'number', min: 0.5, max: 3.0, step: 0.1},
                 {key: 'quantity', label: '交易数量', type: 'number', min: 1, max: 1000, step: 1},
                 {key: 'trend_strength_min', label: '最小趋势强度', type: 'number', min: 0.1, max: 1.0, step: 0.1},
-                {key: 'stop_loss', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
-                {key: 'take_profit', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
-                {key: 'max_position_size', label: '最大仓位(%)', type: 'number', min: 1, max: 100, step: 1},
-                {key: 'ema_short', label: '短期EMA', type: 'number', min: 5, max: 50, step: 1},
-                {key: 'ema_long', label: '长期EMA', type: 'number', min: 20, max: 200, step: 1},
-                {key: 'adx_threshold', label: 'ADX趋势阈值', type: 'number', min: 20, max: 50, step: 1}
+                {key: 'trailing_stop_pct', label: '跟踪止损(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'profit_lock_pct', label: '利润锁定(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
+                {key: 'max_adverse_excursion', label: '最大不利偏移', type: 'number', min: 1, max: 10, step: 0.5},
+                {key: 'ema_fast_period', label: '快速EMA周期', type: 'number', min: 5, max: 50, step: 1},
+                {key: 'ema_slow_period', label: '慢速EMA周期', type: 'number', min: 20, max: 200, step: 1},
+                {key: 'adx_threshold', label: 'ADX趋势阈值', type: 'number', min: 20, max: 50, step: 1},
+                {key: 'adx_period', label: 'ADX计算周期', type: 'number', min: 10, max: 30, step: 1},
+                {key: 'slope_threshold', label: '斜率阈值', type: 'number', min: 0.0001, max: 0.01, step: 0.0001},
+                {key: 'trend_angle_min', label: '最小趋势角度', type: 'number', min: 5, max: 45, step: 1},
+                {key: 'trend_duration_min', label: '最小趋势持续时间', type: 'number', min: 10, max: 120, step: 5},
+                {key: 'max_drawdown_exit', label: '最大回撤退出(%)', type: 'number', min: 2, max: 15, step: 0.5},
+                {key: 'volume_confirmation', label: '成交量确认', type: 'checkbox'},
+                {key: 'multi_timeframe', label: '多时间框架', type: 'checkbox'},
+                {key: 'trend_reversal_detection', label: '趋势反转检测', type: 'checkbox'}
+            ],
+            'breakout': [
+                {key: 'lookback_period', label: '观察周期', type: 'number', min: 10, max: 100, step: 1},
+                {key: 'breakout_threshold', label: '突破阈值(%)', type: 'number', min: 0.5, max: 3.0, step: 0.1},
+                {key: 'quantity', label: '交易数量', type: 'number', min: 0.1, max: 100, step: 0.1},
+                {key: 'volume_threshold', label: '成交量倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
+                {key: 'confirmation_periods', label: '确认周期', type: 'number', min: 1, max: 10, step: 1},
+                {key: 'stop_loss_pct', label: '止损百分比(%)', type: 'number', min: 0.5, max: 10.0, step: 0.1},
+                {key: 'take_profit_pct', label: '止盈百分比(%)', type: 'number', min: 0.5, max: 20.0, step: 0.1},
+                {key: 'atr_multiplier', label: 'ATR倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
+                {key: 'atr_period', label: 'ATR周期', type: 'number', min: 10, max: 50, step: 1},
+                {key: 'breakout_strength_min', label: '最小突破强度', type: 'number', min: 0.1, max: 2.0, step: 0.1},
+                {key: 'false_breakout_filter', label: '假突破过滤', type: 'checkbox'},
+                {key: 'max_holding_period', label: '最大持仓周期', type: 'number', min: 1, max: 1440, step: 1},
+                {key: 'momentum_confirmation', label: '动量确认', type: 'checkbox'},
+                {key: 'price_ma_period', label: '价格均线周期', type: 'number', min: 10, max: 100, step: 1},
+                {key: 'pullback_tolerance', label: '回调容忍度', type: 'number', min: 0.1, max: 2.0, step: 0.1},
+                {key: 'stop_loss_atr_multiple', label: '止损ATR倍数', type: 'number', min: 1.0, max: 5.0, step: 0.1},
+                {key: 'take_profit_atr_multiple', label: '止盈ATR倍数', type: 'number', min: 1.0, max: 10.0, step: 0.1},
+                {key: 'trailing_stop_enabled', label: '跟踪止损', type: 'checkbox'},
+                {key: 'volume_ma_period', label: '成交量均线周期', type: 'number', min: 10, max: 100, step: 1}
             ]
         };
         
@@ -625,22 +664,40 @@ class QuantitativeSystem {
             const backendKey = parameterMapping[config.key] || config.key;
             const value = parameters[backendKey] || parameters[config.key] || '';
             
-            parametersHtml += `
-                <div class="row mb-2">
-                    <div class="col-6">
-                        <label class="form-label">${config.label}</label>
+            if (config.type === 'checkbox') {
+                parametersHtml += `
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label">${config.label}</label>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-check">
+                                <input type="checkbox" 
+                                       class="form-check-input" 
+                                       name="${config.key}"
+                                       ${value ? 'checked' : ''}>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-6">
-                        <input type="${config.type}" 
-                               class="form-control form-control-sm" 
-                               name="${config.key}"
-                               value="${value}"
-                               min="${config.min}"
-                               max="${config.max}"
-                               step="${config.step}">
+                `;
+            } else {
+                parametersHtml += `
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label">${config.label}</label>
+                        </div>
+                        <div class="col-6">
+                            <input type="${config.type}" 
+                                   class="form-control form-control-sm" 
+                                   name="${config.key}"
+                                   value="${value}"
+                                   min="${config.min}"
+                                   max="${config.max}"
+                                   step="${config.step}">
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
         });
         
         container.innerHTML = parametersHtml;
@@ -669,7 +726,12 @@ class QuantitativeSystem {
             const parameters = {};
             const parameterInputs = form.querySelectorAll('#strategyParameters input');
             parameterInputs.forEach(input => {
-                parameters[input.name] = parseFloat(input.value) || input.value;
+                if (input.type === 'checkbox') {
+                    parameters[input.name] = input.checked;
+                } else {
+                    const numValue = parseFloat(input.value);
+                    parameters[input.name] = isNaN(numValue) ? input.value : numValue;
+                }
             });
             
             const configData = {
