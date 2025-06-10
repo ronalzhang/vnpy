@@ -6845,15 +6845,34 @@ class EvolutionaryStrategyEngine:
             logger.error(f"保存演化历史失败: {e}")
     
     def _update_strategies_generation_info(self):
-        """更新所有策略的世代信息"""
+        """🔧 修复：智能更新策略的世代信息 - 避免不必要的代数递增"""
         try:
-            self.quantitative_service.db_manager.execute_query("""
-                UPDATE strategies 
-                SET generation = %s, cycle = %s, last_evolution_time = CURRENT_TIMESTAMP,
-                    evolution_count = evolution_count + 1,
-                    is_persistent = 1
-                WHERE enabled = 1
-            """, (self.current_generation, self.current_cycle))
+            # 🎯 只有真正经历了重大进化的策略才更新代数
+            # 检查本轮有哪些策略进行了参数优化或重大变化
+            recent_evolutions = self.quantitative_service.db_manager.execute_query("""
+                SELECT DISTINCT strategy_id 
+                FROM strategy_evolution_history 
+                WHERE generation = %s AND cycle = %s 
+                AND evolution_type IN ('intelligent_mutation', 'parameter_optimization', 'elite_selected', 'crossover', 'random_creation')
+                AND created_time >= NOW() - INTERVAL '10 minutes'
+            """, (self.current_generation, self.current_cycle), fetch_all=True)
+            
+            if recent_evolutions:
+                evolved_strategy_ids = [row[0] for row in recent_evolutions]
+                placeholders = ', '.join(['%s'] * len(evolved_strategy_ids))
+                
+                # 只更新真正进化的策略
+                self.quantitative_service.db_manager.execute_query(f"""
+                    UPDATE strategies 
+                    SET generation = %s, cycle = %s, last_evolution_time = CURRENT_TIMESTAMP,
+                        evolution_count = evolution_count + 1,
+                        is_persistent = 1
+                    WHERE id IN ({placeholders})
+                """, (self.current_generation, self.current_cycle, *evolved_strategy_ids))
+                
+                print(f"✅ 已更新{len(evolved_strategy_ids)}个真正进化的策略世代信息: 第{self.current_generation}代第{self.current_cycle}轮")
+            else:
+                print(f"ℹ️ 本轮无策略发生重大进化，跳过代数更新")
             
         except Exception as e:
             logger.error(f"更新策略世代信息失败: {e}")
@@ -6868,10 +6887,10 @@ class EvolutionaryStrategyEngine:
                 WHERE id = 1
             """, (self.current_generation,))
             
-            # 创建/更新演化状态表
+            # 🔧 修复：创建/更新演化状态表（修复PostgreSQL语法）
             self.quantitative_service.db_manager.execute_query("""
                 CREATE TABLE IF NOT EXISTS evolution_state (
-                    id INTEGER PRIMARY KEY DEFAULT 1,
+                    id SERIAL PRIMARY KEY,
                     current_generation INTEGER DEFAULT 1,
                     current_cycle INTEGER DEFAULT 1,
                     last_evolution_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -6879,15 +6898,21 @@ class EvolutionaryStrategyEngine:
                 )
             """)
             
+            # 🔧 修复：确保有默认记录，然后更新
             self.quantitative_service.db_manager.execute_query("""
                 INSERT INTO evolution_state (id, current_generation, current_cycle, total_evolutions)
-                VALUES (1, %s, %s, 1)
-                ON CONFLICT (id) 
-                DO UPDATE SET 
-                    current_generation = EXCLUDED.current_generation,
-                    current_cycle = EXCLUDED.current_cycle,
+                VALUES (1, 1, 1, 0)
+                ON CONFLICT (id) DO NOTHING
+            """)
+            
+            # 更新当前状态
+            self.quantitative_service.db_manager.execute_query("""
+                UPDATE evolution_state 
+                SET current_generation = %s, 
+                    current_cycle = %s,
                     last_evolution_time = CURRENT_TIMESTAMP,
-                    total_evolutions = evolution_state.total_evolutions + 1
+                    total_evolutions = total_evolutions + 1
+                WHERE id = 1
             """, (self.current_generation, self.current_cycle))
             
             logger.info(f"💾 世代状态已保存: 第{self.current_generation}代第{self.current_cycle}轮")
@@ -7278,25 +7303,84 @@ class EvolutionaryStrategyEngine:
             return self._create_random_strategy()
     
     def _get_strategy_performance_stats(self, strategy_id):
-        """获取策略表现统计数据"""
+        """🔧 修复：获取真实策略表现统计数据，而非随机模拟数据"""
         try:
-            # 模拟获取策略统计数据，实际应该从数据库查询
-            return {
-                'total_pnl': random.uniform(-50, 100),
-                'win_rate': random.uniform(20, 80),
-                'sharpe_ratio': random.uniform(-1, 2),
-                'max_drawdown': random.uniform(0.05, 0.3),
-                'total_trades': random.randint(10, 100)
-            }
+            # 🔧 从数据库获取真实交易数据
+            trade_logs = self.quantitative_service.db_manager.execute_query("""
+                SELECT 
+                    COUNT(*) as total_trades,
+                    COUNT(CASE WHEN pnl > 0 THEN 1 END) as winning_trades,
+                    SUM(pnl) as total_pnl,
+                    AVG(pnl) as avg_pnl,
+                    MIN(pnl) as min_pnl,
+                    MAX(pnl) as max_pnl,
+                    STDDEV(pnl) as pnl_std
+                FROM strategy_trade_logs 
+                WHERE strategy_id = %s AND created_at >= NOW() - INTERVAL '30 days'
+            """, (strategy_id,), fetch_one=True)
+            
+            if trade_logs and trade_logs[0] > 0:  # 有真实交易数据
+                total_trades, winning_trades, total_pnl, avg_pnl, min_pnl, max_pnl, pnl_std = trade_logs
+                
+                # 计算真实指标
+                win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 50.0
+                
+                # 计算夏普比率 (简化版本，基于PnL标准差)
+                if pnl_std and pnl_std > 0:
+                    sharpe_ratio = (avg_pnl or 0) / pnl_std
+                else:
+                    sharpe_ratio = 0.5
+                
+                # 计算最大回撤 (基于连续亏损)
+                max_drawdown = abs(min_pnl or 0) / 100 if min_pnl else 0.05
+                max_drawdown = min(max_drawdown, 0.5)  # 限制在50%以内
+                
+                print(f"📊 策略{strategy_id[-4:]}真实数据: 交易{total_trades}次, 胜率{win_rate:.1f}%, 总盈亏{total_pnl or 0:.2f}")
+                
+                return {
+                    'total_pnl': float(total_pnl or 0),
+                    'win_rate': float(win_rate),
+                    'sharpe_ratio': float(sharpe_ratio),
+                    'max_drawdown': float(max_drawdown),
+                    'total_trades': int(total_trades)
+                }
+            else:
+                # 🔧 新策略或无交易记录：从策略表获取仿真评分
+                strategy_data = self.quantitative_service.db_manager.execute_query("""
+                    SELECT final_score, generation, cycle, created_at 
+                    FROM strategies WHERE id = %s
+                """, (strategy_id,), fetch_one=True)
+                
+                if strategy_data:
+                    final_score, generation, cycle, created_at = strategy_data
+                    
+                    # 基于策略评分估算性能指标
+                    estimated_win_rate = min(max(final_score or 50, 20), 80)
+                    estimated_pnl = (final_score or 50 - 50) * 2  # 50分对应0盈亏
+                    estimated_sharpe = (final_score or 50 - 30) / 40  # 30-70分对应0-1夏普比率
+                    estimated_drawdown = max(0.02, (70 - (final_score or 50)) / 200)  # 分数越低回撤越大
+                    
+                    print(f"📊 策略{strategy_id[-4:]}仿真数据: 评分{final_score or 50:.1f}分, 估算胜率{estimated_win_rate:.1f}%")
+                    
+                    return {
+                        'total_pnl': float(estimated_pnl),
+                        'win_rate': float(estimated_win_rate),
+                        'sharpe_ratio': float(estimated_sharpe),
+                        'max_drawdown': float(estimated_drawdown),
+                        'total_trades': 5  # 新策略假设5次交易
+                    }
+        
         except Exception as e:
             print(f"⚠️ 获取策略统计失败: {e}")
-            return {
-                'total_pnl': 0.0,
-                'win_rate': 50.0,
-                'sharpe_ratio': 0.5,
-                'max_drawdown': 0.1,
-                'total_trades': 10
-            }
+        
+        # 🔧 最后备用方案：使用默认合理值
+        return {
+            'total_pnl': 0.0,
+            'win_rate': 50.0,
+            'sharpe_ratio': 0.5,
+            'max_drawdown': 0.1,
+            'total_trades': 1
+        }
     
     def _force_parameter_mutation(self, original_params, parent_score, force=False, aggressive=False):
         """🔧 强制参数变异 - 确保参数真实变化"""
@@ -7685,46 +7769,80 @@ class EvolutionaryStrategyEngine:
             return False
     
     def _optimize_strategy_parameters(self, strategy: Dict):
-        """优化策略参数"""
+        """🔧 修复：智能优化策略参数 - 基于真实表现数据，避免重复优化"""
         try:
+            strategy_id = strategy['id']
             strategy_type = strategy['type']
-            template = self.strategy_templates.get(strategy_type)
-            if not template:
+            current_params = strategy.get('parameters', {})
+            fitness = strategy.get('fitness', 50)
+            
+            print(f"🔍 开始优化策略{strategy_id[-4:]} - 当前适应度: {fitness:.1f}")
+            
+            # 🔧 获取真实策略表现统计（不再使用随机数据）
+            strategy_stats = self._get_strategy_performance_stats(strategy_id)
+            
+            # 🎯 智能决策：根据真实表现确定是否需要优化
+            needs_optimization = (
+                strategy_stats['win_rate'] < 40 or           # 胜率低于40%
+                strategy_stats['total_pnl'] < -10 or         # 总亏损超过10
+                strategy_stats['sharpe_ratio'] < 0.5 or      # 夏普比率太低
+                fitness < 60                                 # 适应度评分低于60
+            )
+            
+            if not needs_optimization:
+                print(f"✅ 策略{strategy_id[-4:]}表现良好，无需优化 (胜率{strategy_stats['win_rate']:.1f}%, 盈亏{strategy_stats['total_pnl']:.2f})")
                 return
             
-            current_params = strategy['parameters']
-            fitness = strategy['fitness']
+            print(f"🚨 策略{strategy_id[-4:]}需要优化: 胜率{strategy_stats['win_rate']:.1f}%, 盈亏{strategy_stats['total_pnl']:.2f}, 夏普{strategy_stats['sharpe_ratio']:.2f}")
             
-            # 如果适应度较低，进行参数优化
-            if fitness < 80.0:
-                print(f"🔧 优化策略参数: {strategy['name']} (当前适应度: {fitness:.1f})")
+            # 🔧 使用智能参数优化器
+            if hasattr(self, 'parameter_optimizer'):
+                optimized_params, changes = self.parameter_optimizer.optimize_parameters_intelligently(
+                    strategy_id, current_params, strategy_stats
+                )
                 
-                # 基于表现调整参数
-                for param_name, (min_val, max_val) in template['param_ranges'].items():
-                    if param_name in current_params:
-                        current_val = current_params[param_name]
+                if changes and len(changes) > 0:
+                    # 验证参数确实发生了有意义的变化
+                    real_changes = []
+                    for change in changes:
+                        if abs(change.get('change_pct', 0)) >= 0.5:  # 至少0.5%的变化
+                            real_changes.append(change)
+                    
+                    if real_changes:
+                        # 更新数据库中的策略参数
+                        self.quantitative_service.db_manager.execute_query(
+                            "UPDATE strategies SET parameters = %s, last_optimization_time = CURRENT_TIMESTAMP WHERE id = %s",
+                            (json.dumps(optimized_params), strategy_id)
+                        )
                         
-                        # 根据适应度决定调整方向
-                        if fitness < 60:
-                            # 适应度很低，大幅调整
-                            import random
-                            adjustment = random.uniform(-0.3, 0.3) * (max_val - min_val)
-                        else:
-                            # 适应度中等，小幅调整
-                            import random
-                            adjustment = random.uniform(-0.1, 0.1) * (max_val - min_val)
+                        # 记录优化历史
+                        for change in real_changes:
+                            self._save_evolution_history_fixed(
+                                strategy_id, self.current_generation, self.current_cycle,
+                                'intelligent_mutation', optimized_params, strategy_id
+                            )
+                            print(f"✅ 参数优化: {change['parameter']} {change['from']:.4f}→{change['to']:.4f} ({change['change_pct']:+.1f}%) - {change['reason']}")
                         
-                        new_val = current_val + adjustment
-                        current_params[param_name] = max(min_val, min(max_val, new_val))
+                        print(f"🎯 策略{strategy_id[-4:]}优化完成: {len(real_changes)}个参数已更新")
+                    else:
+                        print(f"⚠️ 策略{strategy_id[-4:]}参数变化太小(<0.5%)，跳过优化")
+                else:
+                    print(f"ℹ️ 策略{strategy_id[-4:]}智能优化器认为无需调整参数")
+            else:
+                # 备用方案：基于表现的简单参数调整
+                print(f"⚠️ 使用备用参数优化方案")
+                optimized_params = self._force_parameter_mutation(current_params, fitness, force=True, aggressive=True)
                 
-                # 更新策略参数
-                self.quantitative_service.strategies[strategy['id']]['parameters'] = current_params
-                self.quantitative_service.strategies[strategy['id']]['updated_time'] = datetime.now().isoformat()
-                
-                print(f"✅ 策略 {strategy['name']} 参数已优化")
+                # 更新数据库
+                self.quantitative_service.db_manager.execute_query(
+                    "UPDATE strategies SET parameters = %s WHERE id = %s",
+                    (json.dumps(optimized_params), strategy_id)
+                )
         
         except Exception as e:
             print(f"❌ 优化策略参数失败: {e}")
+            import traceback
+            traceback.print_exc()
     
 
     def _load_current_generation(self) -> int:
