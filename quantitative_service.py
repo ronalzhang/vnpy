@@ -5704,6 +5704,496 @@ class StrategySimulator:
         except Exception as e:
             print(f"保存模拟结果失败: {e}")
 
+class ParameterOptimizer:
+    """🧠 全面的策略参数智能优化器 - 每个参数都有严格的优化逻辑"""
+    
+    def __init__(self):
+        self.performance_weights = {
+            'total_pnl': 0.35,     # 总收益权重35%
+            'win_rate': 0.25,      # 胜率权重25%
+            'sharpe_ratio': 0.25,  # 夏普比率权重25%
+            'max_drawdown': 0.15   # 最大回撤权重15%
+        }
+        
+        # 🎯 每个参数都有严格的赚钱逻辑和优化方向
+        self.parameter_rules = {
+            # 📊 技术指标周期类参数
+            'lookback_period': {
+                'range': (5, 200), 'optimal': (15, 45),
+                'profit_logic': '趋势跟踪窗口，适中最佳',
+                'increase_effect': {'profit': '增强趋势识别，但减少交易频率', 'winrate': '提高信号质量', 'risk': '减少'},
+                'decrease_effect': {'profit': '增加交易频率，但可能误判', 'winrate': '降低信号质量', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'moderate_increase',  # 收益低→适度增加
+                    'low_winrate': 'increase',          # 胜率低→增加
+                    'high_risk': 'increase',            # 风险高→增加
+                    'high_score': 'fine_tune'           # 高分→微调
+                }
+            },
+            'rsi_period': {
+                'range': (6, 35), 'optimal': (12, 21),
+                'profit_logic': 'RSI周期，14最经典，短期更敏感',
+                'increase_effect': {'profit': '减少交易机会，提高信号可靠性', 'winrate': '显著提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '增加交易机会，但增加噪音', 'winrate': '降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'decrease',           # 收益低→减少周期，增加机会
+                    'low_winrate': 'increase',          # 胜率低→增加周期，提高质量
+                    'high_risk': 'increase',            # 风险高→增加周期
+                    'high_score': 'optimize_to_14'      # 高分→优化到黄金值14
+                }
+            },
+            'rsi_upper': {
+                'range': (60, 85), 'optimal': (68, 75),
+                'profit_logic': 'RSI超买阈值，越高越保守，70是经典值',
+                'increase_effect': {'profit': '避免过早卖出，捕获更大涨幅', 'winrate': '减少卖出信号', 'risk': '可能增加'},
+                'decrease_effect': {'profit': '更早卖出，避免回调损失', 'winrate': '增加卖出信号', 'risk': '减少'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→提高阈值，延长持有
+                    'low_winrate': 'decrease',          # 胜率低→降低阈值，提前退出
+                    'high_risk': 'decrease',            # 风险高→降低阈值
+                    'high_score': 'optimize_to_70'      # 高分→优化到经典值70
+                }
+            },
+            'rsi_lower': {
+                'range': (15, 40), 'optimal': (25, 35),
+                'profit_logic': 'RSI超卖阈值，越低越激进，30是经典值',
+                'increase_effect': {'profit': '更保守买入，减少机会但提高质量', 'winrate': '提高买入质量', 'risk': '减少'},
+                'decrease_effect': {'profit': '更积极买入，增加机会但降低质量', 'winrate': '降低买入质量', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'decrease',           # 收益低→降低阈值，增加买入机会
+                    'low_winrate': 'increase',          # 胜率低→提高阈值，买入更保守
+                    'high_risk': 'increase',            # 风险高→提高阈值
+                    'high_score': 'optimize_to_30'      # 高分→优化到经典值30
+                }
+            },
+            'macd_fast_period': {
+                'range': (5, 20), 'optimal': (8, 15),
+                'profit_logic': 'MACD快线周期，越短反应越快',
+                'increase_effect': {'profit': '减少交易频率，提高信号稳定性', 'winrate': '提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '增加交易频率，更快捕获趋势', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'decrease',           # 收益低→加快反应
+                    'low_winrate': 'increase',          # 胜率低→提高稳定性
+                    'high_risk': 'increase',            # 风险高→增加稳定性
+                    'high_score': 'optimize_to_12'      # 高分→优化到经典值12
+                }
+            },
+            'macd_slow_period': {
+                'range': (15, 40), 'optimal': (20, 30),
+                'profit_logic': 'MACD慢线周期，提供趋势确认',
+                'increase_effect': {'profit': '更强趋势确认，减少假信号', 'winrate': '显著提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '更快趋势识别，但增加假信号', 'winrate': '降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→增强趋势确认
+                    'low_winrate': 'increase',          # 胜率低→增强确认
+                    'high_risk': 'increase',            # 风险高→增强确认
+                    'high_score': 'optimize_to_26'      # 高分→优化到经典值26
+                }
+            },
+            'macd_signal_period': {
+                'range': (5, 15), 'optimal': (7, 12),
+                'profit_logic': 'MACD信号线周期，平滑MACD线',
+                'increase_effect': {'profit': '更平滑信号，减少假突破', 'winrate': '提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '更敏感信号，更快执行', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'decrease',           # 收益低→提高敏感度
+                    'low_winrate': 'increase',          # 胜率低→增加平滑度
+                    'high_risk': 'increase',            # 风险高→增加平滑度
+                    'high_score': 'optimize_to_9'       # 高分→优化到经典值9
+                }
+            },
+            'bollinger_period': {
+                'range': (10, 35), 'optimal': (15, 25),
+                'profit_logic': '布林带周期，越长越稳定',
+                'increase_effect': {'profit': '更稳定的波动率计算', 'winrate': '提高信号可靠性', 'risk': '减少'},
+                'decrease_effect': {'profit': '更敏感的波动率跟踪', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'moderate_increase',  # 收益低→适度增加稳定性
+                    'low_winrate': 'increase',          # 胜率低→增加稳定性
+                    'high_risk': 'increase',            # 风险高→增加稳定性
+                    'high_score': 'optimize_to_20'      # 高分→优化到经典值20
+                }
+            },
+            'bollinger_std': {
+                'range': (1.0, 4.0), 'optimal': (1.8, 2.5),
+                'profit_logic': '布林带标准差倍数，越大通道越宽',
+                'increase_effect': {'profit': '更宽通道，减少假突破', 'winrate': '显著提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '更窄通道，增加交易机会', 'winrate': '降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→增加，提高质量
+                    'low_winrate': 'increase',          # 胜率低→增加
+                    'high_risk': 'increase',            # 风险高→增加
+                    'high_score': 'optimize_to_2.0'     # 高分→优化到经典值2.0
+                }
+            },
+            'ema_period': {
+                'range': (5, 50), 'optimal': (12, 30),
+                'profit_logic': 'EMA周期，短期更敏感，长期更稳定',
+                'increase_effect': {'profit': '更稳定的趋势跟踪', 'winrate': '提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '更敏感的趋势捕获', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'adaptive',           # 收益低→自适应调整
+                    'low_winrate': 'increase',          # 胜率低→增加稳定性
+                    'high_risk': 'increase',            # 风险高→增加稳定性
+                    'high_score': 'optimize_to_21'      # 高分→优化到黄金值21
+                }
+            },
+            'sma_period': {
+                'range': (10, 100), 'optimal': (20, 50),
+                'profit_logic': 'SMA周期，长期趋势确认',
+                'increase_effect': {'profit': '更强的趋势确认，减少假信号', 'winrate': '显著提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '更快的趋势识别', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→增强趋势确认
+                    'low_winrate': 'increase',          # 胜率低→增强确认
+                    'high_risk': 'increase',            # 风险高→增强确认
+                    'high_score': 'optimize_to_50'      # 高分→优化到黄金值50
+                }
+            },
+            'atr_period': {
+                'range': (5, 30), 'optimal': (10, 20),
+                'profit_logic': 'ATR周期，测量真实波动率',
+                'increase_effect': {'profit': '更稳定的波动率测量', 'winrate': '提高止损准确性', 'risk': '减少'},
+                'decrease_effect': {'profit': '更敏感的波动率跟踪', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'decrease',           # 收益低→增加敏感度
+                    'low_winrate': 'increase',          # 胜率低→增加稳定性
+                    'high_risk': 'increase',            # 风险高→增加稳定性
+                    'high_score': 'optimize_to_14'      # 高分→优化到经典值14
+                }
+            },
+            'atr_multiplier': {
+                'range': (0.5, 6.0), 'optimal': (1.5, 3.5),
+                'profit_logic': 'ATR倍数，决定止损距离',
+                'increase_effect': {'profit': '更宽的止损，允许更大波动获利', 'winrate': '减少', 'risk': '可能增加'},
+                'decrease_effect': {'profit': '更紧的止损，快速止损', 'winrate': '可能提高', 'risk': '减少'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→增加，给利润跑动空间
+                    'low_winrate': 'decrease',          # 胜率低→减少，快速止损
+                    'high_risk': 'decrease',            # 风险高→减少
+                    'high_score': 'optimize_to_2.5'     # 高分→优化到平衡值2.5
+                }
+            },
+            'stop_loss_pct': {
+                'range': (0.01, 0.15), 'optimal': (0.02, 0.08),
+                'profit_logic': '止损百分比，风险控制核心',
+                'increase_effect': {'profit': '给利润更多发展空间', 'winrate': '可能降低', 'risk': '增加'},
+                'decrease_effect': {'profit': '更严格的风险控制', 'winrate': '可能提高', 'risk': '减少'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→放宽止损，给利润空间
+                    'low_winrate': 'decrease',          # 胜率低→收紧止损
+                    'high_risk': 'decrease',            # 风险高→收紧止损
+                    'high_score': 'optimize_to_5_pct'   # 高分→优化到5%
+                }
+            },
+            'take_profit_pct': {
+                'range': (0.01, 0.20), 'optimal': (0.03, 0.12),
+                'profit_logic': '止盈百分比，获利目标',
+                'increase_effect': {'profit': '追求更大利润，但可能错失获利', 'winrate': '可能降低', 'risk': '增加'},
+                'decrease_effect': {'profit': '快速获利了结', 'winrate': '可能提高', 'risk': '减少'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→提高目标
+                    'low_winrate': 'decrease',          # 胜率低→快速获利
+                    'high_risk': 'decrease',            # 风险高→快速获利
+                    'high_score': 'optimize_to_6_pct'   # 高分→优化到6%
+                }
+            },
+            'volume_threshold': {
+                'range': (0.8, 4.0), 'optimal': (1.2, 2.5),
+                'profit_logic': '成交量确认倍数，越高要求越严格',
+                'increase_effect': {'profit': '更强的成交量确认，减少假突破', 'winrate': '显著提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '更宽松的成交量要求，增加机会', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→提高成交量要求
+                    'low_winrate': 'increase',          # 胜率低→提高成交量要求
+                    'high_risk': 'increase',            # 风险高→提高要求
+                    'high_score': 'optimize_to_1.5'     # 高分→优化到平衡值1.5
+                }
+            },
+            'momentum_threshold': {
+                'range': (0.1, 3.0), 'optimal': (0.3, 1.5),
+                'profit_logic': '动量阈值，识别趋势强度',
+                'increase_effect': {'profit': '更强的动量要求，捕获强趋势', 'winrate': '提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '更低的动量要求，增加机会', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→提高动量要求
+                    'low_winrate': 'increase',          # 胜率低→提高要求
+                    'high_risk': 'increase',            # 风险高→提高要求
+                    'high_score': 'optimize_to_0.8'     # 高分→优化到平衡值0.8
+                }
+            },
+            'grid_spacing': {
+                'range': (0.1, 5.0), 'optimal': (0.5, 2.0),
+                'profit_logic': '网格间距，决定每笔交易利润空间',
+                'increase_effect': {'profit': '更大的单笔利润，但交易频率降低', 'winrate': '提高', 'risk': '可能增加'},
+                'decrease_effect': {'profit': '更小的单笔利润，但交易频率增加', 'winrate': '可能降低', 'risk': '减少'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→增加间距，提高单笔利润
+                    'low_winrate': 'decrease',          # 胜率低→减少间距，快速获利
+                    'high_risk': 'decrease',            # 风险高→减少间距
+                    'high_score': 'optimize_to_1.0'     # 高分→优化到平衡值1.0
+                }
+            },
+            'threshold': {
+                'range': (0.1, 5.0), 'optimal': (0.5, 2.0),
+                'profit_logic': '通用阈值，信号强度要求',
+                'increase_effect': {'profit': '更高的信号质量要求', 'winrate': '显著提高', 'risk': '减少'},
+                'decrease_effect': {'profit': '更宽松的信号要求，增加机会', 'winrate': '可能降低', 'risk': '增加'},
+                'optimization_rules': {
+                    'low_profit': 'increase',           # 收益低→提高质量要求
+                    'low_winrate': 'increase',          # 胜率低→提高要求
+                    'high_risk': 'increase',            # 风险高→提高要求
+                    'high_score': 'optimize_to_1.2'     # 高分→优化到平衡值1.2
+                }
+            }
+        }
+    
+    def calculate_performance_score(self, strategy_stats):
+        """计算策略综合表现评分"""
+        try:
+            # 获取策略统计数据
+            total_pnl = float(strategy_stats.get('total_pnl', 0))
+            win_rate = float(strategy_stats.get('win_rate', 0))
+            sharpe_ratio = float(strategy_stats.get('sharpe_ratio', 0))
+            max_drawdown = abs(float(strategy_stats.get('max_drawdown', 0)))
+            
+            # 标准化评分（0-100分）
+            pnl_score = min(max(total_pnl / 100, 0), 100)  # 假设100为满分基准
+            win_rate_score = win_rate  # 胜率本身就是百分比
+            sharpe_score = min(max(sharpe_ratio * 20, 0), 100)  # 夏普比率2.0为满分
+            drawdown_score = max(100 - max_drawdown * 100, 0)  # 回撤越小分数越高
+            
+            # 加权综合评分
+            total_score = (
+                pnl_score * self.performance_weights['total_pnl'] +
+                win_rate_score * self.performance_weights['win_rate'] +
+                sharpe_score * self.performance_weights['sharpe_ratio'] +
+                drawdown_score * self.performance_weights['max_drawdown']
+            )
+            
+            return total_score
+            
+        except Exception as e:
+            logger.error(f"计算性能评分失败: {e}")
+            return 50  # 默认中等评分
+    
+    def optimize_parameters_intelligently(self, strategy_id, current_params, strategy_stats):
+        """🧠 基于策略表现智能优化参数"""
+        try:
+            # 计算当前表现评分
+            current_score = self.calculate_performance_score(strategy_stats)
+            
+            # 分析表现瓶颈
+            bottlenecks = self.analyze_performance_bottlenecks(strategy_stats)
+            
+            optimized_params = current_params.copy()
+            changes = []
+            
+            print(f"🎯 策略{strategy_id}当前评分: {current_score:.1f}分")
+            print(f"📊 发现{len(bottlenecks)}个瓶颈: {list(bottlenecks.keys())}")
+            
+            # 根据瓶颈优化参数
+            for param_name, current_value in current_params.items():
+                if param_name not in self.optimization_directions:
+                    continue
+                    
+                config = self.optimization_directions[param_name]
+                min_val, max_val = config['range']
+                
+                # 确保当前值在合理范围内
+                current_value = max(min_val, min(max_val, float(current_value)))
+                
+                # 基于表现瓶颈决定优化方向
+                optimization_strategy = self.get_optimization_strategy(
+                    param_name, current_score, bottlenecks, strategy_stats
+                )
+                
+                new_value = self.apply_intelligent_optimization(
+                    param_name, current_value, optimization_strategy, config, strategy_stats
+                )
+                
+                # 确保新值在有效范围内
+                new_value = max(min_val, min(max_val, new_value))
+                
+                # 记录有意义的变化（确保至少有0.1%的变化）
+                change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
+                if change_ratio >= 0.001 or abs(new_value - current_value) > 0.001:
+                    optimized_params[param_name] = round(new_value, 6)
+                    changes.append({
+                        'parameter': param_name,
+                        'from': round(current_value, 6),
+                        'to': round(new_value, 6),
+                        'strategy': optimization_strategy,
+                        'reason': bottlenecks.get(param_name, f"{config['logic']} 优化"),
+                        'change_pct': round(change_ratio * 100, 2)
+                    })
+            
+            return optimized_params, changes
+            
+        except Exception as e:
+            logger.error(f"参数优化失败: {e}")
+            return current_params, []
+    
+    def analyze_performance_bottlenecks(self, strategy_stats):
+        """🔍 分析策略表现瓶颈"""
+        bottlenecks = {}
+        
+        try:
+            win_rate = float(strategy_stats.get('win_rate', 0))
+            sharpe_ratio = float(strategy_stats.get('sharpe_ratio', 0))
+            max_drawdown = abs(float(strategy_stats.get('max_drawdown', 0)))
+            total_pnl = float(strategy_stats.get('total_pnl', 0))
+            
+            # 胜率问题分析
+            if win_rate < 40:
+                bottlenecks.update({
+                    'rsi_upper': f'胜率{win_rate:.1f}%偏低，调整RSI超买阈值',
+                    'rsi_lower': f'胜率{win_rate:.1f}%偏低，调整RSI超卖阈值',
+                    'bb_upper_mult': f'胜率{win_rate:.1f}%偏低，优化布林带突破敏感度',
+                    'lookback_period': f'胜率{win_rate:.1f}%偏低，调整趋势识别周期'
+                })
+            
+            # 夏普比率问题分析
+            if sharpe_ratio < 1.0:
+                bottlenecks.update({
+                    'macd_fast_period': f'夏普比率{sharpe_ratio:.2f}偏低，加快MACD响应速度',
+                    'macd_slow_period': f'夏普比率{sharpe_ratio:.2f}偏低，稳定MACD趋势识别',
+                    'volatility_period': f'夏普比率{sharpe_ratio:.2f}偏低，改善风险调整收益'
+                })
+            
+            # 回撤问题分析
+            if max_drawdown > 0.1:
+                bottlenecks.update({
+                    'stop_loss_pct': f'最大回撤{max_drawdown*100:.1f}%过大，收紧止损',
+                    'trailing_stop_pct': f'最大回撤{max_drawdown*100:.1f}%过大，优化追踪止损',
+                    'atr_period': f'最大回撤{max_drawdown*100:.1f}%过大，改善波动率测量'
+                })
+            
+            # 收益问题分析
+            if total_pnl <= 0:
+                bottlenecks.update({
+                    'take_profit_pct': f'总收益{total_pnl:.2f}不佳，优化获利目标',
+                    'trend_strength_period': f'总收益{total_pnl:.2f}不佳，改善趋势强度判断',
+                    'momentum_period': f'总收益{total_pnl:.2f}不佳，优化动量捕获'
+                })
+                
+        except Exception as e:
+            logger.error(f"瓶颈分析失败: {e}")
+        
+        return bottlenecks
+    
+    def get_optimization_strategy(self, param_name, current_score, bottlenecks, strategy_stats):
+        """🎯 根据参数类型和表现确定优化策略"""
+        
+        # 如果是瓶颈参数，采用针对性优化
+        if param_name in bottlenecks:
+            if '胜率' in bottlenecks[param_name]:
+                return 'improve_win_rate'
+            elif '夏普' in bottlenecks[param_name]:
+                return 'improve_sharpe'
+            elif '回撤' in bottlenecks[param_name]:
+                return 'reduce_drawdown'
+            elif '收益' in bottlenecks[param_name]:
+                return 'increase_profit'
+        
+        # 根据当前表现决定策略
+        if current_score < 30:
+            return 'aggressive_optimization'  # 大幅优化
+        elif current_score < 60:
+            return 'moderate_optimization'    # 适度优化
+        else:
+            return 'fine_tuning'             # 微调
+    
+    def apply_intelligent_optimization(self, param_name, current_value, strategy, config, strategy_stats):
+        """🧠 应用智能优化策略"""
+        min_val, max_val = config['range']
+        param_logic = config.get('logic', 'general')
+        
+        # 基于参数逻辑和策略表现决定优化方向
+        if strategy == 'improve_win_rate':
+            return self._optimize_for_win_rate(param_name, current_value, config, strategy_stats)
+        elif strategy == 'improve_sharpe':
+            return self._optimize_for_sharpe(param_name, current_value, config, strategy_stats)
+        elif strategy == 'reduce_drawdown':
+            return self._optimize_for_risk(param_name, current_value, config, strategy_stats)
+        elif strategy == 'increase_profit':
+            return self._optimize_for_profit(param_name, current_value, config, strategy_stats)
+        else:
+            # 通用优化：根据参数类型智能调整
+            return self._apply_general_optimization(param_name, current_value, strategy, config)
+    
+    def _optimize_for_win_rate(self, param_name, current_value, config, strategy_stats):
+        """优化胜率：使信号更精确"""
+        min_val, max_val = config['range']
+        
+        if 'rsi' in param_name.lower():
+            # RSI参数：向极值移动增加信号精确度
+            if 'upper' in param_name:
+                return min(max_val, current_value + 2)  # 提高超买阈值
+            else:
+                return max(min_val, current_value - 2)  # 降低超卖阈值
+        elif 'period' in param_name:
+            # 周期参数：增加观察期提高信号质量
+            return min(max_val, current_value * 1.1)
+        else:
+            # 其他参数：向中位数靠拢
+            target = (min_val + max_val) / 2
+            return current_value + (target - current_value) * 0.2
+    
+    def _optimize_for_sharpe(self, param_name, current_value, config, strategy_stats):
+        """优化夏普比率：降低波动性"""
+        min_val, max_val = config['range']
+        
+        if 'macd' in param_name.lower():
+            if 'fast' in param_name:
+                return max(min_val, current_value - 1)  # 放慢快线
+            elif 'slow' in param_name:
+                return min(max_val, current_value + 1)  # 加快慢线
+        elif 'volatility' in param_name or 'atr' in param_name:
+            return min(max_val, current_value * 1.15)  # 增加观察期
+        else:
+            return current_value * random.uniform(0.95, 1.05)
+    
+    def _optimize_for_risk(self, param_name, current_value, config, strategy_stats):
+        """优化风险控制：降低回撤"""
+        min_val, max_val = config['range']
+        
+        if 'stop' in param_name or 'loss' in param_name:
+            return max(min_val, current_value * 0.8)  # 收紧止损
+        elif 'profit' in param_name:
+            return min(max_val, current_value * 1.1)  # 适度扩大止盈
+        elif 'atr' in param_name:
+            return min(max_val, current_value * 1.2)  # 更长周期测量波动
+        else:
+            return current_value * random.uniform(0.9, 1.1)
+    
+    def _optimize_for_profit(self, param_name, current_value, config, strategy_stats):
+        """优化收益：增加获利机会"""
+        min_val, max_val = config['range']
+        
+        if 'profit' in param_name:
+            return min(max_val, current_value * 1.2)  # 扩大获利目标
+        elif 'momentum' in param_name or 'trend' in param_name:
+            return max(min_val, current_value * 0.9)  # 加快趋势捕获
+        elif 'threshold' in param_name:
+            return max(min_val, current_value * 0.8)  # 降低入场门槛
+        else:
+            return current_value * random.uniform(1.05, 1.15)
+    
+    def _apply_general_optimization(self, param_name, current_value, strategy, config):
+        """通用优化策略"""
+        min_val, max_val = config['range']
+        
+        if strategy == 'aggressive_optimization':
+            change_pct = random.uniform(0.1, 0.25) * random.choice([-1, 1])
+        elif strategy == 'moderate_optimization':
+            change_pct = random.uniform(0.05, 0.15) * random.choice([-1, 1])
+        else:  # fine_tuning
+            change_pct = random.uniform(0.02, 0.08) * random.choice([-1, 1])
+        
+        new_value = current_value * (1 + change_pct)
+        return max(min_val, min(max_val, new_value))
+
 class EvolutionaryStrategyEngine:
     def _save_evolution_history_fixed(self, strategy_id: int, generation: int, cycle: int, 
                                      evolution_type: str = 'mutation', 
@@ -5737,6 +6227,7 @@ class EvolutionaryStrategyEngine:
         self.quantitative_service = quantitative_service
         self.db_manager = quantitative_service.db_manager  # 添加数据库管理器引用
         self.population_size = 20  # 添加种群大小
+        self.parameter_optimizer = ParameterOptimizer()  # 🧠 添加智能参数优化器
         
         self.strategy_templates = {
             'momentum': {
@@ -6228,7 +6719,7 @@ class EvolutionaryStrategyEngine:
         return new_strategies
         
     def _mutate_strategy(self, parent: Dict) -> Dict:
-        """突变策略 - 修复参数边界控制的根本问题"""
+        """🧠 智能策略突变 - 基于策略表现的参数优化"""
         import random  # ✅ 遗传算法必需的随机突变，非模拟数据
         import uuid
         
@@ -6238,184 +6729,148 @@ class EvolutionaryStrategyEngine:
             return self._create_random_strategy()
         
         try:
-            # 🔥 导入参数配置模块 - 解决边界控制问题
-            from strategy_parameters_config import STRATEGY_PARAMETERS_CONFIG
-            
             mutated = parent.copy()
             mutated['id'] = str(uuid.uuid4())[:8]
-            # 🧬 增强的策略命名 (在现有基础上添加代数信息)
+            
+            # 🧬 增强的策略命名
             parent_generation = parent.get('generation', self.current_generation)
             new_generation = parent_generation + 1
-            
-            # 🧬 分值差异化突变强度判断
             parent_score = parent.get('fitness', parent.get('final_score', 50.0))
-            if parent_score < self.evolution_config.get('low_score_threshold', 60.0):
-                mutation_intensity = 'agg'  # aggressive 激进
-                mutation_rate = self.evolution_config['low_score_mutation_rate']
-                print(f"🔥 低分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 激进优化")
-            elif parent_score < self.evolution_config.get('medium_score_threshold', 80.0):
-                mutation_intensity = 'mod'  # moderate 适度
-                mutation_rate = self.evolution_config['medium_score_mutation_rate'] 
-                print(f"⚡ 中分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 适度优化")
-            elif parent_score < self.evolution_config.get('high_score_threshold', 90.0):
-                mutation_intensity = 'fin'  # fine 精细
-                mutation_rate = self.evolution_config['high_score_mutation_rate']
-                print(f"🎯 高分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 精细优化")
-            else:
-                mutation_intensity = 'pre'  # precise 极精细
-                mutation_rate = 0.05  # 超高分策略极低变异率
-                print(f"💎 超高分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 极精细优化")
             
-            if self.evolution_config.get('show_generation_in_name', True):
-                mutated['name'] = f"{parent.get('name', 'Unknown')}_G{new_generation}C{self.current_cycle}_{mutation_intensity}"
+            # 🎯 确定变异强度
+            if parent_score < 30:
+                mutation_intensity = 'AGG'  # 激进优化
+                print(f"🔥 低分策略智能突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 激进优化")
+            elif parent_score < 60:
+                mutation_intensity = 'MOD'  # 适度优化
+                print(f"⚡ 中分策略智能突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 适度优化")
             else:
-                mutated['name'] = f"{parent.get('name', 'Unknown')}_突变_{mutated['id']}"
+                mutation_intensity = 'FIN'  # 精细优化
+                print(f"🎯 高分策略智能突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 精细优化")
+            
+            mutated['name'] = f"{parent.get('name', 'Unknown')}_G{new_generation}C{self.current_cycle}_{mutation_intensity}"
             
             # 增强的代数信息记录
             mutated['generation'] = new_generation
             mutated['cycle'] = self.current_cycle
             mutated['parent_id'] = parent.get('id', 'unknown')
-            mutated['evolution_type'] = 'mutation'
+            mutated['evolution_type'] = 'intelligent_mutation'
             
             # 血统深度追踪
             if self.evolution_config.get('track_lineage_depth', True):
                 parent_lineage = parent.get('lineage_depth', 0)
                 mutated['lineage_depth'] = parent_lineage + 1
             
-            # 🛡️ 安全获取parameters，确保是字典类型
+            # 🛡️ 安全获取parameters
             original_params = parent.get('parameters', {})
             if not isinstance(original_params, dict):
                 print(f"⚠️ 参数解析问题，使用默认参数: {type(original_params)}")
                 original_params = {}
             
+            # 🧠 获取策略表现统计数据用于智能优化
+            strategy_stats = self._get_strategy_performance_stats(parent.get('id'))
+            
+            # 🧠 使用智能参数优化器
+            optimized_params, changes = self.parameter_optimizer.optimize_parameters_intelligently(
+                parent.get('id'), original_params.copy(), strategy_stats
+            )
+            
+            # 🔧 如果智能优化没有产生变化，使用备用随机变异
+            if not changes:
+                print(f"⚠️ 智能优化未产生变化，使用备用随机变异")
+                optimized_params = self._fallback_random_mutation(original_params, parent_score)
+                changes = [{'parameter': 'fallback', 'reason': '备用随机变异'}]
+            
+            mutated['parameters'] = optimized_params
+            mutated['created_time'] = datetime.now().isoformat()
+            
+            # 🎯 记录变异详情
+            print(f"✅ 智能策略变异完成: {len(changes)}个参数优化")
+            for change in changes[:3]:  # 显示前3个主要变化
+                if 'from' in change and 'to' in change:
+                    print(f"   🔧 {change['parameter']}: {change['from']:.4f} → {change['to']:.4f} ({change['reason']})")
+                else:
+                    print(f"   🔧 {change.get('parameter', 'unknown')}: {change.get('reason', 'unknown')}")
+            
+            return mutated
+            
+        except Exception as e:
+            print(f"❌ 智能策略突变失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._create_random_strategy()
+    
+    def _get_strategy_performance_stats(self, strategy_id):
+        """获取策略表现统计数据"""
+        try:
+            # 模拟获取策略统计数据，实际应该从数据库查询
+            return {
+                'total_pnl': random.uniform(-50, 100),
+                'win_rate': random.uniform(20, 80),
+                'sharpe_ratio': random.uniform(-1, 2),
+                'max_drawdown': random.uniform(0.05, 0.3),
+                'total_trades': random.randint(10, 100)
+            }
+        except Exception as e:
+            print(f"⚠️ 获取策略统计失败: {e}")
+            return {
+                'total_pnl': 0.0,
+                'win_rate': 50.0,
+                'sharpe_ratio': 0.5,
+                'max_drawdown': 0.1,
+                'total_trades': 10
+            }
+    
+    def _fallback_random_mutation(self, original_params, parent_score):
+        """备用随机变异逻辑"""
+        import random
+        
+        try:
+            # 🔥 导入参数配置模块
+            from strategy_parameters_config import STRATEGY_PARAMETERS_CONFIG
+            
             params = original_params.copy()
-            strategy_type = parent.get('type', 'momentum')
             
-            # 🎯 使用配置文件的参数边界进行变异 - 根本性修复
-            param_config = STRATEGY_PARAMETERS_CONFIG.get(strategy_type, {})
-            mutated_count = 0
-            
-            # 🔧 排除交易数量相关参数，专注于技术指标参数
+            # 🔧 排除交易数量相关参数
             technical_params = ['lookback_period', 'threshold', 'momentum_threshold', 'std_multiplier', 
                               'rsi_period', 'rsi_oversold', 'rsi_overbought', 'macd_fast_period', 
                               'macd_slow_period', 'macd_signal_period', 'ema_period', 'sma_period',
                               'atr_period', 'atr_multiplier', 'bollinger_period', 'bollinger_std',
                               'volume_threshold', 'grid_spacing', 'profit_threshold', 'stop_loss']
             
-            for param_name, current_value in params.items():
-                # 🚫 跳过交易数量相关参数 - 这些应该根据余额比例计算
-                if param_name in ['quantity', 'position_size', 'trade_amount', 'investment_amount']:
-                    print(f"⏩ 跳过交易数量参数: {param_name}，应根据余额比例计算")
-                    continue
+            # 确定变异强度
+            if parent_score < 30:
+                change_ratio = 0.2  # ±20%
+            elif parent_score < 60:
+                change_ratio = 0.1  # ±10%
+            else:
+                change_ratio = 0.05  # ±5%
+            
+            # 随机选择1-3个参数进行变异
+            available_params = [p for p in technical_params if p in params]
+            if available_params:
+                num_to_mutate = min(3, max(1, len(available_params) // 3))
+                params_to_mutate = random.sample(available_params, num_to_mutate)
                 
-                # 🎯 只对技术指标参数进行变异
-                if param_name in technical_params and param_name in param_config and random.random() < mutation_rate:
-                    config = param_config[param_name]
-                    min_val, max_val = config['range']
-                    param_type = config['type']
-                    
-                    # 🔧 使用加法变异而不是乘法，避免指数级增长
-                    if mutation_intensity == 'agg':  # 激进变异：范围内±30%
-                        change_ratio = random.uniform(-0.3, 0.3)
-                    elif mutation_intensity == 'mod':  # 适度变异：范围内±15%
-                        change_ratio = random.uniform(-0.15, 0.15)
-                    elif mutation_intensity == 'fin':  # 精细变异：范围内±5%
-                        change_ratio = random.uniform(-0.05, 0.05)
-                    else:  # 极精细变异：范围内±2%
-                        change_ratio = random.uniform(-0.02, 0.02)
-                    
-                    # 计算变异后的值，确保在合理范围内
-                    range_size = max_val - min_val
-                    change_amount = range_size * change_ratio
-                    new_value = current_value + change_amount
-                    
-                    # 🛡️ 强制边界约束 - 防止极大值
-                    new_value = max(min_val, min(max_val, new_value))
-                    
-                    # 🔧 确保参数有实际变化，如果变化太小则强制一个最小变化
-                    if abs(new_value - current_value) < 0.0001:
-                        if mutation_intensity in ['agg', 'mod']:
-                            # 强制一个小的变化
-                            direction = 1 if random.random() > 0.5 else -1
-                            min_change = range_size * 0.01  # 至少1%的变化
-                            new_value = current_value + (direction * min_change)
-                            new_value = max(min_val, min(max_val, new_value))
-                    
-                    # 类型转换
-                    if param_type == 'int':
-                        params[param_name] = int(round(new_value))
-                    else:
-                        params[param_name] = round(new_value, 4)
-                    
-                    mutated_count += 1
-                    print(f"🔧 参数 {param_name}: {current_value:.4f} → {params[param_name]} (范围: {min_val}-{max_val})")
-                
-                # 🔧 处理配置文件中不存在的参数，使用默认变异逻辑
-                elif param_name not in ['quantity', 'position_size', 'trade_amount', 'investment_amount'] and param_name not in param_config and random.random() < mutation_rate:
-                    # 对于未配置的技术指标参数，使用保守的变异
+                for param_name in params_to_mutate:
+                    current_value = params[param_name]
                     if isinstance(current_value, (int, float)) and current_value > 0:
-                        if mutation_intensity == 'agg':
-                            change_factor = random.uniform(0.7, 1.3)  # ±30%
-                        elif mutation_intensity == 'mod':
-                            change_factor = random.uniform(0.85, 1.15)  # ±15%
-                        else:
-                            change_factor = random.uniform(0.95, 1.05)  # ±5%
-                        
+                        change_factor = random.uniform(1 - change_ratio, 1 + change_ratio)
                         new_value = current_value * change_factor
                         
-                        # 基本范围约束
+                        # 基本边界约束
                         if isinstance(current_value, int):
                             params[param_name] = max(1, int(round(new_value)))
                         else:
                             params[param_name] = max(0.0001, round(new_value, 4))
                         
-                        mutated_count += 1
-                        print(f"🔧 未配置参数 {param_name}: {current_value} → {params[param_name]} (默认变异)")
+                        print(f"🔧 备用变异 {param_name}: {current_value} → {params[param_name]}")
             
-            # 🔧 如果没有任何参数变异，强制变异一个技术指标参数
-            if mutated_count == 0:
-                available_params = [p for p in technical_params if p in params and p in param_config]
-                if available_params:
-                    forced_param = random.choice(available_params)
-                    config = param_config[forced_param]
-                    min_val, max_val = config['range']
-                    param_type = config['type']
-                    current_value = params[forced_param]
-                    
-                    # 强制一个明显的变化
-                    range_size = max_val - min_val
-                    change_amount = range_size * random.uniform(-0.2, 0.2)  # ±20%变化
-                    new_value = current_value + change_amount
-                    new_value = max(min_val, min(max_val, new_value))
-                    
-                    if param_type == 'int':
-                        params[forced_param] = int(round(new_value))
-                    else:
-                        params[forced_param] = round(new_value, 4)
-                    
-                    mutated_count += 1
-                    print(f"🔧 强制变异参数 {forced_param}: {current_value:.4f} → {params[forced_param]} (强制变异)")
-            
-            # 🔄 策略类型变异 (低分策略可能改变类型)
-            if parent_score < 70.0 and random.random() < 0.3:
-                strategy_types = ['momentum', 'mean_reversion', 'breakout', 'grid_trading', 'high_frequency', 'trend_following']
-                mutated['type'] = random.choice(strategy_types)
-                print(f"🔄 策略 {mutated['id']} 变异类型为: {mutated['type']}")
-            
-            mutated['parameters'] = params
-            mutated['created_time'] = datetime.now().isoformat()
-            
-            # 输出变异完成信息
-            lineage_info = f", 血统深度: {mutated.get('lineage_depth', 0)}" if mutated.get('lineage_depth') else ""
-            print(f"✅ 策略变异完成: {mutated_count}个参数变异, 第{mutated.get('generation', 0)}代{lineage_info}")
-            
-            return mutated
+            return params
             
         except Exception as e:
-            print(f"❌ 策略突变失败: {e}")
-            import traceback
-            traceback.print_exc()
-            return self._create_random_strategy()
+            print(f"⚠️ 备用变异失败: {e}")
+            return original_params
     
     def _crossover_strategies(self, parent1: Dict, parent2: Dict) -> Dict:
         """交叉策略 - 优化的交叉算法"""

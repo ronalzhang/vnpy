@@ -96,6 +96,150 @@ def get_db_connection():
         password='123abc74531'
     )
 
+def calculate_strategy_sharpe_ratio(strategy_id, total_trades):
+    """计算策略夏普比率"""
+    try:
+        if total_trades < 5:  # 交易次数太少无法计算准确的夏普比率
+            return 0.0
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取策略的PnL数据
+        cursor.execute("""
+            SELECT pnl FROM strategy_trade_logs 
+            WHERE strategy_id = %s 
+            ORDER BY timestamp DESC 
+            LIMIT 100
+        """, (strategy_id,))
+        
+        pnl_data = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        if len(pnl_data) < 5:
+            return 0.0
+        
+        # 计算收益率的平均值和标准差
+        import statistics
+        mean_return = statistics.mean(pnl_data)
+        if len(pnl_data) > 1:
+            std_return = statistics.stdev(pnl_data)
+            if std_return > 0:
+                return mean_return / std_return
+        
+        return 0.0
+        
+    except Exception as e:
+        print(f"计算夏普比率失败: {e}")
+        return 0.0
+
+def calculate_strategy_max_drawdown(strategy_id):
+    """计算策略最大回撤"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取策略的累计PnL
+        cursor.execute("""
+            SELECT pnl FROM strategy_trade_logs 
+            WHERE strategy_id = %s 
+            ORDER BY timestamp ASC
+        """, (strategy_id,))
+        
+        pnl_data = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        if len(pnl_data) < 2:
+            return 0.0
+        
+        # 计算累计收益曲线
+        cumulative_pnl = []
+        running_total = 0
+        for pnl in pnl_data:
+            running_total += pnl
+            cumulative_pnl.append(running_total)
+        
+        # 计算最大回撤
+        max_drawdown = 0.0
+        peak = cumulative_pnl[0]
+        
+        for value in cumulative_pnl:
+            if value > peak:
+                peak = value
+            if peak > 0:
+                drawdown = (peak - value) / peak
+                max_drawdown = max(max_drawdown, drawdown)
+            
+        return max_drawdown
+        
+    except Exception as e:
+        print(f"计算最大回撤失败: {e}")
+        return 0.0
+
+def calculate_strategy_profit_factor(strategy_id, winning_trades, losing_trades):
+    """计算策略盈亏比"""
+    try:
+        if losing_trades == 0:  # 没有亏损交易
+            return 999.0 if winning_trades > 0 else 0.0
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取盈利和亏损总额
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) as total_profit,
+                SUM(CASE WHEN pnl < 0 THEN ABS(pnl) ELSE 0 END) as total_loss
+            FROM strategy_trade_logs 
+            WHERE strategy_id = %s
+        """, (strategy_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0] and result[1]:
+            total_profit = float(result[0])
+            total_loss = float(result[1])
+            if total_loss > 0:
+                return total_profit / total_loss
+                
+        return 0.0
+        
+    except Exception as e:
+        print(f"计算盈亏比失败: {e}")
+        return 0.0
+
+def calculate_strategy_volatility(strategy_id):
+    """计算策略波动率"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取策略的PnL数据
+        cursor.execute("""
+            SELECT pnl FROM strategy_trade_logs 
+            WHERE strategy_id = %s 
+            ORDER BY timestamp DESC 
+            LIMIT 50
+        """, (strategy_id,))
+        
+        pnl_data = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        if len(pnl_data) < 3:
+            return 0.0
+        
+        # 计算收益率的标准差作为波动率
+        import statistics
+        if len(pnl_data) > 1:
+            return statistics.stdev(pnl_data)
+        
+        return 0.0
+        
+    except Exception as e:
+        print(f"计算波动率失败: {e}")
+        return 0.0
+
 # 导入套利系统模块
 try:
     from integrate_arbitrage import init_arbitrage_system
@@ -1185,6 +1329,12 @@ def quantitative_strategies():
                     else:
                         evolution_display = "初代策略"
                 
+                # 🔥 计算夏普比率和其他重要指标
+                sharpe_ratio = calculate_strategy_sharpe_ratio(sid, total_trades)
+                max_drawdown = calculate_strategy_max_drawdown(sid)
+                profit_factor = calculate_strategy_profit_factor(sid, wins, total_trades - wins if total_trades > 0 else 0)
+                volatility = calculate_strategy_volatility(sid)
+                
                 strategy = {
                     'id': sid,
                     'name': name,
@@ -1200,6 +1350,10 @@ def quantitative_strategies():
                     'win_rate': round(win_rate, 2),
                     'total_pnl': float(total_pnl) if total_pnl else 0.0,
                     'avg_pnl': float(avg_pnl) if avg_pnl else 0.0,
+                    'sharpe_ratio': round(sharpe_ratio, 4),    # ⭐ 夏普比率
+                    'max_drawdown': round(max_drawdown, 4),   # ⭐ 最大回撤
+                    'profit_factor': round(profit_factor, 2), # ⭐ 盈亏比
+                    'volatility': round(volatility, 4),       # ⭐ 波动率
                     'evolution_display': evolution_display,
                     'trade_mode': '真实交易' if enabled else '模拟中'
                 }
