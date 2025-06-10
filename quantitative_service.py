@@ -6343,6 +6343,187 @@ class ParameterOptimizer:
         
         new_value = current_value * (1 + change_pct)
         return max(min_val, min(max_val, new_value))
+    
+    def _determine_optimization_mode(self, current_score, win_rate, total_return, total_trades):
+        """🎯 根据策略表现确定优化模式"""
+        import random
+        # 根据综合表现确定优化强度
+        if current_score < 40 or win_rate < 40 or total_return < -50:
+            return "aggressive"  # 激进优化：表现差，需要大幅改进
+        elif current_score < 60 or win_rate < 60 or total_trades < 5:
+            return "balanced"    # 平衡优化：中等表现，需要全面提升
+        elif current_score < 75 or win_rate < 75:
+            return "fine_tune"   # 精细调优：良好表现，需要精准优化
+        else:
+            return "conservative" # 保守优化：优秀表现，保持稳定
+    
+    def _apply_aggressive_optimization(self, params, strategy_stats):
+        """🔥 激进优化：大幅调整参数突破瓶颈"""
+        import random
+        changes = []
+        
+        # 关键参数大幅优化
+        key_params = {
+            'rsi_period': (10, 25, 14),  # (min, max, optimal)
+            'macd_fast_period': (8, 15, 12),
+            'macd_slow_period': (20, 35, 26),
+            'bb_period': (15, 25, 20),
+            'stop_loss_pct': (2, 8, 5),
+            'take_profit_pct': (4, 12, 8)
+        }
+        
+        for param, (min_val, max_val, optimal) in key_params.items():
+            if param in params:
+                # 向最优值大幅调整
+                current = params[param]
+                if abs(current - optimal) > (max_val - min_val) * 0.1:
+                    # 如果偏离最优值较大，快速调整
+                    new_value = optimal + random.uniform(-2, 2)
+                    new_value = max(min_val, min(max_val, new_value))
+                    params[param] = new_value
+                    changes.append({
+                        'parameter': param,
+                        'from': current,
+                        'to': new_value,
+                        'reason': f'激进优化: 调整到最优范围'
+                    })
+        
+        return changes
+    
+    def _apply_balanced_optimization(self, params, strategy_stats):
+        """⚖️ 平衡优化：综合调整多个参数"""
+        changes = []
+        win_rate = strategy_stats.get('win_rate', 0)
+        total_return = strategy_stats.get('total_return', 0)
+        
+        # 根据表现调整不同类型参数
+        if win_rate < 55:
+            # 优化进场参数
+            changes.extend(self._optimize_entry_parameters(params))
+        
+        if total_return < 20:
+            # 优化盈利参数
+            changes.extend(self._optimize_profit_parameters(params))
+            
+        if strategy_stats.get('max_drawdown', 0) > 0.1:
+            # 优化风险控制参数
+            changes.extend(self._optimize_risk_parameters(params))
+        
+        return changes
+    
+    def _apply_fine_tune_optimization(self, params, strategy_stats):
+        """🎯 精细调优：微调表现良好的策略"""
+        import random
+        changes = []
+        
+        # 小幅调整关键参数
+        fine_tune_params = ['rsi_period', 'bb_std', 'trailing_stop_pct', 'volume_threshold']
+        
+        for param in fine_tune_params:
+            if param in params:
+                current = params[param]
+                # 1-3% 的微调
+                adjustment = random.uniform(0.98, 1.02)
+                new_value = current * adjustment
+                
+                # 确保在合理范围内
+                if param == 'rsi_period':
+                    new_value = max(10, min(25, new_value))
+                elif param == 'bb_std':
+                    new_value = max(1.5, min(3.0, new_value))
+                elif param == 'trailing_stop_pct':
+                    new_value = max(1, min(8, new_value))
+                elif param == 'volume_threshold':
+                    new_value = max(1.1, min(3.0, new_value))
+                
+                params[param] = round(new_value, 4)
+                changes.append({
+                    'parameter': param,
+                    'from': current,
+                    'to': new_value,
+                    'reason': '精细调优'
+                })
+        
+        return changes
+    
+    def _apply_conservative_optimization(self, params, strategy_stats):
+        """🛡️ 保守优化：小幅调整避免破坏稳定性"""
+        import random
+        changes = []
+        
+        # 只调整风险控制相关参数
+        conservative_params = ['stop_loss_pct', 'take_profit_pct', 'position_size_pct']
+        
+        for param in conservative_params:
+            if param in params:
+                current = params[param]
+                # 0.5-1% 的微调
+                adjustment = random.uniform(0.995, 1.005)
+                new_value = current * adjustment
+                
+                params[param] = round(new_value, 4)
+                changes.append({
+                    'parameter': param,
+                    'from': current,
+                    'to': new_value,
+                    'reason': '保守微调'
+                })
+        
+        return changes
+    
+    def _optimize_entry_parameters(self, params):
+        \"\"\"🎯 优化进场参数提升胜率\"\"\"
+        changes = []
+        
+        # RSI 参数优化
+        if 'rsi_oversold' in params and params['rsi_oversold'] > 25:
+            current = params['rsi_oversold']
+            new_value = max(20, current - 2)
+            params['rsi_oversold'] = new_value
+            changes.append({
+                'parameter': 'rsi_oversold',
+                'from': current,
+                'to': new_value,
+                'reason': '提升胜率: 降低RSI超卖阈值'
+            })
+        
+        return changes
+    
+    def _optimize_profit_parameters(self, params):
+        \"\"\"💰 优化盈利参数提升收益\"\"\"
+        changes = []
+        
+        # 止盈参数优化
+        if 'take_profit_pct' in params and params['take_profit_pct'] < 8:
+            current = params['take_profit_pct']
+            new_value = min(10, current + 1)
+            params['take_profit_pct'] = new_value
+            changes.append({
+                'parameter': 'take_profit_pct',
+                'from': current,
+                'to': new_value,
+                'reason': '提升收益: 增加止盈目标'
+            })
+        
+        return changes
+    
+    def _optimize_risk_parameters(self, params):
+        \"\"\"🛡️ 优化风险控制参数\"\"\"
+        changes = []
+        
+        # 止损参数优化
+        if 'stop_loss_pct' in params and params['stop_loss_pct'] > 3:
+            current = params['stop_loss_pct']
+            new_value = max(2, current - 0.5)
+            params['stop_loss_pct'] = new_value
+            changes.append({
+                'parameter': 'stop_loss_pct',
+                'from': current,
+                'to': new_value,
+                'reason': '控制风险: 收紧止损'
+            })
+        
+        return changes
 
 class EvolutionaryStrategyEngine:
     def _save_evolution_history_fixed(self, strategy_id: int, generation: int, cycle: int, 

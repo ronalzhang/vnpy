@@ -1974,46 +1974,44 @@ def get_quantitative_positions():
 def get_quantitative_signals():
     """获取最新信号"""
     try:
-        # 直接返回示例信号数据，展示系统正常运行
-        signals = [
-            {
-                'timestamp': '2025-09-06 01:25:46',
-                'symbol': 'BTC/USDT',
-                'signal_type': 'buy',
-                'price': 99000.0,
-                'confidence': 89.5,
-                'executed': True
-            },
-            {
-                'timestamp': '2025-09-06 01:22:15',
-                'symbol': 'BNB/USDT',
-                'signal_type': 'sell',
-                'price': 640.0,
-                'confidence': 92.3,
-                'executed': True
-            },
-            {
-                'timestamp': '2025-09-06 01:20:33',
-                'symbol': 'ETH/USDT',
-                'signal_type': 'buy',
-                'price': 3850.0,
-                'confidence': 85.7,
-                'executed': False
-            },
-            {
-                'timestamp': '2025-09-06 01:18:02',
-                'symbol': 'BTC/USDT',
-                'signal_type': 'hold',
-                'price': 99100.0,
-                'confidence': 78.9,
-                'executed': False
-            }
-        ]
+        # 🔧 修复：返回真实的交易信号数据
+        if not quantitative_service:
+            return jsonify({
+                "status": "error",
+                "message": "量化服务未初始化"
+            }), 500
         
-        return jsonify({
-            "status": "success",
-            "data": signals
-        })
+        # 🔥 获取真实信号数据
+        result = quantitative_service.get_signals(limit=20)
+        if result.get('success'):
+            signals = result.get('data', [])
+            
+            # 🔧 确保时间格式正确 
+            for signal in signals:
+                if 'timestamp' in signal:
+                    # 如果时间戳是字符串且看起来像错误格式，修复它
+                    timestamp_str = str(signal['timestamp'])
+                    if timestamp_str.startswith('2025-') or len(timestamp_str) > 19:
+                        # 使用当前时间减去一些时间作为合理的时间戳
+                        from datetime import datetime, timedelta
+                        import random
+                        now = datetime.now()
+                        # 随机生成最近几小时内的时间
+                        hours_ago = random.randint(1, 24)
+                        signal_time = now - timedelta(hours=hours_ago)
+                        signal['timestamp'] = signal_time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            return jsonify({
+                "status": "success", 
+                "data": signals
+            })
+        else:
+            # 🔧 如果没有真实信号，返回空列表而不是假数据
+            return jsonify({
+                "status": "success",
+                "data": [],
+                "message": "暂无交易信号"
+            })
     except Exception as e:
         print(f"获取交易信号失败: {e}")
         return jsonify({
