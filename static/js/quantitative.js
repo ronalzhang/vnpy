@@ -1501,8 +1501,8 @@ class QuantitativeSystem {
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
 
-        // 🔧 修复：增加滚动显示的日志条数到20条，最新在前
-        const recentLogs = this.allEvolutionLogs.slice(-20).reverse();
+        // 🔧 修复：滚动显示最新5条日志，最新在前
+        const recentLogs = this.allEvolutionLogs.slice(-5).reverse();
         
         const tickerContent = recentLogs.map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {

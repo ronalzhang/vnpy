@@ -1335,12 +1335,28 @@ def quantitative_strategies():
                 profit_factor = calculate_strategy_profit_factor(sid, wins, total_trades - wins if total_trades > 0 else 0)
                 volatility = calculate_strategy_volatility(sid)
                 
+                # 🔧 修复：正确解析parameters字段
+                try:
+                    if isinstance(params, str):
+                        import json
+                        parsed_params = json.loads(params)
+                    elif isinstance(params, dict):
+                        parsed_params = params
+                    else:
+                        # 如果参数为空，使用默认参数
+                        from strategy_parameters_config import get_strategy_default_parameters
+                        parsed_params = get_strategy_default_parameters(stype)
+                except Exception as e:
+                    print(f"解析策略{sid}参数失败: {e}, 使用默认参数")
+                    from strategy_parameters_config import get_strategy_default_parameters
+                    parsed_params = get_strategy_default_parameters(stype)
+
                 strategy = {
                     'id': sid,
                     'name': name,
                     'symbol': symbol,
                     'type': stype,
-                    'parameters': params if isinstance(params, dict) else {},
+                    'parameters': parsed_params,
                     'enabled': bool(enabled),
                     'final_score': float(score) if score else 0.0,
                     'created_at': created_at.isoformat() if created_at else '',
