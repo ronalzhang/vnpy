@@ -6105,22 +6105,137 @@ class ParameterOptimizer:
             return 'fine_tuning'             # 微调
     
     def apply_intelligent_optimization(self, param_name, current_value, strategy, config, strategy_stats):
-        """🧠 应用智能优化策略"""
+        """🧠 应用基于参数规则的智能优化策略"""
         min_val, max_val = config['range']
-        param_logic = config.get('logic', 'general')
         
-        # 基于参数逻辑和策略表现决定优化方向
-        if strategy == 'improve_win_rate':
-            return self._optimize_for_win_rate(param_name, current_value, config, strategy_stats)
-        elif strategy == 'improve_sharpe':
-            return self._optimize_for_sharpe(param_name, current_value, config, strategy_stats)
-        elif strategy == 'reduce_drawdown':
-            return self._optimize_for_risk(param_name, current_value, config, strategy_stats)
-        elif strategy == 'increase_profit':
-            return self._optimize_for_profit(param_name, current_value, config, strategy_stats)
+        # 使用新的参数规则系统
+        if param_name in self.parameter_rules:
+            return self._apply_rule_based_optimization(param_name, current_value, strategy, strategy_stats)
+        
+        # 回退到通用优化
+        return self._apply_general_optimization(param_name, current_value, strategy, config)
+    
+    def _apply_rule_based_optimization(self, param_name, current_value, strategy, strategy_stats):
+        """🎯 基于参数规则的优化"""
+        rule = self.parameter_rules[param_name]
+        min_val, max_val = rule['range']
+        optimal_min, optimal_max = rule['optimal']
+        optimization_rules = rule['optimization_rules']
+        
+        # 获取策略表现指标
+        total_pnl = float(strategy_stats.get('total_pnl', 0))
+        win_rate = float(strategy_stats.get('win_rate', 0))
+        sharpe_ratio = float(strategy_stats.get('sharpe_ratio', 0))
+        max_drawdown = abs(float(strategy_stats.get('max_drawdown', 0)))
+        
+        # 判断表现状态
+        is_low_profit = total_pnl <= 0
+        is_low_winrate = win_rate < 45
+        is_high_risk = max_drawdown > 0.08 or sharpe_ratio < 0.5
+        is_high_score = win_rate > 70 and sharpe_ratio > 1.5 and total_pnl > 50
+        
+        # 根据表现确定优化规则
+        optimization_rule = None
+        if is_high_score:
+            optimization_rule = optimization_rules.get('high_score', 'fine_tune')
+        elif is_high_risk:
+            optimization_rule = optimization_rules.get('high_risk', 'increase')
+        elif is_low_winrate:
+            optimization_rule = optimization_rules.get('low_winrate', 'increase')
+        elif is_low_profit:
+            optimization_rule = optimization_rules.get('low_profit', 'increase')
         else:
-            # 通用优化：根据参数类型智能调整
-            return self._apply_general_optimization(param_name, current_value, strategy, config)
+            optimization_rule = 'fine_tune'
+        
+        # 应用具体的优化逻辑
+        return self._execute_optimization_rule(
+            param_name, current_value, optimization_rule, 
+            min_val, max_val, optimal_min, optimal_max, strategy_stats
+        )
+    
+    def _execute_optimization_rule(self, param_name, current_value, rule, 
+                                   min_val, max_val, optimal_min, optimal_max, strategy_stats):
+        """🎯 执行具体的优化规则"""
+        import random
+        
+        # 计算当前值在范围内的位置
+        range_position = (current_value - min_val) / (max_val - min_val) if max_val > min_val else 0.5
+        
+        if rule == 'increase':
+            # 增加参数值，向最大值方向移动
+            if current_value < optimal_max:
+                # 在最优范围内，适度增加
+                new_value = min(current_value * random.uniform(1.05, 1.2), optimal_max)
+            else:
+                # 超出最优范围，大幅增加
+                new_value = min(current_value * random.uniform(1.1, 1.3), max_val)
+                
+        elif rule == 'decrease':
+            # 减少参数值，向最小值方向移动
+            if current_value > optimal_min:
+                # 在最优范围内，适度减少
+                new_value = max(current_value * random.uniform(0.8, 0.95), optimal_min)
+            else:
+                # 低于最优范围，小幅减少
+                new_value = max(current_value * random.uniform(0.9, 0.95), min_val)
+                
+        elif rule == 'moderate_increase':
+            # 适度增加，不要过度
+            new_value = min(current_value * random.uniform(1.02, 1.1), 
+                           (current_value + optimal_max) / 2)
+                           
+        elif rule == 'adaptive':
+            # 自适应调整，根据市场状态
+            volatility = abs(float(strategy_stats.get('sharpe_ratio', 1)) - 1)
+            if volatility > 0.5:  # 高波动性市场
+                new_value = current_value * random.uniform(0.95, 1.05)  # 保守调整
+            else:  # 低波动性市场
+                new_value = current_value * random.uniform(0.9, 1.1)   # 积极调整
+                
+        elif rule.startswith('optimize_to_'):
+            # 优化到特定值
+            target_value = self._extract_target_value(rule, param_name)
+            if target_value:
+                # 向目标值缓慢收敛
+                new_value = current_value + (target_value - current_value) * random.uniform(0.1, 0.3)
+            else:
+                new_value = (optimal_min + optimal_max) / 2  # 默认到最优范围中心
+                
+        elif rule == 'fine_tune':
+            # 高分策略的微调
+            new_value = current_value * random.uniform(0.98, 1.02)
+            
+        else:
+            # 默认的保守调整
+            new_value = current_value * random.uniform(0.95, 1.05)
+        
+        # 确保新值在有效范围内
+        new_value = max(min_val, min(max_val, new_value))
+        
+        return new_value
+    
+    def _extract_target_value(self, rule, param_name):
+        """📊 从优化规则中提取目标值"""
+        target_map = {
+            'optimize_to_14': 14,
+            'optimize_to_70': 70,
+            'optimize_to_30': 30,
+            'optimize_to_12': 12,
+            'optimize_to_26': 26,
+            'optimize_to_9': 9,
+            'optimize_to_20': 20,
+            'optimize_to_2.0': 2.0,
+            'optimize_to_21': 21,
+            'optimize_to_50': 50,
+            'optimize_to_2.5': 2.5,
+            'optimize_to_5_pct': 0.05,
+            'optimize_to_6_pct': 0.06,
+            'optimize_to_1.5': 1.5,
+            'optimize_to_0.8': 0.8,
+            'optimize_to_1.0': 1.0,
+            'optimize_to_1.2': 1.2
+        }
+        return target_map.get(rule, None)
     
     def _optimize_for_win_rate(self, param_name, current_value, config, strategy_stats):
         """优化胜率：使信号更精确"""
