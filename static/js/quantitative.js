@@ -1501,8 +1501,8 @@ class QuantitativeSystem {
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
 
-        // 🔧 修复：增加滚动显示的日志条数到20条
-        const recentLogs = this.allEvolutionLogs.slice(-20);
+        // 🔧 修复：增加滚动显示的日志条数到20条，最新在前
+        const recentLogs = this.allEvolutionLogs.slice(-20).reverse();
         
         const tickerContent = recentLogs.map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
@@ -1672,7 +1672,7 @@ function renderLogsPage() {
     if (!app || !app.allEvolutionLogs) return;
     
     const tbody = document.getElementById('allLogsTableBody');
-    const allLogs = [...app.allEvolutionLogs].reverse(); // 最新的在前
+    const allLogs = [...app.allEvolutionLogs].reverse(); // 🔧 修复：最新的在前
     
     // 计算分页
     const totalLogs = allLogs.length;

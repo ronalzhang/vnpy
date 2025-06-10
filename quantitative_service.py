@@ -6506,11 +6506,16 @@ class EvolutionaryStrategyEngine:
             # 5. 生成新策略（变异和交叉）
             new_strategies = self._generate_new_strategies(elites, survivors)
             
-            # 6. 更新世代信息
+            # 🔧 修复：正确更新世代信息 - 立即保存到全局状态
             self.current_cycle += 1
-            if self.current_cycle > 10:  # 每10轮为一代
+            if self.current_cycle > 3:  # 每3轮为一代，加快进化速度
                 self.current_generation += 1
                 self.current_cycle = 1
+            
+            # 🔧 立即更新到数据库和全局状态
+            self._save_generation_state()
+            
+            logger.info(f"🔥 世代信息已更新：第{self.current_generation}代第{self.current_cycle}轮")
             
             # 7. 保存所有策略演化历史
             self._save_evolution_history(elites, new_strategies)
@@ -6601,6 +6606,43 @@ class EvolutionaryStrategyEngine:
             
         except Exception as e:
             logger.error(f"更新策略世代信息失败: {e}")
+    
+    def _save_generation_state(self):
+        """保存当前世代和轮次到全局状态"""
+        try:
+            # 保存到数据库
+            self.quantitative_service.db_manager.execute_query("""
+                UPDATE system_status 
+                SET current_generation = %s, last_updated = CURRENT_TIMESTAMP
+                WHERE id = 1
+            """, (self.current_generation,))
+            
+            # 创建/更新演化状态表
+            self.quantitative_service.db_manager.execute_query("""
+                CREATE TABLE IF NOT EXISTS evolution_state (
+                    id INTEGER PRIMARY KEY DEFAULT 1,
+                    current_generation INTEGER DEFAULT 1,
+                    current_cycle INTEGER DEFAULT 1,
+                    last_evolution_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    total_evolutions INTEGER DEFAULT 0
+                )
+            """)
+            
+            self.quantitative_service.db_manager.execute_query("""
+                INSERT INTO evolution_state (id, current_generation, current_cycle, total_evolutions)
+                VALUES (1, %s, %s, 1)
+                ON CONFLICT (id) 
+                DO UPDATE SET 
+                    current_generation = EXCLUDED.current_generation,
+                    current_cycle = EXCLUDED.current_cycle,
+                    last_evolution_time = CURRENT_TIMESTAMP,
+                    total_evolutions = evolution_state.total_evolutions + 1
+            """, (self.current_generation, self.current_cycle))
+            
+            logger.info(f"💾 世代状态已保存: 第{self.current_generation}代第{self.current_cycle}轮")
+            
+        except Exception as e:
+            logger.error(f"保存世代状态失败: {e}")
     
     def _recover_from_evolution_failure(self):
         """演化失败后的恢复机制"""
@@ -6832,23 +6874,45 @@ class EvolutionaryStrategyEngine:
                 new_strategy['generation'] = 0
                 print(f"🎲 创建全新随机策略")
             
-            # 🔥 关键修复：立即保存新策略到数据库
+            # 🔥 关键修复：立即保存新策略到数据库并记录参数变化
             if self._create_strategy_in_system(new_strategy):
-                # 🔧 保存进化历史，包含修改前后参数对比
+                # 🔧 详细记录进化历史，包含修改前后参数对比
                 if 'parent_id' in new_strategy and new_strategy['parent_id']:
                     # 获取父策略参数
                     parent_strategy = next((s for s in all_strategies if s['id'] == new_strategy['parent_id']), None)
                     if parent_strategy:
-                        self._save_evolution_history_with_comparison(
-                            new_strategy['id'],
-                            new_strategy.get('generation', 0),
-                            new_strategy.get('cycle', 0),
-                            new_strategy.get('evolution_type', 'mutation'),
-                            parent_strategy.get('parameters', {}),  # 修改前参数
-                            new_strategy.get('parameters', {}),     # 修改后参数
-                            new_strategy['parent_id'],
-                            new_strategy.get('final_score', 0)
-                        )
+                        parent_params = parent_strategy.get('parameters', {})
+                        new_params = new_strategy.get('parameters', {})
+                        
+                        # 🔧 记录具体的参数变化详情
+                        param_changes = []
+                        for key in set(list(parent_params.keys()) + list(new_params.keys())):
+                            old_val = parent_params.get(key, 'N/A')
+                            new_val = new_params.get(key, 'N/A')
+                            if old_val != new_val:
+                                param_changes.append(f"{key}: {old_val}→{new_val}")
+                        
+                        evolution_details = f"参数优化: {'; '.join(param_changes[:5])}" if param_changes else "基因重组优化"
+                        
+                        # 保存到进化历史表
+                        self.quantitative_service.db_manager.execute_query("""
+                            INSERT INTO strategy_evolution_history 
+                            (strategy_id, generation, cycle, parent_strategy_id, evolution_type, 
+                             score_before, score_after, new_parameters, created_time, notes)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s)
+                        """, (
+                            new_strategy['id'], 
+                            self.current_generation, 
+                            self.current_cycle,
+                            new_strategy['parent_id'], 
+                            new_strategy.get('evolution_type', 'intelligent_mutation'),
+                            parent_strategy.get('final_score', 0),  # 父策略评分
+                            50.0,  # 新策略初始评分
+                            json.dumps(new_params),
+                            evolution_details
+                        ))
+                        
+                        print(f"📝 进化记录已保存: {evolution_details}")
                 
                 new_strategies.append(new_strategy)
                 print(f"✅ 新策略已保存: {new_strategy['name']} (ID: {new_strategy['id']})")
@@ -6914,17 +6978,37 @@ class EvolutionaryStrategyEngine:
                 parent.get('id'), original_params.copy(), strategy_stats
             )
             
-            # 🔧 如果智能优化没有产生变化，使用备用随机变异
-            if not changes:
-                print(f"⚠️ 智能优化未产生变化，使用备用随机变异")
-                optimized_params = self._fallback_random_mutation(original_params, parent_score)
-                changes = [{'parameter': 'fallback', 'reason': '备用随机变异'}]
+            # 🔧 修复：确保参数真实变化，避免无效优化
+            if not changes or len(changes) == 0:
+                print(f"⚠️ 智能优化未产生变化，使用强制变异")
+                optimized_params = self._force_parameter_mutation(original_params, parent_score, force=True)
+                # 检查强制变异的效果
+                forced_changes = []
+                for key in optimized_params:
+                    old_val = original_params.get(key, 0)
+                    new_val = optimized_params.get(key, 0)
+                    if abs(float(new_val) - float(old_val)) > 0.001:
+                        forced_changes.append({'parameter': key, 'from': old_val, 'to': new_val, 'reason': '强制变异'})
+                changes = forced_changes
             
             mutated['parameters'] = optimized_params
             mutated['created_time'] = datetime.now().isoformat()
             
+            # 🔧 再次验证参数确实发生了变化
+            actual_changes = []
+            for key in mutated['parameters']:
+                old_val = original_params.get(key, 0)
+                new_val = mutated['parameters'][key]
+                if abs(float(new_val) - float(old_val)) > 0.001:
+                    actual_changes.append(f"{key}: {old_val:.4f}→{new_val:.4f}")
+            
+            if len(actual_changes) == 0:
+                print(f"🚨 参数仍未变化，强制随机变异")
+                mutated['parameters'] = self._force_parameter_mutation(original_params, parent_score, force=True, aggressive=True)
+            
             # 🎯 记录变异详情
             print(f"✅ 智能策略变异完成: {len(changes)}个参数优化")
+            print(f"📊 实际参数变化: {len(actual_changes)}项 - {'; '.join(actual_changes[:3])}")
             for change in changes[:3]:  # 显示前3个主要变化
                 if 'from' in change and 'to' in change:
                     print(f"   🔧 {change['parameter']}: {change['from']:.4f} → {change['to']:.4f} ({change['reason']})")
@@ -6960,8 +7044,8 @@ class EvolutionaryStrategyEngine:
                 'total_trades': 10
             }
     
-    def _fallback_random_mutation(self, original_params, parent_score):
-        """备用随机变异逻辑"""
+    def _force_parameter_mutation(self, original_params, parent_score, force=False, aggressive=False):
+        """🔧 强制参数变异 - 确保参数真实变化"""
         import random
         
         try:
@@ -6970,46 +7054,85 @@ class EvolutionaryStrategyEngine:
             
             params = original_params.copy()
             
-            # 🔧 排除交易数量相关参数
+            # 🔧 确保所有技术参数都参与变异
             technical_params = ['lookback_period', 'threshold', 'momentum_threshold', 'std_multiplier', 
                               'rsi_period', 'rsi_oversold', 'rsi_overbought', 'macd_fast_period', 
                               'macd_slow_period', 'macd_signal_period', 'ema_period', 'sma_period',
                               'atr_period', 'atr_multiplier', 'bollinger_period', 'bollinger_std',
                               'volume_threshold', 'grid_spacing', 'profit_threshold', 'stop_loss']
             
-            # 确定变异强度
-            if parent_score < 30:
-                change_ratio = 0.2  # ±20%
+            # 🔧 更强的变异强度确保真实变化
+            if aggressive:
+                change_ratio = 0.3  # ±30% 激进变异
+                min_change = 0.1    # 最小10%变化
+            elif parent_score < 30:
+                change_ratio = 0.25  # ±25%
+                min_change = 0.05   # 最小5%变化
             elif parent_score < 60:
-                change_ratio = 0.1  # ±10%
+                change_ratio = 0.15  # ±15%
+                min_change = 0.03   # 最小3%变化
             else:
-                change_ratio = 0.05  # ±5%
+                change_ratio = 0.08  # ±8%
+                min_change = 0.02   # 最小2%变化
             
-            # 随机选择1-3个参数进行变异
+            # 🔧 强制选择更多参数进行变异
             available_params = [p for p in technical_params if p in params]
             if available_params:
-                num_to_mutate = min(3, max(1, len(available_params) // 3))
-                params_to_mutate = random.sample(available_params, num_to_mutate)
+                if force or aggressive:
+                    # 强制模式：变异50%以上的参数
+                    num_to_mutate = max(3, len(available_params) // 2)
+                else:
+                    num_to_mutate = min(4, max(2, len(available_params) // 3))
                 
+                params_to_mutate = random.sample(available_params, min(num_to_mutate, len(available_params)))
+                
+                changes_made = 0
                 for param_name in params_to_mutate:
                     current_value = params[param_name]
                     if isinstance(current_value, (int, float)) and current_value > 0:
-                        change_factor = random.uniform(1 - change_ratio, 1 + change_ratio)
+                        # 🔧 确保至少有最小变化量
+                        min_change_amount = max(min_change * current_value, 0.001)
+                        max_change_factor = 1 + change_ratio
+                        min_change_factor = 1 - change_ratio
+                        
+                        # 随机决定增加还是减少
+                        if random.random() < 0.5:
+                            change_factor = random.uniform(max(min_change_factor, 1 - change_ratio), 1 - min_change)
+                        else:
+                            change_factor = random.uniform(1 + min_change, min(max_change_factor, 1 + change_ratio))
+                        
                         new_value = current_value * change_factor
                         
-                        # 基本边界约束
+                        # 边界约束和类型处理
                         if isinstance(current_value, int):
-                            params[param_name] = max(1, int(round(new_value)))
+                            new_value = max(1, int(round(new_value)))
                         else:
-                            params[param_name] = max(0.0001, round(new_value, 4))
+                            new_value = max(0.0001, round(new_value, 4))
                         
-                        print(f"🔧 备用变异 {param_name}: {current_value} → {params[param_name]}")
+                        # 🔧 确保真实变化
+                        if abs(new_value - current_value) > 0.001:
+                            params[param_name] = new_value
+                            changes_made += 1
+                            print(f"🔧 强制变异 {param_name}: {current_value:.4f} → {new_value:.4f}")
+                
+                print(f"✅ 强制变异完成：{changes_made}个参数已修改")
             
             return params
             
         except Exception as e:
-            print(f"⚠️ 备用变异失败: {e}")
-            return original_params
+            print(f"❌ 强制变异失败: {e}")
+            # 最后的备用方案：硬编码随机变异
+            params = original_params.copy()
+            for key in ['threshold', 'lookback_period', 'rsi_period']:
+                if key in params:
+                    current = params[key]
+                    params[key] = current * random.uniform(0.8, 1.2)
+                    print(f"🔧 硬编码变异 {key}: {current:.4f} → {params[key]:.4f}")
+            return params
+    
+    def _fallback_random_mutation(self, original_params, parent_score):
+        """备用随机变异逻辑 - 向后兼容"""
+        return self._force_parameter_mutation(original_params, parent_score, force=False, aggressive=False)
     
     def _crossover_strategies(self, parent1: Dict, parent2: Dict) -> Dict:
         """交叉策略 - 优化的交叉算法"""
@@ -7353,24 +7476,48 @@ class EvolutionaryStrategyEngine:
     def _load_current_generation(self) -> int:
         """从数据库加载当前世代数"""
         try:
-            result = self.db_manager.execute_query(
+            # 🔧 修复：从evolution_state表加载真实的世代信息
+            result = self.quantitative_service.db_manager.execute_query(
+                "SELECT current_generation FROM evolution_state WHERE id = 1",
+                fetch_one=True
+            )
+            if result and result[0]:
+                loaded_generation = result[0]
+                logger.info(f"📖 从数据库加载世代信息: 第{loaded_generation}代")
+                return loaded_generation
+            
+            # 如果没有evolution_state表，从strategies表推断
+            result = self.quantitative_service.db_manager.execute_query(
                 "SELECT MAX(generation) FROM strategies WHERE is_persistent = 1",
                 fetch_one=True
             )
             return (result[0] or 0) + 1 if result and result[0] else 1
-        except Exception:
+        except Exception as e:
+            logger.warning(f"加载世代信息失败: {e}，使用默认值")
             return 1
     
     def _load_current_cycle(self) -> int:
         """从数据库加载当前轮次"""
         try:
-            result = self.db_manager.execute_query(
+            # 🔧 修复：从evolution_state表加载真实的轮次信息
+            result = self.quantitative_service.db_manager.execute_query(
+                "SELECT current_cycle FROM evolution_state WHERE id = 1",
+                fetch_one=True
+            )
+            if result and result[0]:
+                loaded_cycle = result[0]
+                logger.info(f"📖 从数据库加载轮次信息: 第{loaded_cycle}轮")
+                return loaded_cycle
+            
+            # 如果没有evolution_state表，从strategies表推断
+            result = self.quantitative_service.db_manager.execute_query(
                 "SELECT MAX(cycle) FROM strategies WHERE generation = %s",
-                (self.current_generation - 1,),
+                (self.current_generation,),
                 fetch_one=True
             )
             return (result[0] or 0) + 1 if result and result[0] else 1
-        except Exception:
+        except Exception as e:
+            logger.warning(f"加载轮次信息失败: {e}，使用默认值")
             return 1
     
     def _protect_high_score_strategies(self):

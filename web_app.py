@@ -3489,15 +3489,16 @@ def manage_strategy_config():
             config_rows = cursor.fetchall()
             
             # 🔥 从后端实际运行系统获取真实配置参数
-            # 先获取系统状态了解当前运行参数
+            # 获取演化引擎的实际配置
             cursor.execute("""
-                SELECT total_strategies, running_strategies, selected_strategies, current_generation
-                FROM system_status ORDER BY last_updated DESC LIMIT 1
+                SELECT current_generation, total_evolutions, current_cycle 
+                FROM evolution_state WHERE id = 1
             """)
-            status_row = cursor.fetchone()
+            evolution_state = cursor.fetchone()
+            current_generation = evolution_state[0] if evolution_state else 1
             
             # 获取实际策略统计信息
-            cursor.execute("SELECT COUNT(*) FROM strategies")
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE is_persistent = 1")
             actual_total_strategies = cursor.fetchone()[0]
             
             cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
@@ -3512,27 +3513,27 @@ def manage_strategy_config():
             cursor.execute("""
                 SELECT 
                     AVG(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) as avg_profit,
-                    COUNT(CASE WHEN pnl > 0 THEN 1 END) * 100.0 / COUNT(*) as win_rate
+                    COUNT(CASE WHEN pnl > 0 THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as win_rate
                 FROM strategy_trade_logs 
                 WHERE timestamp >= NOW() - INTERVAL '7 days'
             """)
             trade_stats = cursor.fetchone()
-            actual_avg_profit = trade_stats[0] or 0
-            actual_win_rate = trade_stats[1] or 65
+            actual_avg_profit = trade_stats[0] or 0 if trade_stats else 0
+            actual_win_rate = trade_stats[1] or 65 if trade_stats else 65
             
-            # 使用实际运行的参数作为配置基准
+            # 🔧 修复：与后端quantitative_service.py的EvolutionaryStrategyEngine保持完全一致
             actual_config = {
-                'evolutionInterval': 15,  # 实际进化间隔调整为15分钟
-                'maxStrategies': actual_total_strategies or 25,  # 使用实际策略数量
-                'minTrades': 8,  # 降低最小交易要求
-                'minWinRate': max(50, actual_win_rate - 10),  # 基于实际胜率动态调整
-                'minProfit': max(0, actual_avg_profit * 0.5),  # 基于实际盈利调整
-                'maxDrawdown': 8,  # 收紧风控
-                'minSharpeRatio': 0.8,  # 降低夏普比率要求
-                'maxPositionSize': 150,  # 增加最大仓位
-                'stopLossPercent': 3,  # 收紧止损
-                'eliminationDays': 5,  # 缩短淘汰周期
-                'minScore': max(40, avg_score - 15)  # 基于实际评分动态调整
+                'evolutionInterval': 10,  # 🔧 与后端evolution_config保持一致：10分钟
+                'maxStrategies': 50,  # 🔧 与后端max_strategies保持一致
+                'minTrades': 20,  # 🔧 与后端策略交易标准保持一致
+                'minWinRate': 75,  # 🔧 与后端胜率要求保持一致
+                'minProfit': 100,  # 🔧 与后端最低收益要求保持一致
+                'maxDrawdown': 2,  # 🔧 与后端风控标准保持一致
+                'minSharpeRatio': 1,  # 🔧 与后端夏普比率要求保持一致
+                'maxPositionSize': 100,  # 🔧 与后端仓位管理保持一致
+                'stopLossPercent': 3,  # 🔧 与后端止损设置保持一致
+                'eliminationDays': 7,  # 🔧 与后端淘汰周期保持一致
+                'minScore': 40  # 🔧 与后端elimination_threshold保持一致
             }
             
             # 合并数据库保存的自定义配置
