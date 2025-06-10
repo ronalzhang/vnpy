@@ -1493,7 +1493,7 @@ class QuantitativeSystem {
         }
     }
 
-    // 渲染进化日志 - CNN滚动新闻样式（显示最新15条）
+    // 渲染进化日志 - CNN滚动新闻样式（显示最新20条）
     renderEvolutionLog(logs) {
         const ticker = document.getElementById('evolutionTicker');
         if (!ticker) return;
@@ -1501,8 +1501,8 @@ class QuantitativeSystem {
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
 
-        // 增加滚动显示的日志条数到15条
-        const recentLogs = this.allEvolutionLogs.slice(-15);
+        // 🔧 修复：增加滚动显示的日志条数到20条
+        const recentLogs = this.allEvolutionLogs.slice(-20);
         
         const tickerContent = recentLogs.map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
@@ -1582,6 +1582,10 @@ function showStrategyManagement() {
 
 function showAllLogs() {
     if (app && app.allEvolutionLogs) {
+        // 🔧 初始化分页变量
+        app.logsCurrentPage = 1;
+        app.logsPerPage = 15;
+        
         // 创建一个新的模态框显示所有日志
         const modalHtml = `
             <div class="modal fade" id="allLogsModal" tabindex="-1">
@@ -1590,6 +1594,7 @@ function showAllLogs() {
                         <div class="modal-header">
                             <h5 class="modal-title">
                                 <i class="fas fa-list me-2"></i>所有策略进化日志
+                                <span class="badge bg-primary ms-2" id="logsTotal">共 ${app.allEvolutionLogs.length} 条</span>
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
@@ -1607,6 +1612,31 @@ function showAllLogs() {
                                         <!-- 日志内容 -->
                                     </tbody>
                                 </table>
+                            </div>
+                            
+                            <!-- 🔧 分页控件 -->
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center">
+                                        <span class="text-muted me-3" id="pageInfo">第1页，共1页</span>
+                                        <span class="text-muted" id="recordInfo">显示第1-15条，共0条记录</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <nav>
+                                        <ul class="pagination justify-content-end mb-0">
+                                            <li class="page-item" id="prevPage">
+                                                <a class="page-link" href="#" onclick="changeLogsPage(app.logsCurrentPage - 1)">上一页</a>
+                                            </li>
+                                            <li class="page-item active" id="currentPageItem">
+                                                <span class="page-link" id="currentPageSpan">1</span>
+                                            </li>
+                                            <li class="page-item" id="nextPage">
+                                                <a class="page-link" href="#" onclick="changeLogsPage(app.logsCurrentPage + 1)">下一页</a>
+                                            </li>
+                                        </ul>
+                                    </nav>
+                                </div>
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -1626,42 +1656,8 @@ function showAllLogs() {
         // 添加新模态框
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         
-        // 填充数据
-        const tbody = document.getElementById('allLogsTableBody');
-        const allLogs = [...app.allEvolutionLogs].reverse(); // 最新的在前
-        
-        tbody.innerHTML = allLogs.map(log => {
-            const time = new Date(log.timestamp).toLocaleString('zh-CN');
-            let actionClass = 'secondary';
-            let actionText = '变更';
-            
-            switch(log.action) {
-                case 'created':
-                    actionClass = 'success';
-                    actionText = '新增';
-                    break;
-                case 'eliminated':
-                    actionClass = 'danger';
-                    actionText = '淘汰';
-                    break;
-                case 'optimized':
-                    actionClass = 'primary';
-                    actionText = '优化';
-                    break;
-                case 'updated':
-                    actionClass = 'info';
-                    actionText = '更新';
-                    break;
-            }
-            
-            return `
-                <tr>
-                    <td class="text-muted">${time}</td>
-                    <td><span class="badge bg-${actionClass}">${actionText}</span></td>
-                    <td>${log.details}</td>
-                </tr>
-            `;
-        }).join('');
+        // 🔧 渲染第一页数据
+        renderLogsPage();
         
         // 显示模态框
         const modal = new bootstrap.Modal(document.getElementById('allLogsModal'));
@@ -1669,6 +1665,95 @@ function showAllLogs() {
     } else {
         console.log('暂无日志数据');
     }
+}
+
+// 🔧 新增：渲染日志分页数据
+function renderLogsPage() {
+    if (!app || !app.allEvolutionLogs) return;
+    
+    const tbody = document.getElementById('allLogsTableBody');
+    const allLogs = [...app.allEvolutionLogs].reverse(); // 最新的在前
+    
+    // 计算分页
+    const totalLogs = allLogs.length;
+    const totalPages = Math.ceil(totalLogs / app.logsPerPage);
+    const startIndex = (app.logsCurrentPage - 1) * app.logsPerPage;
+    const endIndex = Math.min(startIndex + app.logsPerPage, totalLogs);
+    const currentPageLogs = allLogs.slice(startIndex, endIndex);
+    
+    // 渲染表格数据
+    tbody.innerHTML = currentPageLogs.map(log => {
+        const time = new Date(log.timestamp).toLocaleString('zh-CN');
+        let actionClass = 'secondary';
+        let actionText = '变更';
+        
+        switch(log.action) {
+            case 'created':
+                actionClass = 'success';
+                actionText = '新增';
+                break;
+            case 'eliminated':
+                actionClass = 'danger';
+                actionText = '淘汰';
+                break;
+            case 'optimized':
+                actionClass = 'primary';
+                actionText = '优化';
+                break;
+            case 'updated':
+                actionClass = 'info';
+                actionText = '更新';
+                break;
+        }
+        
+        return `
+            <tr>
+                <td class="text-muted">${time}</td>
+                <td><span class="badge bg-${actionClass}">${actionText}</span></td>
+                <td>${log.details}</td>
+            </tr>
+        `;
+    }).join('');
+    
+    // 更新分页信息
+    const pageInfo = document.getElementById('pageInfo');
+    const recordInfo = document.getElementById('recordInfo');
+    const currentPageSpan = document.getElementById('currentPageSpan');
+    const prevPage = document.getElementById('prevPage');
+    const nextPage = document.getElementById('nextPage');
+    
+    if (pageInfo) pageInfo.textContent = `第${app.logsCurrentPage}页，共${totalPages}页`;
+    if (recordInfo) recordInfo.textContent = `显示第${startIndex + 1}-${endIndex}条，共${totalLogs}条记录`;
+    if (currentPageSpan) currentPageSpan.textContent = app.logsCurrentPage;
+    
+    // 更新按钮状态
+    if (prevPage) {
+        if (app.logsCurrentPage <= 1) {
+            prevPage.classList.add('disabled');
+        } else {
+            prevPage.classList.remove('disabled');
+        }
+    }
+    
+    if (nextPage) {
+        if (app.logsCurrentPage >= totalPages) {
+            nextPage.classList.add('disabled');
+        } else {
+            nextPage.classList.remove('disabled');
+        }
+    }
+}
+
+// 🔧 新增：切换日志页面
+function changeLogsPage(page) {
+    if (!app || !app.allEvolutionLogs) return;
+    
+    const totalPages = Math.ceil(app.allEvolutionLogs.length / app.logsPerPage);
+    
+    if (page < 1 || page > totalPages) return;
+    
+    app.logsCurrentPage = page;
+    renderLogsPage();
 }
 
 // 页面加载完成后初始化

@@ -3589,13 +3589,13 @@ def get_evolution_log():
         
         logs = []
         
-        # 🔥 步骤1：从strategy_evolution_history获取大量真实进化数据
+        # 🔥 步骤1：从strategy_evolution_history获取大量真实进化数据（增加到200条保存更多历史）
         cursor.execute("""
             SELECT strategy_id, action_type, evolution_type, generation, cycle, 
                    score_before, score_after, timestamp, notes
             FROM strategy_evolution_history 
             ORDER BY timestamp DESC 
-            LIMIT 15
+            LIMIT 200
         """)
         
         evolution_records = cursor.fetchall()
@@ -3640,7 +3640,7 @@ def get_evolution_log():
         
         return jsonify({
             'success': True,
-            'logs': logs[:20]  # 返回前20条
+            'logs': logs[:100]  # 🔧 返回前100条，支持更丰富的日志展示和分页
         })
         
     except Exception as e:
