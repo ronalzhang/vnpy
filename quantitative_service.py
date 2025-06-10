@@ -2512,9 +2512,12 @@ class QuantitativeService:
         return symbol_map.get(strategy_type, ['BTC/USDT', 'ETH/USDT'])
     
     def _generate_strategy_from_template(self, strategy_type: str) -> Dict:
-        """⭐ 从模板生成具有丰富参数的新策略"""
+        """⭐ 从模板生成具有完整默认参数的新策略"""
         import random
         import uuid
+        
+        # 🔧 使用统一的策略参数配置
+        from strategy_parameters_config import get_strategy_default_parameters
         
         if strategy_type not in self.strategy_templates:
             print(f"❌ 未知策略类型: {strategy_type}")
@@ -2523,13 +2526,33 @@ class QuantitativeService:
         template = self.strategy_templates[strategy_type]
         strategy_id = f"{strategy_type}_{uuid.uuid4().hex[:8]}"
         
-        # 🎯 根据参数范围随机生成参数
-        parameters = {}
-        for param_name, (min_val, max_val) in template['param_ranges'].items():
-            if isinstance(min_val, int) and isinstance(max_val, int):
-                parameters[param_name] = random.randint(min_val, max_val)
-            else:
-                parameters[param_name] = round(random.uniform(min_val, max_val), 4)
+        # 🎯 使用统一配置的默认参数，而不是随机生成
+        parameters = get_strategy_default_parameters(strategy_type)
+        
+        # 🔥 如果统一配置没有参数，再使用模板的参数范围生成默认值
+        if not parameters and 'param_ranges' in template:
+            print(f"⚠️ 使用模板参数范围生成默认值: {strategy_type}")
+            for param_name, (min_val, max_val) in template['param_ranges'].items():
+                # 使用范围的中间值作为默认值，而不是随机值
+                if isinstance(min_val, int) and isinstance(max_val, int):
+                    parameters[param_name] = (min_val + max_val) // 2
+                else:
+                    parameters[param_name] = round((min_val + max_val) / 2, 4)
+        
+        # 🔥 确保至少有基础参数
+        if not parameters:
+            print(f"⚠️ 策略类型 {strategy_type} 无参数配置，使用基础默认参数")
+            parameters = {
+                'lookback_period': 20,
+                'threshold': 0.02,
+                'quantity': 100,
+                'stop_loss_pct': 2.0,
+                'take_profit_pct': 4.0,
+                'rsi_period': 14,
+                'rsi_oversold': 30,
+                'rsi_overbought': 70,
+                'volume_threshold': 2.0
+            }
         
         # 🎯 随机选择交易对
         symbol = random.choice(template['symbols'])
@@ -2549,6 +2572,7 @@ class QuantitativeService:
         }
         
         print(f"✅ 从模板生成新策略: {strategy_config['name']} ({len(parameters)}个参数)")
+        print(f"📊 策略参数: {list(parameters.keys())}")
         return strategy_config
     
     def _get_strategy_by_id(self, strategy_id: int) -> Dict:

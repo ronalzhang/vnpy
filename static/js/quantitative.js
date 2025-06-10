@@ -386,33 +386,7 @@ class QuantitativeSystem {
                                     </div>
                                 </div>
                             </div>
-                            <!-- ⭐ 新增重要指标显示 -->
-                            <div class="row text-center mt-2">
-                                <div class="col-3">
-                                    <div class="metric-item">
-                                        <div class="fw-bold ${strategy.sharpe_ratio > 1 ? 'text-success' : strategy.sharpe_ratio > 0.5 ? 'text-warning' : 'text-danger'}">${(strategy.sharpe_ratio || 0).toFixed(2)}</div>
-                                        <small class="text-muted">夏普比率</small>
-                                    </div>
-                                </div>
-                                <div class="col-3">
-                                    <div class="metric-item">
-                                        <div class="fw-bold ${strategy.max_drawdown < 0.1 ? 'text-success' : strategy.max_drawdown < 0.2 ? 'text-warning' : 'text-danger'}">${((strategy.max_drawdown || 0) * 100).toFixed(1)}%</div>
-                                        <small class="text-muted">最大回撤</small>
-                                    </div>
-                                </div>
-                                <div class="col-3">
-                                    <div class="metric-item">
-                                        <div class="fw-bold ${strategy.profit_factor > 2 ? 'text-success' : strategy.profit_factor > 1 ? 'text-warning' : 'text-danger'}">${(strategy.profit_factor || 0).toFixed(1)}</div>
-                                        <small class="text-muted">盈亏比</small>
-                                    </div>
-                                </div>
-                                <div class="col-3">
-                                    <div class="metric-item">
-                                        <div class="fw-bold ${strategy.volatility < 5 ? 'text-success' : strategy.volatility < 10 ? 'text-warning' : 'text-danger'}">${(strategy.volatility || 0).toFixed(2)}</div>
-                                        <small class="text-muted">波动率</small>
-                                    </div>
-                                </div>
-                            </div>
+
                         </div>
                         
                         <!-- 底部：操作按钮 -->

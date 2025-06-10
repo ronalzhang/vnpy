@@ -769,9 +769,9 @@
 
 /* ==================== 策略进化日志样式 ==================== */
 .evolution-log-container {
-    /* 🔧 响应式宽度设计 */
-    width: min(65vw, 600px); /* 屏幕宽度的65%，最大600px */
-    max-width: 600px;
+    /* 🔧 优化的响应式宽度设计 */
+    width: min(65vw, 750px); /* 宽屏时最大750px，屏幕宽度的65% */
+    max-width: 750px;
     min-width: 300px; /* 最小宽度保证基本显示 */
     height: 36px; /* 增加高度为36px */
     overflow: hidden;
@@ -870,11 +870,11 @@
         background: #fff;
     }
     
-    /* 🔧 滚动日志手机端优化 */
+    /* 🔧 滚动日志手机端优化 - 使用中间95%空间 */
     .evolution-log-container {
-        /* 🔧 手机端精确计算宽度，避免挤压标题 */
-        width: min(calc(100vw - 200px), 280px); /* 减去标题和按钮的空间 */
-        max-width: 280px; /* 控制最大宽度 */
+        /* 🔧 中等屏幕：除了标题和按钮外，使用中间95%的空间 */
+        width: calc((100vw - 160px) * 0.95); /* 标题+按钮约160px，剩余空间的95% */
+        max-width: 320px; /* 控制最大宽度 */
         min-width: 200px; /* 保证最小显示宽度 */
         height: 32px; /* 手机端稍微降低高度 */
         z-index: 8; /* 比默认稍高，但远低于标题 */
@@ -932,9 +932,9 @@
     }
     
     .evolution-log-container {
-        /* 🔧 小屏幕进一步精确控制宽度 */
-        width: min(calc(100vw - 180px), 250px); /* 为标题留更多空间 */
-        max-width: 250px;
+        /* 🔧 小屏幕：使用中间95%空间，为标题和按钮留足空间 */
+        width: calc((100vw - 140px) * 0.95); /* 标题+按钮约140px，剩余空间的95% */
+        max-width: 260px;
         min-width: 180px;
         height: 28px; /* 小屏幕进一步降低高度 */
         z-index: 6; /* 保持低层级 */
@@ -967,80 +967,5 @@
     }
 }
 
-/* ==================== 策略卡片增强显示 ==================== */
-.strategy-card {
-    position: relative;
-    z-index: 15; /* 确保策略卡片在滚动日志之上 */
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin-bottom: 15px;
-    overflow: hidden;
-}
 
-/* ⭐ 新增夏普比率等指标样式 */
-.strategy-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 10px;
-    padding: 15px;
-    background: #f8fafc;
-    border-top: 1px solid #e5e7eb;
-}
-
-.metric-item {
-    text-align: center;
-    padding: 8px;
-    background: white;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.metric-label {
-    font-size: 11px;
-    color: #6b7280;
-    font-weight: 500;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.metric-value {
-    font-size: 14px;
-    font-weight: 600;
-    color: #1f2937;
-}
-
-.metric-value.positive {
-    color: #10b981; /* 绿色 - 正值 */
-}
-
-.metric-value.negative {
-    color: #ef4444; /* 红色 - 负值 */
-}
-
-.metric-value.neutral {
-    color: #6b7280; /* 灰色 - 中性 */
-}
-
-/* 手机端指标显示优化 */
-@media (max-width: 768px) {
-    .strategy-metrics {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-        padding: 12px;
-    }
-    
-    .metric-item {
-        padding: 6px;
-    }
-    
-    .metric-label {
-        font-size: 10px;
-    }
-    
-    .metric-value {
-        font-size: 13px;
-    }
-}
 
