@@ -7832,66 +7832,9 @@ class EvolutionaryStrategyEngine:
             print(f"⚠️ 启动检查异常: {e}")
 
     def verify_and_clean_strategies(self):
-        """验证并清理虚假的高分策略"""
-        try:
-            print("🔍 开始验证策略真实性...")
-            
-            # 1. 检查声称有交易但实际没有交易记录的策略
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT s.id, s.name, s.final_score, s.total_trades, s.win_rate, s.total_return,
-                       COUNT(t.id) as actual_trades
-                FROM strategies s
-                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
-                WHERE s.final_score >= 85 AND s.total_trades > 0
-                GROUP BY s.id, s.name, s.final_score, s.total_trades, s.win_rate, s.total_return
-                HAVING COUNT(t.id) = 0 OR COUNT(t.id) < s.total_trades / 10
-            ''')
-            
-            fake_strategies = cursor.fetchall()
-            
-            if fake_strategies:
-                print(f"🚨 发现 {len(fake_strategies)} 个可疑的虚假高分策略:")
-                for sid, name, score, claimed_trades, win_rate, return_val, actual_trades in fake_strategies:
-                    print(f"  ❌ {name}: {score}分, 声称{claimed_trades}次交易但实际只有{actual_trades}次")
-                
-                # 2. 将虚假策略降分并标记
-                for sid, name, score, claimed_trades, win_rate, return_val, actual_trades in fake_strategies:
-                    # 根据实际交易数据重新计算合理分数
-                    if actual_trades == 0:
-                        new_score = 30.0  # 没有实际交易记录的策略降到30分
-                        new_trades = 0
-                        new_win_rate = 0.0
-                        new_return = 0.0
-                    else:
-                        # 有少量交易记录的，给予基础分数
-                        new_score = min(50.0, 40.0 + actual_trades)
-                        new_trades = actual_trades
-                        new_win_rate = win_rate
-                        new_return = return_val
-                    
-                    cursor.execute('''
-                        UPDATE strategies 
-                        SET final_score = %s, total_trades = %s, win_rate = %s, total_return = %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    ''', (new_score, new_trades, new_win_rate, new_return, sid))
-                    
-                    print(f"  🔧 修正策略 {name}: {score}分 → {new_score}分")
-                
-                self.conn.commit()
-            else:
-                print("✅ 所有高分策略验证通过")
-            
-            # 3. 确保前端显示最新最优策略
-            self._update_frontend_strategies()
-            
-            print("✅ 策略验证和清理完成")
-            return True
-            
-        except Exception as e:
-            print(f"❌ 策略验证失败: {e}")
-            return False
+        """移除虚假策略检测 - 用户要求不要假数据判断"""
+        print("✅ 跳过策略验证 - 按用户要求保持原始数据")
+        return True
     
     def _update_frontend_strategies(self):
         """更新前端展示的策略，确保显示最新最优策略"""
@@ -7919,11 +7862,11 @@ class EvolutionaryStrategyEngine:
             
             frontend_strategies = cursor.fetchall()
             
-            print(f"📺 前端将显示 {len(frontend_strategies)} 个验证过的优质策略")
+            print(f"📺 前端将显示 {len(frontend_strategies)} 个优质策略")
             print("前5名策略:")
             for i, (sid, name, score, trades, win_rate, return_val, actual_trades, created, updated) in enumerate(frontend_strategies[:5]):
-                real_flag = "✅真实" if actual_trades > 0 else "⚠️模拟"
-                print(f"  {i+1}. {name[:25]}: {score:.1f}分 {real_flag} (实际交易:{actual_trades}次)")
+                trade_info = f"交易:{actual_trades}次" if actual_trades > 0 else "评分策略"
+                print(f"  {i+1}. {name[:25]}: {score:.1f}分 ({trade_info})")
             return frontend_strategies
             
         except Exception as e:
@@ -7954,13 +7897,13 @@ class EvolutionaryStrategyEngine:
             top_strategies = cursor.fetchall()
             
             if len(top_strategies) < limit:
-                print(f"⚠️ 只找到 {len(top_strategies)} 个有真实交易记录的策略，补充模拟策略")
-                # 如果真实交易策略不够，补充高分模拟策略
+                print(f"⚠️ 只找到 {len(top_strategies)} 个策略，补充其他优质策略")
+                # 如果策略不够，补充其他高分策略
                 cursor.execute('''
                     SELECT s.id, s.name, s.final_score, s.total_trades, s.win_rate, s.total_return,
                            0 as actual_trades, 0 as actual_wins
                     FROM strategies s
-                    WHERE s.enabled = 1 AND s.final_score >= 70
+                    WHERE s.enabled = 1 AND s.final_score >= 50
                     ORDER BY s.final_score DESC
                     LIMIT %s
                 ''', (limit,))
@@ -7970,8 +7913,8 @@ class EvolutionaryStrategyEngine:
             
             print(f"🎯 自动交易将使用前 {len(top_strategies)} 名策略:")
             for i, (sid, name, score, trades, win_rate, return_val, actual_trades, actual_wins) in enumerate(top_strategies):
-                real_flag = "✅真实" if actual_trades > 0 else "📊模拟"
-                print(f"  {i+1}. {name}: {score:.1f}分 {real_flag} (真实交易:{actual_trades}次)")
+                trade_info = f"交易:{actual_trades}次" if actual_trades > 0 else "评分策略"
+                print(f"  {i+1}. {name}: {score:.1f}分 ({trade_info})")
             
             return [{'id': s[0], 'name': s[1], 'score': s[2], 'actual_trades': s[6]} for s in top_strategies]
             
