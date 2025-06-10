@@ -299,8 +299,14 @@ class QuantitativeSystem {
         container.innerHTML = sortedStrategies.map(strategy => {
             // 生成评分显示 - 使用正确的字段名
             const score = strategy.final_score || 0;
-            // 修复成功率超过100%的问题 - 限制在0-100%之间
-            const winRate = Math.min(Math.max(strategy.win_rate || 0, 0), 1);
+            // 🔧 修复成功率数据不一致问题 - 统一使用详情页的数据格式
+            let winRate = strategy.win_rate || 0;
+            // 如果win_rate是小数形式(0-1)，转换为百分比
+            if (winRate <= 1) {
+                winRate = winRate * 100;
+            }
+            // 限制在0-100%之间
+            winRate = Math.min(Math.max(winRate, 0), 100);
             const totalReturn = strategy.total_return || 0;
             const totalTrades = strategy.total_trades || 0;
             const generation = strategy.generation || 1;
@@ -361,7 +367,7 @@ class QuantitativeSystem {
                                 </div>
                                 <div class="col-4">
                                     <div class="metric-item">
-                                        <div class="text-success fw-bold">${(winRate * 100).toFixed(1)}%</div>
+                                        <div class="text-success fw-bold">${winRate.toFixed(1)}%</div>
                                         <small class="text-muted">成功率</small>
                                     </div>
                                 </div>
@@ -488,14 +494,19 @@ class QuantitativeSystem {
             // 生成参数表单
             this.generateParameterForm(strategy.type, strategy.parameters);
             
-            // 填充统计信息 - 修复NaN问题
+            // 🔧 修复统计信息显示格式 - 统一数据处理
             const totalReturn = strategy.total_return || 0;
-            const winRate = strategy.win_rate || 0;
+            let winRate = strategy.win_rate || 0;
             const totalTrades = strategy.total_trades || 0;
             const dailyReturn = strategy.daily_return || 0;
             
+            // 统一成功率格式处理
+            if (winRate <= 1) {
+                winRate = winRate * 100;
+            }
+            
             document.getElementById('strategyTotalReturn').textContent = `${(totalReturn * 100).toFixed(2)}%`;
-            document.getElementById('strategyWinRate').textContent = `${(winRate * 100).toFixed(1)}%`;
+            document.getElementById('strategyWinRate').textContent = `${winRate.toFixed(1)}%`;
             document.getElementById('strategyTotalTrades').textContent = totalTrades;
             document.getElementById('strategyDailyReturn').textContent = `${(dailyReturn * 100).toFixed(2)}%`;
             
@@ -671,11 +682,15 @@ class QuantitativeSystem {
                             <label class="form-label">${config.label}</label>
                         </div>
                         <div class="col-6">
-                            <div class="form-check">
+                            <div class="form-check form-switch">
                                 <input type="checkbox" 
                                        class="form-check-input" 
                                        name="${config.key}"
+                                       id="${config.key}_switch"
                                        ${value ? 'checked' : ''}>
+                                <label class="form-check-label" for="${config.key}_switch">
+                                    <span class="text-success" style="font-size: 12px;">${value ? '启用' : '禁用'}</span>
+                                </label>
                             </div>
                         </div>
                     </div>
