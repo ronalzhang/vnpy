@@ -777,7 +777,8 @@
     border: none; /* 无边框 */
     margin: 0;
     padding: 0;
-    z-index: 1; /* 低于标题层级 */
+    /* 🔧 保持原有层级，不降低 */
+    z-index: 5; /* 中等层级 */
 }
 
 .evolution-log-header {
@@ -796,7 +797,8 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
-    z-index: 1;
+    /* 🔧 保持原有层级 */
+    z-index: 5;
 }
 
 .evolution-log-ticker {
@@ -809,37 +811,40 @@
     border: none;
     margin: 0;
     padding: 0;
-    z-index: 1;
+    /* 🔧 保持原有层级 */
+    z-index: 5;
     position: relative;
 }
 
-/* 🔧 修复量化策略管理标题的层级问题 */
+/* 🔧 修复量化策略管理标题的层级问题 - 只提高标题层级 */
 .card-header {
     position: relative;
-    z-index: 10; /* 高于滚动日志的层级 */
+    z-index: 20; /* 高于滚动日志的层级 */
     background: #fff; /* 确保有背景色 */
 }
 
 .card-header h5 {
     position: relative;
-    z-index: 11; /* 标题层级最高 */
+    z-index: 21; /* 标题层级最高 */
     margin: 0;
     padding: 0;
+    background: #fff; /* 确保标题有背景 */
 }
 
 /* 🔧 确保卡片标题区域不被滚动日志影响 */
 .card-header .d-flex {
     position: relative;
-    z-index: 10;
+    z-index: 20;
     align-items: center;
     justify-content: space-between;
 }
 
-/* 🔧 进化日志容器在标题右侧，不覆盖标题 */
+/* 🔧 进化日志容器在标题右侧，保持显示 */
 .card-header .evolution-log-container {
     flex-shrink: 0; /* 不压缩 */
     margin-left: auto; /* 推到右侧 */
     margin-right: 16px; /* 与按钮保持间距 */
+    /* 🔧 在所有屏幕尺寸都显示，不隐藏 */
 }
 
 @keyframes scroll-left {
@@ -900,7 +905,7 @@
     display: none; /* 完全隐藏渐变效果 */
 }
 
-/* 响应式调整 */
+/* 响应式调整 - 保持显示滚动日志 */
 @media (max-width: 1200px) {
     .evolution-log-container {
         width: 350px; /* 中等屏幕宽度 */
@@ -923,9 +928,6 @@
         line-height: 30px;
     }
     
-    /* 🔧 小屏幕时隐藏滚动日志，避免挤压 */
-    .card-header .evolution-log-container {
-        display: none;
-    }
+    /* 🔧 移除隐藏逻辑，保持滚动日志显示 */
 }
 

@@ -5719,8 +5719,8 @@ class EvolutionaryStrategyEngine:
             
             cursor.execute(
                 """INSERT INTO strategy_evolution_history 
-                (strategy_id, generation, cycle, evolution_type, new_parameters, 
-                 parent_strategy_id, new_score, created_time)
+               (strategy_id, generation, cycle, evolution_type, new_parameters, 
+                parent_strategy_id, new_score, created_time)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())""",
                 (strategy_id, generation, cycle, evolution_type, 
                  new_params_json, parent_strategy_id or '', new_score or 0.0)
@@ -6204,6 +6204,22 @@ class EvolutionaryStrategyEngine:
             
             # 🔥 关键修复：立即保存新策略到数据库
             if self._create_strategy_in_system(new_strategy):
+                # 🔧 保存进化历史，包含修改前后参数对比
+                if 'parent_id' in new_strategy and new_strategy['parent_id']:
+                    # 获取父策略参数
+                    parent_strategy = next((s for s in all_strategies if s['id'] == new_strategy['parent_id']), None)
+                    if parent_strategy:
+                        self._save_evolution_history_with_comparison(
+                            new_strategy['id'],
+                            new_strategy.get('generation', 0),
+                            new_strategy.get('cycle', 0),
+                            new_strategy.get('evolution_type', 'mutation'),
+                            parent_strategy.get('parameters', {}),  # 修改前参数
+                            new_strategy.get('parameters', {}),     # 修改后参数
+                            new_strategy['parent_id'],
+                            new_strategy.get('final_score', 0)
+                        )
+                
                 new_strategies.append(new_strategy)
                 print(f"✅ 新策略已保存: {new_strategy['name']} (ID: {new_strategy['id']})")
             else:
@@ -6211,7 +6227,7 @@ class EvolutionaryStrategyEngine:
         
         return new_strategies
         
-        def _mutate_strategy(self, parent: Dict) -> Dict:
+    def _mutate_strategy(self, parent: Dict) -> Dict:
         """突变策略 - 修复参数边界控制的根本问题"""
         import random  # ✅ 遗传算法必需的随机突变，非模拟数据
         import uuid
@@ -6279,8 +6295,21 @@ class EvolutionaryStrategyEngine:
             param_config = STRATEGY_PARAMETERS_CONFIG.get(strategy_type, {})
             mutated_count = 0
             
+            # 🔧 排除交易数量相关参数，专注于技术指标参数
+            technical_params = ['lookback_period', 'threshold', 'momentum_threshold', 'std_multiplier', 
+                              'rsi_period', 'rsi_oversold', 'rsi_overbought', 'macd_fast_period', 
+                              'macd_slow_period', 'macd_signal_period', 'ema_period', 'sma_period',
+                              'atr_period', 'atr_multiplier', 'bollinger_period', 'bollinger_std',
+                              'volume_threshold', 'grid_spacing', 'profit_threshold', 'stop_loss']
+            
             for param_name, current_value in params.items():
-                if param_name in param_config and random.random() < mutation_rate:
+                # 🚫 跳过交易数量相关参数 - 这些应该根据余额比例计算
+                if param_name in ['quantity', 'position_size', 'trade_amount', 'investment_amount']:
+                    print(f"⏩ 跳过交易数量参数: {param_name}，应根据余额比例计算")
+                    continue
+                
+                # 🎯 只对技术指标参数进行变异
+                if param_name in technical_params and param_name in param_config and random.random() < mutation_rate:
                     config = param_config[param_name]
                     min_val, max_val = config['range']
                     param_type = config['type']
@@ -6303,6 +6332,15 @@ class EvolutionaryStrategyEngine:
                     # 🛡️ 强制边界约束 - 防止极大值
                     new_value = max(min_val, min(max_val, new_value))
                     
+                    # 🔧 确保参数有实际变化，如果变化太小则强制一个最小变化
+                    if abs(new_value - current_value) < 0.0001:
+                        if mutation_intensity in ['agg', 'mod']:
+                            # 强制一个小的变化
+                            direction = 1 if random.random() > 0.5 else -1
+                            min_change = range_size * 0.01  # 至少1%的变化
+                            new_value = current_value + (direction * min_change)
+                            new_value = max(min_val, min(max_val, new_value))
+                    
                     # 类型转换
                     if param_type == 'int':
                         params[param_name] = int(round(new_value))
@@ -6311,6 +6349,52 @@ class EvolutionaryStrategyEngine:
                     
                     mutated_count += 1
                     print(f"🔧 参数 {param_name}: {current_value:.4f} → {params[param_name]} (范围: {min_val}-{max_val})")
+                
+                # 🔧 处理配置文件中不存在的参数，使用默认变异逻辑
+                elif param_name not in ['quantity', 'position_size', 'trade_amount', 'investment_amount'] and param_name not in param_config and random.random() < mutation_rate:
+                    # 对于未配置的技术指标参数，使用保守的变异
+                    if isinstance(current_value, (int, float)) and current_value > 0:
+                        if mutation_intensity == 'agg':
+                            change_factor = random.uniform(0.7, 1.3)  # ±30%
+                        elif mutation_intensity == 'mod':
+                            change_factor = random.uniform(0.85, 1.15)  # ±15%
+                        else:
+                            change_factor = random.uniform(0.95, 1.05)  # ±5%
+                        
+                        new_value = current_value * change_factor
+                        
+                        # 基本范围约束
+                        if isinstance(current_value, int):
+                            params[param_name] = max(1, int(round(new_value)))
+                        else:
+                            params[param_name] = max(0.0001, round(new_value, 4))
+                        
+                        mutated_count += 1
+                        print(f"🔧 未配置参数 {param_name}: {current_value} → {params[param_name]} (默认变异)")
+            
+            # 🔧 如果没有任何参数变异，强制变异一个技术指标参数
+            if mutated_count == 0:
+                available_params = [p for p in technical_params if p in params and p in param_config]
+                if available_params:
+                    forced_param = random.choice(available_params)
+                    config = param_config[forced_param]
+                    min_val, max_val = config['range']
+                    param_type = config['type']
+                    current_value = params[forced_param]
+                    
+                    # 强制一个明显的变化
+                    range_size = max_val - min_val
+                    change_amount = range_size * random.uniform(-0.2, 0.2)  # ±20%变化
+                    new_value = current_value + change_amount
+                    new_value = max(min_val, min(max_val, new_value))
+                    
+                    if param_type == 'int':
+                        params[forced_param] = int(round(new_value))
+                    else:
+                        params[forced_param] = round(new_value, 4)
+                    
+                    mutated_count += 1
+                    print(f"🔧 强制变异参数 {forced_param}: {current_value:.4f} → {params[forced_param]} (强制变异)")
             
             # 🔄 策略类型变异 (低分策略可能改变类型)
             if parent_score < 70.0 and random.random() < 0.3:
