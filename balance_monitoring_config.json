@@ -1,0 +1,10 @@
+{
+  "balance_update_interval": 300,
+  "alert_thresholds": {
+    "daily_loss_limit": -0.05,
+    "balance_low_threshold": 5000,
+    "max_drawdown": -0.15
+  },
+  "auto_backup_enabled": true,
+  "risk_management_enabled": true
+}

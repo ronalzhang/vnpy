@@ -1,0 +1,281 @@
+{
+  "cleanup_time": "2025-06-08T04:43:51.332579",
+  "fake_strategies_removed": 39,
+  "fake_strategy_details": [
+    {
+      "id": "STRAT_0671",
+      "name": "BTC动量策略",
+      "fake_score": 91.75,
+      "claimed_trades": 89,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0502",
+      "name": "BTC动量策略",
+      "fake_score": 91.44,
+      "claimed_trades": 123,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0208",
+      "name": "BTC动量策略",
+      "fake_score": 91.32,
+      "claimed_trades": 76,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0585",
+      "name": "BTC动量策略",
+      "fake_score": 91.2,
+      "claimed_trades": 103,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0101",
+      "name": "BTC动量策略",
+      "fake_score": 89.99,
+      "claimed_trades": 150,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0503",
+      "name": "BTC动量策略",
+      "fake_score": 89.87,
+      "claimed_trades": 113,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0146",
+      "name": "BTC动量策略",
+      "fake_score": 89.464005,
+      "claimed_trades": 95,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0085",
+      "name": "BTC动量策略",
+      "fake_score": 89.45,
+      "claimed_trades": 107,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0116",
+      "name": "BTC动量策略",
+      "fake_score": 89.4,
+      "claimed_trades": 85,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0199",
+      "name": "BTC动量策略",
+      "fake_score": 88.712,
+      "claimed_trades": 97,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0346",
+      "name": "BTC动量策略",
+      "fake_score": 88.59,
+      "claimed_trades": 149,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "DOGE_momentum_default",
+      "name": "DOGE动量策略",
+      "fake_score": 88.58,
+      "claimed_trades": 126,
+      "created_at": "2025-06-05T23:39:23"
+    },
+    {
+      "id": "STRAT_0155",
+      "name": "BTC动量策略",
+      "fake_score": 88.52,
+      "claimed_trades": 48,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0194",
+      "name": "BTC动量策略",
+      "fake_score": 88.51,
+      "claimed_trades": 132,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0726",
+      "name": "BTC动量策略",
+      "fake_score": 88.43,
+      "claimed_trades": 127,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "eth_trend_001",
+      "name": "ETH趋势跟踪",
+      "fake_score": 88.3,
+      "claimed_trades": 95,
+      "created_at": "2025-06-08T02:12:41.370276"
+    },
+    {
+      "id": "STRAT_0423",
+      "name": "BTC动量策略",
+      "fake_score": 87.87,
+      "claimed_trades": 95,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0364",
+      "name": "BTC动量策略",
+      "fake_score": 87.77,
+      "claimed_trades": 120,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0046",
+      "name": "BTC动量策略",
+      "fake_score": 87.55,
+      "claimed_trades": 128,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0618",
+      "name": "BTC动量策略",
+      "fake_score": 87.5,
+      "claimed_trades": 127,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0026",
+      "name": "BTC动量策略",
+      "fake_score": 87.06,
+      "claimed_trades": 97,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0484",
+      "name": "BTC动量策略",
+      "fake_score": 86.9,
+      "claimed_trades": 113,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0605",
+      "name": "BTC动量策略",
+      "fake_score": 86.75,
+      "claimed_trades": 43,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "sol_grid_001",
+      "name": "SOL网格交易",
+      "fake_score": 86.7,
+      "claimed_trades": 120,
+      "created_at": "2025-06-08T02:12:41.370276"
+    },
+    {
+      "id": "STRAT_0429",
+      "name": "BTC动量策略",
+      "fake_score": 86.54,
+      "claimed_trades": 92,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0492",
+      "name": "BTC动量策略",
+      "fake_score": 86.43,
+      "claimed_trades": 97,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0104",
+      "name": "BTC动量策略",
+      "fake_score": 86.41,
+      "claimed_trades": 140,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0646",
+      "name": "BTC动量策略",
+      "fake_score": 86.2,
+      "claimed_trades": 77,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0415",
+      "name": "BTC动量策略",
+      "fake_score": 86.06,
+      "claimed_trades": 46,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0490",
+      "name": "BTC动量策略",
+      "fake_score": 85.75,
+      "claimed_trades": 148,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0515",
+      "name": "BTC动量策略",
+      "fake_score": 85.74,
+      "claimed_trades": 94,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0524",
+      "name": "BTC动量策略",
+      "fake_score": 85.58,
+      "claimed_trades": 121,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0756",
+      "name": "BTC动量策略",
+      "fake_score": 85.57,
+      "claimed_trades": 29,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0535",
+      "name": "BTC动量策略",
+      "fake_score": 85.520004,
+      "claimed_trades": 83,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0301",
+      "name": "BTC动量策略",
+      "fake_score": 85.38,
+      "claimed_trades": 87,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0109",
+      "name": "BTC动量策略",
+      "fake_score": 85.37,
+      "claimed_trades": 87,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0324",
+      "name": "BTC动量策略",
+      "fake_score": 85.34,
+      "claimed_trades": 113,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0066",
+      "name": "BTC动量策略",
+      "fake_score": 85.2,
+      "claimed_trades": 71,
+      "created_at": "2025-06-05T22:06:36"
+    },
+    {
+      "id": "STRAT_0443",
+      "name": "BTC动量策略",
+      "fake_score": 85.08,
+      "claimed_trades": 110,
+      "created_at": "2025-06-05T22:06:36"
+    }
+  ],
+  "real_strategies_count": 1,
+  "message": "所有fake数据已清理，只保留有真实交易记录的策略"
+}

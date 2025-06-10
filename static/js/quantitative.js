@@ -1502,7 +1502,7 @@ class QuantitativeSystem {
         this.allEvolutionLogs = logs || [];
 
         // 🔧 修复：滚动显示最新5条日志，最新在前
-        const recentLogs = this.allEvolutionLogs.slice(-5).reverse();
+        const recentLogs = this.allEvolutionLogs.slice(-18).reverse();
         
         const tickerContent = recentLogs.map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
