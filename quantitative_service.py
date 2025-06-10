@@ -5739,6 +5739,9 @@ class ParameterOptimizer:
             'max_drawdown': 0.15   # 最大回撤权重15%
         }
         
+        # 🔧 初始化optimization_directions (向后兼容)
+        self.optimization_directions = {}
+        
         # 🎯 每个参数都有严格的赚钱逻辑和优化方向
         self.parameter_rules = {
             # 📊 技术指标周期类参数
@@ -5971,6 +5974,14 @@ class ParameterOptimizer:
                 }
             }
         }
+        
+        # 🔧 构建optimization_directions字典 (向后兼容)
+        self.optimization_directions = {}
+        for param_name, rule in self.parameter_rules.items():
+            self.optimization_directions[param_name] = {
+                'range': rule['range'],
+                'logic': rule.get('profit_logic', '参数优化逻辑')
+            }
     
     def calculate_performance_score(self, strategy_stats):
         """计算策略综合表现评分"""
