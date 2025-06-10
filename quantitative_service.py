@@ -6211,8 +6211,8 @@ class EvolutionaryStrategyEngine:
         
         return new_strategies
         
-    def _mutate_strategy(self, parent: Dict) -> Dict:
-        """突变策略 - 针对90+分优化的突变"""
+        def _mutate_strategy(self, parent: Dict) -> Dict:
+        """突变策略 - 修复参数边界控制的根本问题"""
         import random  # ✅ 遗传算法必需的随机突变，非模拟数据
         import uuid
         
@@ -6222,6 +6222,9 @@ class EvolutionaryStrategyEngine:
             return self._create_random_strategy()
         
         try:
+            # 🔥 导入参数配置模块 - 解决边界控制问题
+            from strategy_parameters_config import STRATEGY_PARAMETERS_CONFIG
+            
             mutated = parent.copy()
             mutated['id'] = str(uuid.uuid4())[:8]
             # 🧬 增强的策略命名 (在现有基础上添加代数信息)
@@ -6232,12 +6235,20 @@ class EvolutionaryStrategyEngine:
             parent_score = parent.get('fitness', parent.get('final_score', 50.0))
             if parent_score < self.evolution_config.get('low_score_threshold', 60.0):
                 mutation_intensity = 'agg'  # aggressive 激进
+                mutation_rate = self.evolution_config['low_score_mutation_rate']
+                print(f"🔥 低分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 激进优化")
             elif parent_score < self.evolution_config.get('medium_score_threshold', 80.0):
                 mutation_intensity = 'mod'  # moderate 适度
+                mutation_rate = self.evolution_config['medium_score_mutation_rate'] 
+                print(f"⚡ 中分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 适度优化")
             elif parent_score < self.evolution_config.get('high_score_threshold', 90.0):
                 mutation_intensity = 'fin'  # fine 精细
+                mutation_rate = self.evolution_config['high_score_mutation_rate']
+                print(f"🎯 高分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 精细优化")
             else:
                 mutation_intensity = 'pre'  # precise 极精细
+                mutation_rate = 0.05  # 超高分策略极低变异率
+                print(f"💎 超高分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 极精细优化")
             
             if self.evolution_config.get('show_generation_in_name', True):
                 mutated['name'] = f"{parent.get('name', 'Unknown')}_G{new_generation}C{self.current_cycle}_{mutation_intensity}"
@@ -6255,27 +6266,6 @@ class EvolutionaryStrategyEngine:
                 parent_lineage = parent.get('lineage_depth', 0)
                 mutated['lineage_depth'] = parent_lineage + 1
             
-            # 🧬 增强的分值差异化突变强度 (基于新配置的优化)
-            parent_score = parent.get('fitness', parent.get('final_score', 50.0))
-            
-            # 使用配置中的阈值和变异率
-            if parent_score < self.evolution_config['low_score_threshold']:
-                mutation_rate = self.evolution_config['low_score_mutation_rate']
-                mutation_intensity = 'aggressive'
-                print(f"🔥 低分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 激进优化")
-            elif parent_score < self.evolution_config['medium_score_threshold']:
-                mutation_rate = self.evolution_config['medium_score_mutation_rate'] 
-                mutation_intensity = 'moderate'
-                print(f"⚡ 中分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 适度优化")
-            elif parent_score < self.evolution_config['high_score_threshold']:
-                mutation_rate = self.evolution_config['high_score_mutation_rate']
-                mutation_intensity = 'precision'
-                print(f"🎯 高分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 精细优化")
-            else:
-                mutation_rate = 0.05  # 超高分策略极低变异率
-                mutation_intensity = 'ultra_precision'
-                print(f"💎 超高分策略突变 {parent.get('name', 'Unknown')} (评分: {parent_score:.1f}) - 极精细优化")
-            
             # 🛡️ 安全获取parameters，确保是字典类型
             original_params = parent.get('parameters', {})
             if not isinstance(original_params, dict):
@@ -6283,61 +6273,44 @@ class EvolutionaryStrategyEngine:
                 original_params = {}
             
             params = original_params.copy()
+            strategy_type = parent.get('type', 'momentum')
             
-            # 🎯 增强的差异化参数突变 (基于mutation_intensity)
+            # 🎯 使用配置文件的参数边界进行变异 - 根本性修复
+            param_config = STRATEGY_PARAMETERS_CONFIG.get(strategy_type, {})
             mutated_count = 0
             
-            # 阈值参数调整
-            if 'threshold' in params:
-                if mutation_intensity == 'aggressive':
-                    params['threshold'] *= random.uniform(0.3, 2.0)  # 大幅调整：30%-200%
-                elif mutation_intensity == 'moderate':
-                    params['threshold'] *= random.uniform(0.7, 1.4)  # 适度调整：70%-140%
-                elif mutation_intensity == 'precision':
-                    params['threshold'] *= random.uniform(0.9, 1.1)  # 精细调整：90%-110%
-                else:  # ultra_precision
-                    params['threshold'] *= random.uniform(0.95, 1.05)  # 极精细：95%-105%
-                mutated_count += 1
-            
-            # 回看周期调整
-            if 'lookback_period' in params:
-                old_period = params['lookback_period']
-                if mutation_intensity == 'aggressive':
-                    change = random.randint(-15, 15)  # ±15周期
-                elif mutation_intensity == 'moderate':
-                    change = random.randint(-5, 5)   # ±5周期
-                elif mutation_intensity == 'precision':
-                    change = random.randint(-2, 2)   # ±2周期
-                else:  # ultra_precision
-                    change = random.randint(-1, 1)   # ±1周期
-                
-                params['lookback_period'] = max(5, min(100, old_period + change))
-                mutated_count += 1
-            
-            # 交易数量调整
-            if 'quantity' in params:
-                if mutation_intensity == 'aggressive':
-                    params['quantity'] *= random.uniform(0.5, 2.0)
-                elif mutation_intensity == 'moderate':
-                    params['quantity'] *= random.uniform(0.8, 1.3)
-                elif mutation_intensity == 'precision':
-                    params['quantity'] *= random.uniform(0.9, 1.1)
-                else:  # ultra_precision
-                    params['quantity'] *= random.uniform(0.95, 1.05)
-                mutated_count += 1
-            
-            # 其他关键参数的智能调整
-            for param_name in ['std_multiplier', 'grid_spacing', 'volume_threshold', 'momentum_threshold']:
-                if param_name in params and random.random() < mutation_rate:
-                    if mutation_intensity == 'aggressive':
-                        params[param_name] *= random.uniform(0.4, 2.5)
-                    elif mutation_intensity == 'moderate':
-                        params[param_name] *= random.uniform(0.7, 1.4)
-                    elif mutation_intensity == 'precision':
-                        params[param_name] *= random.uniform(0.9, 1.1)
-                    else:  # ultra_precision
-                        params[param_name] *= random.uniform(0.97, 1.03)
+            for param_name, current_value in params.items():
+                if param_name in param_config and random.random() < mutation_rate:
+                    config = param_config[param_name]
+                    min_val, max_val = config['range']
+                    param_type = config['type']
+                    
+                    # 🔧 使用加法变异而不是乘法，避免指数级增长
+                    if mutation_intensity == 'agg':  # 激进变异：范围内±30%
+                        change_ratio = random.uniform(-0.3, 0.3)
+                    elif mutation_intensity == 'mod':  # 适度变异：范围内±15%
+                        change_ratio = random.uniform(-0.15, 0.15)
+                    elif mutation_intensity == 'fin':  # 精细变异：范围内±5%
+                        change_ratio = random.uniform(-0.05, 0.05)
+                    else:  # 极精细变异：范围内±2%
+                        change_ratio = random.uniform(-0.02, 0.02)
+                    
+                    # 计算变异后的值，确保在合理范围内
+                    range_size = max_val - min_val
+                    change_amount = range_size * change_ratio
+                    new_value = current_value + change_amount
+                    
+                    # 🛡️ 强制边界约束 - 防止极大值
+                    new_value = max(min_val, min(max_val, new_value))
+                    
+                    # 类型转换
+                    if param_type == 'int':
+                        params[param_name] = int(round(new_value))
+                    else:
+                        params[param_name] = round(new_value, 4)
+                    
                     mutated_count += 1
+                    print(f"🔧 参数 {param_name}: {current_value:.4f} → {params[param_name]} (范围: {min_val}-{max_val})")
             
             # 🔄 策略类型变异 (低分策略可能改变类型)
             if parent_score < 70.0 and random.random() < 0.3:
@@ -6356,6 +6329,8 @@ class EvolutionaryStrategyEngine:
             
         except Exception as e:
             print(f"❌ 策略突变失败: {e}")
+            import traceback
+            traceback.print_exc()
             return self._create_random_strategy()
     
     def _crossover_strategies(self, parent1: Dict, parent2: Dict) -> Dict:

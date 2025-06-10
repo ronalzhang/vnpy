@@ -777,6 +777,7 @@
     border: none; /* 无边框 */
     margin: 0;
     padding: 0;
+    z-index: 1; /* 低于标题层级 */
 }
 
 .evolution-log-header {
@@ -795,6 +796,7 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
+    z-index: 1;
 }
 
 .evolution-log-ticker {
@@ -807,6 +809,37 @@
     border: none;
     margin: 0;
     padding: 0;
+    z-index: 1;
+    position: relative;
+}
+
+/* 🔧 修复量化策略管理标题的层级问题 */
+.card-header {
+    position: relative;
+    z-index: 10; /* 高于滚动日志的层级 */
+    background: #fff; /* 确保有背景色 */
+}
+
+.card-header h5 {
+    position: relative;
+    z-index: 11; /* 标题层级最高 */
+    margin: 0;
+    padding: 0;
+}
+
+/* 🔧 确保卡片标题区域不被滚动日志影响 */
+.card-header .d-flex {
+    position: relative;
+    z-index: 10;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* 🔧 进化日志容器在标题右侧，不覆盖标题 */
+.card-header .evolution-log-container {
+    flex-shrink: 0; /* 不压缩 */
+    margin-left: auto; /* 推到右侧 */
+    margin-right: 16px; /* 与按钮保持间距 */
 }
 
 @keyframes scroll-left {
@@ -888,6 +921,11 @@
         animation-duration: 25s; /* 小屏幕更快速度 */
         font-size: 12px;
         line-height: 30px;
+    }
+    
+    /* 🔧 小屏幕时隐藏滚动日志，避免挤压 */
+    .card-header .evolution-log-container {
+        display: none;
     }
 }
 
