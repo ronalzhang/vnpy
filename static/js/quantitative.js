@@ -1501,8 +1501,14 @@ class QuantitativeSystem {
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
 
-        // 🔧 修复：滚动显示最新5条日志，最新在前
-        const recentLogs = this.allEvolutionLogs.slice(-18).reverse();
+        // 🔧 修复排序：确保最新日志在前面并取前18条
+        const sortedLogs = [...this.allEvolutionLogs].sort((a, b) => {
+            const timeA = new Date(a.timestamp || '1970-01-01').getTime();
+            const timeB = new Date(b.timestamp || '1970-01-01').getTime();
+            return timeB - timeA; // 降序排列，最新在前
+        });
+        
+        const recentLogs = sortedLogs.slice(0, 18);
         
         const tickerContent = recentLogs.map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
@@ -1531,6 +1537,18 @@ class QuantitativeSystem {
                     actionClass = 'optimized';
                     actionText = '更新';
                     break;
+                case 'promoted':
+                    actionClass = 'created';
+                    actionText = '晋级';
+                    break;
+                case 'protected':
+                    actionClass = 'optimized';
+                    actionText = '保护';
+                    break;
+                case 'evolved':
+                    actionClass = 'optimized';
+                    actionText = '进化';
+                    break;
                 default:
                     actionClass = 'created';
                     actionText = '变更';
@@ -1545,11 +1563,16 @@ class QuantitativeSystem {
             `;
         }).join('');
 
-        // 如果日志内容较少，重复显示以确保滚动效果
-        const repeatedContent = tickerContent.length < 300 ? 
-            Array(3).fill(tickerContent).join('') : tickerContent;
+        // 🔧 修复滚动效果：确保有足够内容且不会重置
+        let finalContent = tickerContent;
+        if (tickerContent.length < 500) {
+            // 重复内容确保滚动连续性
+            finalContent = Array(3).fill(tickerContent).join('');
+        }
 
-        ticker.innerHTML = repeatedContent;
+        ticker.innerHTML = finalContent;
+        
+        console.log(`✅ 进化日志已更新: ${recentLogs.length}条最新日志`);
     }
 }
 
@@ -1672,7 +1695,12 @@ function renderLogsPage() {
     if (!app || !app.allEvolutionLogs) return;
     
     const tbody = document.getElementById('allLogsTableBody');
-    const allLogs = [...app.allEvolutionLogs].reverse(); // 🔧 修复：最新的在前
+    // 🔧 修复排序：确保最新日志在前面
+    const allLogs = [...app.allEvolutionLogs].sort((a, b) => {
+        const timeA = new Date(a.timestamp || '1970-01-01').getTime();
+        const timeB = new Date(b.timestamp || '1970-01-01').getTime();
+        return timeB - timeA; // 降序排列，最新在前
+    });
     
     // 计算分页
     const totalLogs = allLogs.length;
@@ -1703,6 +1731,18 @@ function renderLogsPage() {
             case 'updated':
                 actionClass = 'info';
                 actionText = '更新';
+                break;
+            case 'promoted':
+                actionClass = 'warning';
+                actionText = '晋级';
+                break;
+            case 'protected':
+                actionClass = 'info';
+                actionText = '保护';
+                break;
+            case 'evolved':
+                actionClass = 'primary';
+                actionText = '进化';
                 break;
         }
         
