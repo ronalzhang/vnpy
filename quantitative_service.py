@@ -6638,18 +6638,28 @@ class EvolutionaryStrategyEngine:
             }
         }
         
+        # 🔧 从数据库加载管理配置
+        db_config = self._load_management_config_from_db()
+        
         self.evolution_config = {
             'target_score': 100.0,
             'target_success_rate': 1.0,  # 100%
-            'max_strategies': 50,  # 同时运行的最大策略数 (增加到50个)
+            'max_strategies': int(db_config.get('maxStrategies', 50)),  # 从数据库获取，默认50
             'min_strategies': 10,   # 保持的最小策略数
-            'evolution_interval': 180,  # 3分钟进化一次 (180秒)
+            'evolution_interval': int(db_config.get('evolutionInterval', 3)) * 60,  # 转换为秒，从数据库获取分钟数
             'mutation_rate': 0.25,  # 降低变异率，提高稳定性
             'crossover_rate': 0.75,  # 提高交叉率
             'elite_ratio': 0.15,  # 保留最好的15%
-            'elimination_threshold': 45.0,  # 低于45分的策略将被淘汰
-            'trading_threshold': 65.0,  # 65分开始小额交易 (新增)
-            'precision_threshold': 80.0,  # 80分开始精细化优化 (新增)
+            'elimination_threshold': float(db_config.get('minScore', 45.0)),  # 从数据库获取淘汰阈值
+            'trading_threshold': float(db_config.get('minWinRate', 65.0)),  # 从数据库获取交易阈值
+            'precision_threshold': 80.0,  # 80分开始精细化优化
+            'min_trades': int(db_config.get('minTrades', 10)),  # 从数据库获取最小交易次数
+            'min_profit': float(db_config.get('minProfit', 0)),  # 从数据库获取最小收益
+            'max_drawdown': float(db_config.get('maxDrawdown', 10)),  # 从数据库获取最大回撤
+            'min_sharpe_ratio': float(db_config.get('minSharpeRatio', 1.0)),  # 从数据库获取最小夏普比率
+            'max_position_size': float(db_config.get('maxPositionSize', 100)),  # 从数据库获取最大仓位
+            'stop_loss_percent': float(db_config.get('stopLossPercent', 5)),  # 从数据库获取止损百分比
+            'elimination_days': int(db_config.get('eliminationDays', 7)),  # 从数据库获取淘汰天数
             
             # 🧬 分值差异化优化增强配置 (在现有基础上添加)
             'low_score_threshold': 60.0,        # 低分策略阈值
@@ -6664,6 +6674,8 @@ class EvolutionaryStrategyEngine:
             'track_lineage_depth': True,        # 追踪血统深度
             'preserve_evolution_history': True  # 保留进化历史
         }
+        
+        print(f"🔧 进化引擎配置已加载: 进化间隔={self.evolution_config['evolution_interval']}秒, 最大策略数={self.evolution_config['max_strategies']}, 淘汰阈值={self.evolution_config['elimination_threshold']}")
         
         # 初始化世代和轮次信息
         self.current_generation = self._load_current_generation()
@@ -6682,8 +6694,45 @@ class EvolutionaryStrategyEngine:
         self.last_evolution_time = None
         
         print(f"🧬 进化引擎初始化完成 - 第{self.current_generation}代第{self.current_cycle}轮")
-        
     
+    def _load_management_config_from_db(self) -> dict:
+        """从数据库加载策略管理配置"""
+        try:
+            cursor = self.quantitative_service.conn.cursor()
+            
+            # 确保配置表存在
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS strategy_management_config (
+                    id SERIAL PRIMARY KEY,
+                    config_key VARCHAR(50) UNIQUE NOT NULL,
+                    config_value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 获取所有配置
+            cursor.execute("SELECT config_key, config_value FROM strategy_management_config")
+            config_rows = cursor.fetchall()
+            
+            # 转换为字典
+            config_dict = {}
+            for key, value in config_rows:
+                try:
+                    # 尝试转换为数字
+                    if '.' in value:
+                        config_dict[key] = float(value)
+                    else:
+                        config_dict[key] = int(value)
+                except ValueError:
+                    # 如果转换失败，保持字符串
+                    config_dict[key] = value
+            
+            print(f"📊 从数据库加载了 {len(config_dict)} 个配置项: {config_dict}")
+            return config_dict
+            
+        except Exception as e:
+            print(f"❌ 从数据库加载管理配置失败: {e}")
+            return {}
     
     def run_evolution_cycle(self):
         """运行演化周期，确保完整持久化"""
