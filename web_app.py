@@ -1686,6 +1686,19 @@ def strategy_detail(strategy_id):
                     }
                 }
             
+            # 🔥 修复win_rate不一致问题：重新计算真实胜率而不是使用数据库中可能过时的值
+            cursor.execute("""
+                SELECT COUNT(*) as total_trades,
+                       COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
+                FROM strategy_trade_logs
+                WHERE strategy_id = %s
+            """, (strategy_id,))
+            
+            trade_stats = cursor.fetchone()
+            total_trades = trade_stats[0] if trade_stats else 0
+            wins = trade_stats[1] if trade_stats else 0
+            calculated_win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+            
             strategy = {
                 'id': row[0],
                 'name': row[1],
@@ -1694,9 +1707,9 @@ def strategy_detail(strategy_id):
                 'enabled': bool(row[4]),
                 'parameters': parameters,
                 'final_score': row[6] or 0.0,
-                'win_rate': row[7] or 0.0,
+                'win_rate': round(calculated_win_rate, 2),  # 🔥 使用计算后的百分比格式，与策略列表保持一致
                 'total_return': row[8] or 0.0,
-                'total_trades': row[9] or 0,
+                'total_trades': total_trades,  # 🔥 使用真实的交易次数
                 'created_at': row[10].isoformat() if row[10] else None,
                 'updated_at': row[11].isoformat() if row[11] else None
             }

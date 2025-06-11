@@ -299,14 +299,8 @@ class QuantitativeSystem {
         container.innerHTML = sortedStrategies.map(strategy => {
             // 生成评分显示 - 使用正确的字段名
             const score = strategy.final_score || 0;
-            // 🔧 修复成功率数据不一致问题 - 统一使用详情页的数据格式
-            let winRate = strategy.win_rate || 0;
-            // 如果win_rate是小数形式(0-1)，转换为百分比
-            if (winRate <= 1) {
-                winRate = winRate * 100;
-            }
-            // 限制在0-100%之间
-            winRate = Math.min(Math.max(winRate, 0), 100);
+            // 🔥 后端已统一返回百分比格式，前端只需直接使用
+            const winRate = strategy.win_rate || 0;
             const totalReturn = strategy.total_return || 0;
             const totalTrades = strategy.total_trades || 0;
             const generation = strategy.generation || 1;
@@ -528,18 +522,11 @@ class QuantitativeSystem {
             // 生成参数表单
             this.generateParameterForm(strategy.type, strategy.parameters);
             
-            // 🔧 修复统计信息显示格式 - 统一数据处理
+            // 🔥 后端已统一返回百分比格式，前端只需直接使用
             const totalReturn = strategy.total_return || 0;
-            let winRate = strategy.win_rate || 0;
+            const winRate = strategy.win_rate || 0;
             const totalTrades = strategy.total_trades || 0;
             const dailyReturn = strategy.daily_return || 0;
-            
-            // 统一成功率格式处理
-            if (winRate <= 1) {
-                winRate = winRate * 100;
-            }
-            // 限制在0-100%之间，与策略卡片保持一致
-            winRate = Math.min(Math.max(winRate, 0), 100);
             
             document.getElementById('strategyTotalReturn').textContent = `${(totalReturn * 100).toFixed(2)}%`;
             document.getElementById('strategyWinRate').textContent = `${winRate.toFixed(1)}%`;
