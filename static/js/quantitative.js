@@ -538,6 +538,8 @@ class QuantitativeSystem {
             if (winRate <= 1) {
                 winRate = winRate * 100;
             }
+            // 限制在0-100%之间，与策略卡片保持一致
+            winRate = Math.min(Math.max(winRate, 0), 100);
             
             document.getElementById('strategyTotalReturn').textContent = `${(totalReturn * 100).toFixed(2)}%`;
             document.getElementById('strategyWinRate').textContent = `${winRate.toFixed(1)}%`;
