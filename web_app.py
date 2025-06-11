@@ -1291,7 +1291,8 @@ def quantitative_strategies():
                 print(f"获取maxStrategies配置失败，使用默认值: {e}")
             
             # 🔥 修复策略ID显示：只显示完整格式的STRAT_策略，按交易记录和评分排序
-            cursor.execute('''
+            # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+            query = f'''
                 SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
                        s.created_at, s.generation, s.cycle,
                        COUNT(t.id) as total_trades,
@@ -1304,8 +1305,9 @@ def quantitative_strategies():
                 GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
                          s.final_score, s.created_at, s.generation, s.cycle
                 ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
-                LIMIT %s
-            ''', (max_display_strategies,))
+                LIMIT {max_display_strategies}
+            '''
+            cursor.execute(query)
             
             rows = cursor.fetchall()
             strategies = []
@@ -1952,15 +1954,17 @@ def get_strategy_optimization_logs(strategy_id):
         cursor = conn.cursor()
         
         # 🔥 从strategy_optimization_logs表获取优化记录
-        cursor.execute("""
+        # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+        query = f"""
             SELECT id, strategy_id, generation, optimization_type, 
                    old_parameters, new_parameters, trigger_reason, 
                    timestamp, target_success_rate, validation_passed, cycle
             FROM strategy_optimization_logs 
             WHERE strategy_id = %s
             ORDER BY timestamp DESC
-            LIMIT %s
-        """, (strategy_id, limit))
+            LIMIT {limit}
+        """
+        cursor.execute(query, (strategy_id,))
         
         rows = cursor.fetchall()
         logs = []
@@ -2734,15 +2738,16 @@ def get_operations_log():
             
             # 获取分页数据
             offset = (page - 1) * per_page
+            # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
             query = f"""
                 SELECT operation_type, operation_detail, result, timestamp, 
                        COALESCE(user_id, 'system') as user_id
                 FROM operation_logs 
                 {where_clause}
                 ORDER BY timestamp DESC 
-                LIMIT %s OFFSET %s
+                LIMIT {per_page} OFFSET {offset}
             """
-            cursor.execute(query, params + [per_page, offset])
+            cursor.execute(query, params)
             
             logs = []
             for i, row in enumerate(cursor.fetchall()):
@@ -2870,7 +2875,8 @@ def select_top_strategies():
         cursor = conn.cursor()
         
         # 🔥 提高真实交易标准：至少10次交易，65%+胜率，盈利≥10U
-        cursor.execute('''
+        # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+        query = f'''
             SELECT s.id, s.name, s.final_score,
                    COUNT(t.id) as actual_trades,
                    COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
@@ -2883,14 +2889,16 @@ def select_top_strategies():
                 AND COUNT(CASE WHEN t.pnl > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 65
                 AND COALESCE(SUM(t.pnl), 0) >= 10.0
             ORDER BY SUM(t.pnl) DESC, s.final_score DESC
-            LIMIT %s
-        ''', (max_strategies,))
+            LIMIT {max_strategies}
+        '''
+        cursor.execute(query)
         
         qualified_strategies = cursor.fetchall()
         
         if not qualified_strategies:
             # 如果没有合格的，选择最有潜力的前3个（至少3次交易）
-            cursor.execute('''
+            # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+            query = f'''
                 SELECT s.id, s.name, s.final_score,
                        COUNT(t.id) as actual_trades,
                        COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
@@ -2901,8 +2909,9 @@ def select_top_strategies():
                 GROUP BY s.id, s.name, s.final_score
                 HAVING COUNT(t.id) >= 3
                 ORDER BY s.final_score DESC, SUM(t.pnl) DESC
-                LIMIT %s
-            ''', (max_strategies,))
+                LIMIT {max_strategies}
+            '''
+            cursor.execute(query)
             
             qualified_strategies = cursor.fetchall()
             selection_mode = "潜力策略模式"

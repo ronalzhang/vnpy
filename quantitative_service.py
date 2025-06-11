@@ -4514,13 +4514,15 @@ class QuantitativeService:
                 
                 # 只返回真实执行的交易记录
                 cursor = self.conn.cursor()
-                cursor.execute('''
+                # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+                query = f'''
                     SELECT timestamp, symbol, signal_type, price, confidence, executed
                     FROM trading_signals 
                     WHERE executed = true
                     ORDER BY timestamp DESC 
-                    LIMIT %s
-                ''', (limit,))
+                    LIMIT {limit}
+                '''
+                cursor.execute(query)
                 
                 signals = []
                 for row in cursor.fetchall():
@@ -4542,12 +4544,14 @@ class QuantitativeService:
             
             # 原有逻辑（非真实数据模式）
             cursor = self.conn.cursor()
-            cursor.execute('''
+            # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+            query = f'''
                 SELECT timestamp, symbol, signal_type, price, confidence, executed
                 FROM trading_signals 
                 ORDER BY timestamp DESC 
-                LIMIT %s
-            ''', (limit,))
+                LIMIT {limit}
+            '''
+            cursor.execute(query)
             
             signals = []
             for row in cursor.fetchall():
@@ -4716,13 +4720,15 @@ class QuantitativeService:
         """获取策略交易日志"""
         try:
             cursor = self.conn.cursor()
-            cursor.execute('''
+            # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+            query = f'''
                 SELECT strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp
                 FROM strategy_trade_logs 
                 WHERE strategy_id = %s
                 ORDER BY timestamp DESC
-                LIMIT %s
-            ''', (strategy_id, limit))
+                LIMIT {limit}
+            '''
+            cursor.execute(query, (strategy_id,))
             
             logs = []
             for row in cursor.fetchall():
@@ -4747,14 +4753,16 @@ class QuantitativeService:
         """获取策略优化记录"""
         try:
             cursor = self.conn.cursor()
-            cursor.execute('''
+            # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+            query = f'''
                 SELECT strategy_id, optimization_type, old_parameters, new_parameters, 
                        trigger_reason, target_success_rate, timestamp
                 FROM strategy_optimization_logs 
                 WHERE strategy_id = %s
                 ORDER BY timestamp DESC
-                LIMIT %s
-            ''', (strategy_id, limit))
+                LIMIT {limit}
+            '''
+            cursor.execute(query, (strategy_id,))
             
             logs = []
             for row in cursor.fetchall():
