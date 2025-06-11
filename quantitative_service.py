@@ -2002,7 +2002,7 @@ class AutomatedStrategyManager:
         """计算单一策略风险"""
         # ⭐ 使用统一方法获取策略
         strategy = self.quantitative_service._get_strategy_by_id(strategy_id)
-            if not strategy:
+        if not strategy:
             return 0
         
         quantity = strategy.get("parameters", {}).get('quantity', 0)
