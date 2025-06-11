@@ -3936,7 +3936,7 @@ class QuantitativeService:
             # 🔥 修复：只选择关键字段避免35字段的复杂查询问题
             print(f"DEBUG: db_manager类型: {type(self.db_manager)}")
             print(f"DEBUG: db_manager属性: {dir(self.db_manager)}")
-            cursor = self.db_manager.db_adapter.connection.cursor()
+            cursor = self.db_manager.connection.cursor()
             cursor.execute("""
                 SELECT id, name, symbol, type, enabled, parameters, 
                        final_score, win_rate, total_return, total_trades,
