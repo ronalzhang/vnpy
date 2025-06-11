@@ -3704,8 +3704,8 @@ class QuantitativeService:
                 })
                 print(f"✅ 成功获取真实持仓数据: {len(positions)}个持仓")
                 return positions
-                else:
-                print("❌ API返回空持仓数据")
+                if len(positions) == 0:
+                    print("❌ API返回空持仓数据")
                 return []
                 
         except Exception as e:
@@ -3739,7 +3739,7 @@ class QuantitativeService:
                 
                 print(f"✅ 从Binance获取到 {len(positions)} 个真实持仓")
                 return positions
-                else:
+            else:
                 print("❌ 交易所客户端未初始化")
                 return []
                 
@@ -3884,7 +3884,7 @@ class QuantitativeService:
                     'avg_pnl': result[2] or 0,
                     'total_pnl': result[3] or 0
                 }
-                else:
+            else:
                 # 没有历史数据，返回默认值
                 return {
                     'total_trades': 0,
@@ -3921,7 +3921,7 @@ class QuantitativeService:
                 
                 if evolution_type == 'initial':
                     return f"初代策略"
-            else:
+                else:
                     return f"第{generation}代第{round_num}轮"
             else:
                 return "初代策略"
