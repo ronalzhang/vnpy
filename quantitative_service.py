@@ -7768,7 +7768,7 @@ class EvolutionaryStrategyEngine:
                 print(f"❌ 策略{strategy_id[-4:]}初始化验证失败，将被移除")
                 # 验证失败的策略不参与进化
                 self.quantitative_service.db_manager.execute_query(
-                    "UPDATE strategies SET enabled = 0, status = 'validation_failed' WHERE id = %s",
+                    "UPDATE strategies SET enabled = 0, notes = 'validation_failed' WHERE id = %s",
                     (strategy_id,)
                 )
                 return False
