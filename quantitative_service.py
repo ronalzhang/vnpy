@@ -3599,6 +3599,9 @@ class QuantitativeService:
             # 🔥 无法获取真实价格时直接返回None，不使用任何模拟价格
             print(f"❌ 无法获取 {symbol} 真实价格，跳过此次交易信号生成")
             return None
+        except Exception as e:
+            print(f"❌ 获取价格时发生异常: {e}")
+            return None
     
     def _should_execute_trade_based_on_conditions(self, strategy, current_balance):
         """🔥 基于真实数据判断是否应该执行交易，替代随机决策"""
