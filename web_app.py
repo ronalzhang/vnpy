@@ -1889,11 +1889,11 @@ def get_strategy_trade_logs(strategy_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 🔥 修复：查询trading_signals表获取真实的交易记录
+        # 🔥 修复：查询trading_signals表获取真实的交易记录，使用正确的字段映射
         # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
         query = f"""
             SELECT timestamp, symbol, signal_type, price, quantity, 
-                   pnl, executed, id, strategy_id, signal_type as action, pnl as real_pnl,
+                   expected_return as pnl, executed, id, strategy_id, signal_type as action, expected_return as real_pnl,
                    'verification' as trade_type, false as is_real_money, id as exchange_order_id, confidence
             FROM trading_signals 
             WHERE strategy_id = %s
