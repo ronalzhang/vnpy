@@ -3952,13 +3952,6 @@ class QuantitativeService:
             """
             rows = self.db_manager.execute_query(query, fetch_all=True)
             
-            # 🔥 调试：打印查询结果信息
-            print(f"查询结果类型: {type(rows)}")
-            print(f"查询结果长度: {len(rows) if rows else 0}")
-            if rows:
-                print(f"第一行类型: {type(rows[0])}")
-                print(f"第一行内容: {rows[0]}")
-            
             if not rows:
                 print("⚠️ 没有找到STRAT_格式的策略，数据库可能存在问题")
                 # 如果没有STRAT_策略，说明数据库有问题，返回空结果而不是短格式策略
@@ -3968,7 +3961,6 @@ class QuantitativeService:
             
             for idx, row in enumerate(rows or []):
                 try:
-                    print(f"处理第{idx+1}行数据...")  # 添加处理进度
                     # PostgreSQL返回字典格式
                     if isinstance(row, dict):
                         # 🔧 正确解析parameters字段
@@ -4041,6 +4033,7 @@ class QuantitativeService:
                     
                 except Exception as e:
                     print(f"⚠️ 解析第{idx+1}行策略数据失败: {e}")
+                    print(f"错误类型: {type(e).__name__}")
                     print(f"错误行数据: {row}")
                     import traceback
                     traceback.print_exc()
