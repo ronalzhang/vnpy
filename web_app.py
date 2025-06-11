@@ -1873,17 +1873,19 @@ def toggle_strategy(strategy_id):
 
 @app.route('/api/quantitative/strategies/<strategy_id>/trade-logs', methods=['GET'])
 def get_strategy_trade_logs(strategy_id):
-    """获取策略交易日志"""
+    """获取策略交易日志 - 支持验证交易和真实交易分类显示"""
     try:
-        limit = int(request.args.get('limit', 100))
+        limit = int(request.args.get('limit', 200))  # 🔥 修复：增加交易日志显示限制到200条
         
         # 直接从数据库获取交易日志
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # 🔥 修复：添加更多字段，支持验证交易和真实交易的区分
         cursor.execute("""
             SELECT timestamp, symbol, signal_type, price, quantity, 
-                   pnl, executed, id, strategy_name, action, real_pnl
+                   pnl, executed, id, strategy_name, action, real_pnl,
+                   trade_type, is_real_money, exchange_order_id, confidence
             FROM strategy_trade_logs 
             WHERE strategy_id = %s
             ORDER BY timestamp DESC
@@ -1894,6 +1896,12 @@ def get_strategy_trade_logs(strategy_id):
         logs = []
         
         for row in rows:
+            # 🔥 处理交易类型，统一成功率计算不区分真实交易和模拟交易
+            trade_type = row[11] if len(row) > 11 and row[11] else 'simulation'
+            is_real_money = row[12] if len(row) > 12 and row[12] else False
+            confidence = row[14] if len(row) > 14 and row[14] else 0.75
+            
+            # 🔥 统一交易记录，不区分模拟和真实，都参与成功率和评分计算
             logs.append({
                 'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
                 'symbol': row[1] or '',
@@ -1902,46 +1910,84 @@ def get_strategy_trade_logs(strategy_id):
                 'quantity': float(row[4]) if row[4] else 0.0,
                 'pnl': float(row[5]) if row[5] else 0.0,
                 'executed': bool(row[6]) if row[6] is not None else False,
+                'confidence': float(confidence),
                 'id': row[7],
                 'strategy_name': row[8] or '',
                 'action': row[9] or '',
-                'real_pnl': float(row[10]) if row[10] else 0.0
+                'real_pnl': float(row[10]) if row[10] else 0.0,
+                'trade_type': trade_type,
+                'is_real_money': is_real_money,
+                'validation_id': row[13][:8] if len(row) > 13 and row[13] else None
             })
         
         conn.close()
+        
+        # 🔥 修复：返回格式改为前端期望的格式
         return jsonify({
-            "status": "success",
+            "success": True,  # 修复：从"status"改为"success"
             "logs": logs
         })
         
     except Exception as e:
+        print(f"获取策略交易日志失败: {e}")
         return jsonify({
-            "status": "error",
+            "success": False,  # 修复：从"status"改为"success"
             "message": str(e)
         }), 500
 
 @app.route('/api/quantitative/strategies/<strategy_id>/optimization-logs', methods=['GET'])
 def get_strategy_optimization_logs(strategy_id):
-    """获取策略优化记录 - 重定向到quantitative_service统一处理"""
+    """获取策略优化记录 - 直接从数据库获取数据"""
     try:
-        if quantitative_service:
-            logs = quantitative_service.get_strategy_optimization_logs(strategy_id, limit=10)
-            return jsonify({
-                'success': True,
-                'logs': logs
+        limit = int(request.args.get('limit', 100))  # 🔥 修复：默认显示100条日志
+        
+        # 🔥 修复：直接从数据库获取优化日志，不依赖quantitative_service
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 🔥 从strategy_optimization_logs表获取优化记录
+        cursor.execute("""
+            SELECT id, strategy_id, generation, optimization_type, 
+                   old_parameters, new_parameters, trigger_reason, 
+                   timestamp, target_success_rate, validation_passed, cycle
+            FROM strategy_optimization_logs 
+            WHERE strategy_id = %s
+            ORDER BY timestamp DESC
+            LIMIT %s
+        """, (strategy_id, limit))
+        
+        rows = cursor.fetchall()
+        logs = []
+        
+        for row in rows:
+            logs.append({
+                'id': row[0],
+                'strategy_id': row[1],
+                'generation': row[2] if row[2] else 1,
+                'optimization_type': row[3] or 'parameter_adjustment',
+                'old_parameters': row[4] or '{}',
+                'new_parameters': row[5] or '{}',
+                'trigger_reason': row[6] or '无触发原因',
+                'timestamp': row[7].strftime('%Y-%m-%d %H:%M:%S') if row[7] else '',
+                'target_success_rate': float(row[8]) if row[8] else 0.0,
+                'success': bool(row[9]) if row[9] is not None else True,
+                'cycle': row[10] if row[10] else 1
             })
-        else:
-            return jsonify({
-                'success': False,
-                'message': 'quantitative_service未初始化'
-            })
+        
+        conn.close()
+        
+        # 🔥 修复：返回格式与交易日志API保持一致
+        return jsonify({
+            "success": True,  # 使用"success"而不是"status"
+            "logs": logs
+        })
             
     except Exception as e:
         print(f"获取策略优化记录失败: {e}")
         return jsonify({
             'success': False,
             'message': f'获取失败: {str(e)}'
-        })
+        }), 500
 
 @app.route('/api/quantitative/positions', methods=['GET'])
 def get_quantitative_positions():

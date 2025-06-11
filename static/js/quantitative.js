@@ -943,7 +943,7 @@ class QuantitativeSystem {
                 // 存储完整日志数据用于分页
                 this.optimizationLogs = data.logs;
                 this.currentLogPage = 1;
-                this.logsPerPage = 5;
+                this.logsPerPage = 10;  // 🔥 修复：增加每页显示日志数量到10条
                 
                 this.renderOptimizationLogs();
                 this.renderLogPagination();
@@ -971,8 +971,8 @@ class QuantitativeSystem {
             <tr>
                 <td>${this.formatTime(log.timestamp)}</td>
                 <td><span class="badge bg-info">${log.optimization_type || '未知类型'}</span></td>
-                <td><code>${JSON.stringify(log.old_params || log.old_parameters || {}, null, 1)}</code></td>
-                <td><code>${JSON.stringify(log.new_params || log.new_parameters || {}, null, 1)}</code></td>
+                <td><code style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">${JSON.stringify(log.old_parameters || {}, null, 1)}</code></td>
+                <td><code style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">${JSON.stringify(log.new_parameters || {}, null, 1)}</code></td>
                 <td>${log.trigger_reason || '无原因'}</td>
                 <td>${log.target_success_rate || 0}%</td>
             </tr>
@@ -1670,14 +1670,14 @@ class QuantitativeSystem {
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
 
-        // 🔧 修复排序：确保最新日志在前面并取前18条
+        // 🔧 修复排序：确保最新日志在前面并取前30条
         const sortedLogs = [...this.allEvolutionLogs].sort((a, b) => {
             const timeA = new Date(a.timestamp || '1970-01-01').getTime();
             const timeB = new Date(b.timestamp || '1970-01-01').getTime();
             return timeB - timeA; // 降序排列，最新在前
         });
         
-        const recentLogs = sortedLogs.slice(0, 18);
+        const recentLogs = sortedLogs.slice(0, 30);  // 🔥 修复：增加显示日志数量到30条
         
         const tickerContent = recentLogs.map(log => {
             const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
@@ -1776,7 +1776,7 @@ function showAllLogs() {
     if (app && app.allEvolutionLogs) {
         // 🔧 初始化分页变量
         app.logsCurrentPage = 1;
-        app.logsPerPage = 15;
+        app.logsPerPage = 20;  // 🔥 修复：增加每页显示日志数量到20条
         
         // 创建一个新的模态框显示所有日志
         const modalHtml = `
