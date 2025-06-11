@@ -1830,6 +1830,47 @@ def reset_strategy_params(strategy_id):
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)})
 
+@app.route('/api/quantitative/strategies/<strategy_id>/toggle', methods=['POST'])
+def toggle_strategy(strategy_id):
+    """切换策略启用/禁用状态"""
+    try:
+        # 直接操作数据库
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取当前状态
+        cursor.execute("SELECT enabled, name FROM strategies WHERE id = %s", (strategy_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': '策略不存在'})
+        
+        current_enabled = bool(row[0])
+        strategy_name = row[1]
+        new_enabled = not current_enabled
+        
+        # 更新状态
+        cursor.execute("""
+            UPDATE strategies 
+            SET enabled = %s, updated_at = CURRENT_TIMESTAMP 
+            WHERE id = %s
+        """, (new_enabled, strategy_id))
+        
+        conn.commit()
+        conn.close()
+        
+        status = "启用" if new_enabled else "禁用"
+        return jsonify({
+            'success': True,
+            'message': f'策略 {strategy_name} 已{status}',
+            'enabled': new_enabled
+        })
+        
+    except Exception as e:
+        print(f"切换策略状态失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)})
+
 @app.route('/api/quantitative/strategies/<strategy_id>/trade-logs', methods=['GET'])
 def get_strategy_trade_logs(strategy_id):
     """获取策略交易日志"""
