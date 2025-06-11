@@ -3799,5 +3799,52 @@ def log_evolution_event():
             'message': f'记录失败: {str(e)}'
         })
 
+@app.route('/api/test-strategies-query', methods=['GET'])
+def test_strategies_query():
+    """测试策略查询逻辑"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 使用和主API相同的查询逻辑
+        cursor.execute('''
+            SELECT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
+                   COUNT(t.id) as total_trades
+            FROM strategies s
+            LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+            WHERE s.id LIKE 'STRAT_%'
+            GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.final_score
+            ORDER BY COUNT(t.id) DESC, s.final_score DESC
+            LIMIT 10
+        ''')
+        
+        rows = cursor.fetchall()
+        strategies = []
+        
+        for row in rows:
+            strategies.append({
+                'id': row[0],
+                'name': row[1],
+                'symbol': row[2],
+                'type': row[3],
+                'enabled': row[4],
+                'final_score': row[5],
+                'total_trades': row[6]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "message": f"查询到 {len(strategies)} 个STRAT_格式策略",
+            "data": strategies
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"查询失败: {str(e)}"
+        }), 500
+
 if __name__ == '__main__':
     main() 
