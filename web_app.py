@@ -1321,12 +1321,12 @@ def quantitative_strategies():
                     print(f"解包策略数据失败: {e}, row: {row}")
                     continue
                 
-                # 🔥 修复win_rate计算逻辑：只计算已执行的交易，且盈利判断也必须基于已执行的交易
+                # 🔥 修复win_rate计算逻辑：从trading_signals表查询真实交易数据
                 cursor.execute("""
-                    SELECT COUNT(*) as executed_trades,
+                    SELECT COUNT(*) as total_trades,
                            COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
-                    FROM strategy_trade_logs
-                    WHERE strategy_id = %s AND executed = true
+                    FROM trading_signals
+                    WHERE strategy_id = %s
                 """, (sid,))
                 
                 trade_stats = cursor.fetchone()
@@ -1889,13 +1889,13 @@ def get_strategy_trade_logs(strategy_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 🔥 修复：添加更多字段，支持验证交易和真实交易的区分
+        # 🔥 修复：查询trading_signals表获取真实的交易记录
         # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
         query = f"""
             SELECT timestamp, symbol, signal_type, price, quantity, 
-                   pnl, executed, id, strategy_name, action, real_pnl,
-                   trade_type, is_real_money, exchange_order_id, confidence
-            FROM strategy_trade_logs 
+                   pnl, executed, id, strategy_id, signal_type as action, pnl as real_pnl,
+                   'verification' as trade_type, false as is_real_money, id as exchange_order_id, confidence
+            FROM trading_signals 
             WHERE strategy_id = %s
             ORDER BY timestamp DESC
             LIMIT {limit}
@@ -1922,12 +1922,12 @@ def get_strategy_trade_logs(strategy_id):
                 'executed': bool(row[6]) if row[6] is not None else False,
                 'confidence': float(confidence),
                 'id': row[7],
-                'strategy_name': row[8] or '',
-                'action': row[9] or '',
+                'strategy_name': row[8] or '',  # 这里是strategy_id
+                'action': row[9] or '',  # 这里是signal_type
                 'real_pnl': float(row[10]) if row[10] else 0.0,
                 'trade_type': trade_type,
                 'is_real_money': is_real_money,
-                'validation_id': row[13][:8] if len(row) > 13 and row[13] else None
+                'validation_id': str(row[7])[:8] if row[7] else None  # 使用ID作为验证ID
             })
         
         conn.close()
