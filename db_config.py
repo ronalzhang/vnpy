@@ -60,7 +60,10 @@ class DatabaseAdapter:
             # PostgreSQL使用%s占位符
             query = query.replace('?', '%s')
             
-            cursor.execute(query, params)
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
             
             if fetch_one:
                 result = cursor.fetchone()
