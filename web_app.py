@@ -2011,7 +2011,7 @@ def get_quantitative_positions():
                 positions_data = quantitative_service.get_positions()
                 if positions_data and positions_data.get('success'):
                     return jsonify({
-                        "status": "success", 
+                        "success": True, 
                         "data": positions_data.get('data', [])
                     })
             except Exception as e:
