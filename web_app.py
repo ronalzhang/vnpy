@@ -1881,155 +1881,22 @@ def get_strategy_trade_logs(strategy_id):
 
 @app.route('/api/quantitative/strategies/<strategy_id>/optimization-logs', methods=['GET'])
 def get_strategy_optimization_logs(strategy_id):
-    """获取策略优化记录"""
+    """获取策略优化记录 - 重定向到quantitative_service统一处理"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        logs = []
-        
-        # 🔥 步骤1：从strategy_evolution_history获取真实的参数变化记录
-        cursor.execute("""
-            SELECT strategy_id, evolution_type, generation, cycle, 
-                   score_before, score_after, new_parameters, timestamp, notes
-            FROM strategy_evolution_history 
-            WHERE strategy_id = %s AND new_parameters IS NOT NULL
-            ORDER BY timestamp DESC
-            LIMIT 10
-        """, (strategy_id,))
-        
-        evolution_logs = cursor.fetchall()
-        print(f"🔍 获取策略 {strategy_id} 的 {len(evolution_logs)} 条进化记录")
-        
-        for row in evolution_logs:
-            strategy_id_db, evolution_type, generation, cycle, score_before, score_after, new_parameters, timestamp, notes = row
+        if quantitative_service:
+            logs = quantitative_service.get_strategy_optimization_logs(strategy_id, limit=10)
+            return jsonify({
+                'success': True,
+                'logs': logs
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'quantitative_service未初始化'
+            })
             
-            try:
-                # 解析新参数
-                if new_parameters:
-                    import json
-                    new_params_dict = json.loads(new_parameters) if isinstance(new_parameters, str) else new_parameters
-                else:
-                    new_params_dict = {}
-                
-                # 构造优化记录
-                optimization_type = {
-                    'mutation': '智能变异',
-                    'intelligent_mutation': '智能变异',
-                    'crossover': '基因交叉',
-                    'elite_selected': '精英选择'
-                }.get(evolution_type, '参数优化')
-                
-                trigger_reason = notes if notes else f'第{generation}代第{cycle}轮进化'
-                
-                # 🔧 修复：使用完整的参数而不是只有score
-                # 模拟旧参数（基于新参数生成合理的旧参数）
-                old_params_dict = {}
-                for param_name, new_value in new_params_dict.items():
-                    if isinstance(new_value, (int, float)):
-                        # 生成略微不同的旧值
-                        change_factor = 0.9 + (hash(param_name + str(strategy_id_db)) % 20) / 100  # 0.9-1.1
-                        old_params_dict[param_name] = round(new_value / change_factor, 6)
-                    else:
-                        old_params_dict[param_name] = new_value
-                
-                logs.append({
-                    'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else '',
-                    'optimization_type': optimization_type,
-                    'old_parameters': old_params_dict,
-                    'new_parameters': new_params_dict,
-                    'trigger_reason': trigger_reason,
-                    'target_success_rate': float(score_after) if score_after else 0
-                })
-                
-            except Exception as e:
-                print(f"⚠️ 解析进化记录失败: {e}")
-                continue
-        
-        # 🔥 步骤2：如果没有足够的记录，添加示例记录展示功能
-        if len(logs) < 3:
-            from datetime import datetime, timedelta
-            
-            # 添加更详细的示例记录
-            sample_logs = [
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=5)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'optimization_type': '智能变异优化',
-                    'old_parameters': {
-                        'lookback_period': 20,
-                        'threshold': 0.02,
-                        'momentum_threshold': 0.01,
-                        'rsi_period': 14,
-                        'stop_loss': 0.03,
-                        'take_profit': 0.05
-                    },
-                    'new_parameters': {
-                        'lookback_period': 22,
-                        'threshold': 0.018,
-                        'momentum_threshold': 0.012,
-                        'rsi_period': 16,
-                        'stop_loss': 0.025,
-                        'take_profit': 0.055
-                    },
-                    'trigger_reason': '胜率提升优化',
-                    'target_success_rate': 78.5
-                },
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=8)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'optimization_type': '风险控制优化',
-                    'old_parameters': {
-                        'position_sizing': 0.1,
-                        'max_drawdown': 0.05,
-                        'volatility_filter': 0.02,
-                        'correlation_threshold': 0.7
-                    },
-                    'new_parameters': {
-                        'position_sizing': 0.08,
-                        'max_drawdown': 0.04,
-                        'volatility_filter': 0.018,
-                        'correlation_threshold': 0.75
-                    },
-                    'trigger_reason': '回撤控制优化',
-                    'target_success_rate': 82.1
-                },
-                {
-                    'timestamp': (datetime.now() - timedelta(minutes=12)).strftime('%Y-%m-%d %H:%M:%S'),
-                    'optimization_type': '收益增强优化',
-                    'old_parameters': {
-                        'entry_signal_strength': 0.6,
-                        'exit_signal_strength': 0.5,
-                        'profit_target_ratio': 2.0,
-                        'trailing_stop_pct': 0.015
-                    },
-                    'new_parameters': {
-                        'entry_signal_strength': 0.65,
-                        'exit_signal_strength': 0.55,
-                        'profit_target_ratio': 2.2,
-                        'trailing_stop_pct': 0.012
-                    },
-                    'trigger_reason': '收益率提升优化',
-                    'target_success_rate': 85.3
-                }
-            ]
-            
-            # 只添加不重复的示例
-            for sample in sample_logs:
-                if len(logs) < 5:  # 最多5条记录
-                    logs.append(sample)
-        
-        conn.close()
-        
-        print(f"✅ 返回策略 {strategy_id} 的 {len(logs)} 条优化记录")
-        
-        return jsonify({
-            'success': True,
-            'logs': logs[:10]  # 最多返回10条
-        })
-        
     except Exception as e:
         print(f"获取策略优化记录失败: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': f'获取失败: {str(e)}'
