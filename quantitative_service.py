@@ -3991,7 +3991,7 @@ class QuantitativeService:
                             'win_rate': float(row.get('win_rate', 0)),
                             'total_return': float(row.get('total_return', 0)),
                             'total_trades': int(row.get('total_trades', 0)),
-                            'qualified_for_trading': float(row.get('final_score', 0)) >= 55.0,  # 🔧 降低门槛：55分以上可进行验证交易和参数优化
+                            'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,  # 🔧 修复门槛：65分以上符合真实交易条件
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
                             'data_source': self._get_strategy_evolution_display(row['id'])
@@ -4024,7 +4024,7 @@ class QuantitativeService:
                             'win_rate': float(row.get('win_rate', 0)),
                             'total_return': float(row.get('total_return', 0)),
                             'total_trades': int(row.get('total_trades', 0)),
-                            'qualified_for_trading': float(row.get('final_score', 0)) >= 55.0,  # 🔧 降低门槛：55分以上可进行验证交易和参数优化
+                            'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,  # 🔧 修复门槛：65分以上符合真实交易条件
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
                             'data_source': self._get_strategy_evolution_display(row.get('id', ''))
@@ -4037,7 +4037,8 @@ class QuantitativeService:
                     continue
             
             print(f"✅ 从PostgreSQL查询到 {len(strategies_list)} 个策略")
-            print(f"🎯 其中 {sum(1 for s in strategies_list if s['qualified_for_trading'])} 个策略符合真实交易条件(≥65分)")
+            qualified_count = sum(1 for s in strategies_list if s['qualified_for_trading'])
+            print(f"🎯 其中 {qualified_count} 个策略符合真实交易条件(≥65分) - 验证交易不受此限制")
             
             return {'success': True, 'data': strategies_list}
             
