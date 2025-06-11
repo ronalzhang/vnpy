@@ -3933,18 +3933,10 @@ class QuantitativeService:
     def get_strategies(self):
         """获取完整ID格式的策略 - 优先显示有交易记录的STRAT_策略"""
         try:
-            # 🔥 修复：简化查询，只显示完整ID格式的策略
-            query = """
-            SELECT id, name, symbol, type, enabled, parameters,
-                   final_score, win_rate, total_return, total_trades,
-                   created_at, updated_at
-            FROM strategies 
-            WHERE id LIKE 'STRAT_%'
-            ORDER BY final_score DESC, total_trades DESC
-            LIMIT 50
-            """
+            # 🔥 修复：使用最简单的查询避免psycopg2问题
+            query = "SELECT * FROM strategies WHERE id LIKE 'STRAT_%' LIMIT 50"
             
-            rows = self.db_manager.execute_query(query, params=(), fetch_all=True)
+            rows = self.db_manager.execute_query(query, fetch_all=True)
             
             if not rows:
                 print("⚠️ 没有找到STRAT_格式的策略，数据库可能存在问题")
