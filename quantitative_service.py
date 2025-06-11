@@ -3933,11 +3933,8 @@ class QuantitativeService:
     def get_strategies(self):
         """获取完整ID格式的策略 - 优先显示有交易记录的STRAT_策略"""
         try:
-            # 🔥 修复：只选择关键字段避免35字段的复杂查询问题
-            print(f"DEBUG: db_manager类型: {type(self.db_manager)}")
-            print(f"DEBUG: db_manager属性: {dir(self.db_manager)}")
-            cursor = self.db_manager.connection.cursor()
-            cursor.execute("""
+            # 🔥 修复：回到使用包装方法，但确保参数正确
+            query = """
                 SELECT id, name, symbol, type, enabled, parameters, 
                        final_score, win_rate, total_return, total_trades,
                        created_at, updated_at, generation, cycle
@@ -3945,13 +3942,8 @@ class QuantitativeService:
                 WHERE id LIKE 'STRAT_%' 
                 ORDER BY final_score DESC, total_trades DESC
                 LIMIT 50
-            """)
-            rows = cursor.fetchall()
-            cursor.close()
-            
-            # 转换为字典格式
-            if rows:
-                rows = [dict(row) for row in rows]
+            """
+            rows = self.db_manager.execute_query(query, (), fetch_all=True)
             
             if not rows:
                 print("⚠️ 没有找到STRAT_格式的策略，数据库可能存在问题")
