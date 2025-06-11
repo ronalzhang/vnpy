@@ -107,7 +107,7 @@ def calculate_strategy_sharpe_ratio(strategy_id, total_trades):
         
         # 获取策略的PnL数据
         cursor.execute("""
-            SELECT pnl FROM strategy_trade_logs 
+            SELECT expected_return FROM trading_signals 
             WHERE strategy_id = %s 
             ORDER BY timestamp DESC 
             LIMIT 100
@@ -141,7 +141,7 @@ def calculate_strategy_max_drawdown(strategy_id):
         
         # 获取策略的累计PnL
         cursor.execute("""
-            SELECT pnl FROM strategy_trade_logs 
+            SELECT expected_return FROM trading_signals 
             WHERE strategy_id = %s 
             ORDER BY timestamp ASC
         """, (strategy_id,))
@@ -188,9 +188,9 @@ def calculate_strategy_profit_factor(strategy_id, winning_trades, losing_trades)
         # 获取盈利和亏损总额
         cursor.execute("""
             SELECT 
-                SUM(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) as total_profit,
-                SUM(CASE WHEN pnl < 0 THEN ABS(pnl) ELSE 0 END) as total_loss
-            FROM strategy_trade_logs 
+                SUM(CASE WHEN expected_return > 0 THEN expected_return ELSE 0 END) as total_profit,
+                SUM(CASE WHEN expected_return < 0 THEN ABS(expected_return) ELSE 0 END) as total_loss
+            FROM trading_signals 
             WHERE strategy_id = %s
         """, (strategy_id,))
         
@@ -218,7 +218,7 @@ def calculate_strategy_volatility(strategy_id):
         
         # 获取策略的PnL数据
         cursor.execute("""
-            SELECT pnl FROM strategy_trade_logs 
+            SELECT expected_return FROM trading_signals 
             WHERE strategy_id = %s 
             ORDER BY timestamp DESC 
             LIMIT 50
@@ -1296,11 +1296,11 @@ def quantitative_strategies():
                 SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
                        s.created_at, s.generation, s.cycle,
                        COUNT(t.id) as total_trades,
-                       COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
-                       SUM(t.pnl) as total_pnl,
-                       AVG(t.pnl) as avg_pnl
+                       COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) as wins,
+                       SUM(t.expected_return) as total_pnl,
+                       AVG(t.expected_return) as avg_pnl
                 FROM strategies s
-                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+                LEFT JOIN trading_signals t ON s.id = t.strategy_id
                 WHERE s.id LIKE 'STRAT_%'
                 GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
                          s.final_score, s.created_at, s.generation, s.cycle
@@ -1324,7 +1324,7 @@ def quantitative_strategies():
                 # 🔥 修复win_rate计算逻辑：从trading_signals表查询真实交易数据
                 cursor.execute("""
                     SELECT COUNT(*) as total_trades,
-                           COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
+                           COUNT(CASE WHEN expected_return > 0 THEN 1 END) as wins
                     FROM trading_signals
                     WHERE strategy_id = %s
                 """, (sid,))
@@ -1499,7 +1499,7 @@ def delete_quantitative_strategy(strategy_id):
             }), 404
         
         # 删除相关的交易日志
-        cursor.execute("DELETE FROM strategy_trade_logs WHERE strategy_id = %s", (strategy_id,))
+        cursor.execute("DELETE FROM trading_signals WHERE strategy_id = %s", (strategy_id,))
         
         # 删除策略
         cursor.execute("DELETE FROM strategies WHERE id = %s", (strategy_id,))
@@ -1711,9 +1711,9 @@ def strategy_detail(strategy_id):
             # 🔥 修复win_rate计算逻辑：只计算已执行的交易，且盈利判断也必须基于已执行的交易
             cursor.execute("""
                 SELECT COUNT(*) as executed_trades,
-                       COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
-                FROM strategy_trade_logs
-                WHERE strategy_id = %s AND executed = true
+                       COUNT(CASE WHEN expected_return > 0 THEN 1 END) as wins
+                FROM trading_signals
+                WHERE strategy_id = %s AND executed = 1
             """, (strategy_id,))
             
             trade_stats = cursor.fetchone()
@@ -3504,11 +3504,11 @@ def get_real_trading_status():
         # 统计今日盈亏
         cursor.execute("""
             SELECT 
-                COUNT(CASE WHEN trade_type = 'simulation' THEN 1 END) as sim_trades,
-                COUNT(CASE WHEN trade_type = 'real' THEN 1 END) as real_trades,
-                SUM(CASE WHEN trade_type = 'simulation' THEN pnl ELSE 0 END) as sim_pnl,
-                SUM(CASE WHEN trade_type = 'real' THEN pnl ELSE 0 END) as real_pnl
-            FROM strategy_trade_logs 
+                COUNT(CASE WHEN signal_type = 'simulation' THEN 1 END) as sim_trades,
+                COUNT(CASE WHEN signal_type = 'real' THEN 1 END) as real_trades,
+                SUM(CASE WHEN signal_type = 'simulation' THEN expected_return ELSE 0 END) as sim_pnl,
+                SUM(CASE WHEN signal_type = 'real' THEN expected_return ELSE 0 END) as real_pnl
+            FROM trading_signals 
             WHERE DATE(timestamp) = CURRENT_DATE
         """)
         
@@ -3627,9 +3627,9 @@ def manage_strategy_config():
             # 获取实际交易统计参数
             cursor.execute("""
                 SELECT 
-                    AVG(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) as avg_profit,
-                    COUNT(CASE WHEN pnl > 0 THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as win_rate
-                FROM strategy_trade_logs 
+                    AVG(CASE WHEN expected_return > 0 THEN expected_return ELSE 0 END) as avg_profit,
+                    COUNT(CASE WHEN expected_return > 0 THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as win_rate
+                FROM trading_signals 
                 WHERE timestamp >= NOW() - INTERVAL '7 days'
             """)
             trade_stats = cursor.fetchone()
