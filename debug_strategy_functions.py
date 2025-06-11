@@ -525,8 +525,8 @@ def test_sql_parameter_issue():
             print(f"   ❌ 简单查询失败: {e}")
             traceback.print_exc()
         
-        # 测试2: 带参数查询
-        print("   测试2: 带参数查询...")
+        # 测试2: 带参数查询（元组方式）
+        print("   测试2: 带参数查询（元组方式）...")
         try:
             max_strategies = 30
             print(f"   🔍 参数值: {max_strategies}")
@@ -536,9 +536,42 @@ def test_sql_parameter_issue():
             
             cursor.execute("SELECT COUNT(*) FROM strategies WHERE id LIKE 'STRAT_%' LIMIT %s", (max_strategies,))
             result = cursor.fetchone()
-            print(f"   ✅ 带参数查询成功: {result}")
+            print(f"   ✅ 带参数查询（元组）成功: {result}")
         except Exception as e:
-            print(f"   ❌ 带参数查询失败: {e}")
+            print(f"   ❌ 带参数查询（元组）失败: {e}")
+            traceback.print_exc()
+        
+        # 测试2.1: 带参数查询（列表方式）
+        print("   测试2.1: 带参数查询（列表方式）...")
+        try:
+            max_strategies = 30
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE id LIKE 'STRAT_%' LIMIT %s", [max_strategies])
+            result = cursor.fetchone()
+            print(f"   ✅ 带参数查询（列表）成功: {result}")
+        except Exception as e:
+            print(f"   ❌ 带参数查询（列表）失败: {e}")
+            traceback.print_exc()
+        
+        # 测试2.2: 硬编码查询
+        print("   测试2.2: 硬编码查询...")
+        try:
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE id LIKE 'STRAT_%' LIMIT 30")
+            result = cursor.fetchone()
+            print(f"   ✅ 硬编码查询成功: {result}")
+        except Exception as e:
+            print(f"   ❌ 硬编码查询失败: {e}")
+            traceback.print_exc()
+            
+        # 测试2.3: 字符串格式化
+        print("   测试2.3: 字符串格式化查询...")
+        try:
+            max_strategies = 30
+            query = f"SELECT COUNT(*) FROM strategies WHERE id LIKE 'STRAT_%' LIMIT {max_strategies}"
+            cursor.execute(query)
+            result = cursor.fetchone()
+            print(f"   ✅ 字符串格式化查询成功: {result}")
+        except Exception as e:
+            print(f"   ❌ 字符串格式化查询失败: {e}")
             traceback.print_exc()
         
         # 测试3: 完整主查询（不带参数）
@@ -565,8 +598,34 @@ def test_sql_parameter_issue():
             print(f"   ❌ 完整查询(无参数)失败: {e}")
             traceback.print_exc()
         
-        # 测试4: 完整主查询（带参数）
-        print("   测试4: 完整主查询（带参数）...")
+        # 测试4: 完整主查询（字符串格式化）
+        print("   测试4: 完整主查询（字符串格式化）...")
+        try:
+            max_strategies = 30
+            query = f'''
+                SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
+                       s.created_at, s.generation, s.cycle,
+                       COUNT(t.id) as total_trades,
+                       COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
+                       SUM(t.pnl) as total_pnl,
+                       AVG(t.pnl) as avg_pnl
+                FROM strategies s
+                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+                WHERE s.id LIKE 'STRAT_%'
+                GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
+                         s.final_score, s.created_at, s.generation, s.cycle
+                ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
+                LIMIT {max_strategies}
+            '''
+            cursor.execute(query)
+            result = cursor.fetchall()
+            print(f"   ✅ 完整查询(字符串格式化)成功: 获得{len(result)}条记录")
+        except Exception as e:
+            print(f"   ❌ 完整查询(字符串格式化)失败: {e}")
+            traceback.print_exc()
+        
+        # 测试5: 完整主查询（带参数）
+        print("   测试5: 完整主查询（带参数）...")
         try:
             max_strategies = 30
             cursor.execute('''
