@@ -19,12 +19,16 @@ def test_complete_strategy_api():
         cursor = conn.cursor()
         
         # 🔧 模拟从前端配置获取最大显示策略数
-        cursor.execute("""
-            SELECT value FROM system_config 
-            WHERE key = 'max_display_strategies'
-        """)
-        max_strategies_config = cursor.fetchone()
-        max_display_strategies = int(max_strategies_config[0]) if max_strategies_config else 30
+        try:
+            cursor.execute("""
+                SELECT config_value FROM strategy_management_config 
+                WHERE config_key = 'maxStrategies'
+            """)
+            max_strategies_config = cursor.fetchone()
+            max_display_strategies = int(max_strategies_config[0]) if max_strategies_config else 50
+        except Exception:
+            # 如果配置表不存在，使用默认值
+            max_display_strategies = 50
         print(f"🔧 策略显示数量从配置获取: {max_display_strategies}")
         
         # 主查询
