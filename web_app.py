@@ -1328,8 +1328,8 @@ def quantitative_strategies():
                 """, (sid,))
                 
                 trade_stats = cursor.fetchone()
-                calculated_total_trades = trade_stats[0] if trade_stats else 0
-                calculated_wins = trade_stats[1] if trade_stats else 0
+                calculated_total_trades = trade_stats[0] if trade_stats and len(trade_stats) >= 1 else 0
+                calculated_wins = trade_stats[1] if trade_stats and len(trade_stats) >= 2 else 0
                 win_rate = (calculated_wins / calculated_total_trades * 100) if calculated_total_trades > 0 else 0
                 
                 # 🔧 调试输出
