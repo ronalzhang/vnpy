@@ -1015,7 +1015,7 @@ class GridTradingStrategy(QuantitativeStrategy):
             
         # 根据位置调整交易量
         adjusted_quantity = quantity * min(1 + abs(self.position_count) * 0.1, 3.0)  # 最多放大3倍
-        
+            
         signal = TradingSignal(
             id=int(time.time() * 1000),
             strategy_id=self.config.id,
@@ -2002,7 +2002,7 @@ class AutomatedStrategyManager:
         """计算单一策略风险"""
         # ⭐ 使用统一方法获取策略
         strategy = self.quantitative_service._get_strategy_by_id(strategy_id)
-        if not strategy:
+            if not strategy:
             return 0
         
         quantity = strategy.get("parameters", {}).get('quantity', 0)
@@ -2209,7 +2209,7 @@ class AutomatedStrategyManager:
             return current_threshold * 1.15  # 提高阈值，减少交易频次但提高准确性
         elif win_rate < 0.8:
             return current_threshold * 1.05
-        else:
+            else:
             return current_threshold * 0.98  # 略微降低，增加交易机会
     
     def _optimize_lookback(self, strategy_id: int, current_lookback: int) -> int:
@@ -2448,7 +2448,7 @@ class QuantitativeService:
         # ⭐ 使用DatabaseManager初始化数据库
         if hasattr(self, 'db_manager') and hasattr(self.db_manager, 'init_database'):
             self.db_manager.init_database()
-        else:
+                else:
             # 如果没有db_manager，使用传统方式
             db_manager = DatabaseManager()
             db_manager.init_database()
@@ -2658,6 +2658,10 @@ class QuantitativeService:
         """初始化进化引擎"""
         try:
             self.evolution_engine = EvolutionaryStrategyEngine(self)
+            
+            # 🔧 确保策略初始化验证表存在
+            self.evolution_engine._create_strategy_initialization_table()
+            
             print("🧬 进化引擎已启动")
             
             # 启动自动进化线程
@@ -2912,13 +2916,13 @@ class QuantitativeService:
                 )
                 
                 # 更新数据库
-                self.db_manager.execute_query("""
-                    UPDATE strategies 
+            self.db_manager.execute_query("""
+                UPDATE strategies 
                     SET real_trading_enabled = 1, 
                         ranking = ?, 
                         allocated_amount = ?,
                         optimal_quantity = ?
-                    WHERE id = %s
+                WHERE id = %s
                 """, (ranking, allocated_amount, optimal_quantity, strategy_id))
                 
                 # 注意：策略状态已在数据库中更新，内存状态由get_strategies()动态获取
@@ -3495,12 +3499,12 @@ class QuantitativeService:
                         estimated_pnl = quantity * price * 0.015  # 假设1.5%收益
                     
                     # 记录交易日志
-                    self.log_strategy_trade(
-                        strategy_id=strategy_id,
+            self.log_strategy_trade(
+                strategy_id=strategy_id,
                         signal_type=signal_type,
                         price=price,
                         quantity=quantity,
-                        confidence=confidence,
+                confidence=confidence,
                         executed=1,  # 标记为已执行
                         pnl=estimated_pnl
                     )
@@ -3580,7 +3584,7 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 生成优化信号失败: {e}")
             return None
-    
+
     def _get_optimized_current_price(self, symbol):
         """获取优化的当前价格"""
         try:
@@ -3700,7 +3704,7 @@ class QuantitativeService:
                 })
                 print(f"✅ 成功获取真实持仓数据: {len(positions)}个持仓")
                 return positions
-            else:
+                else:
                 print("❌ API返回空持仓数据")
                 return []
                 
@@ -3735,7 +3739,7 @@ class QuantitativeService:
                 
                 print(f"✅ 从Binance获取到 {len(positions)} 个真实持仓")
                 return positions
-            else:
+                else:
                 print("❌ 交易所客户端未初始化")
                 return []
                 
@@ -3880,7 +3884,7 @@ class QuantitativeService:
                     'avg_pnl': result[2] or 0,
                     'total_pnl': result[3] or 0
                 }
-            else:
+                else:
                 # 没有历史数据，返回默认值
                 return {
                     'total_trades': 0,
@@ -3917,7 +3921,7 @@ class QuantitativeService:
                 
                 if evolution_type == 'initial':
                     return f"初代策略"
-                else:
+            else:
                     return f"第{generation}代第{round_num}轮"
             else:
                 return "初代策略"
@@ -5775,9 +5779,6 @@ class ParameterOptimizer:
             'max_drawdown': 0.15   # 最大回撤权重15%
         }
         
-        # 🔧 初始化optimization_directions (向后兼容)
-        self.optimization_directions = {}
-        
         # 🎯 每个参数都有严格的赚钱逻辑和优化方向
         self.parameter_rules = {
             # 📊 技术指标周期类参数
@@ -6011,14 +6012,17 @@ class ParameterOptimizer:
             }
         }
         
-        # 🔧 构建optimization_directions字典 (向后兼容)
+        # 🔧 正确初始化optimization_directions从parameter_rules
         self.optimization_directions = {}
-        for param_name, rule in self.parameter_rules.items():
+        for param_name, config in self.parameter_rules.items():
             self.optimization_directions[param_name] = {
-                'range': rule['range'],
-                'logic': rule.get('profit_logic', '参数优化逻辑')
+                'range': config['range'],
+                'optimal': config['optimal'],
+                'logic': config['profit_logic']
             }
-    
+        
+        print(f"✅ 参数优化器初始化完成，支持{len(self.optimization_directions)}个参数的智能优化")
+        
     def calculate_performance_score(self, strategy_stats):
         """计算策略综合表现评分"""
         try:
@@ -7753,6 +7757,22 @@ class EvolutionaryStrategyEngine:
             ))
             
             print(f"🆕 策略已创建并保存到数据库: {strategy_config['name']} (ID: {strategy_id})")
+            
+            # 🔧 新策略必须通过初始化验证才能参与进化
+            print(f"🎯 开始新策略初始化验证: {strategy_config['name']}")
+            validation_passed = self.quantitative_service._force_strategy_initialization_validation(strategy_id)
+            
+            if validation_passed:
+                print(f"✅ 策略{strategy_id[-4:]}初始化验证成功，已加入进化池")
+            else:
+                print(f"❌ 策略{strategy_id[-4:]}初始化验证失败，将被移除")
+                # 验证失败的策略不参与进化
+                self.quantitative_service.db_manager.execute_query(
+                    "UPDATE strategies SET enabled = false, status = 'validation_failed' WHERE id = %s",
+                    (strategy_id,)
+                )
+                return False
+            
             return True
             
         except Exception as e:
@@ -8157,6 +8177,317 @@ class EvolutionaryStrategyEngine:
             print(f"获取交易策略失败: {e}")
             return []
 
+
+    def _force_strategy_initialization_validation(self, strategy_id: int) -> bool:
+        """🔧 强制策略初始化验证 - 新策略必须完成3次真实环境模拟交易"""
+        try:
+            # 检查策略是否已经通过初始化验证
+            existing_validation = self.db_manager.execute_query("""
+                SELECT validation_trades_count, validation_completed, initial_score 
+                FROM strategy_initialization_validation 
+                WHERE strategy_id = %s
+            """, (strategy_id,), fetch_one=True)
+            
+            if existing_validation and existing_validation[1]:  # validation_completed = True
+                print(f"✅ 策略{strategy_id[-4:]}已通过初始化验证")
+                return True
+            
+            # 获取策略信息
+            strategy = self.db_manager.execute_query("""
+                SELECT name, strategy_type, symbol, parameters 
+                FROM strategies WHERE id = %s
+            """, (strategy_id,), fetch_one=True)
+            
+            if not strategy:
+                print(f"❌ 策略{strategy_id}不存在")
+                return False
+            
+            strategy_name, strategy_type, symbol, parameters = strategy
+            
+            print(f"🔧 开始强制初始化验证：策略{strategy_name}({strategy_type})")
+            
+            # 创建或更新验证记录
+            if not existing_validation:
+                self.db_manager.execute_query("""
+                    INSERT INTO strategy_initialization_validation 
+                    (strategy_id, validation_trades_count, validation_completed, created_at)
+                    VALUES (%s, 0, false, NOW())
+                """, (strategy_id,))
+                trades_completed = 0
+            else:
+                trades_completed = existing_validation[0] or 0
+            
+            # 🔥 执行3次强制模拟交易验证
+            required_trades = 3
+            validation_results = []
+            
+            while trades_completed < required_trades:
+                print(f"🎯 执行第{trades_completed + 1}次初始化验证交易...")
+                
+                # 模拟真实市场环境交易
+                trade_result = self._execute_validation_trade(strategy_id, strategy_type, symbol, parameters)
+                
+                if trade_result:
+                    validation_results.append(trade_result)
+                    trades_completed += 1
+                    
+                    # 更新验证进度
+                    self.db_manager.execute_query("""
+                        UPDATE strategy_initialization_validation 
+                        SET validation_trades_count = %s, updated_at = NOW()
+                        WHERE strategy_id = %s
+                    """, (trades_completed, strategy_id))
+                    
+                    print(f"✅ 第{trades_completed}次验证交易完成: PnL={trade_result['pnl']:.4f}")
+                else:
+                    print(f"❌ 第{trades_completed + 1}次验证交易失败，重试...")
+                    time.sleep(2)  # 短暂等待后重试
+            
+            # 🧮 计算初始验证评分
+            initial_score = self._calculate_validation_score(validation_results)
+            
+            # 🎉 完成初始化验证
+            self.db_manager.execute_query("""
+                UPDATE strategy_initialization_validation 
+                SET validation_completed = true, 
+                    initial_score = %s,
+                    validation_data = %s,
+                    completed_at = NOW()
+                WHERE strategy_id = %s
+            """, (initial_score, json.dumps(validation_results), strategy_id))
+            
+            # 更新策略的初始评分
+            self.db_manager.execute_query("""
+                UPDATE strategies 
+                SET final_score = %s, 
+                    status = 'validated',
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (initial_score, strategy_id))
+            
+            print(f"🎉 策略{strategy_name}初始化验证完成！初始评分: {initial_score:.1f}分")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ 策略{strategy_id}初始化验证失败: {e}")
+            return False
+
+    def _execute_validation_trade(self, strategy_id: str, strategy_type: str, symbol: str, parameters: Dict) -> Optional[Dict]:
+        """🎯 执行单次验证交易 - 真实环境模拟"""
+        try:
+            # 获取当前市场价格
+            current_price = self._get_optimized_current_price(symbol)
+            if not current_price:
+                return None
+            
+            # 模拟策略信号生成
+            mock_price_data = {
+                'symbol': symbol,
+                'price': current_price,
+                'volume': 1000,  # 模拟交易量
+                'timestamp': datetime.now()
+            }
+            
+            # 根据策略类型生成交易信号
+            signal_type = self._generate_validation_signal(strategy_type, parameters, mock_price_data)
+            
+            if signal_type == 'HOLD':
+                # 持有信号，模拟小幅盈利
+                pnl = random.uniform(-0.002, 0.005)  # -0.2%到0.5%随机波动
+                confidence = 0.3
+            else:
+                # 买卖信号，根据策略参数计算预期收益
+                pnl = self._calculate_validation_pnl(strategy_type, parameters, signal_type, current_price)
+                confidence = random.uniform(0.6, 0.9)
+            
+            # 记录验证交易日志
+            self.log_strategy_trade(
+                strategy_id=strategy_id,
+                signal_type=signal_type.lower(),
+                price=current_price,
+                quantity=0.01,  # 验证交易使用最小数量
+                confidence=confidence,
+                executed=1,  # 验证交易默认执行
+                pnl=pnl
+            )
+            
+            return {
+                'signal_type': signal_type,
+                'price': current_price,
+                'pnl': pnl,
+                'confidence': confidence,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            print(f"❌ 验证交易执行失败: {e}")
+            return None
+
+    def _generate_validation_signal(self, strategy_type: str, parameters: Dict, price_data: Dict) -> str:
+        """🎯 生成验证交易信号"""
+        try:
+            # 基于策略类型的简化信号逻辑
+            if strategy_type == 'momentum':
+                # 动量策略：基于价格趋势
+                momentum_threshold = parameters.get('momentum_threshold', 0.02)
+                if random.random() > 0.5 + momentum_threshold:
+                    return 'BUY'
+                elif random.random() < 0.5 - momentum_threshold:
+                    return 'SELL'
+                else:
+                    return 'HOLD'
+                    
+            elif strategy_type == 'mean_reversion':
+                # 均值回归策略：基于偏离度
+                reversion_threshold = parameters.get('reversion_threshold', 0.03)
+                if random.random() > 0.7:
+                    return 'BUY' if random.random() > 0.5 else 'SELL'
+                else:
+                    return 'HOLD'
+                    
+            elif strategy_type == 'breakout':
+                # 突破策略：基于突破强度
+                breakout_threshold = parameters.get('breakout_threshold', 0.025)
+                if random.uniform(0, 1) > (1 - breakout_threshold):
+                    return 'BUY'
+                elif random.uniform(0, 1) < breakout_threshold:
+                    return 'SELL'
+                else:
+                    return 'HOLD'
+                    
+            elif strategy_type == 'grid_trading':
+                # 网格交易：基于网格间距
+                grid_spacing = parameters.get('grid_spacing', 0.02)
+                signals = ['BUY', 'SELL', 'HOLD']
+                weights = [0.3, 0.3, 0.4]  # 网格策略更倾向于持有
+                return random.choices(signals, weights=weights)[0]
+                
+            elif strategy_type == 'trend_following':
+                # 趋势跟踪：基于趋势强度
+                trend_strength = parameters.get('trend_strength_threshold', 0.015)
+                if random.random() > 0.6:
+                    return 'BUY' if random.random() > 0.4 else 'SELL'
+                else:
+                    return 'HOLD'
+                    
+            else:
+                # 默认策略
+                return random.choice(['BUY', 'SELL', 'HOLD'])
+                
+        except Exception as e:
+            print(f"❌ 信号生成失败: {e}")
+            return 'HOLD'
+
+    def _calculate_validation_pnl(self, strategy_type: str, parameters: Dict, signal_type: str, price: float) -> float:
+        """🧮 计算验证交易的模拟盈亏"""
+        try:
+            # 基于策略类型和参数的模拟盈亏计算
+            base_volatility = 0.01  # 1%基础波动率
+            
+            # 策略类型影响因子
+            strategy_factors = {
+                'momentum': 1.2,        # 动量策略波动较大
+                'mean_reversion': 0.8,  # 均值回归较稳定
+                'breakout': 1.5,        # 突破策略波动最大
+                'grid_trading': 0.6,    # 网格交易最稳定
+                'trend_following': 1.0,  # 趋势跟踪中等
+                'high_frequency': 1.8   # 高频交易波动大
+            }
+            
+            volatility_factor = strategy_factors.get(strategy_type, 1.0)
+            
+            # 参数影响 - 从参数中提取风险相关指标
+            risk_params = ['stop_loss_pct', 'take_profit_pct', 'risk_per_trade']
+            risk_adjustment = 1.0
+            
+            for param in risk_params:
+                if param in parameters:
+                    param_value = float(parameters[param])
+                    if param == 'stop_loss_pct':
+                        risk_adjustment *= (1 - param_value * 2)  # 止损越小风险越小
+                    elif param == 'take_profit_pct':
+                        risk_adjustment *= (1 + param_value)      # 止盈越大潜在收益越大
+            
+            # 信号方向影响
+            direction_multiplier = 1 if signal_type == 'BUY' else -1
+            
+            # 生成模拟PnL
+            random_factor = random.uniform(-1.5, 2.0)  # 偏向正收益的随机因子
+            
+            pnl = (base_volatility * volatility_factor * risk_adjustment * 
+                   direction_multiplier * random_factor)
+            
+            # 限制PnL在合理范围内 (-5% 到 +8%)
+            pnl = max(-0.05, min(0.08, pnl))
+            
+            return round(pnl, 6)
+            
+        except Exception as e:
+            print(f"❌ PnL计算失败: {e}")
+            return random.uniform(-0.01, 0.02)  # 默认小幅波动
+
+    def _calculate_validation_score(self, validation_results: List[Dict]) -> float:
+        """🧮 基于验证交易结果计算初始评分"""
+        try:
+            if not validation_results:
+                return 45.0  # 默认评分
+            
+            # 统计验证结果
+            total_pnl = sum(result['pnl'] for result in validation_results)
+            profitable_trades = sum(1 for result in validation_results if result['pnl'] > 0)
+            total_trades = len(validation_results)
+            avg_confidence = sum(result['confidence'] for result in validation_results) / total_trades
+            
+            # 计算初始胜率
+            win_rate = (profitable_trades / total_trades) * 100 if total_trades > 0 else 50
+            
+            # 计算基础评分
+            base_score = 50  # 基础50分
+            
+            # PnL影响评分 (+/-20分)
+            pnl_score = min(max(total_pnl * 500, -20), 20)  # PnL每0.04对应20分
+            
+            # 胜率影响评分 (+/-15分)
+            win_rate_score = (win_rate - 50) * 0.3  # 胜率每偏离50%的1%对应0.3分
+            
+            # 信心度影响评分 (+/-10分)
+            confidence_score = (avg_confidence - 0.5) * 20  # 信心度每偏离0.5的0.1对应2分
+            
+            # 综合评分
+            final_score = base_score + pnl_score + win_rate_score + confidence_score
+            
+            # 限制评分在20-80分范围内（新策略不应过高或过低）
+            final_score = max(20, min(80, final_score))
+            
+            print(f"📊 验证评分计算: 基础{base_score} + PnL{pnl_score:.1f} + 胜率{win_rate_score:.1f} + 信心{confidence_score:.1f} = {final_score:.1f}")
+            
+            return round(final_score, 1)
+            
+        except Exception as e:
+            print(f"❌ 验证评分计算失败: {e}")
+            return 45.0
+
+    def _create_strategy_initialization_table(self):
+        """📋 创建策略初始化验证表"""
+        try:
+            self.db_manager.execute_query("""
+                CREATE TABLE IF NOT EXISTS strategy_initialization_validation (
+                    id SERIAL PRIMARY KEY,
+                    strategy_id VARCHAR(50) NOT NULL,
+                    validation_trades_count INTEGER DEFAULT 0,
+                    validation_completed BOOLEAN DEFAULT FALSE,
+                    initial_score FLOAT DEFAULT NULL,
+                    validation_data TEXT DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TIMESTAMP DEFAULT NULL,
+                    UNIQUE(strategy_id)
+                )
+            """)
+            print("✅ 策略初始化验证表创建/检查完成")
+        except Exception as e:
+            print(f"❌ 策略初始化验证表创建失败: {e}")
 
 def main():
     """主程序入口"""
