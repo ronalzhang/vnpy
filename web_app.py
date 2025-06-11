@@ -1278,8 +1278,8 @@ def quantitative_strategies():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 🔥 修复：从配置中获取显示的策略数量
-            max_display_strategies = 20  # 默认显示20个
+            # 🔥 修复：从配置中获取显示的策略数量，增加默认显示数量以包含更多有交易记录的策略
+            max_display_strategies = 50  # 增加到50个以确保显示所有有交易记录的策略
             try:
                 cursor.execute("SELECT config_value FROM strategy_management_config WHERE config_key = 'maxStrategies'")
                 max_strategies_config = cursor.fetchone()
@@ -1289,7 +1289,7 @@ def quantitative_strategies():
             except Exception as e:
                 print(f"获取maxStrategies配置失败，使用默认值: {e}")
             
-            # 获取配置数量的优质策略（按评分排序）
+            # 🔥 修复策略ID显示：优先显示有交易记录的完整ID策略，然后是高分策略
             cursor.execute('''
                 SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
                        s.created_at, s.generation, s.cycle,
@@ -1299,10 +1299,10 @@ def quantitative_strategies():
                        AVG(t.pnl) as avg_pnl
                 FROM strategies s
                 LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
-                WHERE s.final_score >= 40
+                WHERE (s.id LIKE 'STRAT_%' OR COUNT(t.id) > 0)
                 GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
                          s.final_score, s.created_at, s.generation, s.cycle
-                ORDER BY s.final_score DESC, s.created_at DESC
+                ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
                 LIMIT %s
             ''', (max_display_strategies,))
             
