@@ -3915,9 +3915,16 @@ class QuantitativeService:
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             
             if result:
-                generation = result[0] if isinstance(result, tuple) else result.get('generation', 1)
-                round_num = result[1] if isinstance(result, tuple) else result.get('round', 1)
-                evolution_type = result[2] if isinstance(result, tuple) else result.get('evolution_type', 'initial')
+                # PostgreSQL通过RealDictCursor返回字典格式
+                if isinstance(result, dict):
+                    generation = result.get('generation', 1)
+                    round_num = result.get('round', 1)
+                    evolution_type = result.get('evolution_type', 'initial')
+                else:
+                    # 备用处理（不太可能执行到这里）
+                    generation = result[0] if len(result) > 0 else 1
+                    round_num = result[1] if len(result) > 1 else 1
+                    evolution_type = result[2] if len(result) > 2 else 'initial'
                 
                 if evolution_type == 'initial':
                     return f"初代策略"
