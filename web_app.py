@@ -197,7 +197,8 @@ def calculate_strategy_profit_factor(strategy_id, winning_trades, losing_trades)
         result = cursor.fetchone()
         conn.close()
         
-        if result and result[0] and result[1]:
+        # 🔥 修复：安全访问tuple元素，防止index out of range错误
+        if result and len(result) >= 2 and result[0] and result[1]:
             total_profit = float(result[0])
             total_loss = float(result[1])
             if total_loss > 0:
@@ -1344,7 +1345,7 @@ def quantitative_strategies():
                         LIMIT 1
                     """, (sid,))
                     latest_gen = cursor.fetchone()
-                    if latest_gen and latest_gen[0]:
+                    if latest_gen and len(latest_gen) >= 2 and latest_gen[0]:
                         latest_generation = latest_gen[0]
                         latest_cycle = latest_gen[1] or 1
                         evolution_display = f"第{latest_generation}代第{latest_cycle}轮"
@@ -2683,7 +2684,8 @@ def get_operations_log():
             
             # 检查是否有真实日志
             cursor.execute("SELECT COUNT(*) FROM operation_logs")
-            log_count = cursor.fetchone()[0]
+            log_result = cursor.fetchone()
+            log_count = log_result[0] if log_result else 0
             
             # 🔥 修复：直接从数据库获取真实日志，不生成假数据
             
@@ -2720,7 +2722,8 @@ def get_operations_log():
             # 计算总数
             count_query = f"SELECT COUNT(*) FROM operation_logs {where_clause}"
             cursor.execute(count_query, params)
-            total_count = cursor.fetchone()[0]
+            total_result = cursor.fetchone()
+            total_count = total_result[0] if total_result else 0
             
             # 检查并添加缺失的字段
             try:
@@ -2754,13 +2757,16 @@ def get_operations_log():
             
             # 计算统计信息
             cursor.execute("SELECT COUNT(*) FROM operation_logs WHERE result = 'success'")
-            success_count = cursor.fetchone()[0] or 0
+            success_result = cursor.fetchone()
+            success_count = success_result[0] if success_result else 0
             
             cursor.execute("SELECT COUNT(*) FROM operation_logs WHERE result = 'failed'")
-            error_count = cursor.fetchone()[0] or 0
+            error_result = cursor.fetchone()
+            error_count = error_result[0] if error_result else 0
             
             cursor.execute("SELECT COUNT(*) FROM operation_logs WHERE result = 'warning'")
-            warning_count = cursor.fetchone()[0] or 0
+            warning_result = cursor.fetchone()
+            warning_count = warning_result[0] if warning_result else 0
             
             conn.close()
             
