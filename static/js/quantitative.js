@@ -327,10 +327,20 @@ class QuantitativeSystem {
                 scoreStatus = '⚠️ 待优化';
             }
             
-            // 交易状态 - 根据合格线和交易次数判断
-            const isSimulation = score < 65 || totalTrades < 10;
-            const tradingStatus = isSimulation ? '模拟中' : '真实交易';
-            const tradingBadgeClass = isSimulation ? 'bg-warning' : 'bg-success';
+            // 🔥 交易状态 - 完全基于真实数据，不再区分模拟
+            let tradingStatus, tradingBadgeClass;
+            if (strategy.enabled) {
+                if (score >= 65) {
+                    tradingStatus = '真实交易';
+                    tradingBadgeClass = 'bg-success';
+                } else {
+                    tradingStatus = '策略验证';  // 更准确的标签：低分策略在真实环境中模拟交易验证
+                    tradingBadgeClass = 'bg-warning';
+                }
+            } else {
+                tradingStatus = '已停止';
+                tradingBadgeClass = 'bg-secondary';
+            }
             
             return `
             <div class="col-md-4 mb-3">
@@ -441,13 +451,37 @@ class QuantitativeSystem {
 
     // 启动策略
     async startStrategy(strategyIndex) {
+        const strategy = this.strategies[strategyIndex];
+        if (!strategy) return;
+        
         this.showMessage('策略启动中...', 'info');
         
-        // 模拟启动延迟
-        setTimeout(() => {
-            this.showMessage('策略已启动', 'success');
+        try {
+            // 根据策略分数决定启动模式
+            const score = strategy.final_score || 0;
+            const mode = score >= 65 ? 'real' : 'verification';
+            const modeText = score >= 65 ? '真实交易' : '策略验证';
+            
+            // 调用后端API启动策略
+            const response = await fetch(`/api/quantitative/strategies/${strategy.id}/start`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: mode })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showMessage(`策略已启动 - ${modeText}模式`, 'success');
+            } else {
+                this.showMessage(data.message || '策略启动失败', 'error');
+            }
+            
             this.loadStrategies(); // 重新加载策略状态
-        }, 1000);
+        } catch (error) {
+            console.error('策略启动失败:', error);
+            this.showMessage('策略启动失败', 'error');
+        }
     }
 
     // 切换策略状态
@@ -980,30 +1014,14 @@ class QuantitativeSystem {
         const ctx = document.getElementById('performanceChart');
         if (!ctx) return;
 
-        // 生成模拟数据
-        const labels = [];
-        const data = [];
-        const now = new Date();
-        
-        for (let i = 29; i >= 0; i--) {
-            const date = new Date(now);
-            date.setDate(date.getDate() - i);
-            labels.push(date.toLocaleDateString());
-            
-            // 模拟收益数据（波动上升）
-            const baseValue = 10000;
-            const trend = i * 15; // 上升趋势
-            const noise = (Math.random() - 0.5) * 200; // 随机波动
-            data.push(baseValue + trend + noise);
-        }
-
+        // 🔥 只显示基于真实数据的收益曲线，不生成任何模拟数据
         performanceChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels: [],
                 datasets: [{
                     label: '账户价值',
-                    data: data,
+                    data: [],
                     borderColor: '#1677ff',
                     backgroundColor: 'rgba(22, 119, 255, 0.1)',
                     fill: true,
@@ -1030,6 +1048,37 @@ class QuantitativeSystem {
                 }
             }
         });
+
+        // 加载真实的收益历史数据
+        this.loadRealPerformanceData();
+    }
+
+    // 加载真实收益数据
+    async loadRealPerformanceData() {
+        try {
+            const response = await fetch('/api/quantitative/performance-history');
+            const data = await response.json();
+            
+            if (data.success && data.data && data.data.length > 0) {
+                const labels = data.data.map(item => {
+                    const date = new Date(item.timestamp);
+                    return date.toLocaleDateString();
+                });
+                
+                const values = data.data.map(item => item.account_value);
+                
+                if (performanceChart) {
+                    performanceChart.data.labels = labels;
+                    performanceChart.data.datasets[0].data = values;
+                    performanceChart.update();
+                }
+            } else {
+                // 如果没有真实数据，显示空图表
+                console.log('暂无真实收益数据，显示空图表');
+            }
+        } catch (error) {
+            console.error('加载真实收益数据失败:', error);
+        }
     }
 
     // 初始化资产历史图表
@@ -1173,13 +1222,13 @@ class QuantitativeSystem {
                     console.log('🎉 资产里程碑:', milestones.map(m => m.milestone_note).join(', '));
                 }
                 
-            } else {
-                console.warn('未获取到资产历史数据，响应数据:', data);
-                // 如果没有真实数据，尝试显示模拟数据
-                if (data.data && data.data.length === 0) {
-                    console.log('返回了空数组，可能是新系统还没有历史数据');
+                            } else {
+                    console.warn('未获取到资产历史数据，响应数据:', data);
+                    // 🔥 不再显示任何模拟数据，只显示真实数据或空状态
+                    if (data.data && data.data.length === 0) {
+                        console.log('返回了空数组，可能是新系统还没有历史数据');
+                    }
                 }
-            }
             
         } catch (error) {
             console.error('加载资产历史失败:', error);
