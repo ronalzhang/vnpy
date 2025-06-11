@@ -2448,7 +2448,7 @@ class QuantitativeService:
         # ⭐ 使用DatabaseManager初始化数据库
         if hasattr(self, 'db_manager') and hasattr(self.db_manager, 'init_database'):
             self.db_manager.init_database()
-                else:
+        else:
             # 如果没有db_manager，使用传统方式
             db_manager = DatabaseManager()
             db_manager.init_database()
@@ -3499,12 +3499,12 @@ class QuantitativeService:
                         estimated_pnl = quantity * price * 0.015  # 假设1.5%收益
                     
                     # 记录交易日志
-            self.log_strategy_trade(
-                strategy_id=strategy_id,
+                    self.log_strategy_trade(
+                        strategy_id=strategy_id,
                         signal_type=signal_type,
                         price=price,
                         quantity=quantity,
-                confidence=confidence,
+                        confidence=confidence,
                         executed=1,  # 标记为已执行
                         pnl=estimated_pnl
                     )
