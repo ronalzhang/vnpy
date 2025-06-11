@@ -1326,6 +1326,9 @@ def quantitative_strategies():
                 calculated_wins = trade_stats[1] if trade_stats else 0
                 win_rate = (calculated_wins / calculated_total_trades * 100) if calculated_total_trades > 0 else 0
                 
+                # 🔧 调试输出
+                print(f"📊 策略列表API - {sid}: 已执行={calculated_total_trades}, 盈利={calculated_wins}, 计算成功率={win_rate:.2f}%")
+                
                 # 🔥 修复：使用数据库中真实的代数，不要人为放大
                 try:
                     cursor.execute("""
@@ -1709,6 +1712,9 @@ def strategy_detail(strategy_id):
             total_trades = trade_stats[0] if trade_stats else 0
             wins = trade_stats[1] if trade_stats else 0
             calculated_win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+            
+            # 🔧 调试输出
+            print(f"📊 策略详情API - {strategy_id}: 已执行={total_trades}, 盈利={wins}, 计算成功率={calculated_win_rate:.2f}%")
             
             strategy = {
                 'id': row[0],
