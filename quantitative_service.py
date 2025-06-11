@@ -3933,19 +3933,14 @@ class QuantitativeService:
     def get_strategies(self):
         """获取完整ID格式的策略 - 优先显示有交易记录的STRAT_策略"""
         try:
-            # 🔥 修复：只显示完整ID格式的策略，优先显示有交易记录的策略
+            # 🔥 修复：简化查询，只显示完整ID格式的策略
             query = """
-            SELECT s.id, s.name, s.symbol, s.type, s.enabled, s.parameters, 
-                   s.final_score, s.win_rate, s.total_return, s.total_trades,
-                   s.created_at, s.updated_at,
-                   COUNT(t.id) as actual_trades
-            FROM strategies s
-            LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
-            WHERE s.id LIKE 'STRAT_%'
-            GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.parameters,
-                     s.final_score, s.win_rate, s.total_return, s.total_trades,
-                     s.created_at, s.updated_at
-            ORDER BY COUNT(t.id) DESC, s.final_score DESC
+            SELECT id, name, symbol, type, enabled, parameters,
+                   final_score, win_rate, total_return, total_trades,
+                   created_at, updated_at
+            FROM strategies 
+            WHERE id LIKE 'STRAT_%'
+            ORDER BY final_score DESC, total_trades DESC
             LIMIT 50
             """
             
