@@ -3925,6 +3925,8 @@ class QuantitativeService:
     def get_strategies(self):
         """获取完整ID格式的策略 - 优先显示有交易记录的STRAT_策略"""
         try:
+            print("🔍 开始执行策略查询...")
+            
             # 🔥 修复：回到使用包装方法，但确保参数正确
             query = """
                 SELECT id, name, symbol, type, enabled, parameters, 
@@ -3935,7 +3937,9 @@ class QuantitativeService:
                 ORDER BY final_score DESC, total_trades DESC
                 LIMIT 50
             """
+            print("🔍 执行数据库查询...")
             rows = self.db_manager.execute_query(query, fetch_all=True)
+            print(f"🔍 查询完成，获得 {len(rows) if rows else 0} 条记录")
             
             if not rows:
                 print("⚠️ 没有找到STRAT_格式的策略，数据库可能存在问题")
@@ -4032,6 +4036,7 @@ class QuantitativeService:
             
         except Exception as e:
             print(f"❌ 查询策略列表失败: {e}")
+            print(f"错误类型: {type(e).__name__}")
             import traceback
             traceback.print_exc()
             return {'success': False, 'error': str(e), 'data': []}
