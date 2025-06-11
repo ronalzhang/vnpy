@@ -3476,7 +3476,7 @@ class QuantitativeService:
         try:
             # 获取未执行的信号
             query = "SELECT * FROM trading_signals WHERE executed = 0 ORDER BY timestamp DESC LIMIT 10"
-            signals = self.db_manager.execute_query(query, fetch_all=True)
+            signals = self.db_manager.execute_query(query, params=(), fetch_all=True)
             
             if not signals:
                 return 0
