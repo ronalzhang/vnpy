@@ -344,86 +344,149 @@ def test_full_strategy_api_simulation():
         
         max_display_strategies = 30
         
-        cursor.execute('''
-            SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
-                   s.created_at, s.generation, s.cycle,
-                   COUNT(t.id) as total_trades,
-                   COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
-                   SUM(t.pnl) as total_pnl,
-                   AVG(t.pnl) as avg_pnl
-            FROM strategies s
-            LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
-            WHERE s.id LIKE 'STRAT_%'
-            GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
-                     s.final_score, s.created_at, s.generation, s.cycle
-            ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
-            LIMIT %s
-        ''', (max_display_strategies,))
+        print("🔧 准备执行主查询...")
+        try:
+            cursor.execute('''
+                SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
+                       s.created_at, s.generation, s.cycle,
+                       COUNT(t.id) as total_trades,
+                       COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
+                       SUM(t.pnl) as total_pnl,
+                       AVG(t.pnl) as avg_pnl
+                FROM strategies s
+                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+                WHERE s.id LIKE 'STRAT_%'
+                GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
+                         s.final_score, s.created_at, s.generation, s.cycle
+                ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
+                LIMIT %s
+            ''', (max_display_strategies,))
+            print("✅ 主查询执行成功")
+        except Exception as query_error:
+            print(f"❌ 主查询执行失败: {query_error}")
+            traceback.print_exc()
+            return {"status": "error", "message": f"主查询失败: {query_error}"}
         
-        rows = cursor.fetchall()
+        try:
+            rows = cursor.fetchall()
+            print(f"✅ 主查询结果获取成功，共 {len(rows)} 条记录")
+        except Exception as fetch_error:
+            print(f"❌ 主查询结果获取失败: {fetch_error}")
+            traceback.print_exc()
+            return {"status": "error", "message": f"结果获取失败: {fetch_error}"}
+        
         strategies = []
-        
         print(f"🔧 开始处理 {len(rows)} 个策略...")
         
         for i, row in enumerate(rows):
             print(f"\n   策略 {i+1}/{len(rows)}:")
+            print(f"     🔍 行数据长度: {len(row)}")
+            print(f"     🔍 行数据类型: {type(row)}")
             
             try:
+                print("     🔧 开始解包主查询结果...")
+                if len(row) < 14:
+                    print(f"     ❌ 行数据长度不足: 期望14，实际{len(row)}")
+                    print(f"     🔍 实际数据: {row}")
+                    continue
+                
                 sid, name, symbol, stype, params, enabled, score, created_at, generation, cycle, \
                 total_trades, wins, total_pnl, avg_pnl = row
                 
                 print(f"     ✅ 基本数据解包成功: {sid}")
                 
                 # 子查询测试
-                cursor.execute("""
-                    SELECT COUNT(*) as executed_trades,
-                           COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
-                    FROM strategy_trade_logs
-                    WHERE strategy_id = %s AND executed = true
-                """, (sid,))
+                print("     🔧 开始执行子查询...")
+                try:
+                    cursor.execute("""
+                        SELECT COUNT(*) as executed_trades,
+                               COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
+                        FROM strategy_trade_logs
+                        WHERE strategy_id = %s AND executed = true
+                    """, (sid,))
+                    print("     ✅ 子查询执行成功")
+                except Exception as subquery_error:
+                    print(f"     ❌ 子查询执行失败: {subquery_error}")
+                    traceback.print_exc()
+                    continue
                 
-                trade_stats = cursor.fetchone()
+                try:
+                    trade_stats = cursor.fetchone()
+                    print(f"     ✅ 子查询结果获取成功: {trade_stats}")
+                except Exception as subfetch_error:
+                    print(f"     ❌ 子查询结果获取失败: {subfetch_error}")
+                    traceback.print_exc()
+                    continue
                 
                 if trade_stats and len(trade_stats) >= 2:
                     calculated_total_trades = trade_stats[0]
                     calculated_wins = trade_stats[1] 
                     win_rate = (calculated_wins / calculated_total_trades * 100) if calculated_total_trades > 0 else 0
-                    print(f"     ✅ 子查询成功: 交易={calculated_total_trades}, 胜率={win_rate:.2f}%")
+                    print(f"     ✅ 子查询数据解析成功: 交易={calculated_total_trades}, 胜率={win_rate:.2f}%")
                 else:
                     calculated_total_trades = 0
                     calculated_wins = 0
                     win_rate = 0
-                    print(f"     ⚠️ 子查询无数据")
+                    print(f"     ⚠️ 子查询无数据或数据长度不足")
                 
                 # 计算函数测试
                 print(f"     🔧 开始计算函数测试...")
-                sharpe_ratio = calculate_strategy_sharpe_ratio(sid, calculated_total_trades)
-                max_drawdown = calculate_strategy_max_drawdown(sid)
-                profit_factor = calculate_strategy_profit_factor(sid, calculated_wins, calculated_total_trades - calculated_wins)
-                volatility = calculate_strategy_volatility(sid)
+                try:
+                    sharpe_ratio = calculate_strategy_sharpe_ratio(sid, calculated_total_trades)
+                    print(f"     ✅ 夏普比率计算完成: {sharpe_ratio}")
+                except Exception as sharpe_error:
+                    print(f"     ❌ 夏普比率计算失败: {sharpe_error}")
+                    sharpe_ratio = 0.0
                 
-                print(f"     ✅ 计算完成: 夏普={sharpe_ratio:.4f}, 回撤={max_drawdown:.4f}, 盈亏比={profit_factor:.2f}, 波动率={volatility:.4f}")
+                try:
+                    max_drawdown = calculate_strategy_max_drawdown(sid)
+                    print(f"     ✅ 最大回撤计算完成: {max_drawdown}")
+                except Exception as drawdown_error:
+                    print(f"     ❌ 最大回撤计算失败: {drawdown_error}")
+                    max_drawdown = 0.0
+                
+                try:
+                    profit_factor = calculate_strategy_profit_factor(sid, calculated_wins, calculated_total_trades - calculated_wins)
+                    print(f"     ✅ 盈亏比计算完成: {profit_factor}")
+                except Exception as profit_error:
+                    print(f"     ❌ 盈亏比计算失败: {profit_error}")
+                    profit_factor = 0.0
+                
+                try:
+                    volatility = calculate_strategy_volatility(sid)
+                    print(f"     ✅ 波动率计算完成: {volatility}")
+                except Exception as vol_error:
+                    print(f"     ❌ 波动率计算失败: {vol_error}")
+                    volatility = 0.0
+                
+                print(f"     ✅ 所有计算完成: 夏普={sharpe_ratio:.4f}, 回撤={max_drawdown:.4f}, 盈亏比={profit_factor:.2f}, 波动率={volatility:.4f}")
                 
                 # 构建策略对象
-                strategy = {
-                    'id': sid,
-                    'name': name,
-                    'symbol': symbol,
-                    'type': stype,
-                    'enabled': bool(enabled),
-                    'final_score': float(score) if score else 0.0,
-                    'total_trades': calculated_total_trades,
-                    'win_rate': round(win_rate, 2),
-                    'total_pnl': float(total_pnl) if total_pnl else 0.0,
-                    'avg_pnl': float(avg_pnl) if avg_pnl else 0.0,
-                    'sharpe_ratio': round(sharpe_ratio, 4),
-                    'max_drawdown': round(max_drawdown, 4),
-                    'profit_factor': round(profit_factor, 2),
-                    'volatility': round(volatility, 4)
-                }
-                
-                strategies.append(strategy)
-                print(f"     ✅ 策略对象构建成功")
+                print("     🔧 开始构建策略对象...")
+                try:
+                    strategy = {
+                        'id': sid,
+                        'name': name,
+                        'symbol': symbol,
+                        'type': stype,
+                        'enabled': bool(enabled),
+                        'final_score': float(score) if score else 0.0,
+                        'total_trades': calculated_total_trades,
+                        'win_rate': round(win_rate, 2),
+                        'total_pnl': float(total_pnl) if total_pnl else 0.0,
+                        'avg_pnl': float(avg_pnl) if avg_pnl else 0.0,
+                        'sharpe_ratio': round(sharpe_ratio, 4),
+                        'max_drawdown': round(max_drawdown, 4),
+                        'profit_factor': round(profit_factor, 2),
+                        'volatility': round(volatility, 4)
+                    }
+                    
+                    strategies.append(strategy)
+                    print(f"     ✅ 策略对象构建成功")
+                except Exception as build_error:
+                    print(f"     ❌ 策略对象构建失败: {build_error}")
+                    traceback.print_exc()
+                    continue
                 
             except Exception as e:
                 print(f"     ❌ 策略处理失败: {e}")
