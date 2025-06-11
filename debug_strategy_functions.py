@@ -344,9 +344,10 @@ def test_full_strategy_api_simulation():
         
         max_display_strategies = 30
         
-        print("🔧 准备执行主查询...")
+        print("🔧 准备执行主查询（使用字符串格式化）...")
         try:
-            cursor.execute('''
+            # 🔥 使用字符串格式化替代参数绑定，避免tuple index out of range错误
+            query = f'''
                 SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
                        s.created_at, s.generation, s.cycle,
                        COUNT(t.id) as total_trades,
@@ -359,8 +360,9 @@ def test_full_strategy_api_simulation():
                 GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
                          s.final_score, s.created_at, s.generation, s.cycle
                 ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
-                LIMIT %s
-            ''', (max_display_strategies,))
+                LIMIT {max_display_strategies}
+            '''
+            cursor.execute(query)
             print("✅ 主查询执行成功")
         except Exception as query_error:
             print(f"❌ 主查询执行失败: {query_error}")
