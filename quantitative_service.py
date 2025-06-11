@@ -3959,8 +3959,9 @@ class QuantitativeService:
             
             strategies_list = []
             
-            for row in rows or []:
+            for idx, row in enumerate(rows or []):
                 try:
+                    print(f"处理第{idx+1}行数据...")  # 添加处理进度
                     # PostgreSQL返回字典格式
                     if isinstance(row, dict):
                         # 🔧 正确解析parameters字段
@@ -4032,7 +4033,10 @@ class QuantitativeService:
                     strategies_list.append(strategy_data)
                     
                 except Exception as e:
-                    print(f"⚠️ 解析策略数据失败: {e}, row: {row}")
+                    print(f"⚠️ 解析第{idx+1}行策略数据失败: {e}")
+                    print(f"错误行数据: {row}")
+                    import traceback
+                    traceback.print_exc()
                     continue
             
             print(f"✅ 从PostgreSQL查询到 {len(strategies_list)} 个策略")
