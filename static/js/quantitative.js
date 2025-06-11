@@ -710,9 +710,10 @@ class QuantitativeSystem {
                                        class="form-check-input" 
                                        name="${config.key}"
                                        id="${config.key}_switch"
+                                       onchange="updateSwitchLabel('${config.key}_switch')"
                                        ${value ? 'checked' : ''}>
                                 <label class="form-check-label" for="${config.key}_switch">
-                                    <span class="text-success" style="font-size: 12px;">${value ? '启用' : '禁用'}</span>
+                                    <span id="${config.key}_label" class="${value ? 'text-success' : 'text-muted'}" style="font-size: 12px;">${value ? '启用' : '禁用'}</span>
                                 </label>
                             </div>
                         </div>
@@ -1962,6 +1963,20 @@ function changeLogsPage(page) {
     
     app.logsCurrentPage = page;
     renderLogsPage();
+}
+
+// 🔧 修复开关标签更新问题
+function updateSwitchLabel(switchId) {
+    const checkbox = document.getElementById(switchId);
+    const labelId = switchId.replace('_switch', '_label');
+    const label = document.getElementById(labelId);
+    
+    if (checkbox && label) {
+        const isChecked = checkbox.checked;
+        label.textContent = isChecked ? '启用' : '禁用';
+        label.className = isChecked ? 'text-success' : 'text-muted';
+        label.style.fontSize = '12px';
+    }
 }
 
 // 页面加载完成后初始化
