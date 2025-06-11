@@ -7760,7 +7760,7 @@ class EvolutionaryStrategyEngine:
             
             # 🔧 新策略必须通过初始化验证才能参与进化
             print(f"🎯 开始新策略初始化验证: {strategy_config['name']}")
-            validation_passed = self.quantitative_service._force_strategy_initialization_validation(strategy_id)
+            validation_passed = self._force_strategy_initialization_validation(strategy_id)
             
             if validation_passed:
                 print(f"✅ 策略{strategy_id[-4:]}初始化验证成功，已加入进化池")
@@ -7822,6 +7822,12 @@ class EvolutionaryStrategyEngine:
             current_params = strategy.get('parameters', {})
             fitness = strategy.get('fitness', 50)
             strategy_name = strategy.get('name', 'Unknown')
+            strategy_enabled = strategy.get('enabled', True)
+            
+            # 🚨 重要检查：只优化启用的策略
+            if not strategy_enabled:
+                print(f"⏸️ 策略{strategy_id[-4:]} {strategy_name} 已停用，跳过参数优化")
+                return
             
             print(f"🔧 开始策略参数优化闭环: {strategy_name} (ID: {strategy_id[-4:]}, 当前适应度: {fitness:.1f})")
             
