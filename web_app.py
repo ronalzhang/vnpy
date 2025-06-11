@@ -1299,9 +1299,10 @@ def quantitative_strategies():
                        AVG(t.pnl) as avg_pnl
                 FROM strategies s
                 LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
-                WHERE (s.id LIKE 'STRAT_%' OR COUNT(t.id) > 0)
+                WHERE s.id LIKE 'STRAT_%'
                 GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
                          s.final_score, s.created_at, s.generation, s.cycle
+                HAVING COUNT(t.id) > 0 OR s.final_score >= 40
                 ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
                 LIMIT %s
             ''', (max_display_strategies,))
