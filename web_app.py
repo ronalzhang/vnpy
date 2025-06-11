@@ -1848,12 +1848,12 @@ def toggle_strategy(strategy_id):
         strategy_name = row[1]
         new_enabled = not current_enabled
         
-        # 更新状态
+        # 更新状态 - 转换boolean为integer
         cursor.execute("""
             UPDATE strategies 
             SET enabled = %s, updated_at = CURRENT_TIMESTAMP 
             WHERE id = %s
-        """, (new_enabled, strategy_id))
+        """, (1 if new_enabled else 0, strategy_id))
         
         conn.commit()
         conn.close()
