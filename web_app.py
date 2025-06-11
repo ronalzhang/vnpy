@@ -2046,7 +2046,7 @@ def get_quantitative_positions():
         ]
         
         return jsonify({
-            "status": "success",
+            "success": True,
             "data": positions
         })
     except Exception as e:
