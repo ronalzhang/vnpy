@@ -3871,7 +3871,7 @@ class QuantitativeService:
                        AVG(pnl) as avg_pnl,
                        SUM(pnl) as total_pnl
                 FROM strategy_trade_logs 
-                WHERE strategy_id = %s AND timestamp > datetime('now', '-7 days')
+                WHERE strategy_id = %s AND timestamp > NOW() - INTERVAL '7 days'
             ''', (strategy_id,))
             
             result = cursor.fetchone()
@@ -7768,7 +7768,7 @@ class EvolutionaryStrategyEngine:
                 print(f"❌ 策略{strategy_id[-4:]}初始化验证失败，将被移除")
                 # 验证失败的策略不参与进化
                 self.quantitative_service.db_manager.execute_query(
-                    "UPDATE strategies SET enabled = false, status = 'validation_failed' WHERE id = %s",
+                    "UPDATE strategies SET enabled = 0, status = 'validation_failed' WHERE id = %s",
                     (strategy_id,)
                 )
                 return False
