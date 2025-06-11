@@ -507,8 +507,104 @@ def test_full_strategy_api_simulation():
         traceback.print_exc()
         return {"status": "error", "message": f"完整测试失败: {e}"}
 
+def test_sql_parameter_issue():
+    """测试SQL查询参数问题"""
+    print("\n🔧 开始测试SQL查询参数问题...")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 测试1: 简单查询
+        print("   测试1: 简单无参数查询...")
+        try:
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE id LIKE 'STRAT_%'")
+            result = cursor.fetchone()
+            print(f"   ✅ 简单查询成功: {result}")
+        except Exception as e:
+            print(f"   ❌ 简单查询失败: {e}")
+            traceback.print_exc()
+        
+        # 测试2: 带参数查询
+        print("   测试2: 带参数查询...")
+        try:
+            max_strategies = 30
+            print(f"   🔍 参数值: {max_strategies}")
+            print(f"   🔍 参数类型: {type(max_strategies)}")
+            print(f"   🔍 参数元组: {(max_strategies,)}")
+            print(f"   🔍 参数元组类型: {type((max_strategies,))}")
+            
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE id LIKE 'STRAT_%' LIMIT %s", (max_strategies,))
+            result = cursor.fetchone()
+            print(f"   ✅ 带参数查询成功: {result}")
+        except Exception as e:
+            print(f"   ❌ 带参数查询失败: {e}")
+            traceback.print_exc()
+        
+        # 测试3: 完整主查询（不带参数）
+        print("   测试3: 完整主查询（不带参数）...")
+        try:
+            cursor.execute('''
+                SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
+                       s.created_at, s.generation, s.cycle,
+                       COUNT(t.id) as total_trades,
+                       COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
+                       SUM(t.pnl) as total_pnl,
+                       AVG(t.pnl) as avg_pnl
+                FROM strategies s
+                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+                WHERE s.id LIKE 'STRAT_%'
+                GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
+                         s.final_score, s.created_at, s.generation, s.cycle
+                ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
+                LIMIT 5
+            ''')
+            result = cursor.fetchall()
+            print(f"   ✅ 完整查询(无参数)成功: 获得{len(result)}条记录")
+        except Exception as e:
+            print(f"   ❌ 完整查询(无参数)失败: {e}")
+            traceback.print_exc()
+        
+        # 测试4: 完整主查询（带参数）
+        print("   测试4: 完整主查询（带参数）...")
+        try:
+            max_strategies = 30
+            cursor.execute('''
+                SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
+                       s.created_at, s.generation, s.cycle,
+                       COUNT(t.id) as total_trades,
+                       COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
+                       SUM(t.pnl) as total_pnl,
+                       AVG(t.pnl) as avg_pnl
+                FROM strategies s
+                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+                WHERE s.id LIKE 'STRAT_%'
+                GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
+                         s.final_score, s.created_at, s.generation, s.cycle
+                ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
+                LIMIT %s
+            ''', (max_strategies,))
+            result = cursor.fetchall()
+            print(f"   ✅ 完整查询(带参数)成功: 获得{len(result)}条记录")
+        except Exception as e:
+            print(f"   ❌ 完整查询(带参数)失败: {e}")
+            traceback.print_exc()
+        
+        conn.close()
+        
+        return {"status": "success", "message": "SQL参数测试完成"}
+        
+    except Exception as e:
+        print(f"❌ SQL参数测试失败: {e}")
+        traceback.print_exc()
+        return {"status": "error", "message": f"SQL参数测试失败: {e}"}
+
 if __name__ == "__main__":
     print("🚀 开始策略计算函数深度调试...")
+    
+    # 测试0: SQL参数问题
+    result0 = test_sql_parameter_issue()
+    print(f"\nSQL参数测试结果: {result0}")
     
     # 测试1: 基本查询
     result1 = test_strategy_query()
