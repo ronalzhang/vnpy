@@ -15,6 +15,134 @@ def get_db_connection():
         password='123abc74531'
     )
 
+def calculate_strategy_sharpe_ratio(strategy_id, total_trades):
+    """计算策略夏普比率"""
+    try:
+        if total_trades < 5:  # 交易次数太少无法计算准确的夏普比率
+            return 0.0
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取策略的PnL数据
+        cursor.execute("""
+            SELECT pnl FROM strategy_trade_logs 
+            WHERE strategy_id = %s 
+            ORDER BY timestamp DESC 
+            LIMIT 100
+        """, (strategy_id,))
+        
+        pnl_data = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        if len(pnl_data) < 5:
+            return 0.0
+        
+        # 计算收益率的平均值和标准差
+        import statistics
+        mean_return = statistics.mean(pnl_data)
+        if len(pnl_data) > 1:
+            std_return = statistics.stdev(pnl_data)
+            if std_return > 0:
+                return mean_return / std_return
+        
+        return 0.0
+        
+    except Exception as e:
+        print(f"计算夏普比率失败: {e}")
+        return 0.0
+
+def calculate_strategy_profit_factor(strategy_id, winning_trades, losing_trades):
+    """计算策略盈亏比"""
+    try:
+        if losing_trades == 0:  # 没有亏损交易
+            return 999.0 if winning_trades > 0 else 0.0
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取盈利和亏损总额
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN pnl > 0 THEN pnl ELSE 0 END) as total_profit,
+                SUM(CASE WHEN pnl < 0 THEN ABS(pnl) ELSE 0 END) as total_loss
+            FROM strategy_trade_logs 
+            WHERE strategy_id = %s
+        """, (strategy_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        # 🔥 修复：安全访问tuple元素，防止index out of range错误
+        if result and len(result) >= 2:
+            total_profit = float(result[0]) if result[0] else 0.0
+            total_loss = float(result[1]) if result[1] else 0.0
+            if total_loss > 0:
+                return total_profit / total_loss
+                
+        return 0.0
+        
+    except Exception as e:
+        print(f"计算盈亏比失败: {e}")
+        return 0.0
+
+def test_calculation_functions():
+    """测试计算函数"""
+    print("\n步骤6: 测试计算函数...")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取第一个策略进行测试
+        cursor.execute("SELECT id FROM strategies WHERE id LIKE 'STRAT_%' LIMIT 1")
+        strategy_result = cursor.fetchone()
+        
+        if not strategy_result:
+            print("    ❌ 没有找到策略进行测试")
+            return
+            
+        test_strategy_id = strategy_result[0]
+        print(f"    🔍 测试策略: {test_strategy_id}")
+        
+        # 获取交易统计数据
+        cursor.execute("""
+            SELECT COUNT(*) as total_trades,
+                   COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins,
+                   COUNT(CASE WHEN pnl <= 0 THEN 1 END) as losses
+            FROM strategy_trade_logs
+            WHERE strategy_id = %s AND executed = true
+        """, (test_strategy_id,))
+        
+        trade_stats = cursor.fetchone()
+        total_trades = trade_stats[0] if trade_stats else 0
+        wins = trade_stats[1] if trade_stats and len(trade_stats) > 1 else 0
+        losses = trade_stats[2] if trade_stats and len(trade_stats) > 2 else 0
+        
+        print(f"    📊 交易统计: 总数={total_trades}, 盈利={wins}, 亏损={losses}")
+        
+        # 测试夏普比率计算
+        try:
+            sharpe_ratio = calculate_strategy_sharpe_ratio(test_strategy_id, total_trades)
+            print(f"    ✅ 夏普比率计算成功: {sharpe_ratio}")
+        except Exception as e:
+            print(f"    ❌ 夏普比率计算失败: {e}")
+            traceback.print_exc()
+        
+        # 测试盈亏比计算
+        try:
+            profit_factor = calculate_strategy_profit_factor(test_strategy_id, wins, losses)
+            print(f"    ✅ 盈亏比计算成功: {profit_factor}")
+        except Exception as e:
+            print(f"    ❌ 盈亏比计算失败: {e}")
+            traceback.print_exc()
+        
+        conn.close()
+        
+    except Exception as e:
+        print(f"    ❌ 计算函数测试失败: {e}")
+        traceback.print_exc()
+
 def test_strategies_api_step_by_step():
     """逐步测试策略API的每个步骤"""
     print("🔧 开始逐步测试策略API...")
@@ -116,6 +244,9 @@ def test_strategies_api_step_by_step():
             except Exception as e:
                 print(f"  ❌ 策略 {i+1} 处理失败: {e}")
                 traceback.print_exc()
+        
+        # 新增：测试计算函数
+        test_calculation_functions()
         
         conn.close()
         print("\n🎉 测试完成！")
