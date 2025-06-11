@@ -849,7 +849,7 @@ class QuantitativeSystem {
         }
     }
 
-    // 加载交易日志
+    // 🔧 新增：加载分类交易日志 - 支持验证交易和真实交易分类显示
     async loadTradeLogs(strategyId) {
         try {
             const response = await fetch(`/api/quantitative/strategies/${strategyId}/trade-logs`);
@@ -858,19 +858,67 @@ class QuantitativeSystem {
             const tbody = document.getElementById('tradeLogsTable');
             
             if (data.success && data.logs && data.logs.length > 0) {
-                tbody.innerHTML = data.logs.map(log => `
-                    <tr>
-                        <td>${this.formatTime(log.timestamp)}</td>
-                        <td><span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">${log.signal_type.toUpperCase()}</span></td>
-                        <td>${log.price.toFixed(6)}</td>
-                        <td>${log.quantity.toFixed(6)}</td>
-                        <td>${(log.confidence * 100).toFixed(1)}%</td>
-                        <td>${log.executed ? '<span class="badge bg-success">已执行</span>' : '<span class="badge bg-secondary">未执行</span>'}</td>
-                        <td class="${log.pnl && log.pnl >= 0 ? 'text-success' : 'text-danger'}">
-                            ${log.pnl ? (log.pnl >= 0 ? '+' : '') + log.pnl.toFixed(6) + 'U' : '-'}
+                // 🔧 分类交易日志
+                const realTrades = data.logs.filter(log => 
+                    !log.trade_type || log.trade_type === 'real_trading'
+                );
+                const validationTrades = data.logs.filter(log => 
+                    log.trade_type === 'optimization_validation' || 
+                    log.trade_type === 'initialization_validation'
+                );
+                
+                tbody.innerHTML = [
+                    // 显示真实交易
+                    ...realTrades.map(log => `
+                        <tr class="real-trade-row">
+                            <td>
+                                <span class="badge bg-primary me-1">真实</span>
+                                ${this.formatTime(log.timestamp)}
+                            </td>
+                            <td><span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">${log.signal_type.toUpperCase()}</span></td>
+                            <td>${log.price.toFixed(6)}</td>
+                            <td>${log.quantity.toFixed(6)}</td>
+                            <td>${(log.confidence * 100).toFixed(1)}%</td>
+                            <td>${log.executed ? '<span class="badge bg-success">已执行</span>' : '<span class="badge bg-secondary">未执行</span>'}</td>
+                            <td class="${log.pnl && log.pnl >= 0 ? 'text-success' : 'text-danger'}">
+                                ${log.pnl ? (log.pnl >= 0 ? '+' : '') + log.pnl.toFixed(6) + 'U' : '-'}
+                            </td>
+                        </tr>
+                    `),
+                    // 显示验证交易
+                    ...validationTrades.map(log => `
+                        <tr class="validation-trade-row" style="background-color: #f8f9fa;">
+                            <td>
+                                <span class="badge ${log.trade_type === 'optimization_validation' ? 'bg-warning' : 'bg-info'} me-1">
+                                    ${log.trade_type === 'optimization_validation' ? '参数验证' : '初始验证'}
+                                </span>
+                                ${this.formatTime(log.timestamp)}
+                            </td>
+                            <td><span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">${log.signal_type.toUpperCase()}</span></td>
+                            <td>${log.price.toFixed(6)}</td>
+                            <td>${log.quantity.toFixed(6)}</td>
+                            <td>${(log.confidence * 100).toFixed(1)}%</td>
+                            <td><span class="badge bg-secondary">验证交易</span></td>
+                            <td class="${log.pnl && log.pnl >= 0 ? 'text-success' : 'text-danger'}">
+                                ${log.pnl ? (log.pnl >= 0 ? '+' : '') + log.pnl.toFixed(6) + 'U' : '-'}
+                                ${log.validation_id ? `<br><small class="text-muted">ID: ${log.validation_id.substr(-4)}</small>` : ''}
+                            </td>
+                        </tr>
+                    `)
+                ].join('');
+                
+                // 🔧 添加统计信息
+                const realCount = realTrades.length;
+                const validationCount = validationTrades.length;
+                const statsRow = `
+                    <tr class="table-info">
+                        <td colspan="7" class="text-center">
+                            <strong>交易统计：真实交易 ${realCount} 条，验证交易 ${validationCount} 条</strong>
                         </td>
                     </tr>
-                `).join('');
+                `;
+                tbody.innerHTML = statsRow + tbody.innerHTML;
+                
             } else {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">暂无交易记录</td></tr>';
             }
