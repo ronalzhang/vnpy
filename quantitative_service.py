@@ -8202,8 +8202,8 @@ class EvolutionaryStrategyEngine:
                 ORDER BY 
                     (COUNT(t.id) * 0.3 + s.final_score * 0.7) DESC,  -- 综合真实交易数和评分
                     s.final_score DESC
-                LIMIT %s
-            ''', (limit,))
+                LIMIT {limit}
+            '''.format(limit=limit))
             
             top_strategies = cursor.fetchall()
             
@@ -8216,8 +8216,8 @@ class EvolutionaryStrategyEngine:
                     FROM strategies s
                     WHERE s.enabled = 1 AND s.final_score >= 50
                     ORDER BY s.final_score DESC
-                    LIMIT %s
-                ''', (limit,))
+                    LIMIT {limit}
+                '''.format(limit=limit))
                 
                 additional_strategies = cursor.fetchall()
                 top_strategies.extend(additional_strategies[:limit - len(top_strategies)])

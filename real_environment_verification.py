@@ -300,16 +300,16 @@ class RealEnvironmentVerifier:
                     SELECT * FROM strategy_verification_history 
                     WHERE strategy_id = %s 
                     ORDER BY created_at DESC 
-                    LIMIT %s
-                """
-                params = (strategy_id, limit)
+                    LIMIT {limit}
+                """.format(limit=limit)
+                params = (strategy_id,)
             else:
                 query = """
                     SELECT * FROM strategy_verification_history 
                     ORDER BY created_at DESC 
-                    LIMIT %s
-                """
-                params = (limit,)
+                    LIMIT {limit}
+                """.format(limit=limit)
+                params = ()
                 
             results = self.qs.db_manager.execute_query(query, params, fetch_all=True)
             return [dict(row) for row in results] if results else []
