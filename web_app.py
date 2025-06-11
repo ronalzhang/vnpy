@@ -1289,7 +1289,7 @@ def quantitative_strategies():
             except Exception as e:
                 print(f"获取maxStrategies配置失败，使用默认值: {e}")
             
-            # 🔥 修复策略ID显示：优先显示有交易记录的完整ID策略，然后是高分策略
+            # 🔥 修复策略ID显示：只显示完整格式的STRAT_策略，按交易记录和评分排序
             cursor.execute('''
                 SELECT s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, s.final_score,
                        s.created_at, s.generation, s.cycle,
@@ -1302,7 +1302,6 @@ def quantitative_strategies():
                 WHERE s.id LIKE 'STRAT_%'
                 GROUP BY s.id, s.name, s.symbol, s.type, s.parameters, s.enabled, 
                          s.final_score, s.created_at, s.generation, s.cycle
-                HAVING COUNT(t.id) > 0 OR s.final_score >= 40
                 ORDER BY COUNT(t.id) DESC, s.final_score DESC, s.created_at DESC
                 LIMIT %s
             ''', (max_display_strategies,))
