@@ -3400,7 +3400,8 @@ def enable_real_trading():
             SELECT COUNT(*) FROM strategies 
             WHERE enabled = 1 AND final_score >= 85
         """)
-        qualified_count = cursor.fetchone()[0]
+        qualified_result = cursor.fetchone()
+        qualified_count = qualified_result[0] if qualified_result else 0
         
         if qualified_count < 3:
             return jsonify({
@@ -3487,7 +3488,8 @@ def get_real_trading_status():
             SELECT COUNT(*) FROM strategies 
             WHERE enabled = 1 AND final_score >= 85
         """)
-        qualified_strategies = cursor.fetchone()[0]
+        qualified_result2 = cursor.fetchone()
+        qualified_strategies = qualified_result2[0] if qualified_result2 else 0
         
         # 统计今日盈亏
         cursor.execute("""
@@ -3599,15 +3601,18 @@ def manage_strategy_config():
             
             # 获取实际策略统计信息
             cursor.execute("SELECT COUNT(*) FROM strategies WHERE is_persistent = 1")
-            actual_total_strategies = cursor.fetchone()[0]
+            total_result = cursor.fetchone()
+            actual_total_strategies = total_result[0] if total_result else 0
             
             cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
-            actual_running_strategies = cursor.fetchone()[0]
+            running_result = cursor.fetchone()
+            actual_running_strategies = running_result[0] if running_result else 0
             
             cursor.execute("""
                 SELECT AVG(final_score) FROM strategies WHERE enabled = 1 AND final_score > 0
             """)
-            avg_score = cursor.fetchone()[0] or 50
+            avg_result = cursor.fetchone()
+            avg_score = avg_result[0] if avg_result and avg_result[0] else 50
             
             # 获取实际交易统计参数
             cursor.execute("""
