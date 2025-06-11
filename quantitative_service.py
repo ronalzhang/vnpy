@@ -3949,7 +3949,7 @@ class QuantitativeService:
             LIMIT 50
             """
             
-            rows = self.db_manager.execute_query(query, fetch_all=True)
+            rows = self.db_manager.execute_query(query, params=(), fetch_all=True)
             
             if not rows:
                 print("⚠️ 没有找到STRAT_格式的策略，数据库可能存在问题")
