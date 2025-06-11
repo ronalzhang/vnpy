@@ -6848,27 +6848,47 @@ class EvolutionaryStrategyEngine:
         try:
             # 保存精英策略历史
             for elite in elites:
+                # 🔥 修复：获取实际的策略评分而不是0，使用整数百分制
+                actual_score = elite.get('final_score', 0)
+                if actual_score == 0:
+                    actual_score = elite.get('score', 0)
+                if actual_score == 0:
+                    actual_score = elite.get('fitness', 0)
+                
+                # 确保是百分制整数
+                actual_score = int(round(actual_score))
+                
                 self.quantitative_service.db_manager.execute_query("""
                     INSERT INTO strategy_evolution_history 
-                    (strategy_id, generation, cycle, evolution_type, new_score, created_time)
-                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    (strategy_id, generation, cycle, evolution_type, score_before, score_after, new_score, created_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """, (elite['id'], self.current_generation, self.current_cycle, 
-                      'elite_selected', elite.get('final_score', 0)))
+                      'elite_selected', 0, actual_score, actual_score))
             
             # 保存新策略历史
             for new_strategy in new_strategies:
                 parent_id = new_strategy.get('parent_id', '')
                 evolution_type = new_strategy.get('evolution_type', 'unknown')
                 
+                # 🔥 修复：获取实际的策略评分而不是0，使用整数百分制
+                actual_score = new_strategy.get('final_score', 0)
+                if actual_score == 0:
+                    actual_score = new_strategy.get('score', 0)
+                if actual_score == 0:
+                    actual_score = new_strategy.get('fitness', 0)
+                
+                # 确保是百分制整数
+                actual_score = int(round(actual_score))
+                
                 self.quantitative_service.db_manager.execute_query("""
                     INSERT INTO strategy_evolution_history 
                     (strategy_id, generation, cycle, parent_strategy_id, evolution_type, 
-                     new_parameters, new_score, created_time)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                     new_parameters, score_before, score_after, new_score, created_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """, (new_strategy['id'], self.current_generation, self.current_cycle,
                       parent_id, evolution_type, 
                       json.dumps(new_strategy.get('parameters', {})),
-                      new_strategy.get('final_score', 0)))
+                      0, actual_score, actual_score))
                       
         except Exception as e:
             logger.error(f"保存演化历史失败: {e}")

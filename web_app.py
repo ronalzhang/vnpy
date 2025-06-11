@@ -3694,30 +3694,30 @@ def get_evolution_log():
         for record in evolution_records:
             strategy_id, action_type, evolution_type, generation, cycle, score_before, score_after, timestamp, notes = record
             
-            # 🔧 修复：构造详细描述，正确显示代数信息，支持所有进化类型
+            # 🔧 修复：构造详细描述，正确显示代数信息和百分制评分
             if 'mutation' in evolution_type or evolution_type == 'parameter_optimization':
-                details = f"策略{strategy_id[-4:]}变异进化: 第{generation}代第{cycle}轮"
+                details = f"策略{strategy_id[-4:]}变异进化: 第{generation}代第{cycle}轮，评分{int(score_after)}"
                 action = 'optimized'
             elif evolution_type == 'elite_selected':
-                details = f"精英策略{strategy_id[-4:]}晋级: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
+                details = f"精英策略{strategy_id[-4:]}晋级: 第{generation}代第{cycle}轮，评分{int(score_after)}"
                 action = 'promoted'
             elif evolution_type == 'protection_elite_protection':
-                details = f"策略{strategy_id[-4:]}精英保护: 第{generation}代第{cycle}轮"
+                details = f"策略{strategy_id[-4:]}精英保护: 第{generation}代第{cycle}轮，评分{int(score_after)}"
                 action = 'protected'
             elif evolution_type == 'protection_score_protection':
-                details = f"策略{strategy_id[-4:]}评分保护: 第{generation}代第{cycle}轮"
+                details = f"策略{strategy_id[-4:]}评分保护: 第{generation}代第{cycle}轮，评分{int(score_after)}"
                 action = 'protected'
             elif 'protection' in evolution_type:
-                details = f"策略{strategy_id[-4:]}保护机制激活: 第{generation}代第{cycle}轮"
+                details = f"策略{strategy_id[-4:]}保护机制激活: 第{generation}代第{cycle}轮，评分{int(score_after)}"
                 action = 'protected'
             elif evolution_type == 'random_creation':
-                details = f"新策略{strategy_id[-4:]}创建: 第{generation}代第{cycle}轮"
+                details = f"新策略{strategy_id[-4:]}创建: 第{generation}代第{cycle}轮，评分{int(score_after)}"
                 action = 'created'
             elif evolution_type == 'unknown' or not evolution_type:
-                details = f"策略{strategy_id[-4:]}进化更新: 第{generation}代第{cycle}轮"
+                details = f"策略{strategy_id[-4:]}进化更新: 第{generation}代第{cycle}轮，评分{int(score_after)}"
                 action = 'evolved'
             else:
-                details = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle}轮 ({evolution_type})"
+                details = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle}轮，评分{int(score_after)} ({evolution_type})"
                 action = 'evolved'
             
             logs.append({
