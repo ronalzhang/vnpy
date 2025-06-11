@@ -1881,67 +1881,66 @@ def toggle_strategy(strategy_id):
 
 @app.route('/api/quantitative/strategies/<strategy_id>/trade-logs', methods=['GET'])
 def get_strategy_trade_logs(strategy_id):
-    """获取策略交易日志 - 支持验证交易和真实交易分类显示"""
+    """获取策略交易日志 - 统一查询trading_signals表"""
     try:
-        limit = int(request.args.get('limit', 200))  # 🔥 修复：增加交易日志显示限制到200条
+        limit = int(request.args.get('limit', 200))
         
-        # 直接从数据库获取交易日志
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 🔥 修复：查询trading_signals表获取真实的交易记录，使用正确的字段映射
-        # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
-        query = f"""
+        # 🔥 统一查询trading_signals表，简化字段映射
+        query = """
             SELECT timestamp, symbol, signal_type, price, quantity, 
-                   expected_return as pnl, executed, id, strategy_id, signal_type as action, expected_return as real_pnl,
-                   confidence
+                   expected_return, executed, id, strategy_id, confidence,
+                   risk_level, strategy_score, priority
             FROM trading_signals 
             WHERE strategy_id = %s
             ORDER BY timestamp DESC
-            LIMIT {limit}
+            LIMIT %s
         """
-        cursor.execute(query, (strategy_id,))
+        cursor.execute(query, (strategy_id, limit))
         
         rows = cursor.fetchall()
         logs = []
         
         for row in rows:
-            # 🔥 处理交易类型，统一成功率计算不区分真实交易和模拟交易
-            trade_type = 'verification'  # 固定为验证交易
-            is_real_money = False  # 验证交易都是模拟
-            confidence = row[11] if len(row) > 11 and row[11] else 0.75  # confidence在第12个位置(索引11)
+            # 安全的字段访问
+            timestamp = row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else ''
+            symbol = row[1] or ''
+            signal_type = row[2] or ''
+            price = float(row[3]) if row[3] is not None else 0.0
+            quantity = float(row[4]) if row[4] is not None else 0.0
+            pnl = float(row[5]) if row[5] is not None else 0.0
+            executed = bool(row[6]) if row[6] is not None else False
+            record_id = row[7] if row[7] is not None else 0
+            confidence = float(row[9]) if row[9] is not None else 0.75
             
-            # 🔥 统一交易记录，不区分模拟和真实，都参与成功率和评分计算
             logs.append({
-                'timestamp': row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else '',
-                'symbol': row[1] or '',
-                'signal_type': row[2] or '',
-                'price': float(row[3]) if row[3] else 0.0,
-                'quantity': float(row[4]) if row[4] else 0.0,
-                'pnl': float(row[5]) if row[5] else 0.0,
-                'executed': bool(row[6]) if row[6] is not None else False,
-                'confidence': float(confidence),
-                'id': row[7],
-                'strategy_name': row[8] or '',  # 这里是strategy_id
-                'action': row[9] or '',  # 这里是signal_type
-                'real_pnl': float(row[10]) if row[10] else 0.0,
-                'trade_type': trade_type,
-                'is_real_money': is_real_money,
-                'validation_id': str(row[7])[:8] if row[7] else None  # 使用ID作为验证ID
+                'timestamp': timestamp,
+                'symbol': symbol,
+                'signal_type': signal_type,
+                'price': price,
+                'quantity': quantity,
+                'pnl': pnl,
+                'executed': executed,
+                'confidence': confidence,
+                'id': record_id,
+                'trade_type': 'real_trading' if executed else 'simulation',
+                'is_real_money': executed,
+                'validation_id': str(record_id)[-6:] if record_id else None
             })
         
         conn.close()
         
-        # 🔥 修复：返回格式改为前端期望的格式
         return jsonify({
-            "success": True,  # 修复：从"status"改为"success"
+            "success": True,
             "logs": logs
         })
         
     except Exception as e:
         print(f"获取策略交易日志失败: {e}")
         return jsonify({
-            "success": False,  # 修复：从"status"改为"success"
+            "success": False,
             "message": str(e)
         }), 500
 
