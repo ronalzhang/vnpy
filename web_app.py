@@ -1310,8 +1310,13 @@ def quantitative_strategies():
             strategies = []
             
             for row in rows:
-                sid, name, symbol, stype, params, enabled, score, created_at, generation, cycle, \
-                total_trades, wins, total_pnl, avg_pnl = row
+                # 🔥 修复：安全解包tuple，防止index out of range错误
+                try:
+                    sid, name, symbol, stype, params, enabled, score, created_at, generation, cycle, \
+                    total_trades, wins, total_pnl, avg_pnl = row
+                except ValueError as e:
+                    print(f"解包策略数据失败: {e}, row: {row}")
+                    continue
                 
                 # 🔥 修复win_rate计算逻辑：只计算已执行的交易，且盈利判断也必须基于已执行的交易
                 cursor.execute("""
