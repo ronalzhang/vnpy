@@ -1890,15 +1890,17 @@ def get_strategy_trade_logs(strategy_id):
         cursor = conn.cursor()
         
         # 🔥 修复：添加更多字段，支持验证交易和真实交易的区分
-        cursor.execute("""
+        # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+        query = f"""
             SELECT timestamp, symbol, signal_type, price, quantity, 
                    pnl, executed, id, strategy_name, action, real_pnl,
                    trade_type, is_real_money, exchange_order_id, confidence
             FROM strategy_trade_logs 
             WHERE strategy_id = %s
             ORDER BY timestamp DESC
-            LIMIT %s
-        """, (strategy_id, limit))
+            LIMIT {limit}
+        """
+        cursor.execute(query, (strategy_id,))
         
         rows = cursor.fetchall()
         logs = []
