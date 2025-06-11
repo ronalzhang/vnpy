@@ -2209,7 +2209,7 @@ class AutomatedStrategyManager:
             return current_threshold * 1.15  # 提高阈值，减少交易频次但提高准确性
         elif win_rate < 0.8:
             return current_threshold * 1.05
-            else:
+        else:
             return current_threshold * 0.98  # 略微降低，增加交易机会
     
     def _optimize_lookback(self, strategy_id: int, current_lookback: int) -> int:
