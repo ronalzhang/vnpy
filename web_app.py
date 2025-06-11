@@ -1313,7 +1313,18 @@ def quantitative_strategies():
                 sid, name, symbol, stype, params, enabled, score, created_at, generation, cycle, \
                 total_trades, wins, total_pnl, avg_pnl = row
                 
-                win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+                # 🔥 修复win_rate不一致问题：重新计算真实胜率，与策略详情API保持一致
+                cursor.execute("""
+                    SELECT COUNT(*) as total_trades,
+                           COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
+                    FROM strategy_trade_logs
+                    WHERE strategy_id = %s
+                """, (sid,))
+                
+                trade_stats = cursor.fetchone()
+                calculated_total_trades = trade_stats[0] if trade_stats else 0
+                calculated_wins = trade_stats[1] if trade_stats else 0
+                win_rate = (calculated_wins / calculated_total_trades * 100) if calculated_total_trades > 0 else 0
                 
                 # 🔥 修复：使用数据库中真实的代数，不要人为放大
                 try:
@@ -1373,7 +1384,7 @@ def quantitative_strategies():
                     'created_at': created_at.isoformat() if created_at else '',
                     'generation': generation,
                     'cycle': cycle,
-                    'total_trades': total_trades or 0,
+                    'total_trades': calculated_total_trades,  # 🔥 使用重新计算的交易次数
                     'win_rate': round(win_rate, 2),
                     'total_pnl': float(total_pnl) if total_pnl else 0.0,
                     'avg_pnl': float(avg_pnl) if avg_pnl else 0.0,
