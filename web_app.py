@@ -3050,7 +3050,8 @@ def create_strategy():
         
         # 生成策略ID
         import random
-        strategy_id = f"{data['type']}_{data['symbol'].replace('/', '_')}_{random.randint(1000, 9999)}"
+        # 🔥 修复：手动创建策略也使用完整格式ID
+        strategy_id = f"STRAT_{data['type'].upper()}_{data['symbol'].replace('/', '_')}_{random.randint(1000, 9999)}"
         
         # 创建策略配置
         strategy_config = {

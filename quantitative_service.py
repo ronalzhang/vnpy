@@ -2523,7 +2523,8 @@ class QuantitativeService:
             return {}
         
         template = self.strategy_templates[strategy_type]
-        strategy_id = f"{strategy_type}_{uuid.uuid4().hex[:8]}"
+        # 🔥 修复：使用完整格式的策略ID，而不是短格式
+        strategy_id = f"STRAT_{strategy_type.upper()}_{uuid.uuid4().hex[:8]}"
         
         # 🎯 使用统一配置的默认参数，而不是随机生成
         parameters = get_strategy_default_parameters(strategy_type)
@@ -3930,33 +3931,30 @@ class QuantitativeService:
             return "初代策略"
 
     def get_strategies(self):
-        """获取前20个高分策略 - 直接从PostgreSQL查询"""
+        """获取完整ID格式的策略 - 优先显示有交易记录的STRAT_策略"""
         try:
-            # 从PostgreSQL数据库查询前20个高分策略
+            # 🔥 修复：只显示完整ID格式的策略，优先显示有交易记录的策略
             query = """
-            SELECT id, name, symbol, type, enabled, parameters, 
-                   final_score, win_rate, total_return, total_trades,
-                   created_at, updated_at
-            FROM strategies 
-            WHERE final_score >= 6.5
-            ORDER BY final_score DESC 
-            LIMIT 20
+            SELECT s.id, s.name, s.symbol, s.type, s.enabled, s.parameters, 
+                   s.final_score, s.win_rate, s.total_return, s.total_trades,
+                   s.created_at, s.updated_at,
+                   COUNT(t.id) as actual_trades
+            FROM strategies s
+            LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+            WHERE s.id LIKE 'STRAT_%'
+            GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.parameters,
+                     s.final_score, s.win_rate, s.total_return, s.total_trades,
+                     s.created_at, s.updated_at
+            ORDER BY COUNT(t.id) DESC, s.final_score DESC
+            LIMIT 50
             """
             
             rows = self.db_manager.execute_query(query, fetch_all=True)
             
             if not rows:
-                print("⚠️ 没有找到符合条件的策略（>=6.5分），显示所有策略前20个")
-                # 如果没有高分策略，显示所有策略的前20个
-                query = """
-                SELECT id, name, symbol, type, enabled, parameters,
-                       final_score, win_rate, total_return, total_trades,
-                       created_at, updated_at
-                FROM strategies 
-                ORDER BY final_score DESC 
-                LIMIT 20
-                """
-                rows = self.db_manager.execute_query(query, fetch_all=True)
+                print("⚠️ 没有找到STRAT_格式的策略，数据库可能存在问题")
+                # 如果没有STRAT_策略，说明数据库有问题，返回空结果而不是短格式策略
+                return {'success': True, 'data': []}
             
             strategies_list = []
             
@@ -7593,7 +7591,8 @@ class EvolutionaryStrategyEngine:
         # 随机选择交易对
         symbol = random.choice(template['symbols'])
         
-        strategy_id = f"{strategy_type}_{symbol.replace('/', '_')}_{random.randint(1000, 9999)}"
+        # 🔥 修复：确保进化系统也使用完整格式的策略ID
+        strategy_id = f"STRAT_{strategy_type.upper()}_{symbol.replace('/', '_')}_{random.randint(1000, 9999)}"
         
         # 增强的随机策略创建 (在现有基础上添加代数信息)
         new_generation = self.current_generation + 1
