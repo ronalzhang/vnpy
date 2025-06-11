@@ -1313,10 +1313,10 @@ def quantitative_strategies():
                 sid, name, symbol, stype, params, enabled, score, created_at, generation, cycle, \
                 total_trades, wins, total_pnl, avg_pnl = row
                 
-                # 🔥 修复win_rate不一致问题：重新计算真实胜率，与策略详情API保持一致
+                # 🔥 修复win_rate计算逻辑：只计算已执行的交易，这才是真正的成功率
                 cursor.execute("""
-                    SELECT COUNT(*) as total_trades,
-                           COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
+                    SELECT COUNT(CASE WHEN executed = true THEN 1 END) as executed_trades,
+                           COUNT(CASE WHEN executed = true AND pnl > 0 THEN 1 END) as wins
                     FROM strategy_trade_logs
                     WHERE strategy_id = %s
                 """, (sid,))
@@ -1697,10 +1697,10 @@ def strategy_detail(strategy_id):
                     }
                 }
             
-            # 🔥 修复win_rate不一致问题：重新计算真实胜率而不是使用数据库中可能过时的值
+            # 🔥 修复win_rate计算逻辑：只计算已执行的交易，这才是真正的成功率
             cursor.execute("""
-                SELECT COUNT(*) as total_trades,
-                       COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
+                SELECT COUNT(CASE WHEN executed = true THEN 1 END) as executed_trades,
+                       COUNT(CASE WHEN executed = true AND pnl > 0 THEN 1 END) as wins
                 FROM strategy_trade_logs
                 WHERE strategy_id = %s
             """, (strategy_id,))
