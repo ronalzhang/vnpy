@@ -1894,7 +1894,7 @@ def get_strategy_trade_logs(strategy_id):
         query = f"""
             SELECT timestamp, symbol, signal_type, price, quantity, 
                    expected_return as pnl, executed, id, strategy_id, signal_type as action, expected_return as real_pnl,
-                   'verification' as trade_type, false as is_real_money, id as exchange_order_id, confidence
+                   confidence
             FROM trading_signals 
             WHERE strategy_id = %s
             ORDER BY timestamp DESC
@@ -1907,9 +1907,9 @@ def get_strategy_trade_logs(strategy_id):
         
         for row in rows:
             # 🔥 处理交易类型，统一成功率计算不区分真实交易和模拟交易
-            trade_type = row[11] if len(row) > 11 and row[11] else 'simulation'
-            is_real_money = row[12] if len(row) > 12 and row[12] else False
-            confidence = row[14] if len(row) > 14 and row[14] else 0.75
+            trade_type = 'verification'  # 固定为验证交易
+            is_real_money = False  # 验证交易都是模拟
+            confidence = row[11] if len(row) > 11 and row[11] else 0.75  # confidence在第12个位置(索引11)
             
             # 🔥 统一交易记录，不区分模拟和真实，都参与成功率和评分计算
             logs.append({
