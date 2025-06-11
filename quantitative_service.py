@@ -3037,7 +3037,7 @@ class QuantitativeService:
                 auto_trading_enabled=False,  # 明确设置自动交易关闭
                 total_strategies=len(strategies),
                 running_strategies=len(enabled_strategies),
-                selected_strategies=len([s for s in enabled_strategies if s.get('final_score', 0) >= 65]),
+                selected_strategies=len([s for s in enabled_strategies if s.get('final_score', 0) >= 55]),  # 🔧 降低门槛以启动验证交易
                 system_health='online',
                 notes='量化系统已启动，策略正在进化，自动交易待开启'
             )
@@ -3992,7 +3992,7 @@ class QuantitativeService:
                             'win_rate': float(row.get('win_rate', 0)),
                             'total_return': float(row.get('total_return', 0)),
                             'total_trades': int(row.get('total_trades', 0)),
-                            'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,  # 65分以上可真实交易
+                            'qualified_for_trading': float(row.get('final_score', 0)) >= 55.0,  # 🔧 降低门槛：55分以上可进行验证交易和参数优化
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
                             'data_source': self._get_strategy_evolution_display(row['id'])
@@ -4025,7 +4025,7 @@ class QuantitativeService:
                             'win_rate': float(row.get('win_rate', 0)),
                             'total_return': float(row.get('total_return', 0)),
                             'total_trades': int(row.get('total_trades', 0)),
-                            'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,
+                            'qualified_for_trading': float(row.get('final_score', 0)) >= 55.0,  # 🔧 降低门槛：55分以上可进行验证交易和参数优化
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
                             'data_source': self._get_strategy_evolution_display(row.get('id', ''))
