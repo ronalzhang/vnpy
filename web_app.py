@@ -1313,12 +1313,12 @@ def quantitative_strategies():
                 sid, name, symbol, stype, params, enabled, score, created_at, generation, cycle, \
                 total_trades, wins, total_pnl, avg_pnl = row
                 
-                # 🔥 修复win_rate计算逻辑：只计算已执行的交易，这才是真正的成功率
+                # 🔥 修复win_rate计算逻辑：只计算已执行的交易，且盈利判断也必须基于已执行的交易
                 cursor.execute("""
-                    SELECT COUNT(CASE WHEN executed = true THEN 1 END) as executed_trades,
-                           COUNT(CASE WHEN executed = true AND pnl > 0 THEN 1 END) as wins
+                    SELECT COUNT(*) as executed_trades,
+                           COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
                     FROM strategy_trade_logs
-                    WHERE strategy_id = %s
+                    WHERE strategy_id = %s AND executed = true
                 """, (sid,))
                 
                 trade_stats = cursor.fetchone()
@@ -1700,12 +1700,12 @@ def strategy_detail(strategy_id):
                     }
                 }
             
-            # 🔥 修复win_rate计算逻辑：只计算已执行的交易，这才是真正的成功率
+            # 🔥 修复win_rate计算逻辑：只计算已执行的交易，且盈利判断也必须基于已执行的交易
             cursor.execute("""
-                SELECT COUNT(CASE WHEN executed = true THEN 1 END) as executed_trades,
-                       COUNT(CASE WHEN executed = true AND pnl > 0 THEN 1 END) as wins
+                SELECT COUNT(*) as executed_trades,
+                       COUNT(CASE WHEN pnl > 0 THEN 1 END) as wins
                 FROM strategy_trade_logs
-                WHERE strategy_id = %s
+                WHERE strategy_id = %s AND executed = true
             """, (strategy_id,))
             
             trade_stats = cursor.fetchone()
