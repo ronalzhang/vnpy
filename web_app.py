@@ -2022,11 +2022,13 @@ def get_quantitative_positions():
                         else:
                             try:
                                 # 获取真实价格
+                                print(f"🔍 正在获取 {symbol}/USDT 价格...")
                                 ticker = binance_client.fetch_ticker(f"{symbol}/USDT")
                                 current_price = float(ticker['last'])
                                 avg_price = current_price  # 简化处理，使用当前价格作为平均价格
+                                print(f"✅ {symbol}/USDT 价格获取成功: {current_price}")
                             except Exception as e:
-                                print(f"获取 {symbol} 价格失败: {e}")
+                                print(f"❌ 获取 {symbol} 价格失败: {e}")
                                 avg_price = 1.0
                                 current_price = 1.0
                         
