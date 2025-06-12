@@ -9428,9 +9428,26 @@ class EvolutionaryStrategyEngine:
             # 🔧 新参数优化的预期改进（基于参数质量）
             optimization_bonus = self._calculate_parameter_optimization_bonus(parameters)
             
-            # 🔧 基础PnL计算
-            base_pnl = random.uniform(-0.5, 1.2) * base_quantity * type_factor
-            base_pnl *= risk_factor * profit_factor * (1 + optimization_bonus)
+            # 🔧 基础PnL计算 - 基于真实市场条件，不使用随机数
+            # 基于策略类型和参数质量计算预期PnL，不使用假数据
+            base_pnl = 0.0  # 初始化为0，只有真实交易才有PnL
+            
+            # 🔧 只有在有历史交易数据的情况下才计算预期收益
+            try:
+                cursor = self.quantitative_service.db_manager.execute_query(
+                    "SELECT AVG(pnl) as avg_pnl FROM trading_signals WHERE strategy_id = %s AND executed = 1 AND pnl != 0",
+                    (strategy_id,), fetch_one=True
+                )
+                if cursor and cursor[0] is not None:
+                    historical_avg_pnl = float(cursor[0])
+                    # 基于历史真实PnL计算，加入参数优化的改进预期
+                    base_pnl = historical_avg_pnl * (1 + optimization_bonus) * risk_factor * profit_factor
+                else:
+                    # 没有历史数据时，PnL为0，需要通过真实交易建立历史
+                    base_pnl = 0.0
+            except Exception as e:
+                print(f"⚠️ 计算历史PnL失败，使用0值: {e}")
+                base_pnl = 0.0
             
             # 🔧 价格影响
             price_factor = min(price / 50.0, 2.0)  # 价格越高影响越大
