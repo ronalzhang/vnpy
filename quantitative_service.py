@@ -3370,7 +3370,7 @@ class QuantitativeService:
             buy_generated = 0
             sell_generated = 0
             
-            for strategy in sorted_strategies[:10]:  # 限制处理数量
+            for strategy in sorted_strategies:  # 处理所有前端配置的策略数量
                 try:
                     if not isinstance(strategy, dict):
                         print(f"⚠️ 跳过无效策略数据: {strategy}")
@@ -4047,17 +4047,18 @@ class QuantitativeService:
         try:
             print("🔍 开始执行策略查询...")
             
-            # 🔥 修复：获取前端配置的maxStrategies限制，只处理排名前N的策略
+            # 🔥 修复：从前端策略管理配置中动态获取maxStrategies值
             try:
                 cursor = self.conn.cursor()
-                cursor.execute("SELECT value FROM system_settings WHERE key = 'maxStrategies'")
+                cursor.execute("SELECT config_value FROM strategy_management_config WHERE config_key = 'maxStrategies'")
                 result = cursor.fetchone()
-                max_strategies = int(result[0]) if result else 20  # 默认20个
+                max_strategies = int(float(result[0])) if result and result[0] else 20  # 默认20个
+                print(f"🔧 从前端配置获取策略显示数量: {max_strategies}")
             except Exception as e:
                 print(f"⚠️ 获取maxStrategies配置失败，使用默认值20: {e}")
                 max_strategies = 20
             
-            print(f"🎯 遵循maxStrategies配置：只处理前{max_strategies}个策略")
+            print(f"🎯 遵循前端maxStrategies配置：只处理前{max_strategies}个策略，只有这些策略参与进化和信号生成")
             
             query = """
                 SELECT id, name, symbol, type, enabled, parameters, 
