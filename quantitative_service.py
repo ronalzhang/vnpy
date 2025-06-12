@@ -7582,7 +7582,8 @@ class EvolutionaryStrategyEngine:
         
         try:
             mutated = parent.copy()
-            mutated['id'] = str(uuid.uuid4())[:8]
+            # 🔥 修复：使用完整UUID格式而非短ID
+            mutated['id'] = str(uuid.uuid4())
             
             # 🧬 增强的策略命名
             parent_generation = parent.get('generation', self.current_generation)
