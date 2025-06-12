@@ -90,14 +90,14 @@ class ComprehensiveVerificationTest:
                     "lookback_period": random.randint(20, 100)
                 }
                 
-                # 插入策略
+                # 插入策略（修复enabled字段类型）
                 self.cursor.execute("""
                     INSERT INTO strategies (
                         id, name, symbol, type, enabled, parameters, 
                         final_score, win_rate, total_trades, total_return,
                         created_at, updated_at, generation, cycle
                     ) VALUES (
-                        %s, %s, 'BTCUSDT', 'momentum', true, %s,
+                        %s, %s, 'BTCUSDT', 'momentum', 1, %s,
                         %s, %s, %s, %s, %s, %s, 2, 3
                     )
                 """, (
