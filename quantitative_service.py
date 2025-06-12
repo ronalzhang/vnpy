@@ -9237,10 +9237,15 @@ class EvolutionaryStrategyEngine:
             pnl = self._calculate_optimization_validation_pnl(strategy_type, new_params, signal_type, price_data['current_price'], validation_amount)
             
             # 🔧 保存验证交易记录（明确标记为验证交易）
-            trade_log_id = self._save_optimization_validation_trade(
-                strategy_id, validation_id, trade_sequence, signal_type, 
-                price_data['current_price'], new_params, pnl
-            )
+            try:
+                trade_log_id = self._save_optimization_validation_trade(
+                    strategy_id, validation_id, trade_sequence, signal_type, 
+                    price_data['current_price'], new_params, pnl
+                )
+                print(f"✅ 策略{strategy_id}验证交易{trade_sequence}已保存: {trade_log_id}")
+            except Exception as save_error:
+                print(f"❌ 策略{strategy_id}验证交易{trade_sequence}保存失败: {save_error}")
+                trade_log_id = f"FAILED_{int(time.time())}"
             
             return {
                 'id': trade_log_id,
