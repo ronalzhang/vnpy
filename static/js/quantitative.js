@@ -927,8 +927,8 @@ class QuantitativeSystem {
                     <td>${log.quantity.toFixed(6)}</td>
                     <td>${(log.confidence * 100).toFixed(1)}%</td>
                     <td>${log.executed ? '<span class="badge bg-success">已执行</span>' : '<span class="badge bg-secondary">未执行</span>'}</td>
-                    <td class="${log.pnl && log.pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${log.pnl ? (log.pnl >= 0 ? '+' : '') + log.pnl.toFixed(6) + 'U' : '-'}
+                    <td class="${log.pnl !== null && log.pnl !== undefined && log.pnl >= 0 ? 'text-success' : 'text-danger'}">
+                        ${log.pnl !== null && log.pnl !== undefined ? (log.pnl >= 0 ? '+' : '') + log.pnl.toFixed(6) + 'U' : '-'}
                     </td>
                 </tr>
             `),
@@ -946,8 +946,8 @@ class QuantitativeSystem {
                     <td>${log.quantity.toFixed(6)}</td>
                     <td>${(log.confidence * 100).toFixed(1)}%</td>
                     <td><span class="badge bg-secondary">验证交易</span></td>
-                    <td class="${log.pnl && log.pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${log.pnl ? (log.pnl >= 0 ? '+' : '') + log.pnl.toFixed(6) + 'U' : '-'}
+                    <td class="${log.pnl !== null && log.pnl !== undefined && log.pnl >= 0 ? 'text-success' : 'text-danger'}">
+                        ${log.pnl !== null && log.pnl !== undefined ? (log.pnl >= 0 ? '+' : '') + log.pnl.toFixed(6) + 'U' : '-'}
                         ${log.validation_id ? `<br><small class="text-muted">ID: ${log.validation_id.substr(-4)}</small>` : ''}
                     </td>
                 </tr>

@@ -1915,17 +1915,17 @@ def get_strategy_trade_logs(strategy_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 🔥 统一查询trading_signals表，简化字段映射
+        # 🔥 统一查询trading_signals表，包含所有交易记录（验证+真实）
         query = """
             SELECT timestamp, symbol, signal_type, price, quantity, 
                    expected_return, executed, id, strategy_id, confidence,
-                   risk_level, strategy_score, priority
+                   risk_level, strategy_score, priority, trade_type
             FROM trading_signals 
-            WHERE strategy_id = %s
+            WHERE strategy_id = %s OR strategy_id LIKE %s
             ORDER BY timestamp DESC
             LIMIT %s
         """
-        cursor.execute(query, (strategy_id, limit))
+        cursor.execute(query, (strategy_id, f'%{strategy_id}%', limit))
         
         rows = cursor.fetchall()
         logs = []
@@ -1941,6 +1941,7 @@ def get_strategy_trade_logs(strategy_id):
             executed = bool(row[6]) if row[6] is not None else False
             record_id = row[7] if row[7] is not None else 0
             confidence = float(row[9]) if row[9] is not None else 0.75
+            trade_type = row[13] if len(row) > 13 else 'simulation'
             
             logs.append({
                 'timestamp': timestamp,
@@ -1952,7 +1953,7 @@ def get_strategy_trade_logs(strategy_id):
                 'executed': executed,
                 'confidence': confidence,
                 'id': record_id,
-                'trade_type': 'real_trading' if executed else 'simulation',
+                'trade_type': trade_type,
                 'is_real_money': executed,
                 'validation_id': str(record_id)[-6:] if record_id else None
             })
