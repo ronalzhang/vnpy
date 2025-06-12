@@ -4845,13 +4845,16 @@ class QuantitativeService:
             print(f"记录策略优化日志失败: {e}")
     
 
-    def get_strategy_trade_logs(self, strategy_id, limit=100):
-        """获取策略交易日志"""
+    def get_strategy_trade_logs(self, strategy_id, limit=200):
+        """获取策略交易日志 - 包含验证交易和真实交易的完整记录"""
         try:
             cursor = self.conn.cursor()
-            # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+            
+            # 🔧 修复：查询包含trade_type等验证交易相关字段
             query = f'''
-                SELECT strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp
+                SELECT strategy_id, signal_type, price, quantity, confidence, executed, pnl, 
+                       timestamp, trade_type, validation_id, parameters_used,
+                       COALESCE(trade_type, 'real_trading') as trade_category
                 FROM strategy_trade_logs 
                 WHERE strategy_id = %s
                 ORDER BY timestamp DESC
@@ -4861,6 +4864,22 @@ class QuantitativeService:
             
             logs = []
             for row in cursor.fetchall():
+                trade_type = row[8] if row[8] else 'real_trading'
+                validation_id = row[9] if row[9] else None
+                parameters_used = row[10] if row[10] else None
+                
+                # 🔧 标记交易类型
+                if trade_type == 'optimization_validation':
+                    trade_label = '🔬 参数验证交易'
+                elif trade_type == 'initialization_validation':
+                    trade_label = '🚀 初始化验证交易'
+                elif trade_type == 'periodic_validation':
+                    trade_label = '🔄 定期验证交易'
+                elif trade_type == 'score_verification':
+                    trade_label = '📊 分数验证交易'
+                else:
+                    trade_label = '💰 真实交易'
+                
                 logs.append({
                     'strategy_id': row[0],
                     'signal_type': row[1],
@@ -4869,14 +4888,49 @@ class QuantitativeService:
                     'confidence': float(row[4]),
                     'executed': bool(row[5]),
                     'pnl': float(row[6]) if row[6] is not None else 0.0,
-                    'timestamp': row[7]
+                    'timestamp': row[7],
+                    'trade_type': trade_type,
+                    'trade_label': trade_label,
+                    'validation_id': validation_id,
+                    'parameters_used': parameters_used,
+                    'is_validation': trade_type != 'real_trading'
                 })
             
+            print(f"🔍 策略{strategy_id[-4:]}交易日志: {len(logs)}条记录 (包含验证交易)")
             return logs
             
         except Exception as e:
             print(f"获取策略交易日志失败: {e}")
-            return []
+            # 🔧 fallback：尝试旧格式查询
+            try:
+                cursor.execute(f'''
+                    SELECT strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp
+                    FROM strategy_trade_logs 
+                    WHERE strategy_id = %s
+                    ORDER BY timestamp DESC
+                    LIMIT {limit}
+                ''', (strategy_id,))
+                
+                logs = []
+                for row in cursor.fetchall():
+                    logs.append({
+                        'strategy_id': row[0],
+                        'signal_type': row[1],
+                        'price': float(row[2]),
+                        'quantity': float(row[3]),
+                        'confidence': float(row[4]),
+                        'executed': bool(row[5]),
+                        'pnl': float(row[6]) if row[6] is not None else 0.0,
+                        'timestamp': row[7],
+                        'trade_type': 'real_trading',
+                        'trade_label': '💰 真实交易',
+                        'is_validation': False
+                    })
+                
+                return logs
+            except Exception as e2:
+                print(f"fallback查询也失败: {e2}")
+                return []
     
     def get_strategy_optimization_logs(self, strategy_id, limit=100):
         """获取策略优化记录"""
@@ -6903,6 +6957,11 @@ class EvolutionaryStrategyEngine:
             if not strategies:
                 logger.warning("⚠️ 没有可用策略进行演化")
                 return
+            
+            # 🔍 1.5. 定期验证高分策略（每2轮进化执行一次）
+            if self.current_cycle % 2 == 0:
+                print(f"🔬 执行高分策略定期验证...")
+                self._validate_high_score_strategies_periodically()
             
             # 2. 保存演化前状态快照
             self._save_evolution_snapshot("before_evolution", strategies)
@@ -9339,38 +9398,49 @@ class EvolutionaryStrategyEngine:
         try:
             trade_id = f"OPT_TRADE_{validation_id}_{sequence}"
             
-            # 🔧 确保trade_type列存在
+            # 🔧 优先保存到trading_signals表（前端使用的主要表）
             try:
                 self.quantitative_service.db_manager.execute_query("""
-                    ALTER TABLE strategy_trade_logs 
-                    ADD COLUMN IF NOT EXISTS trade_type VARCHAR(50) DEFAULT 'real_trading'
-                """)
-                self.quantitative_service.db_manager.execute_query("""
-                    ALTER TABLE strategy_trade_logs 
-                    ADD COLUMN IF NOT EXISTS validation_id VARCHAR(50)
-                """)
-                self.quantitative_service.db_manager.execute_query("""
-                    ALTER TABLE strategy_trade_logs 
-                    ADD COLUMN IF NOT EXISTS parameters_used JSONB
-                """)
-            except:
-                pass  # 列可能已经存在
+                    INSERT INTO trading_signals 
+                    (strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed, 
+                     trade_type, validation_id, validation_round, parameters_used)
+                    VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s, %s, %s)
+                """, (
+                    strategy_id, 
+                    parameters.get('symbol', 'BTCUSDT'), 
+                    signal_type, 
+                    price,
+                    parameters.get('quantity', 10.0), 
+                    0.85,  # 验证交易置信度固定85%
+                    1,  # 标记为已执行
+                    'optimization_validation',  # 🔥 明确标记交易类型
+                    validation_id,
+                    sequence,
+                    json.dumps(parameters)
+                ))
+                print(f"✅ 验证交易已保存到trading_signals表: {trade_id}")
+            except Exception as e:
+                print(f"⚠️ 保存到trading_signals失败，尝试strategy_trade_logs: {e}")
             
-            # 🔧 保存到策略交易日志，明确标记为验证交易
-            self.quantitative_service.db_manager.execute_query("""
-                INSERT INTO strategy_trade_logs 
-                (id, strategy_id, signal_type, price, quantity, confidence, executed, pnl, 
-                 created_at, trade_type, validation_id, parameters_used)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s)
-            """, (
-                trade_id, strategy_id, signal_type, price, 
-                parameters.get('quantity', 10.0), 0.85,  # 验证交易置信度固定85%
-                1,  # 标记为已执行
-                pnl,
-                'optimization_validation',  # 🔥 明确标记交易类型
-                validation_id,
-                json.dumps(parameters)
-            ))
+            # 🔧 同时保存到strategy_trade_logs表（兼容性）
+            try:
+                self.quantitative_service.db_manager.execute_query("""
+                    INSERT INTO strategy_trade_logs 
+                    (id, strategy_id, signal_type, price, quantity, confidence, executed, pnl, 
+                     created_at, trade_type, validation_id, parameters_used)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s)
+                """, (
+                    trade_id, strategy_id, signal_type, price, 
+                    parameters.get('quantity', 10.0), 0.85,  # 验证交易置信度固定85%
+                    1,  # 标记为已执行
+                    pnl,
+                    'optimization_validation',  # 🔥 明确标记交易类型
+                    validation_id,
+                    json.dumps(parameters)
+                ))
+                print(f"✅ 验证交易已保存到strategy_trade_logs表: {trade_id}")
+            except Exception as e:
+                print(f"⚠️ 保存到strategy_trade_logs失败: {e}")
             
             return trade_id
             
@@ -9490,6 +9560,296 @@ class EvolutionaryStrategyEngine:
             return float(result[0]) if result else 50.0
         except:
             return 50.0
+
+    def _validate_high_score_strategies_periodically(self):
+        """🔧 新增：定期验证高分策略的真实性"""
+        try:
+            print("🔍 开始定期验证高分策略...")
+            
+            # 🔧 查找需要验证的高分策略（≥65分且距离上次验证超过24小时）
+            cursor = self.quantitative_service.conn.cursor()
+            cursor.execute("""
+                SELECT s.id, s.final_score, s.parameters, s.type, s.symbol,
+                       COALESCE(hsv.next_validation, '1970-01-01'::timestamp) as next_validation
+                FROM strategies s
+                LEFT JOIN high_score_validation hsv ON s.id = hsv.strategy_id 
+                    AND hsv.validation_type = 'periodic_check'
+                    AND hsv.timestamp = (
+                        SELECT MAX(timestamp) FROM high_score_validation hsv2 
+                        WHERE hsv2.strategy_id = s.id AND hsv2.validation_type = 'periodic_check'
+                    )
+                WHERE s.final_score >= 65 
+                    AND s.enabled = true
+                    AND (hsv.next_validation IS NULL OR hsv.next_validation <= NOW())
+                ORDER BY s.final_score DESC
+                LIMIT 10
+            """)
+            
+            strategies_to_validate = cursor.fetchall()
+            
+            if not strategies_to_validate:
+                print("✅ 暂无需要定期验证的高分策略")
+                return
+            
+            print(f"🎯 发现 {len(strategies_to_validate)} 个高分策略需要验证")
+            
+            for strategy_data in strategies_to_validate:
+                strategy_id, score, parameters, strategy_type, symbol, last_validation = strategy_data
+                
+                print(f"🔬 验证高分策略 {strategy_id[-4:]} (分数: {score:.1f})")
+                
+                # 🔧 执行验证交易
+                validation_result = self._execute_high_score_validation(
+                    strategy_id, score, parameters, strategy_type, symbol
+                )
+                
+                if validation_result:
+                    print(f"✅ 策略{strategy_id[-4:]}高分验证完成: {validation_result['result']}")
+                else:
+                    print(f"❌ 策略{strategy_id[-4:]}高分验证失败")
+                
+                # 短暂延迟
+                time.sleep(2)
+                
+        except Exception as e:
+            print(f"❌ 定期验证高分策略失败: {e}")
+
+    def _execute_high_score_validation(self, strategy_id: str, original_score: float, 
+                                     parameters: str, strategy_type: str, symbol: str) -> Optional[Dict]:
+        """🔧 新增：执行高分策略验证"""
+        try:
+            import json
+            
+            # 🔧 解析策略参数
+            if isinstance(parameters, str):
+                params = json.loads(parameters)
+            else:
+                params = parameters
+            
+            # 🔧 执行5次验证交易
+            validation_trades = []
+            validation_id = f"HIGH_VAL_{strategy_id}_{int(time.time())}"
+            
+            for i in range(5):
+                print(f"🔬 执行高分策略验证交易 {i+1}/5...")
+                
+                # 获取当前价格
+                current_price = self.quantitative_service._get_optimized_current_price(symbol)
+                
+                # 生成验证信号
+                signal_type = self._generate_high_score_validation_signal(strategy_type, params, current_price)
+                
+                # 计算验证PnL（使用真实策略逻辑）
+                validation_pnl = self._calculate_high_score_validation_pnl(
+                    strategy_type, params, signal_type, current_price, original_score
+                )
+                
+                # 记录验证交易
+                trade_id = self._save_high_score_validation_trade(
+                    strategy_id, validation_id, i+1, signal_type, current_price, validation_pnl
+                )
+                
+                validation_trades.append({
+                    'trade_id': trade_id,
+                    'signal_type': signal_type,
+                    'price': current_price,
+                    'pnl': validation_pnl,
+                    'sequence': i+1
+                })
+                
+                time.sleep(1)  # 避免过快交易
+            
+            # 🔧 分析验证结果
+            validation_score = self._calculate_high_score_validation_score(validation_trades, original_score)
+            score_difference = abs(validation_score - original_score)
+            
+            # 🔧 判断验证结果
+            if score_difference <= 10:  # 允许±10分误差
+                validation_result = 'passed'
+                score_adjustment = 0
+                next_validation = datetime.now() + timedelta(hours=48)  # 48小时后再次验证
+            elif validation_score < original_score * 0.8:  # 表现下降超过20%
+                validation_result = 'failed'
+                score_adjustment = -min(15, score_difference)  # 最多扣15分
+                next_validation = datetime.now() + timedelta(hours=12)  # 12小时后重新验证
+            else:
+                validation_result = 'warning'
+                score_adjustment = -5  # 轻微调整
+                next_validation = datetime.now() + timedelta(hours=24)  # 24小时后再次验证
+            
+            # 🔧 保存验证记录
+            self._save_high_score_validation_record(
+                strategy_id, original_score, validation_trades, validation_score, 
+                validation_result, score_adjustment, next_validation
+            )
+            
+            # 🔧 应用分数调整（如有需要）
+            if score_adjustment != 0:
+                new_score = max(20, original_score + score_adjustment)  # 最低20分
+                self._apply_high_score_adjustment(strategy_id, new_score, validation_result)
+            
+            return {
+                'validation_id': validation_id,
+                'original_score': original_score,
+                'validation_score': validation_score,
+                'result': validation_result,
+                'score_adjustment': score_adjustment,
+                'trades_count': len(validation_trades)
+            }
+            
+        except Exception as e:
+            print(f"❌ 执行高分策略验证失败: {e}")
+            return None
+
+    def _generate_high_score_validation_signal(self, strategy_type: str, parameters: Dict, current_price: float) -> str:
+        """🔧 新增：为高分策略生成验证信号"""
+        try:
+            # 使用与优化验证相同的逻辑，确保一致性
+            price_data = {'current_price': current_price}
+            return self._generate_optimization_validation_signal(strategy_type, parameters, price_data)
+        except:
+            return 'hold'
+
+    def _calculate_high_score_validation_pnl(self, strategy_type: str, parameters: Dict, 
+                                           signal_type: str, price: float, original_score: float) -> float:
+        """🔧 新增：计算高分策略验证PnL"""
+        try:
+            # 🔧 根据策略分数调整验证金额
+            base_amount = 20.0  # 高分策略使用更大验证金额
+            if original_score >= 85:
+                validation_amount = 50.0  # 顶级策略
+            elif original_score >= 75:
+                validation_amount = 35.0
+            else:
+                validation_amount = base_amount
+            
+            # 使用与优化验证相同的PnL计算逻辑
+            return self._calculate_optimization_validation_pnl(
+                strategy_type, parameters, signal_type, price, validation_amount
+            )
+        except:
+            return 0.0
+
+    def _calculate_high_score_validation_score(self, validation_trades: List[Dict], original_score: float) -> float:
+        """🔧 新增：计算高分策略验证得分"""
+        try:
+            if not validation_trades:
+                return original_score * 0.5  # 严重惩罚
+            
+            # 基础统计
+            total_pnl = sum(trade['pnl'] for trade in validation_trades)
+            win_trades = [trade for trade in validation_trades if trade['pnl'] > 0]
+            win_rate = len(win_trades) / len(validation_trades) * 100
+            
+            # 🔧 高分策略验证评分标准更严格
+            pnl_score = min(max(total_pnl * 8 + 50, 10), 95)  # PnL权重稍降低
+            win_rate_score = min(win_rate * 1.1, 90)  # 胜率权重提高
+            
+            # 🔧 一致性检查（高分策略应该表现稳定）
+            pnl_values = [trade['pnl'] for trade in validation_trades]
+            pnl_std = np.std(pnl_values) if len(pnl_values) > 1 else 0
+            consistency_score = max(80 - pnl_std * 40, 20)  # 更严格的一致性要求
+            
+            # 🔧 综合评分（与原评分对比）
+            validation_score = (pnl_score * 0.4 + win_rate_score * 0.35 + consistency_score * 0.25)
+            
+            # 🔧 高分策略期望调整
+            expected_performance = min(original_score * 0.95, 90)  # 期望保持95%表现
+            if validation_score >= expected_performance:
+                return validation_score
+            else:
+                # 未达到期望，给予适当惩罚
+                return validation_score * 0.9
+                
+        except Exception as e:
+            print(f"❌ 计算高分验证得分失败: {e}")
+            return original_score * 0.7
+
+    def _save_high_score_validation_trade(self, strategy_id: str, validation_id: str, 
+                                        sequence: int, signal_type: str, price: float, pnl: float) -> str:
+        """🔧 新增：保存高分策略验证交易"""
+        try:
+            trade_id = f"HIGH_VAL_TRADE_{validation_id}_{sequence}"
+            
+            # 保存到strategy_trade_logs，标记为高分验证交易
+            cursor = self.quantitative_service.conn.cursor()
+            cursor.execute("""
+                INSERT INTO strategy_trade_logs 
+                (id, strategy_id, signal_type, price, quantity, confidence, executed, pnl, 
+                 created_at, trade_type, validation_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
+            """, (
+                trade_id, strategy_id, signal_type, price, 
+                20.0, 0.9, 1, pnl, 'score_verification', validation_id
+            ))
+            self.quantitative_service.conn.commit()
+            
+            return trade_id
+            
+        except Exception as e:
+            print(f"❌ 保存高分验证交易失败: {e}")
+            return f"FALLBACK_{int(time.time())}"
+
+    def _save_high_score_validation_record(self, strategy_id: str, original_score: float,
+                                         validation_trades: List[Dict], validation_score: float,
+                                         validation_result: str, score_adjustment: float,
+                                         next_validation: datetime):
+        """🔧 新增：保存高分策略验证记录"""
+        try:
+            cursor = self.quantitative_service.conn.cursor()
+            
+            validation_details = {
+                'trades': validation_trades,
+                'pnl_total': sum(trade['pnl'] for trade in validation_trades),
+                'win_rate': len([t for t in validation_trades if t['pnl'] > 0]) / len(validation_trades) * 100,
+                'validation_timestamp': datetime.now().isoformat()
+            }
+            
+            cursor.execute("""
+                INSERT INTO high_score_validation 
+                (strategy_id, validation_type, original_score, validation_trades, 
+                 validation_success_rate, validation_pnl, validation_result, 
+                 score_adjustment, validation_details, next_validation)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                strategy_id, 'periodic_check', original_score, len(validation_trades),
+                validation_details['win_rate'], validation_details['pnl_total'],
+                validation_result, score_adjustment, json.dumps(validation_details),
+                next_validation
+            ))
+            self.quantitative_service.conn.commit()
+            
+            print(f"📝 高分策略验证记录已保存: {strategy_id[-4:]} = {validation_result}")
+            
+        except Exception as e:
+            print(f"❌ 保存高分验证记录失败: {e}")
+
+    def _apply_high_score_adjustment(self, strategy_id: str, new_score: float, reason: str):
+        """🔧 新增：应用高分策略评分调整"""
+        try:
+            cursor = self.quantitative_service.conn.cursor()
+            
+            # 更新策略评分
+            cursor.execute("""
+                UPDATE strategies 
+                SET final_score = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (new_score, strategy_id))
+            
+            # 记录调整日志
+            cursor.execute("""
+                INSERT INTO strategy_evolution_logs (action, details, timestamp)
+                VALUES (%s, %s, CURRENT_TIMESTAMP)
+            """, (
+                'score_adjustment',
+                f"高分策略{strategy_id[-4:]}验证结果{reason}，评分调整至{new_score:.1f}"
+            ))
+            
+            self.quantitative_service.conn.commit()
+            print(f"🔧 策略{strategy_id[-4:]}评分已调整至{new_score:.1f} (原因: {reason})")
+            
+        except Exception as e:
+            print(f"❌ 应用高分策略评分调整失败: {e}")
 
 def main():
     """主程序入口"""
