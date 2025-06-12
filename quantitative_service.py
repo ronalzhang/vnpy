@@ -1961,15 +1961,20 @@ class AutomatedStrategyManager:
             # ⭐ 使用统一方法获取策略
             strategy = self.quantitative_service._get_strategy_by_id(strategy_id)
             if strategy:
-                # 根据分配调整交易量
+                # 根据分配调整交易量 - 修复天文数字问题
                 base_quantity = strategy.get("parameters", {}).get('quantity', 1.0)
                 
                 # ⭐ 使用统一API获取策略总数
                 strategies_response = self.quantitative_service.get_strategies()
                 total_strategies = len(strategies_response.get('data', [])) if strategies_response.get('success') else 1
                 
-                allocation_factor = allocation / (self.initial_capital / total_strategies)
-                new_quantity = base_quantity * allocation_factor
+                # 🚨 修复分配因子计算，避免天文数字
+                # 确保分母不为0且合理
+                per_strategy_capital = max(self.initial_capital / total_strategies, 100.0)  # 每策略至少100U
+                allocation_factor = min(allocation / per_strategy_capital, 10.0)  # 限制最大10倍放大
+                
+                # 🚨 应用安全的数量计算，防止异常放大
+                new_quantity = min(base_quantity * allocation_factor, 1000.0)  # 限制最大数量1000
                 
                 # 更新策略参数
                 new_params = strategy.get("parameters", {}).copy()
