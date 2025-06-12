@@ -2004,34 +2004,30 @@ def get_strategy_optimization_logs(strategy_id):
 def get_quantitative_positions():
     """获取真实持仓信息 - 使用账户余额数据"""
     try:
-        # 使用和account-info相同的逻辑获取币安余额
+        # 使用和account-info相同的逻辑获取币安余额  
         if 'binance' in exchange_clients:
             try:
                 binance_client = exchange_clients['binance']
                 balance_data = binance_client.fetch_balance()
+                print(f"💼 获取余额数据成功，包含 {len(balance_data.get('total', {}))} 个资产")
                 
                 positions = []
                 # 从total余额中获取所有非零资产
-                print(f"📊 开始处理 {len(balance_data.get('total', {}))} 个资产...")
                 for symbol, amount in balance_data.get('total', {}).items():
                     if amount and amount > 0:  # 只显示有余额的资产
-                        print(f"💰 处理资产: {symbol} = {amount}")
                         # 获取真实价格
                         if symbol in ['USDT', 'USDC', 'BUSD']:
                             # 稳定币价格为1
-                            print(f"💵 {symbol} 是稳定币，设置价格为1.0")
                             avg_price = 1.0
                             current_price = 1.0
                         else:
                             try:
                                 # 获取真实价格
-                                print(f"🔍 正在获取 {symbol}/USDT 价格...")
                                 ticker = binance_client.fetch_ticker(f"{symbol}/USDT")
                                 current_price = float(ticker['last'])
                                 avg_price = current_price  # 简化处理，使用当前价格作为平均价格
-                                print(f"✅ {symbol}/USDT 价格获取成功: {current_price}")
                             except Exception as e:
-                                print(f"❌ 获取 {symbol} 价格失败: {e}")
+                                print(f"获取 {symbol} 价格失败: {e}")
                                 avg_price = 1.0
                                 current_price = 1.0
                         
