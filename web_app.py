@@ -2014,12 +2014,28 @@ def get_quantitative_positions():
                 # 从total余额中获取所有非零资产
                 for symbol, amount in balance_data.get('total', {}).items():
                     if amount and amount > 0:  # 只显示有余额的资产
+                        # 获取真实价格
+                        if symbol in ['USDT', 'USDC', 'BUSD']:
+                            # 稳定币价格为1
+                            avg_price = 1.0
+                            current_price = 1.0
+                        else:
+                            try:
+                                # 获取真实价格
+                                ticker = binance_client.fetch_ticker(f"{symbol}/USDT")
+                                current_price = float(ticker['last'])
+                                avg_price = current_price  # 简化处理，使用当前价格作为平均价格
+                            except Exception as e:
+                                print(f"获取 {symbol} 价格失败: {e}")
+                                avg_price = 1.0
+                                current_price = 1.0
+                        
                         position = {
                             'symbol': symbol,
                             'quantity': float(amount),
-                            'avg_price': 1.0,  # 稳定币价格为1
-                            'current_price': 1.0,
-                            'unrealized_pnl': 0.0,  # 稳定币不计算未实现损益
+                            'avg_price': avg_price,
+                            'current_price': current_price,
+                            'unrealized_pnl': (current_price - avg_price) * float(amount),
                             'realized_pnl': 0.0,
                             'exchange': 'binance'
                         }
