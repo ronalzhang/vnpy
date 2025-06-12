@@ -3454,18 +3454,34 @@ class QuantitativeService:
                 # 🔥 新增：检查全局买卖失衡，强制纠正
                 else:
                     # 检查全局买卖比例失衡（解决91%:9%问题）
-                    global_signals = self.db_manager.execute_query("""
-                        SELECT 
-                            COUNT(CASE WHEN signal_type = 'buy' THEN 1 END) as global_buy,
-                            COUNT(CASE WHEN signal_type = 'sell' THEN 1 END) as global_sell
-                        FROM trading_signals 
-                        WHERE timestamp > NOW() - INTERVAL '6 hours'
-                    """, fetch_one=True)
-                    
-                    if global_signals and len(global_signals) >= 2:
-                        global_buy = global_signals[0] if global_signals[0] is not None else 0
-                        global_sell = global_signals[1] if global_signals[1] is not None else 0
-                    else:
+                    try:
+                        global_signals = self.db_manager.execute_query("""
+                            SELECT 
+                                COUNT(CASE WHEN signal_type = 'buy' THEN 1 END) as global_buy,
+                                COUNT(CASE WHEN signal_type = 'sell' THEN 1 END) as global_sell
+                            FROM trading_signals 
+                            WHERE timestamp > NOW() - INTERVAL '6 hours'
+                        """, fetch_one=True)
+                        
+                        # 安全处理查询结果
+                        if global_signals:
+                            if hasattr(global_signals, '_asdict'):
+                                # 如果是namedtuple，转换为字典
+                                signal_dict = global_signals._asdict()
+                                global_buy = signal_dict.get('global_buy', 0) or 0
+                                global_sell = signal_dict.get('global_sell', 0) or 0
+                            elif isinstance(global_signals, (list, tuple)) and len(global_signals) >= 2:
+                                # 如果是列表或元组
+                                global_buy = global_signals[0] if global_signals[0] is not None else 0
+                                global_sell = global_signals[1] if global_signals[1] is not None else 0
+                            else:
+                                global_buy = 0
+                                global_sell = 0
+                        else:
+                            global_buy = 0
+                            global_sell = 0
+                    except Exception as e:
+                        print(f"⚠️ 获取全局信号统计失败: {e}")
                         global_buy = 0
                         global_sell = 0
                     global_total = global_buy + global_sell
