@@ -2012,11 +2012,14 @@ def get_quantitative_positions():
                 
                 positions = []
                 # 从total余额中获取所有非零资产
+                print(f"📊 开始处理 {len(balance_data.get('total', {}))} 个资产...")
                 for symbol, amount in balance_data.get('total', {}).items():
                     if amount and amount > 0:  # 只显示有余额的资产
+                        print(f"💰 处理资产: {symbol} = {amount}")
                         # 获取真实价格
                         if symbol in ['USDT', 'USDC', 'BUSD']:
                             # 稳定币价格为1
+                            print(f"💵 {symbol} 是稳定币，设置价格为1.0")
                             avg_price = 1.0
                             current_price = 1.0
                         else:
