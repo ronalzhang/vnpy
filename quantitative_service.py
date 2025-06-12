@@ -3256,7 +3256,7 @@ class QuantitativeService:
                 SELECT COUNT(*) as total, 
                        SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins
                 FROM strategy_trade_logs 
-                WHERE strategy_id = %s AND executed = true
+                WHERE strategy_id = %s AND executed = TRUE
             '''
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             
@@ -3274,7 +3274,7 @@ class QuantitativeService:
         try:
             query = '''
                 SELECT COUNT(*) as count FROM strategy_trade_logs 
-                WHERE strategy_id = %s AND executed = true
+                WHERE strategy_id = %s AND executed = TRUE
             '''
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             return result.get('count', 0) if result else 0
@@ -3288,7 +3288,7 @@ class QuantitativeService:
         try:
             query = '''
                 SELECT SUM(pnl) as total_pnl FROM strategy_trade_logs 
-                WHERE strategy_id = %s AND executed = true
+                WHERE strategy_id = %s AND executed = TRUE
             '''
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             total_pnl = result.get('total_pnl', 0.0) if result else 0.0
@@ -3330,7 +3330,7 @@ class QuantitativeService:
                 MAX(timestamp) as last_trade_time,
                 COUNT(*) as total_executed_trades
             FROM trading_signals 
-            WHERE strategy_id = %s AND executed = true
+            WHERE strategy_id = %s AND executed = TRUE
             """
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
             
@@ -4744,7 +4744,7 @@ class QuantitativeService:
                 query = f'''
                     SELECT timestamp, symbol, signal_type, price, confidence, executed
                     FROM trading_signals 
-                    WHERE executed = true
+                    WHERE executed = TRUE
                     ORDER BY timestamp DESC 
                     LIMIT {limit}
                 '''
@@ -4902,7 +4902,7 @@ class QuantitativeService:
             
             # 统计交易次数
             try:
-                query = "SELECT COUNT(*) as count FROM strategy_trade_logs WHERE executed = true"
+                query = "SELECT COUNT(*) as count FROM strategy_trade_logs WHERE executed = TRUE"
                 result = self.db_manager.execute_query(query, fetch_one=True)
                 total_trades = result.get('count', 0) if result else 0
             except Exception as e:
