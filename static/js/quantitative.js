@@ -1116,6 +1116,12 @@ class QuantitativeSystem {
             }
         } catch (error) {
             console.error('加载真实收益数据失败:', error);
+            // 显示空图表而不是错误
+            if (performanceChart) {
+                performanceChart.data.labels = [];
+                performanceChart.data.datasets[0].data = [];
+                performanceChart.update();
+            }
         }
     }
 
@@ -1220,11 +1226,11 @@ class QuantitativeSystem {
                 
                 // 更新图表数据
                 const labels = data.data.map(item => {
-                    const date = new Date(item.timestamp);
+                    const date = new Date(item.date || item.timestamp);
                     return date.toLocaleDateString();
                 });
                 
-                const balances = data.data.map(item => item.total_balance);
+                const balances = data.data.map(item => item.balance || item.total_balance);
                 
                 if (this.balanceChart) {
                     this.balanceChart.data.labels = labels;
@@ -1236,7 +1242,7 @@ class QuantitativeSystem {
                 }
                 
                 // 更新当前资产显示
-                const currentBalance = data.data[data.data.length - 1].total_balance;
+                const currentBalance = data.data[data.data.length - 1].balance || data.data[data.data.length - 1].total_balance;
                 const currentBalanceEl = document.getElementById('currentBalance');
                 if (currentBalanceEl) {
                     currentBalanceEl.textContent = `${currentBalance.toLocaleString()}U`;
