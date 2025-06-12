@@ -3462,8 +3462,12 @@ class QuantitativeService:
                         WHERE timestamp > NOW() - INTERVAL '6 hours'
                     """, fetch_one=True)
                     
-                    global_buy = global_signals[0] if global_signals else 0
-                    global_sell = global_signals[1] if global_signals else 0
+                    if global_signals and len(global_signals) >= 2:
+                        global_buy = global_signals[0] if global_signals[0] is not None else 0
+                        global_sell = global_signals[1] if global_signals[1] is not None else 0
+                    else:
+                        global_buy = 0
+                        global_sell = 0
                     global_total = global_buy + global_sell
                     
                     # 如果全局买入占比超过75%，强制生成卖出信号
