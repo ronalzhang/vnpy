@@ -2004,37 +2004,46 @@ def get_strategy_optimization_logs(strategy_id):
 def get_quantitative_positions():
     """获取真实持仓信息 - 使用账户余额数据"""
     try:
-        # 使用和account-info相同的逻辑获取余额
-        balance = safe_get_account_balance()
-        
-        if balance is None:
+        # 使用和account-info相同的逻辑获取币安余额
+        if 'binance' in exchange_clients:
+            try:
+                binance_client = exchange_clients['binance']
+                balance_data = binance_client.fetch_balance()
+                
+                positions = []
+                # 从total余额中获取所有非零资产
+                for symbol, amount in balance_data.get('total', {}).items():
+                    if amount and amount > 0:  # 只显示有余额的资产
+                        position = {
+                            'symbol': symbol,
+                            'quantity': float(amount),
+                            'avg_price': 1.0,  # 稳定币价格为1
+                            'current_price': 1.0,
+                            'unrealized_pnl': 0.0,  # 稳定币不计算未实现损益
+                            'realized_pnl': 0.0,
+                            'exchange': 'binance'
+                        }
+                        positions.append(position)
+                
+                return jsonify({
+                    "success": True,
+                    "data": positions,
+                    "message": f"获取到 {len(positions)} 个持仓"
+                })
+                
+            except Exception as e:
+                print(f"从币安获取持仓失败: {e}")
+                return jsonify({
+                    "success": False,
+                    "message": f"获取币安持仓失败: {str(e)}",
+                    "data": []
+                })
+        else:
             return jsonify({
                 "success": True,
-                "message": "暂无持仓",
+                "message": "币安客户端未初始化，暂无持仓",
                 "data": []
             })
-        
-        # 将余额转换为持仓格式
-        positions = []
-        if isinstance(balance, dict):
-            for symbol, amount in balance.items():
-                if amount and amount > 0:  # 只显示有余额的资产
-                    position = {
-                        'symbol': symbol,
-                        'quantity': float(amount),
-                        'avg_price': 1.0,  # 稳定币价格为1
-                        'current_price': 1.0,
-                        'unrealized_pnl': 0.0,  # 稳定币不计算未实现损益
-                        'realized_pnl': 0.0,
-                        'exchange': 'binance'
-                    }
-                    positions.append(position)
-        
-        return jsonify({
-            "success": True,
-            "data": positions,
-            "message": f"获取到 {len(positions)} 个持仓"
-        })
         
     except Exception as e:
         print(f"获取持仓信息失败: {e}")
