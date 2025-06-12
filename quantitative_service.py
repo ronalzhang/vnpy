@@ -3563,10 +3563,11 @@ class QuantitativeService:
             strategy_score = strategy.get('final_score', 50)
             
             if signal_type == 'buy':
-                # 🔧 验证交易：即使余额为0也要生成信号
+                # 🔧 验证交易：即使余额为0也要生成信号，使用更有意义的验证金额
                 if strategy_score < 65:  # 验证交易
-                    trade_amount = 0.5  # 固定验证交易金额
-                    print(f"💰 策略{strategy_id[-4:]}验证交易买入: 固定金额{trade_amount} USDT")
+                    # 🔥 增加验证交易金额，模拟真实交易环境下的风险验证
+                    trade_amount = 5.0  # 提升至5 USDT验证金额，更好验证策略风险
+                    print(f"💰 策略{strategy_id[-4:]}验证交易买入: 固定金额{trade_amount} USDT (模拟验证)")
                 elif current_balance > 0:  # 真实交易
                     trade_amount = min(
                         current_balance * 0.06,  # 6%的余额
@@ -3576,8 +3577,8 @@ class QuantitativeService:
                     trade_amount = max(0.1, trade_amount)  # 最少0.1 USDT（降低要求）
                     print(f"💰 策略{strategy_id[-4:]}真实交易买入: 金额{trade_amount} USDT (余额{current_balance:.2f})")
                 else:  # 余额为0但需要生成买入信号（验证场景）
-                    trade_amount = 0.1  # 最小验证金额
-                    print(f"💰 策略{strategy_id[-4:]}零余额验证买入: 金额{trade_amount} USDT")
+                    trade_amount = 8.0  # 提升最小验证金额至8 USDT，测试更真实的风险
+                    print(f"💰 策略{strategy_id[-4:]}零余额验证买入: 金额{trade_amount} USDT (模拟验证)")
                 
                 quantity = trade_amount / current_price
             else:
@@ -7719,8 +7720,14 @@ class EvolutionaryStrategyEngine:
             # 计算验证交易的盈亏
             pnl = self._calculate_validation_pnl(strategy_type, parameters, signal_type, current_price)
             
-            # 计算交易量（固定小额验证交易）
-            quantity = 0.001 if symbol.startswith('BTC') else 0.01
+            # 计算交易量（提升验证交易量以更好验证策略风险）
+            # 🔥 根据验证金额计算合理的交易量，验证交易可以用更大金额来测试真实风险
+            if symbol.startswith('BTC'):
+                quantity = 10.0 / current_price  # 10 USDT等值的BTC，验证更大风险
+            elif symbol.startswith('ETH'):
+                quantity = 8.0 / current_price  # 8 USDT等值的ETH，验证更大风险
+            else:
+                quantity = 5.0 / current_price  # 5 USDT等值的其他币种，验证更大风险
             
             trade_result = {
                 'strategy_id': strategy_id,
@@ -8666,11 +8673,19 @@ class EvolutionaryStrategyEngine:
                 confidence = random.uniform(0.6, 0.9)
             
             # 记录验证交易日志
+            # 🔥 使用更有意义的验证交易数量，验证交易用更大金额模拟真实风险
+            if symbol.startswith('BTC'):
+                validation_quantity = 10.0 / current_price  # 10 USDT等值的BTC
+            elif symbol.startswith('ETH'):
+                validation_quantity = 8.0 / current_price  # 8 USDT等值的ETH
+            else:
+                validation_quantity = 5.0 / current_price  # 5 USDT等值的其他币种
+                
             self.log_strategy_trade(
                 strategy_id=strategy_id,
                 signal_type=signal_type.lower(),
                 price=current_price,
-                quantity=0.01,  # 验证交易使用最小数量
+                quantity=validation_quantity,  # 使用更有意义的验证交易数量
                 confidence=confidence,
                 executed=1,  # 验证交易默认执行
                 pnl=pnl
