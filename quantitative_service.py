@@ -7097,18 +7097,17 @@ class EvolutionaryStrategyEngine:
                 'timestamp': datetime.now().isoformat()
             }
             
-            for strategy in strategies:
-                self.quantitative_service.db_manager.execute_query("""
-                    INSERT INTO strategy_snapshots 
-                    (strategy_id, snapshot_name, parameters, final_score, performance_metrics)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (
-                    strategy['id'],
-                    f"{snapshot_type}_G{self.current_generation}_C{self.current_cycle}",
-                    json.dumps(strategy.get('parameters', {})),
-                    strategy.get('final_score', 0),
-                    json.dumps(snapshot_data)
-                ))
+            # 使用strategy_evolution_history表记录快照信息
+            snapshot_summary = f"快照类型: {snapshot_type}, 策略数: {len(strategies)}, 平均评分: {snapshot_data['avg_score']:.1f}"
+            
+            self.quantitative_service.db_manager.execute_query("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, action_type, evolution_type, generation, cycle, notes, timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, (
+                f'SNAPSHOT_{snapshot_type.upper()}', 'generation_snapshot', 'system_evolution',
+                self.current_generation, self.current_cycle, snapshot_summary
+            ))
                 
         except Exception as e:
             logger.error(f"保存演化快照失败: {e}")
@@ -9640,12 +9639,14 @@ class EvolutionaryStrategyEngine:
             )
             
             # 🔧 记录进化日志
+            # 记录到策略优化日志表
             self.quantitative_service.db_manager.execute_query("""
-                INSERT INTO strategy_evolution_logs (action, details, timestamp)
-                VALUES (%s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO strategy_optimization_logs (strategy_id, optimization_type, trigger_reason, timestamp)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
             """, (
-                'optimized',
-                f"策略{strategy_id[-4:]}参数优化验证通过并应用: {change_summary}"
+                strategy_id,
+                'parameter_optimization_applied',
+                f"参数优化验证通过并应用: {change_summary}"
             ))
             
             print(f"✅ 策略{strategy_id[-4:]}验证通过的参数已应用到真实交易")
