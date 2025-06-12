@@ -3523,14 +3523,69 @@ class QuantitativeService:
         print(f"🔧 策略{strategy_id[-4:]}信号决策: 评分={strategy_score:.1f}, 类型={strategy_type}, 余额={current_balance:.2f}")
         print(f"📊 需要买入{buy_needed}个(已生成{buy_generated}个), 允许卖出{sell_allowed}个(已生成{sell_generated}个), 持仓={has_position}")
         
-        # 🔧 验证交易优先（不受余额限制）
+        # 🔧 验证交易优先（不受余额限制），确保买卖平衡
         # 低分策略需要验证交易来提升评分
         if strategy_score < 65:
-            if buy_generated < buy_needed:
-                print(f"✅ 策略{strategy_id[-4:]}验证交易买入信号（低分策略无余额限制）")
+            # 🔥 修复：确保买卖信号平衡生成，优先生成买入，但要保证有卖出
+            if buy_generated < buy_needed and sell_generated < sell_allowed:
+                # 🔥 修复：强制买卖信号平衡，纠正极端不平衡问题
+                import random
+                current_balance_ratio = buy_generated / max(sell_generated, 1)  # 当前买卖比例
+                
+                # 如果买信号过多（比例>3:1），强制生成卖信号
+                if current_balance_ratio > 3.0:
+                    print(f"✅ 策略{strategy_id[-4:]}强制平衡：卖出信号（纠正买卖失衡 {current_balance_ratio:.1f}:1）")
+                    return 'sell'
+                # 如果卖信号过多（比例<0.5:1），强制生成买信号  
+                elif current_balance_ratio < 0.5:
+                    print(f"✅ 策略{strategy_id[-4:]}强制平衡：买入信号（纠正卖买失衡 1:{1/current_balance_ratio:.1f}）")
+                    return 'buy'
+                # 🔥 新增：检查全局买卖失衡，强制纠正
+                else:
+                    # 检查全局买卖比例失衡（解决91%:9%问题）
+                    cursor.execute("""
+                        SELECT 
+                            COUNT(CASE WHEN signal_type = 'buy' THEN 1 END) as global_buy,
+                            COUNT(CASE WHEN signal_type = 'sell' THEN 1 END) as global_sell
+                        FROM trading_signals 
+                        WHERE timestamp > NOW() - INTERVAL '6 hours'
+                    """)
+                    
+                    global_signals = cursor.fetchone()
+                    global_buy = global_signals[0] if global_signals else 0
+                    global_sell = global_signals[1] if global_signals else 0
+                    global_total = global_buy + global_sell
+                    
+                    # 如果全局买入占比超过75%，强制生成卖出信号
+                    if global_total > 10 and global_buy / global_total > 0.75:
+                        if sell_generated < sell_allowed:
+                            print(f"🔥 策略{strategy_id[-4:]}全局失衡纠正：卖出信号（全局比例 {global_buy}:{global_sell}）")
+                            return 'sell'
+                    
+                    # 如果全局卖出占比超过75%，强制生成买入信号
+                    if global_total > 10 and global_sell / global_total > 0.75:
+                        if buy_generated < buy_needed:
+                            print(f"🔥 策略{strategy_id[-4:]}全局失衡纠正：买入信号（全局比例 {global_buy}:{global_sell}）")
+                            return 'buy'
+                    
+                    # 正常平衡策略：确保买卖都有机会，目标6:4比例
+                    target_buy_ratio = 0.6
+                    if buy_generated <= sell_generated:
+                        probability_buy = target_buy_ratio  # 稍微偏向买入
+                    else:
+                        probability_buy = 1 - target_buy_ratio  # 稍微偏向卖出
+                    
+                    if random.random() < probability_buy:
+                        print(f"✅ 策略{strategy_id[-4:]}平衡验证：买入信号（目标6:4比例）")
+                        return 'buy'
+                    else:
+                        print(f"✅ 策略{strategy_id[-4:]}平衡验证：卖出信号（目标6:4比例）")
+                        return 'sell'
+            elif buy_generated < buy_needed:
+                print(f"✅ 策略{strategy_id[-4:]}验证交易买入信号（买入需求）")
                 return 'buy'
             elif sell_generated < sell_allowed:
-                print(f"✅ 策略{strategy_id[-4:]}验证交易卖出信号（低分策略无余额限制）")
+                print(f"✅ 策略{strategy_id[-4:]}验证交易卖出信号（卖出需求）")
                 return 'sell'
         
         # 🎯 高评分策略优先生成买入信号
@@ -9646,6 +9701,32 @@ class EvolutionaryStrategyEngine:
                 '参数优化验证通过', 0
             )
             
+            # 🔥 新增：立即重新计算并更新策略评分
+            try:
+                updated_stats = self._get_strategy_performance_stats(strategy_id)
+                new_score = self.quantitative_service._calculate_strategy_score(
+                    updated_stats['total_pnl'], 
+                    updated_stats['win_rate'], 
+                    updated_stats['sharpe_ratio'],
+                    updated_stats['max_drawdown'],
+                    updated_stats['profit_factor'],
+                    updated_stats['total_trades']
+                )
+                
+                # 立即更新数据库中的评分
+                self.quantitative_service.db_manager.execute_query("""
+                    UPDATE strategies 
+                    SET final_score = %s, win_rate = %s, total_return = %s, 
+                        total_trades = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (new_score, updated_stats['win_rate'], updated_stats['total_pnl'], 
+                      updated_stats['total_trades'], strategy_id))
+                
+                print(f"🔥 策略{strategy_id[-4:]}评分实时更新: {new_score:.1f}分 (验证交易更新)")
+                
+            except Exception as e:
+                print(f"❌ 策略评分实时更新失败: {e}")
+            
             # 🔧 记录进化日志
             change_summary = '; '.join([f"{c.get('parameter', 'unknown')}: {c.get('from', 'N/A')}→{c.get('to', 'N/A')}" for c in changes[:3]])
             self.quantitative_service.db_manager.execute_query("""
@@ -9656,10 +9737,212 @@ class EvolutionaryStrategyEngine:
                 f"策略{strategy_id[-4:]}参数优化验证通过并应用: {change_summary}"
             ))
             
+            # 🔥 新增：智能进化决策系统 - 根据评分变化智能触发下一步进化
+            self._intelligent_evolution_decision(strategy_id, new_score, updated_stats)
+            
             print(f"✅ 策略{strategy_id[-4:]}验证通过的参数已应用到真实交易")
             
         except Exception as e:
             print(f"❌ 应用验证参数失败: {e}")
+
+    def _intelligent_evolution_decision(self, strategy_id: str, current_score: float, current_stats: Dict):
+        """🔥 新增：智能进化决策系统 - 根据评分变化智能触发进化"""
+        try:
+            # 获取历史评分
+            previous_score = self.quantitative_service._get_previous_strategy_score(strategy_id)
+            score_change = current_score - previous_score
+            
+            # 获取策略基本信息
+            strategy = self.quantitative_service._get_strategy_by_id(strategy_id)
+            win_rate = current_stats.get('win_rate', 0)
+            total_trades = current_stats.get('total_trades', 0)
+            
+            print(f"🧠 策略{strategy_id[-4:]}智能进化决策: 评分 {previous_score:.1f}→{current_score:.1f} (变化{score_change:+.1f})")
+            
+            # 🎯 决策逻辑：根据评分变化和表现制定进化策略
+            if score_change >= 5 and current_score >= 75:
+                # 评分显著提升且达到高分 - 保护并微调
+                decision = self._protect_and_fine_tune_strategy(strategy_id, current_score, current_stats)
+                print(f"🏆 策略{strategy_id[-4:]}表现优秀，采用保护性微调策略")
+                
+            elif score_change >= 2 and current_score >= 65:
+                # 评分稳步提升且合格 - 巩固优势
+                decision = self._consolidate_advantage_strategy(strategy_id, current_score, current_stats)
+                print(f"📈 策略{strategy_id[-4:]}稳步改善，采用巩固优势策略")
+                
+            elif -3 <= score_change <= 2 and current_score >= 60:
+                # 评分稳定在中等水平 - 适度优化
+                decision = self._moderate_optimization_strategy(strategy_id, current_score, current_stats)
+                print(f"⚖️ 策略{strategy_id[-4:]}表现稳定，采用适度优化策略")
+                
+            elif score_change < -3 or current_score < 60:
+                # 评分下降或较低 - 积极优化
+                decision = self._aggressive_optimization_strategy(strategy_id, current_score, current_stats)
+                print(f"🚨 策略{strategy_id[-4:]}需要改进，采用积极优化策略")
+                
+            else:
+                # 默认情况 - 标准优化
+                decision = self._standard_optimization_strategy(strategy_id, current_score, current_stats)
+                print(f"🔧 策略{strategy_id[-4:]}采用标准优化策略")
+            
+            # 记录决策日志
+            self.quantitative_service.db_manager.execute_query("""
+                INSERT INTO strategy_evolution_logs (action, details, timestamp)
+                VALUES (%s, %s, CURRENT_TIMESTAMP)
+            """, (
+                'intelligent_decision',
+                f"策略{strategy_id[-4:]}智能决策: {decision['action']} | 原因: {decision['reason']} | 评分变化: {score_change:+.1f}"
+            ))
+            
+        except Exception as e:
+            print(f"❌ 智能进化决策失败: {e}")
+
+    def _protect_and_fine_tune_strategy(self, strategy_id: str, score: float, stats: Dict) -> Dict:
+        """🏆 保护并微调高分策略"""
+        # 对高分策略进行保护性微调，避免过度优化
+        self._mark_strategy_protected(strategy_id, 3, f"高分策略保护 (评分{score:.1f})")
+        
+        # 只对非关键参数进行小幅调整
+        return {
+            'action': 'protective_fine_tune',
+            'reason': f'评分{score:.1f}，保护性微调',
+            'priority': 'low',
+            'params_to_adjust': ['quantity', 'confidence_threshold'],
+            'adjustment_range': 0.05  # 5%的微调
+        }
+
+    def _consolidate_advantage_strategy(self, strategy_id: str, score: float, stats: Dict) -> Dict:
+        """📈 巩固优势策略"""
+        # 巩固当前优势，适度扩展
+        return {
+            'action': 'consolidate_advantage',
+            'reason': f'评分{score:.1f}，巩固优势',
+            'priority': 'medium',
+            'params_to_adjust': ['lookback_period', 'threshold', 'quantity'],
+            'adjustment_range': 0.1  # 10%的调整
+        }
+
+    def _moderate_optimization_strategy(self, strategy_id: str, score: float, stats: Dict) -> Dict:
+        """⚖️ 适度优化策略"""
+        # 中等表现策略，适度优化
+        return {
+            'action': 'moderate_optimization', 
+            'reason': f'评分{score:.1f}，适度优化',
+            'priority': 'medium',
+            'params_to_adjust': ['threshold', 'lookback_period', 'stop_loss_pct', 'take_profit_pct'],
+            'adjustment_range': 0.15  # 15%的调整
+        }
+
+    def _aggressive_optimization_strategy(self, strategy_id: str, score: float, stats: Dict) -> Dict:
+        """🚨 积极优化策略"""
+        # 低分或下降策略，积极优化
+        return {
+            'action': 'aggressive_optimization',
+            'reason': f'评分{score:.1f}，需要积极改进', 
+            'priority': 'high',
+            'params_to_adjust': ['threshold', 'lookback_period', 'std_multiplier', 'quantity', 
+                               'stop_loss_pct', 'take_profit_pct', 'grid_spacing', 'breakout_threshold'],
+            'adjustment_range': 0.25  # 25%的大幅调整
+        }
+
+    def _standard_optimization_strategy(self, strategy_id: str, score: float, stats: Dict) -> Dict:
+        """🔧 标准优化策略"""
+        # 标准优化流程
+        return {
+            'action': 'standard_optimization',
+            'reason': f'评分{score:.1f}，标准优化',
+            'priority': 'medium',
+            'params_to_adjust': ['threshold', 'lookback_period', 'quantity', 'stop_loss_pct'],
+            'adjustment_range': 0.12  # 12%的调整
+        }
+
+    def _update_strategy_score_after_validation(self, strategy_id: str, pnl: float, signal_type: str):
+        """🔥 新增：验证交易后立即更新策略评分"""
+        try:
+            # 🔧 获取最新交易统计
+            updated_stats = self._get_strategy_performance_stats(strategy_id)
+            
+            # 🔧 计算新评分（包含实时交易效果）
+            new_score = self.quantitative_service._calculate_strategy_score(
+                updated_stats['total_pnl'], 
+                updated_stats['win_rate'], 
+                updated_stats['sharpe_ratio'],
+                updated_stats['max_drawdown'],
+                updated_stats['profit_factor'],
+                updated_stats['total_trades']
+            )
+            
+            # 🔧 立即更新数据库评分
+            self.quantitative_service.db_manager.execute_query("""
+                UPDATE strategies 
+                SET final_score = %s, win_rate = %s, total_return = %s, 
+                    total_trades = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (new_score, updated_stats['win_rate'], updated_stats['total_pnl'], 
+                  updated_stats['total_trades'], strategy_id))
+            
+            # 🔧 记录评分更新日志
+            print(f"📊 策略{strategy_id[-4:]}实时评分更新: {new_score:.1f}分 | {signal_type}交易PnL: {pnl:+.4f}")
+            
+            # 🔧 保存评分历史
+            self.quantitative_service._save_strategy_score_history(strategy_id, new_score)
+            
+            return new_score
+            
+        except Exception as e:
+            print(f"❌ 实时评分更新失败: {e}")
+            return None
+
+    def _create_real_time_scoring_system(self):
+        """🔥 新增：创建实时评分系统表"""
+        try:
+            self.quantitative_service.db_manager.execute_query("""
+                CREATE TABLE IF NOT EXISTS real_time_scoring (
+                    id SERIAL PRIMARY KEY,
+                    strategy_id VARCHAR(50) NOT NULL,
+                    score_before DECIMAL(10,2),
+                    score_after DECIMAL(10,2),
+                    score_change DECIMAL(10,2),
+                    trigger_event VARCHAR(100),  -- 'validation_trade', 'real_trade', 'optimization'
+                    trade_pnl DECIMAL(15,6),
+                    trade_signal_type VARCHAR(10),
+                    total_trades INTEGER,
+                    win_rate DECIMAL(5,2),
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_strategy_scoring (strategy_id, timestamp)
+                )
+            """)
+            
+            print("✅ 实时评分系统表创建完成")
+            
+        except Exception as e:
+            print(f"❌ 创建实时评分系统表失败: {e}")
+
+    def _log_score_change(self, strategy_id: str, score_before: float, score_after: float, 
+                         trigger_event: str, trade_pnl: float = None, signal_type: str = None):
+        """🔥 新增：记录评分变化日志"""
+        try:
+            score_change = score_after - score_before
+            
+            # 获取当前策略统计
+            updated_stats = self._get_strategy_performance_stats(strategy_id)
+            
+            self.quantitative_service.db_manager.execute_query("""
+                INSERT INTO real_time_scoring 
+                (strategy_id, score_before, score_after, score_change, trigger_event, 
+                 trade_pnl, trade_signal_type, total_trades, win_rate, timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, (
+                strategy_id, score_before, score_after, score_change, trigger_event,
+                trade_pnl, signal_type, updated_stats.get('total_trades', 0), 
+                updated_stats.get('win_rate', 0)
+            ))
+            
+            if abs(score_change) >= 1:  # 只记录显著变化
+                print(f"🎯 策略{strategy_id[-4:]}评分变化: {score_before:.1f}→{score_after:.1f} ({score_change:+.1f}) | 触发: {trigger_event}")
+                
+        except Exception as e:
+            print(f"❌ 记录评分变化失败: {e}")
 
     def _handle_optimization_validation_failure(self, strategy_id: str, old_params: Dict, changes: List[Dict]):
         """🔧 新增：处理参数优化验证失败"""
