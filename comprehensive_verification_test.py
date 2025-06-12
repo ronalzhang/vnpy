@@ -143,10 +143,10 @@ class ComprehensiveVerificationTest:
                 self.cursor.execute("""
                     INSERT INTO trading_signals (
                         strategy_id, symbol, signal_type, price, quantity, 
-                        confidence, executed, pnl, timestamp,
+                        confidence, executed, expected_return, timestamp,
                         trade_type, validation_id, validation_round
                     ) VALUES (
-                        %s, 'BTCUSDT', %s, %s, 10.0, 0.8, true, %s, %s,
+                        %s, 'BTCUSDT', %s, %s, 10.0, 0.8, 1, %s, %s,
                         'score_verification', %s, %s
                     )
                 """, (
