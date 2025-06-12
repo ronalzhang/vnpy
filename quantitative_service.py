@@ -3454,15 +3454,14 @@ class QuantitativeService:
                 # 🔥 新增：检查全局买卖失衡，强制纠正
                 else:
                     # 检查全局买卖比例失衡（解决91%:9%问题）
-                    cursor.execute("""
+                    global_signals = self.db_manager.execute_query("""
                         SELECT 
                             COUNT(CASE WHEN signal_type = 'buy' THEN 1 END) as global_buy,
                             COUNT(CASE WHEN signal_type = 'sell' THEN 1 END) as global_sell
                         FROM trading_signals 
                         WHERE timestamp > NOW() - INTERVAL '6 hours'
-                    """)
+                    """, fetch_one=True)
                     
-                    global_signals = cursor.fetchone()
                     global_buy = global_signals[0] if global_signals else 0
                     global_sell = global_signals[1] if global_signals else 0
                     global_total = global_buy + global_sell
