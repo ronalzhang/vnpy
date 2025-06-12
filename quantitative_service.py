@@ -4047,7 +4047,18 @@ class QuantitativeService:
         try:
             print("🔍 开始执行策略查询...")
             
-            # 🔥 修复：回到使用包装方法，但确保参数正确
+            # 🔥 修复：获取前端配置的maxStrategies限制，只处理排名前N的策略
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT value FROM system_settings WHERE key = 'maxStrategies'")
+                result = cursor.fetchone()
+                max_strategies = int(result[0]) if result else 20  # 默认20个
+            except Exception as e:
+                print(f"⚠️ 获取maxStrategies配置失败，使用默认值20: {e}")
+                max_strategies = 20
+            
+            print(f"🎯 遵循maxStrategies配置：只处理前{max_strategies}个策略")
+            
             query = """
                 SELECT id, name, symbol, type, enabled, parameters, 
                        final_score, win_rate, total_return, total_trades,
@@ -4055,10 +4066,10 @@ class QuantitativeService:
                 FROM strategies 
                 WHERE id LIKE 'STRAT_%' 
                 ORDER BY final_score DESC, total_trades DESC
-                LIMIT 50
+                LIMIT %s
             """
             print("🔍 执行数据库查询...")
-            rows = self.db_manager.execute_query(query, fetch_all=True)
+            rows = self.db_manager.execute_query(query, (max_strategies,), fetch_all=True)
             print(f"🔍 查询完成，获得 {len(rows) if rows else 0} 条记录")
             
             if not rows:
@@ -5378,36 +5389,11 @@ class QuantitativeService:
             return False
 
     def check_and_start_signal_generation(self):
-        """检查并启动信号生成"""
+        """检查并启动信号生成（删除重复循环，使用主循环）"""
         try:
-            if not self.running:
-                print("⚠️ 系统未运行，正在启动...")
-                self.start()
-                
-            # 启动信号生成
-            if not hasattr(self, '_signal_thread') or not self._signal_thread.is_alive():
-                import threading
-                import time
-                
-                def signal_generation_loop():
-                    """交易信号生成循环"""
-                    while self.running:
-                        try:
-                            # 每30秒生成一次交易信号
-                            signals = self.generate_trading_signals()
-                            if signals:
-                                print(f"🎯 生成了 {len(signals)} 个交易信号")
-                            else:
-                                print("📊 暂无满足条件的交易信号")
-                            time.sleep(30)  # 30秒
-                        except Exception as e:
-                            print(f"信号生成错误: {e}")
-                            time.sleep(60)
-                
-                self._signal_thread = threading.Thread(target=signal_generation_loop, daemon=True)
-                self._signal_thread.start()
-                print("🎯 交易信号生成器已启动")
-                
+            # 🔥 删除重复的信号生成循环，统一使用_start_auto_management中的信号生成循环
+            # 主循环在4575行已经包含了信号生成功能，避免重复处理
+            print("🎯 使用主循环中的信号生成，无需启动重复循环")
             return True
             
         except Exception as e:
@@ -8134,8 +8120,9 @@ class EvolutionaryStrategyEngine:
         # 随机选择交易对
         symbol = random.choice(template['symbols'])
         
-        # 🔥 修复：确保进化系统也使用完整格式的策略ID
-        strategy_id = f"STRAT_{strategy_type.upper()}_{symbol.replace('/', '_')}_{random.randint(1000, 9999)}"
+        # 🔥 修复：使用完整UUID格式而非短ID
+        import uuid
+        strategy_id = f"STRAT_{strategy_type.upper()}_{uuid.uuid4().hex[:8].upper()}"
         
         # 增强的随机策略创建 (在现有基础上添加代数信息)
         new_generation = self.current_generation + 1

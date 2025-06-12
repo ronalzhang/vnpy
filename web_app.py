@@ -1438,7 +1438,9 @@ def quantitative_strategies():
                 }), 400
             
             # 生成策略ID
-            strategy_id = f"STRAT_{symbol.replace('/', '_')}_{str(uuid.uuid4())[:8]}"
+            import uuid
+            # 🔥 修复：使用完整UUID格式而非短ID
+            strategy_id = f"STRAT_{data['type'].upper()}_{uuid.uuid4().hex[:8].upper()}"
             
             # 直接插入数据库
             conn = get_db_connection()
@@ -3106,9 +3108,9 @@ def create_strategy():
                 return jsonify({"status": "error", "message": f"缺少必要字段: {field}"})
         
         # 生成策略ID
-        import random
-        # 🔥 修复：手动创建策略也使用完整格式ID
-        strategy_id = f"STRAT_{data['type'].upper()}_{data['symbol'].replace('/', '_')}_{random.randint(1000, 9999)}"
+        import uuid
+        # 🔥 修复：使用完整UUID格式而非短ID
+        strategy_id = f"STRAT_{data['type'].upper()}_{uuid.uuid4().hex[:8].upper()}"
         
         # 创建策略配置
         strategy_config = {
