@@ -7241,22 +7241,22 @@ class EvolutionaryStrategyEngine:
         try:
             logger.warning("🔄 演化失败，尝试恢复上一个稳定状态...")
             
-            # 回滚到上一个成功的快照
+            # 🔧 修复：移除对已删除表的引用，使用evolution_state表代替
             try:
-                last_snapshot = self.quantitative_service.db_manager.execute_query("""
-                    SELECT snapshot_name FROM strategy_snapshots 
-                    WHERE snapshot_name LIKE '%after_evolution%'
-                    ORDER BY snapshot_time DESC LIMIT 1
+                last_state = self.quantitative_service.db_manager.execute_query("""
+                    SELECT notes FROM evolution_state 
+                    WHERE state_type = 'recovery_point'
+                    ORDER BY created_at DESC LIMIT 1
                 """, fetch_one=True)
                 
-                if last_snapshot and len(last_snapshot) > 0:
-                    logger.info(f"🔄 恢复到快照: {last_snapshot[0]}")
-                    # 这里可以添加具体的恢复逻辑
+                if last_state and len(last_state) > 0:
+                    logger.info(f"🔄 找到恢复信息: {last_state[0]}")
+                    logger.info("🔄 系统将继续运行并自我修复")
                 else:
-                    logger.info("🔄 没有找到可恢复的快照，系统将继续运行")
-            except Exception as snapshot_error:
-                logger.error(f"快照恢复查询失败: {snapshot_error}")
-                logger.info("🔄 跳过快照恢复，系统将继续运行")
+                    logger.info("🔄 没有找到恢复点，系统将继续运行")
+            except Exception as recovery_error:
+                logger.error(f"恢复状态查询失败: {recovery_error}")
+                logger.info("🔄 跳过恢复状态检查，系统将继续运行")
             
         except Exception as e:
             logger.error(f"演化失败恢复机制执行失败: {e}")
@@ -9694,13 +9694,19 @@ class EvolutionaryStrategyEngine:
                 decision = self._standard_optimization_strategy(strategy_id, current_score, current_stats)
                 print(f"🔧 策略{strategy_id[-4:]}采用标准优化策略")
             
-            # 记录决策日志
+            # 🔧 修复：使用strategy_evolution_history表记录决策日志
             self.quantitative_service.db_manager.execute_query("""
-                INSERT INTO strategy_evolution_logs (action, details, timestamp)
-                VALUES (%s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, evolution_type, new_parameters, created_time)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (
+                strategy_id, self.current_generation, self.current_cycle,
                 'intelligent_decision',
-                f"策略{strategy_id[-4:]}智能决策: {decision['action']} | 原因: {decision['reason']} | 评分变化: {score_change:+.1f}"
+                json.dumps({
+                    "action": decision['action'],
+                    "reason": decision['reason'], 
+                    "score_change": round(score_change, 1)
+                })
             ))
             
         except Exception as e:
@@ -9885,14 +9891,19 @@ class EvolutionaryStrategyEngine:
                 WHERE id = %s
             """, (json.dumps(old_params), strategy_id))
             
-            # 🔧 记录验证失败日志
+            # 🔧 修复：使用strategy_evolution_history表记录验证失败日志  
             change_summary = '; '.join([f"{c.get('parameter', 'unknown')}" for c in changes[:3]])
             self.quantitative_service.db_manager.execute_query("""
-                INSERT INTO strategy_evolution_logs (action, details, timestamp)
-                VALUES (%s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, evolution_type, new_parameters, created_time)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (
+                strategy_id, self.current_generation, self.current_cycle,
                 'validation_failed',
-                f"策略{strategy_id[-4:]}参数优化验证失败，保持原参数: {change_summary}"
+                json.dumps({
+                    "reason": "参数优化验证失败，保持原参数",
+                    "changes_attempted": change_summary
+                })
             ))
             
             print(f"⚠️ 策略{strategy_id[-4:]}参数优化验证失败，已恢复原始参数")

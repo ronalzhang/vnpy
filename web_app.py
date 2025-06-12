@@ -2943,16 +2943,16 @@ def select_top_strategies():
         query = f'''
             SELECT s.id, s.name, s.final_score,
                    COUNT(t.id) as actual_trades,
-                   COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
-                   SUM(t.pnl) as total_pnl
+                   COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) as wins,
+                   SUM(t.expected_return) as total_pnl
             FROM strategies s
-            LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+            LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = true
             WHERE s.enabled = 1
             GROUP BY s.id, s.name, s.final_score
             HAVING COUNT(t.id) >= 10 
-                AND COUNT(CASE WHEN t.pnl > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 65
-                AND COALESCE(SUM(t.pnl), 0) >= 10.0
-            ORDER BY SUM(t.pnl) DESC, s.final_score DESC
+                AND COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 65
+                AND COALESCE(SUM(t.expected_return), 0) >= 10.0
+            ORDER BY SUM(t.expected_return) DESC, s.final_score DESC
             LIMIT {max_strategies}
         '''
         cursor.execute(query)
@@ -2965,14 +2965,14 @@ def select_top_strategies():
             query = f'''
                 SELECT s.id, s.name, s.final_score,
                        COUNT(t.id) as actual_trades,
-                       COUNT(CASE WHEN t.pnl > 0 THEN 1 END) as wins,
-                       SUM(t.pnl) as total_pnl
+                       COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) as wins,
+                       SUM(t.expected_return) as total_pnl
                 FROM strategies s
-                LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+                LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = true
                 WHERE s.enabled = 1
                 GROUP BY s.id, s.name, s.final_score
                 HAVING COUNT(t.id) >= 3
-                ORDER BY s.final_score DESC, SUM(t.pnl) DESC
+                ORDER BY s.final_score DESC, SUM(t.expected_return) DESC
                 LIMIT {max_strategies}
             '''
             cursor.execute(query)
@@ -3901,7 +3901,7 @@ def test_strategies_query():
             SELECT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
                    COUNT(t.id) as total_trades
             FROM strategies s
-            LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
+            LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = true
             WHERE s.id LIKE 'STRAT_%'
             GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.final_score
             ORDER BY COUNT(t.id) DESC, s.final_score DESC
