@@ -4728,22 +4728,31 @@ class QuantitativeService:
     def _fetch_fresh_balance(self):
         """获取实时余额信息"""
         try:
-            if hasattr(self, 'exchanges') and self.exchanges:
-                for exchange_name, exchange in self.exchanges.items():
+            # 🔧 修复：使用正确的字段名 exchange_clients 而不是 exchanges
+            if hasattr(self, 'exchange_clients') and self.exchange_clients:
+                for exchange_name, exchange in self.exchange_clients.items():
                     if exchange:
-                        balance = exchange.fetch_balance()
-                        usdt_balance = balance.get('USDT', {}).get('free', 0)
-                        if usdt_balance > 0:
-                            return float(usdt_balance)
+                        try:
+                            balance = exchange.fetch_balance()
+                            usdt_balance = balance.get('USDT', {}).get('free', 0)
+                            if usdt_balance > 0:
+                                print(f"✅ 从{exchange_name}获取到余额: {usdt_balance} USDT")
+                                return float(usdt_balance)
+                        except Exception as e:
+                            print(f"⚠️ 获取{exchange_name}余额失败: {e}")
+                            continue
             
-            # 从数据库获取
+            # 如果没有交易所客户端或余额获取失败，从数据库获取
             result = self.db_manager.execute_query(
                 "SELECT balance FROM account_info ORDER BY timestamp DESC LIMIT 1", 
                 fetch_one=True
             )
             if result:
-                return float(result.get('balance', 0))
+                db_balance = float(result.get('balance', 0))
+                print(f"📊 从数据库获取余额: {db_balance} USDT")
+                return db_balance
             
+            print("⚠️ 无法获取余额信息，所有数据源都失败")
             return 0  # 无法获取余额时返回0，避免使用误导性的硬编码值
         except Exception as e:
             print(f"❌ 获取余额失败: {e}")
