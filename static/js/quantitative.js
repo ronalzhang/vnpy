@@ -391,7 +391,7 @@ class QuantitativeSystem {
                                 </div>
                                 <div class="col-6">
                                     <div class="metric-item">
-                                        <div class="text-warning fw-bold">${((totalReturn / 30) * 100).toFixed(3)}%</div>
+                                        <div class="text-warning fw-bold">${((strategy.daily_return || 0) * 100).toFixed(3)}%</div>
                                         <small class="text-muted">日收益</small>
                                     </div>
                                 </div>

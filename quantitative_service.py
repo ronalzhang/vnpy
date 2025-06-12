@@ -3320,6 +3320,75 @@ class QuantitativeService:
             except:
                 pass
 
+    def _calculate_strategy_daily_return(self, strategy_id, total_return):
+        """🔧 计算策略真实日收益率 - 基于实际运行天数"""
+        try:
+            # 获取策略首次交易时间和最新交易时间
+            query = """
+            SELECT 
+                MIN(timestamp) as first_trade_time,
+                MAX(timestamp) as last_trade_time,
+                COUNT(*) as total_executed_trades
+            FROM trading_signals 
+            WHERE strategy_id = %s AND executed = true
+            """
+            result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+            
+            if result and result.get('first_trade_time') and result.get('last_trade_time'):
+                from datetime import datetime
+                
+                # 计算实际运行天数
+                first_time = result['first_trade_time']
+                last_time = result['last_trade_time']
+                
+                # 如果是字符串，转换为datetime对象
+                if isinstance(first_time, str):
+                    first_time = datetime.fromisoformat(first_time.replace('Z', '+00:00'))
+                if isinstance(last_time, str):
+                    last_time = datetime.fromisoformat(last_time.replace('Z', '+00:00'))
+                
+                # 计算运行天数，至少1天
+                running_days = max((last_time - first_time).days, 1)
+                
+                # 如果运行时间少于1天，按1天计算
+                if running_days == 0:
+                    running_days = 1
+                
+                # 计算日均收益率
+                daily_return = total_return / running_days if running_days > 0 else 0.0
+                
+                return daily_return
+            
+            else:
+                # 没有交易记录，检查策略创建时间
+                query = """
+                SELECT created_at FROM strategies WHERE id = %s
+                """
+                strategy_result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
+                
+                if strategy_result and strategy_result.get('created_at'):
+                    from datetime import datetime
+                    
+                    created_time = strategy_result['created_at']
+                    if isinstance(created_time, str):
+                        created_time = datetime.fromisoformat(created_time.replace('Z', '+00:00'))
+                    
+                    # 计算从创建到现在的天数
+                    now = datetime.now()
+                    running_days = max((now - created_time).days, 1)
+                    
+                    daily_return = total_return / running_days if running_days > 0 else 0.0
+                    return daily_return
+                
+                # 完全没有时间参考，默认按30天计算（向下兼容）
+                daily_return = total_return / 30.0 if total_return != 0 else 0.0
+                return daily_return
+                
+        except Exception as e:
+            print(f"❌ 计算策略 {strategy_id} 日收益失败: {e}")
+            # 错误时按总收益除以30天计算
+            return total_return / 30.0 if total_return != 0 else 0.0
+
     def generate_trading_signals(self):
         """生成交易信号 - 全面优化版本"""
         try:
@@ -4132,10 +4201,12 @@ class QuantitativeService:
                             'win_rate': float(row.get('win_rate', 0)),
                             'total_return': float(row.get('total_return', 0)),
                             'total_trades': int(row.get('total_trades', 0)),
+                            'daily_return': self._calculate_strategy_daily_return(row['id'], float(row.get('total_return', 0))),
                             'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,  # 🔧 修复门槛：65分以上符合真实交易条件
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
-                            'data_source': self._get_strategy_evolution_display(row['id'])
+                            'data_source': self._get_strategy_evolution_display(row['id']),
+                            'evolution_display': self._get_strategy_evolution_display(row['id'])
                         }
                     else:
                         # 备用处理（不应该执行到这里，因为只使用PostgreSQL）
@@ -4165,10 +4236,12 @@ class QuantitativeService:
                             'win_rate': float(row.get('win_rate', 0)),
                             'total_return': float(row.get('total_return', 0)),
                             'total_trades': int(row.get('total_trades', 0)),
+                            'daily_return': self._calculate_strategy_daily_return(row.get('id', ''), float(row.get('total_return', 0))),
                             'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,  # 🔧 修复门槛：65分以上符合真实交易条件
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
-                            'data_source': self._get_strategy_evolution_display(row.get('id', ''))
+                            'data_source': self._get_strategy_evolution_display(row.get('id', '')),
+                            'evolution_display': self._get_strategy_evolution_display(row.get('id', ''))
                         }
                     
                     strategies_list.append(strategy_data)
@@ -4514,7 +4587,7 @@ class QuantitativeService:
                 'win_rate': float(result.get('win_rate', 0)),
                 'total_return': float(result.get('total_return', 0)),
                 'total_trades': int(result.get('total_trades', 0)),
-                'daily_return': float(result.get('total_return', 0)) / 30 if result.get('total_return') else 0,  # 估算日收益
+                'daily_return': self._calculate_strategy_daily_return(strategy_id, float(result.get('total_return', 0))),
                 'created_time': result.get('created_at', ''),
                 'updated_time': result.get('updated_at', ''),
                 'data_source': self._get_strategy_evolution_display(strategy_id)
