@@ -4070,8 +4070,29 @@ class QuantitativeService:
                 LIMIT %s
             """
             print("🔍 执行数据库查询...")
-            rows = self.db_manager.execute_query(query, (max_strategies,), fetch_all=True)
-            print(f"🔍 查询完成，获得 {len(rows) if rows else 0} 条记录")
+            try:
+                rows = self.db_manager.execute_query(query, (max_strategies,), fetch_all=True)
+                print(f"🔍 查询完成，获得 {len(rows) if rows else 0} 条记录")
+            except Exception as e:
+                print(f"❌ 查询执行失败: {e}")
+                print(f"Query: {query}")
+                print(f"Params: ({max_strategies},)")
+                # 尝试不带参数的查询作为备用
+                try:
+                    fallback_query = f"""
+                        SELECT id, name, symbol, type, enabled, parameters, 
+                               final_score, win_rate, total_return, total_trades,
+                               created_at, updated_at, generation, cycle
+                        FROM strategies 
+                        WHERE id LIKE 'STRAT_%' 
+                        ORDER BY final_score DESC, total_trades DESC
+                        LIMIT {max_strategies}
+                    """
+                    rows = self.db_manager.execute_query(fallback_query, (), fetch_all=True)
+                    print(f"✅ 备用查询成功，获得 {len(rows) if rows else 0} 条记录")
+                except Exception as fallback_error:
+                    print(f"❌ 备用查询也失败: {fallback_error}")
+                    return {'success': False, 'error': str(e), 'data': []}
             
             if not rows:
                 print("⚠️ 没有找到STRAT_格式的策略，数据库可能存在问题")
