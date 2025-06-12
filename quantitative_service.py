@@ -1500,105 +1500,15 @@ class AutomatedStrategyManager:
     
     def _calculate_strategy_score(self, total_return: float, win_rate: float, 
                                 sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> float:
-        """🎯 重新设计的严格评分系统 - 现实的策略评估标准"""
+        """🔥 调用统一的评分计算函数 - 避免重复代码"""
         try:
-            # 🔥 严格权重分配 - 更现实的评分标准
-            weights = {
-                'win_rate': 0.30,      # 胜率权重
-                'total_return': 0.25,   # 收益权重  
-                'sharpe_ratio': 0.20,   # 夏普比率权重
-                'max_drawdown': 0.15,   # 风险控制权重
-                'profit_factor': 0.10   # 盈利因子权重
-            }
-            
-            # 🎯 严格胜率评分 - 大多数策略初始会低于60分
-            if win_rate >= 0.85:
-                win_score = 90.0 + (win_rate - 0.85) * 67  # 85%+胜率才能接近满分
-            elif win_rate >= 0.75:
-                win_score = 70.0 + (win_rate - 0.75) * 200  # 75-85%胜率得70-90分
-            elif win_rate >= 0.65:
-                win_score = 50.0 + (win_rate - 0.65) * 200  # 65-75%胜率得50-70分
-            elif win_rate >= 0.55:
-                win_score = 30.0 + (win_rate - 0.55) * 200  # 55-65%胜率得30-50分
-            else:
-                win_score = max(0, win_rate * 55)  # <55%胜率得分很低
-            
-            # 💰 严格收益评分 - 要求真实可持续的收益
-            if total_return >= 0.20:  # 20%+年化收益
-                return_score = 90.0 + min(10, (total_return - 0.20) * 50)
-            elif total_return >= 0.15:  # 15-20%年化收益
-                return_score = 70.0 + (total_return - 0.15) * 400
-            elif total_return >= 0.10:  # 10-15%年化收益
-                return_score = 50.0 + (total_return - 0.10) * 400
-            elif total_return >= 0.05:  # 5-10%年化收益
-                return_score = 25.0 + (total_return - 0.05) * 500
-            elif total_return > 0:
-                return_score = total_return * 500  # 0-5%收益得分很低
-            else:
-                return_score = max(0, 25 + total_return * 100)  # 负收益严重扣分
-            
-            # 📊 严格夏普比率评分
-            if sharpe_ratio >= 2.0:
-                sharpe_score = 90.0 + min(10, (sharpe_ratio - 2.0) * 5)
-            elif sharpe_ratio >= 1.5:
-                sharpe_score = 70.0 + (sharpe_ratio - 1.5) * 40
-            elif sharpe_ratio >= 1.0:
-                sharpe_score = 45.0 + (sharpe_ratio - 1.0) * 50
-            elif sharpe_ratio >= 0.5:
-                sharpe_score = 20.0 + (sharpe_ratio - 0.5) * 50
-            else:
-                sharpe_score = max(0, sharpe_ratio * 40)
-            
-            # 🛡️ 严格最大回撤评分 - 风险控制是关键
-            if max_drawdown <= 0.02:  # 回撤<=2%
-                drawdown_score = 95.0
-            elif max_drawdown <= 0.05:  # 2-5%回撤
-                drawdown_score = 80.0 - (max_drawdown - 0.02) * 500
-            elif max_drawdown <= 0.10:  # 5-10%回撤
-                drawdown_score = 60.0 - (max_drawdown - 0.05) * 400
-            elif max_drawdown <= 0.15:  # 10-15%回撤
-                drawdown_score = 40.0 - (max_drawdown - 0.10) * 400
-            else:
-                drawdown_score = max(0, 20 - (max_drawdown - 0.15) * 200)  # >15%回撤严重扣分
-            
-            # 💸 严格盈利因子评分
-            if profit_factor >= 2.5:
-                profit_score = 90.0 + min(10, (profit_factor - 2.5) * 4)
-            elif profit_factor >= 2.0:
-                profit_score = 70.0 + (profit_factor - 2.0) * 40
-            elif profit_factor >= 1.5:
-                profit_score = 45.0 + (profit_factor - 1.5) * 50
-            elif profit_factor >= 1.0:
-                profit_score = 20.0 + (profit_factor - 1.0) * 50
-            else:
-                profit_score = max(0, profit_factor * 20)
-            
-            # 🧮 计算最终评分
-            final_score = (
-                win_score * weights['win_rate'] +
-                return_score * weights['total_return'] +
-                sharpe_score * weights['sharpe_ratio'] +
-                drawdown_score * weights['max_drawdown'] +
-                profit_score * weights['profit_factor']
+            return self.quantitative_service._calculate_strategy_score(
+                total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor, total_trades
             )
-            
-            # 📉 交易次数惩罚 - 过少交易次数扣分
-            if total_trades < 10:
-                trade_penalty = (10 - total_trades) * 2  # 每缺少1次交易扣2分
-                final_score = max(0, final_score - trade_penalty)
-            elif total_trades > 1000:
-                trade_penalty = (total_trades - 1000) * 0.01  # 过度交易小幅扣分
-                final_score = max(0, final_score - trade_penalty)
-            
-            # 🎯 确保评分在0-100范围内
-            final_score = max(0.0, min(100.0, final_score))
-            
-            return final_score
-            
         except Exception as e:
             print(f"计算策略评分出错: {e}")
             return 0.0
-    
+
     def _rebalance_capital(self, performances: Dict[str, Dict]):
         """动态资金再平衡 - 优秀策略获得更多资金"""
         # 按评分排序
@@ -9702,34 +9612,15 @@ class EvolutionaryStrategyEngine:
                 '参数优化验证通过', 0
             )
             
-            # 🔥 新增：立即重新计算并更新策略评分
-            try:
-                updated_stats = self._get_strategy_performance_stats(strategy_id)
-                new_score = self.quantitative_service._calculate_strategy_score(
-                    updated_stats['total_pnl'], 
-                    updated_stats['win_rate'], 
-                    updated_stats['sharpe_ratio'],
-                    updated_stats['max_drawdown'],
-                    updated_stats['profit_factor'],
-                    updated_stats['total_trades']
-                )
-                
-                # 立即更新数据库中的评分
-                self.quantitative_service.db_manager.execute_query("""
-                    UPDATE strategies 
-                    SET final_score = %s, win_rate = %s, total_return = %s, 
-                        total_trades = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                """, (new_score, updated_stats['win_rate'], updated_stats['total_pnl'], 
-                      updated_stats['total_trades'], strategy_id))
-                
-                print(f"🔥 策略{strategy_id[-4:]}评分实时更新: {new_score:.1f}分 (验证交易更新)")
-                
-            except Exception as e:
-                print(f"❌ 策略评分实时更新失败: {e}")
+            # 🔥 使用统一评分更新系统
+            change_summary = '; '.join([f"{c.get('parameter', 'unknown')}: {c.get('from', 'N/A')}→{c.get('to', 'N/A')}" for c in changes[:3]])
+            new_score = self._unified_strategy_score_update(
+                strategy_id=strategy_id,
+                trigger_event='parameter_optimization_validated',
+                reason=f"参数优化验证通过: {change_summary}"
+            )
             
             # 🔧 记录进化日志
-            change_summary = '; '.join([f"{c.get('parameter', 'unknown')}: {c.get('from', 'N/A')}→{c.get('to', 'N/A')}" for c in changes[:3]])
             self.quantitative_service.db_manager.execute_query("""
                 INSERT INTO strategy_evolution_logs (action, details, timestamp)
                 VALUES (%s, %s, CURRENT_TIMESTAMP)
@@ -9737,9 +9628,6 @@ class EvolutionaryStrategyEngine:
                 'optimized',
                 f"策略{strategy_id[-4:]}参数优化验证通过并应用: {change_summary}"
             ))
-            
-            # 🔥 新增：智能进化决策系统 - 根据评分变化智能触发下一步进化
-            self._intelligent_evolution_decision(strategy_id, new_score, updated_stats)
             
             print(f"✅ 策略{strategy_id[-4:]}验证通过的参数已应用到真实交易")
             
@@ -9857,23 +9745,31 @@ class EvolutionaryStrategyEngine:
             'adjustment_range': 0.12  # 12%的调整
         }
 
-    def _update_strategy_score_after_validation(self, strategy_id: str, pnl: float, signal_type: str):
-        """🔥 新增：验证交易后立即更新策略评分"""
+    def _unified_strategy_score_update(self, strategy_id: str, trigger_event: str, 
+                                     trade_pnl: float = None, signal_type: str = None,
+                                     force_score: float = None, reason: str = None) -> float:
+        """🔥 统一策略评分更新系统 - 消除所有重复代码"""
         try:
-            # 🔧 获取最新交易统计
-            updated_stats = self._get_strategy_performance_stats(strategy_id)
+            # 🎯 获取更新前评分
+            score_before = self._get_strategy_current_score(strategy_id)
             
-            # 🔧 计算新评分（包含实时交易效果）
-            new_score = self.quantitative_service._calculate_strategy_score(
-                updated_stats['total_pnl'], 
-                updated_stats['win_rate'], 
-                updated_stats['sharpe_ratio'],
-                updated_stats['max_drawdown'],
-                updated_stats['profit_factor'],
-                updated_stats['total_trades']
-            )
+            if force_score is not None:
+                # 强制设置评分（用于高分调整等特殊场景）
+                new_score = force_score
+                updated_stats = self._get_strategy_performance_stats(strategy_id)
+            else:
+                # 🔧 获取最新交易统计并计算新评分
+                updated_stats = self._get_strategy_performance_stats(strategy_id)
+                new_score = self.quantitative_service._calculate_strategy_score(
+                    updated_stats['total_pnl'], 
+                    updated_stats['win_rate'], 
+                    updated_stats['sharpe_ratio'],
+                    updated_stats['max_drawdown'],
+                    updated_stats['profit_factor'],
+                    updated_stats['total_trades']
+                )
             
-            # 🔧 立即更新数据库评分
+            # 🔧 统一数据库更新逻辑
             self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
                 SET final_score = %s, win_rate = %s, total_return = %s, 
@@ -9882,17 +9778,31 @@ class EvolutionaryStrategyEngine:
             """, (new_score, updated_stats['win_rate'], updated_stats['total_pnl'], 
                   updated_stats['total_trades'], strategy_id))
             
-            # 🔧 记录评分更新日志
-            print(f"📊 策略{strategy_id[-4:]}实时评分更新: {new_score:.1f}分 | {signal_type}交易PnL: {pnl:+.4f}")
-            
             # 🔧 保存评分历史
             self.quantitative_service._save_strategy_score_history(strategy_id, new_score)
+            
+            # 🔧 记录评分变化日志
+            self._log_score_change(strategy_id, score_before, new_score, trigger_event, trade_pnl, signal_type)
+            
+            # 🔧 统一输出日志格式
+            score_change = new_score - score_before
+            if reason:
+                print(f"📊 策略{strategy_id[-4:]}评分更新: {score_before:.1f}→{new_score:.1f} ({score_change:+.1f}) | {trigger_event} | {reason}")
+            else:
+                if trade_pnl is not None:
+                    print(f"📊 策略{strategy_id[-4:]}评分更新: {score_before:.1f}→{new_score:.1f} ({score_change:+.1f}) | {trigger_event} | {signal_type}交易PnL: {trade_pnl:+.4f}")
+                else:
+                    print(f"📊 策略{strategy_id[-4:]}评分更新: {score_before:.1f}→{new_score:.1f} ({score_change:+.1f}) | {trigger_event}")
+            
+            # 🔥 智能进化协调机制 - 评分更新后自动触发进化决策
+            if abs(score_change) >= 0.5:  # 评分有显著变化才触发
+                self._intelligent_evolution_decision(strategy_id, new_score, updated_stats)
             
             return new_score
             
         except Exception as e:
-            print(f"❌ 实时评分更新失败: {e}")
-            return None
+            print(f"❌ 统一评分更新失败: {e}")
+            return score_before if 'score_before' in locals() else 50.0
 
     def _create_real_time_scoring_system(self):
         """🔥 新增：创建实时评分系统表"""
@@ -10244,19 +10154,18 @@ class EvolutionaryStrategyEngine:
             print(f"❌ 保存高分验证记录失败: {e}")
 
     def _apply_high_score_adjustment(self, strategy_id: str, new_score: float, reason: str):
-        """🔧 新增：应用高分策略评分调整"""
+        """🔧 应用高分策略评分调整 - 使用统一评分更新系统"""
         try:
-            cursor = self.quantitative_service.conn.cursor()
-            
-            # 更新策略评分
-            cursor.execute("""
-                UPDATE strategies 
-                SET final_score = %s, updated_at = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (new_score, strategy_id))
+            # 🔥 使用统一评分更新系统
+            self._unified_strategy_score_update(
+                strategy_id=strategy_id,
+                trigger_event='high_score_adjustment',
+                force_score=new_score,
+                reason=reason
+            )
             
             # 记录调整日志
-            cursor.execute("""
+            self.quantitative_service.db_manager.execute_query("""
                 INSERT INTO strategy_evolution_logs (action, details, timestamp)
                 VALUES (%s, %s, CURRENT_TIMESTAMP)
             """, (
@@ -10264,11 +10173,17 @@ class EvolutionaryStrategyEngine:
                 f"高分策略{strategy_id[-4:]}验证结果{reason}，评分调整至{new_score:.1f}"
             ))
             
-            self.quantitative_service.conn.commit()
-            print(f"🔧 策略{strategy_id[-4:]}评分已调整至{new_score:.1f} (原因: {reason})")
-            
         except Exception as e:
             print(f"❌ 应用高分策略评分调整失败: {e}")
+
+    def update_strategy_score_after_validation(self, strategy_id: str, pnl: float, signal_type: str):
+        """🔥 验证交易后更新策略评分 - 使用统一评分更新系统"""
+        return self._unified_strategy_score_update(
+            strategy_id=strategy_id,
+            trigger_event='validation_trade_executed',
+            trade_pnl=pnl,
+            signal_type=signal_type
+        )
 
 def main():
     """主程序入口"""
