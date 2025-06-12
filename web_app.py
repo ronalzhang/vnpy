@@ -1384,6 +1384,24 @@ def quantitative_strategies():
                     from strategy_parameters_config import get_strategy_default_parameters
                     parsed_params = get_strategy_default_parameters(stype)
 
+                # 🔧 计算日收益率 - 基于真实交易历史
+                daily_return = 0.0
+                if calculated_total_trades > 0:
+                    # 获取策略首次和最新交易时间
+                    cursor.execute("""
+                        SELECT MIN(timestamp) as first_trade, MAX(timestamp) as last_trade
+                        FROM trading_signals 
+                        WHERE strategy_id = %s AND expected_return IS NOT NULL
+                    """, (sid,))
+                    date_range = cursor.fetchone()
+                    if date_range and date_range[0] and date_range[1]:
+                        from datetime import datetime
+                        first_date = date_range[0] if isinstance(date_range[0], datetime) else datetime.fromisoformat(str(date_range[0]))
+                        last_date = date_range[1] if isinstance(date_range[1], datetime) else datetime.fromisoformat(str(date_range[1]))
+                        days_active = max(1, (last_date - first_date).days)
+                        total_return_decimal = float(total_pnl) / 100.0 if total_pnl else 0.0  # 转换为小数形式
+                        daily_return = total_return_decimal / days_active if days_active > 0 else 0.0
+                
                 strategy = {
                     'id': sid,
                     'name': name,
@@ -1396,8 +1414,10 @@ def quantitative_strategies():
                     'generation': generation,
                     'cycle': cycle,
                     'total_trades': calculated_total_trades,  # 🔥 使用重新计算的交易次数
-                    'win_rate': round(win_rate, 2),
-                    'total_pnl': float(total_pnl) if total_pnl else 0.0,
+                    'win_rate': round(win_rate / 100.0, 4),   # 🔧 转换为小数形式，与前端期望一致
+                    'total_return': round(float(total_pnl) / 100.0 if total_pnl else 0.0, 4),  # 🔧 使用total_return字段名，转换为小数
+                    'daily_return': round(daily_return, 6),   # 🔧 添加daily_return字段
+                    'total_pnl': float(total_pnl) if total_pnl else 0.0,  # 保留原字段用于兼容
                     'avg_pnl': float(avg_pnl) if avg_pnl else 0.0,
                     'sharpe_ratio': round(sharpe_ratio, 4),    # ⭐ 夏普比率
                     'max_drawdown': round(max_drawdown, 4),   # ⭐ 最大回撤
