@@ -2074,10 +2074,10 @@ def get_quantitative_signals():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 查询最新的交易信号 - 包括验证交易和真实交易信号
+        # 查询最新的交易信号 - 根据实际表结构查询
         cursor.execute("""
             SELECT strategy_id, signal_type, symbol, timestamp, price, quantity, 
-                   confidence, executed, trade_type, validation_id
+                   confidence, executed, status, side, expected_return, risk_level
             FROM trading_signals 
             ORDER BY timestamp DESC 
             LIMIT %s
@@ -2089,9 +2089,11 @@ def get_quantitative_signals():
             if len(row) >= 6:
                 strategy_id, signal_type, symbol, timestamp, price, quantity = row[:6]
                 confidence = row[6] if len(row) > 6 else 0.8
-                executed = row[7] if len(row) > 7 else False  
-                trade_type = row[8] if len(row) > 8 else 'real_trading'
-                validation_id = row[9] if len(row) > 9 else None
+                executed = row[7] if len(row) > 7 else 0
+                status = row[8] if len(row) > 8 else 'active'
+                side = row[9] if len(row) > 9 else 'buy'
+                expected_return = row[10] if len(row) > 10 else 0.0
+                risk_level = row[11] if len(row) > 11 else 'medium'
                 
                 signal = {
                     'strategy_id': strategy_id,
@@ -2101,9 +2103,11 @@ def get_quantitative_signals():
                     'price': float(price) if price else 0.0,
                     'quantity': float(quantity) if quantity else 0.0,
                     'confidence': float(confidence),
-                    'executed': bool(executed),
-                    'trade_type': trade_type,
-                    'validation_id': validation_id
+                    'executed': bool(executed) if executed else False,
+                    'status': status,
+                    'side': side,
+                    'expected_return': float(expected_return) if expected_return else 0.0,
+                    'risk_level': risk_level
                 }
                 signals.append(signal)
         
