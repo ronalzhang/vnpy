@@ -1449,7 +1449,7 @@ class QuantitativeSystem {
             const tbody = document.getElementById('signalsTable');
             if (!tbody) return;
             
-            if (data.success && data.data && data.data.length > 0) {
+            if ((data.success || data.status === 'success') && data.data && data.data.length > 0) {
                 tbody.innerHTML = data.data.slice(0, 15).map(signal => `
                     <tr>
                         <td>${this.formatTime(signal.timestamp)}</td>
