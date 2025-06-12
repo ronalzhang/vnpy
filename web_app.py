@@ -2002,54 +2002,63 @@ def get_strategy_optimization_logs(strategy_id):
 
 @app.route('/api/quantitative/positions', methods=['GET'])
 def get_quantitative_positions():
-    """获取当前持仓"""
+    """获取真实持仓信息 - 直接调用交易所API"""
     try:
-        # 获取实际的持仓数据
-        if quantitative_service:
-            try:
-                positions_data = quantitative_service.get_positions()
-                if positions_data and positions_data.get('success'):
-                    return jsonify({
-                        "success": True, 
-                        "data": positions_data.get('data', [])
-                    })
-            except Exception as e:
-                print(f"获取真实持仓失败，使用示例数据: {e}")
+        # 🔥 获取真实持仓数据，使用与account-info相同的逻辑
+        exchange_clients = init_api_clients()
+        positions = []
         
-        # 备用：返回示例持仓数据，展示系统正常运行
-        positions = [
-            {
-                'symbol': 'USDT',
-                'quantity': 0.0,  # 移除硬编码
-                'avg_price': 1.0,
-                'current_price': 1.0,
-                'unrealized_pnl': 0.0,
-                'realized_pnl': 0.0
-            },
-            {
-                'symbol': 'BTC',
-                'quantity': 0.00015,
-                'avg_price': 98500.0,
-                'current_price': 99000.0,
-                'unrealized_pnl': 7.5,
-                'realized_pnl': 0.0
-            },
-            {
-                'symbol': 'BNB',
-                'quantity': 0.02,
-                'avg_price': 635.5,
-                'current_price': 640.0,
-                'unrealized_pnl': 0.09,
-                'realized_pnl': 0.0
-            }
-        ]
+        for exchange_name, client in exchange_clients.items():
+            if client:
+                try:
+                    if exchange_name == 'binance':
+                        # 获取币安现货账户余额
+                        balance = client.fetch_balance()
+                        for symbol, data in balance['total'].items():
+                            if data > 0:  # 只显示有余额的币种
+                                # 获取当前价格
+                                try:
+                                    if symbol != 'USDT':
+                                        ticker = client.fetch_ticker(f"{symbol}/USDT")
+                                        current_price = ticker['last']
+                                    else:
+                                        current_price = 1.0
+                                except:
+                                    current_price = 0.0
+                                
+                                position = {
+                                    'symbol': symbol,
+                                    'quantity': float(data),
+                                    'avg_price': current_price,  # 现货没有成本价，使用当前价
+                                    'current_price': current_price,
+                                    'unrealized_pnl': 0.0,  # 现货没有未实现盈亏
+                                    'realized_pnl': 0.0,
+                                    'exchange': exchange_name
+                                }
+                                positions.append(position)
+                    
+                    elif exchange_name == 'okx':
+                        # OKX持仓逻辑（如果需要的话）
+                        pass
+                        
+                except Exception as ex:
+                    print(f"获取{exchange_name}持仓失败: {ex}")
+                    continue
+        
+        # 如果没有获取到任何持仓，返回空列表
+        if not positions:
+            positions = []
         
         return jsonify({
             "success": True,
-            "data": positions
+            "data": positions,
+            "message": f"获取到 {len(positions)} 个持仓"
         })
+        
     except Exception as e:
         print(f"获取持仓信息失败: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "status": "error",
             "message": f"获取持仓信息失败: {str(e)}"
@@ -2057,48 +2066,60 @@ def get_quantitative_positions():
 
 @app.route('/api/quantitative/signals', methods=['GET'])
 def get_quantitative_signals():
-    """获取最新信号"""
+    """获取最新交易信号 - 直接从数据库查询实时信号"""
     try:
-        # 🔧 修复：返回真实的交易信号数据
-        if not quantitative_service:
-            return jsonify({
-                "status": "error",
-                "message": "量化服务未初始化"
-            }), 500
+        limit = request.args.get('limit', 20, type=int)
         
-        # 🔥 获取真实信号数据
-        result = quantitative_service.get_signals(limit=20)
-        if result.get('success'):
-            signals = result.get('data', [])
-            
-            # 🔧 确保时间格式正确 
-            for signal in signals:
-                if 'timestamp' in signal:
-                    # 如果时间戳是字符串且看起来像错误格式，修复它
-                    timestamp_str = str(signal['timestamp'])
-                    if timestamp_str.startswith('2025-') or len(timestamp_str) > 19:
-                        # 使用当前时间减去一些时间作为合理的时间戳
-                        from datetime import datetime, timedelta
-                        import random
-                        now = datetime.now()
-                        # 随机生成最近几小时内的时间
-                        hours_ago = random.randint(1, 24)
-                        signal_time = now - timedelta(hours=hours_ago)
-                        signal['timestamp'] = signal_time.strftime('%Y-%m-%d %H:%M:%S')
-            
-            return jsonify({
-                "status": "success", 
-                "data": signals
-            })
-        else:
-            # 🔧 如果没有真实信号，返回空列表而不是假数据
-            return jsonify({
-                "status": "success",
-                "data": [],
-                "message": "暂无交易信号"
-            })
+        # 🔥 直接从数据库查询实时交易信号，不依赖quantitative_service
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查询最新的交易信号 - 包括验证交易和真实交易信号
+        cursor.execute("""
+            SELECT strategy_id, signal_type, symbol, timestamp, price, quantity, 
+                   confidence, executed, trade_type, validation_id
+            FROM trading_signals 
+            ORDER BY timestamp DESC 
+            LIMIT %s
+        """, (limit,))
+        
+        signals = []
+        for row in cursor.fetchall():
+            # 安全解包数据
+            if len(row) >= 6:
+                strategy_id, signal_type, symbol, timestamp, price, quantity = row[:6]
+                confidence = row[6] if len(row) > 6 else 0.8
+                executed = row[7] if len(row) > 7 else False  
+                trade_type = row[8] if len(row) > 8 else 'real_trading'
+                validation_id = row[9] if len(row) > 9 else None
+                
+                signal = {
+                    'strategy_id': strategy_id,
+                    'signal_type': signal_type,
+                    'symbol': symbol,
+                    'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else '',
+                    'price': float(price) if price else 0.0,
+                    'quantity': float(quantity) if quantity else 0.0,
+                    'confidence': float(confidence),
+                    'executed': bool(executed),
+                    'trade_type': trade_type,
+                    'validation_id': validation_id
+                }
+                signals.append(signal)
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "data": signals,
+            "message": f"获取到 {len(signals)} 条实时交易信号"
+        })
+        
     except Exception as e:
         print(f"获取交易信号失败: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "status": "error",
             "message": f"获取交易信号失败: {str(e)}"
