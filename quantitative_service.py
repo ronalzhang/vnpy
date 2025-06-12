@@ -3565,9 +3565,10 @@ class QuantitativeService:
             if signal_type == 'buy':
                 # 🔧 验证交易：即使余额为0也要生成信号，使用更有意义的验证金额
                 if strategy_score < 65:  # 验证交易
-                    # 🔥 增加验证交易金额，模拟真实交易环境下的风险验证
-                    trade_amount = 5.0  # 提升至5 USDT验证金额，更好验证策略风险
-                    print(f"💰 策略{strategy_id[-4:]}验证交易买入: 固定金额{trade_amount} USDT (模拟验证)")
+                    # 🔥 使用渐进式验证交易金额系统
+                    trade_amount = self.evolution_engine._get_validation_amount_by_stage(strategy_id, strategy['symbol'])
+                    stage = self.evolution_engine._get_strategy_validation_stage(strategy_id)
+                    print(f"💰 策略{strategy_id[-4:]}第{stage}阶段验证交易买入: 金额{trade_amount} USDT (渐进式验证)")
                 elif current_balance > 0:  # 真实交易
                     trade_amount = min(
                         current_balance * 0.06,  # 6%的余额
@@ -3577,8 +3578,10 @@ class QuantitativeService:
                     trade_amount = max(0.1, trade_amount)  # 最少0.1 USDT（降低要求）
                     print(f"💰 策略{strategy_id[-4:]}真实交易买入: 金额{trade_amount} USDT (余额{current_balance:.2f})")
                 else:  # 余额为0但需要生成买入信号（验证场景）
-                    trade_amount = 8.0  # 提升最小验证金额至8 USDT，测试更真实的风险
-                    print(f"💰 策略{strategy_id[-4:]}零余额验证买入: 金额{trade_amount} USDT (模拟验证)")
+                    # 🔥 使用渐进式验证交易金额系统
+                    trade_amount = self.evolution_engine._get_validation_amount_by_stage(strategy_id, strategy['symbol'])
+                    stage = self.evolution_engine._get_strategy_validation_stage(strategy_id)
+                    print(f"💰 策略{strategy_id[-4:]}零余额第{stage}阶段验证买入: 金额{trade_amount} USDT (渐进式验证)")
                 
                 quantity = trade_amount / current_price
             else:
@@ -7662,6 +7665,172 @@ class EvolutionaryStrategyEngine:
             print(f"❌ 生成验证交易失败: {e}")
             return []
     
+    # ==================== 🔥 新增：渐进式验证阶段管理系统 ====================
+    
+    def _get_strategy_validation_stage(self, strategy_id: str) -> int:
+        """获取策略当前验证阶段"""
+        try:
+            # 从数据库获取策略当前验证阶段
+            result = self.quantitative_service.db_manager.execute_query(
+                "SELECT validation_stage FROM strategies WHERE id = %s", 
+                (strategy_id,), fetch_one=True
+            )
+            
+            if result and 'validation_stage' in result:
+                return result['validation_stage'] or 1
+            
+            # 如果没有validation_stage字段，尝试添加
+            try:
+                self.quantitative_service.db_manager.execute_query(
+                    "ALTER TABLE strategies ADD COLUMN IF NOT EXISTS validation_stage INTEGER DEFAULT 1"
+                )
+                # 为该策略设置初始阶段
+                self.quantitative_service.db_manager.execute_query(
+                    "UPDATE strategies SET validation_stage = 1 WHERE id = %s", 
+                    (strategy_id,)
+                )
+                return 1
+            except:
+                pass
+            
+            return 1  # 默认第1阶段
+            
+        except Exception as e:
+            print(f"❌ 获取策略{strategy_id[-4:]}验证阶段失败: {e}")
+            return 1
+
+    def _get_validation_amount_by_stage(self, strategy_id: str, symbol: str) -> float:
+        """🔥 根据策略验证阶段获取对应的验证交易金额"""
+        try:
+            stage = self._get_strategy_validation_stage(strategy_id)
+            
+            # 🔥 渐进式验证金额等级系统
+            stage_amounts = {
+                1: 5.0,      # 第1阶段：基础验证 5U
+                2: 100.0,    # 第2阶段：中级验证 100U  
+                3: 500.0,    # 第3阶段：高级验证 500U
+                4: 2000.0,   # 第4阶段：专业验证 2000U
+                5: 10000.0   # 第5阶段：大资金验证 10000U
+            }
+            
+            base_amount = stage_amounts.get(stage, 5.0)
+            
+            # 🔥 根据币种调整验证金额
+            if symbol.startswith('BTC'):
+                final_amount = base_amount  # BTC用标准金额
+            elif symbol.startswith('ETH'):
+                final_amount = base_amount * 0.8  # ETH用80%金额
+            else:
+                final_amount = base_amount * 0.6  # 其他币种用60%金额
+            
+            print(f"🎯 策略{strategy_id[-4:]}第{stage}阶段验证: {symbol} 金额{final_amount}U")
+            return final_amount
+            
+        except Exception as e:
+            print(f"❌ 获取验证金额失败: {e}")
+            return 5.0  # 默认5U
+
+    def _get_strategy_historical_performance(self, strategy_id: str) -> Dict:
+        """获取策略历史最佳表现"""
+        try:
+            # 获取策略当前评分和成功率
+            result = self.quantitative_service.db_manager.execute_query(
+                "SELECT final_score, win_rate FROM strategies WHERE id = %s", 
+                (strategy_id,), fetch_one=True
+            )
+            
+            if result:
+                return {
+                    'score': result.get('final_score', 0),
+                    'win_rate': result.get('win_rate', 0)
+                }
+            
+            return {'score': 0, 'win_rate': 0}
+            
+        except Exception as e:
+            print(f"❌ 获取策略历史表现失败: {e}")
+            return {'score': 0, 'win_rate': 0}
+
+    def _should_upgrade_validation_stage(self, strategy_id: str, new_score: float, new_win_rate: float) -> bool:
+        """🔥 判断策略是否应该升级验证阶段"""
+        try:
+            # 获取历史最佳表现
+            historical = self._get_strategy_historical_performance(strategy_id)
+            old_score = historical['score']
+            old_win_rate = historical['win_rate']
+            
+            # 🔥 升级条件：评分AND成功率都有提升
+            score_improved = new_score > old_score
+            win_rate_improved = new_win_rate > old_win_rate
+            
+            # 需要显著提升才升级（防止小幅波动造成频繁升级）
+            significant_score_improvement = (new_score - old_score) >= 2.0  # 至少提升2分
+            significant_win_rate_improvement = (new_win_rate - old_win_rate) >= 0.05  # 至少提升5%
+            
+            should_upgrade = (score_improved and win_rate_improved and 
+                            (significant_score_improvement or significant_win_rate_improvement))
+            
+            if should_upgrade:
+                print(f"✅ 策略{strategy_id[-4:]}表现提升: 评分{old_score:.1f}→{new_score:.1f}, 成功率{old_win_rate:.1f}%→{new_win_rate:.1f}% - 可升级验证阶段")
+            else:
+                print(f"📊 策略{strategy_id[-4:]}表现对比: 评分{old_score:.1f}→{new_score:.1f}, 成功率{old_win_rate:.1f}%→{new_win_rate:.1f}% - 保持当前阶段")
+            
+            return should_upgrade
+            
+        except Exception as e:
+            print(f"❌ 判断验证阶段升级失败: {e}")
+            return False
+
+    def _update_strategy_validation_stage(self, strategy_id: str, upgrade: bool = False) -> int:
+        """🔥 更新策略验证阶段"""
+        try:
+            current_stage = self._get_strategy_validation_stage(strategy_id)
+            
+            if upgrade and current_stage < 5:  # 最高第5阶段
+                new_stage = current_stage + 1
+                
+                # 更新数据库
+                self.quantitative_service.db_manager.execute_query(
+                    "UPDATE strategies SET validation_stage = %s WHERE id = %s", 
+                    (new_stage, strategy_id)
+                )
+                
+                print(f"🎉 策略{strategy_id[-4:]}验证阶段升级: 第{current_stage}阶段 → 第{new_stage}阶段")
+                
+                # 记录升级日志
+                stage_names = {1: "基础验证5U", 2: "中级验证100U", 3: "高级验证500U", 
+                              4: "专业验证2000U", 5: "大资金验证10000U"}
+                print(f"🔥 进入{stage_names.get(new_stage, f'第{new_stage}阶段')}验证")
+                
+                return new_stage
+            else:
+                if not upgrade:
+                    print(f"📋 策略{strategy_id[-4:]}保持第{current_stage}阶段验证（表现未显著提升）")
+                else:
+                    print(f"🏆 策略{strategy_id[-4:]}已达最高验证阶段（第{current_stage}阶段）")
+                
+                return current_stage
+                
+        except Exception as e:
+            print(f"❌ 更新验证阶段失败: {e}")
+            return 1
+
+    def _log_validation_stage_progress(self, strategy_id: str, stage: int, amount: float, result: str):
+        """记录验证阶段进展日志"""
+        try:
+            stage_names = {
+                1: "基础验证", 2: "中级验证", 3: "高级验证", 
+                4: "专业验证", 5: "大资金验证"
+            }
+            
+            log_message = f"策略{strategy_id[-4:]} {stage_names.get(stage, f'第{stage}阶段')}({amount}U) - {result}"
+            print(f"📈 {log_message}")
+            
+            # 可以将此日志保存到数据库的进化日志表中
+            
+        except Exception as e:
+            print(f"❌ 记录验证进展失败: {e}")
+
     def _ensure_strategy_has_validation_data(self, strategy_id: str, strategy: Dict) -> bool:
         """🔧 确保策略有足够的验证数据用于进化评估"""
         try:
@@ -7720,14 +7889,11 @@ class EvolutionaryStrategyEngine:
             # 计算验证交易的盈亏
             pnl = self._calculate_validation_pnl(strategy_type, parameters, signal_type, current_price)
             
-            # 计算交易量（提升验证交易量以更好验证策略风险）
-            # 🔥 根据验证金额计算合理的交易量，验证交易可以用更大金额来测试真实风险
-            if symbol.startswith('BTC'):
-                quantity = 10.0 / current_price  # 10 USDT等值的BTC，验证更大风险
-            elif symbol.startswith('ETH'):
-                quantity = 8.0 / current_price  # 8 USDT等值的ETH，验证更大风险
-            else:
-                quantity = 5.0 / current_price  # 5 USDT等值的其他币种，验证更大风险
+            # 🔥 计算交易量（使用渐进式验证金额系统）
+            validation_amount = self._get_validation_amount_by_stage(strategy_id, symbol)
+            quantity = validation_amount / current_price
+            
+            print(f"🔥 策略{strategy_id[-4:]}验证交易: {symbol} 使用{validation_amount}U金额, 数量{quantity:.6f}")
             
             trade_result = {
                 'strategy_id': strategy_id,
@@ -8235,6 +8401,31 @@ class EvolutionaryStrategyEngine:
                         if validation_passed:
                             print(f"✅ 策略{strategy_id[-4:]}参数优化验证通过，应用新参数")
                             self._apply_validated_parameters(strategy_id, new_parameters, real_changes)
+                            
+                            # 🔥 检查是否应该升级验证阶段
+                            try:
+                                # 获取策略更新后的表现
+                                updated_strategy = self.quantitative_service.db_manager.execute_query(
+                                    "SELECT final_score, win_rate, symbol FROM strategies WHERE id = %s", 
+                                    (strategy_id,), fetch_one=True
+                                )
+                                
+                                if updated_strategy:
+                                    new_score = updated_strategy.get('final_score', 0)
+                                    new_win_rate = updated_strategy.get('win_rate', 0)
+                                    strategy_symbol = updated_strategy.get('symbol', 'BTC/USDT')
+                                    
+                                    # 判断是否升级验证阶段
+                                    should_upgrade = self._should_upgrade_validation_stage(strategy_id, new_score, new_win_rate)
+                                    new_stage = self._update_strategy_validation_stage(strategy_id, upgrade=should_upgrade)
+                                    
+                                    if should_upgrade:
+                                        validation_amount = self._get_validation_amount_by_stage(strategy_id, strategy_symbol)
+                                        self._log_validation_stage_progress(strategy_id, new_stage, validation_amount, 
+                                            "验证阶段升级成功")
+                                    
+                            except Exception as e:
+                                print(f"❌ 检查验证阶段升级失败: {e}")
                         else:
                             print(f"❌ 策略{strategy_id[-4:]}参数优化验证失败，保持原参数")
                             self._handle_optimization_validation_failure(strategy_id, current_params, real_changes)
@@ -8672,14 +8863,9 @@ class EvolutionaryStrategyEngine:
                 pnl = self._calculate_validation_pnl(strategy_type, parameters, signal_type, current_price)
                 confidence = random.uniform(0.6, 0.9)
             
-            # 记录验证交易日志
-            # 🔥 使用更有意义的验证交易数量，验证交易用更大金额模拟真实风险
-            if symbol.startswith('BTC'):
-                validation_quantity = 10.0 / current_price  # 10 USDT等值的BTC
-            elif symbol.startswith('ETH'):
-                validation_quantity = 8.0 / current_price  # 8 USDT等值的ETH
-            else:
-                validation_quantity = 5.0 / current_price  # 5 USDT等值的其他币种
+            # 🔥 记录验证交易日志（使用渐进式验证金额）
+            validation_amount = self._get_validation_amount_by_stage(strategy_id, symbol)
+            validation_quantity = validation_amount / current_price
                 
             self.log_strategy_trade(
                 strategy_id=strategy_id,
@@ -8987,8 +9173,9 @@ class EvolutionaryStrategyEngine:
             # 🔧 使用新参数生成验证信号
             signal_type = self._generate_optimization_validation_signal(strategy_type, new_params, price_data)
             
-            # 🔧 计算验证PnL（基于新参数的预期表现）
-            pnl = self._calculate_optimization_validation_pnl(strategy_type, new_params, signal_type, price_data['current_price'])
+            # 🔧 计算验证PnL（基于新参数的预期表现和当前验证阶段）
+            validation_amount = self._get_validation_amount_by_stage(strategy_id, symbol)
+            pnl = self._calculate_optimization_validation_pnl(strategy_type, new_params, signal_type, price_data['current_price'], validation_amount)
             
             # 🔧 保存验证交易记录（明确标记为验证交易）
             trade_log_id = self._save_optimization_validation_trade(
@@ -9068,11 +9255,11 @@ class EvolutionaryStrategyEngine:
             return 'hold'
 
     def _calculate_optimization_validation_pnl(self, strategy_type: str, parameters: Dict, 
-                                             signal_type: str, price: float) -> float:
+                                             signal_type: str, price: float, validation_amount: float = 5.0) -> float:
         """🔧 新增：计算参数优化验证交易的PnL"""
         try:
-            # 🔧 基于新参数计算预期PnL
-            base_quantity = parameters.get('quantity', 10.0)
+            # 🔧 基于新参数和验证金额计算预期PnL
+            base_quantity = validation_amount / price  # 使用实际验证金额计算交易量
             
             # 🔧 策略类型影响因子
             type_factors = {
