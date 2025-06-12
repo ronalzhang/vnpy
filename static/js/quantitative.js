@@ -876,11 +876,12 @@ class QuantitativeSystem {
             const tbody = document.getElementById('tradeLogsTable');
             
             if (data.success && data.logs && data.logs.length > 0) {
-                // 🔧 分类交易日志
+                // 🔧 修复：正确分类交易日志，包含所有类型
                 const realTrades = data.logs.filter(log => 
-                    !log.trade_type || log.trade_type === 'real_trading'
+                    log.executed === true || log.trade_type === 'real_trading'
                 );
                 const validationTrades = data.logs.filter(log => 
+                    log.executed === false || log.trade_type === 'simulation' ||
                     log.trade_type === 'optimization_validation' || 
                     log.trade_type === 'initialization_validation'
                 );
@@ -907,8 +908,8 @@ class QuantitativeSystem {
                     ...validationTrades.map(log => `
                         <tr class="validation-trade-row" style="background-color: #f8f9fa;">
                             <td>
-                                <span class="badge ${log.trade_type === 'optimization_validation' ? 'bg-warning' : 'bg-info'} me-1">
-                                    ${log.trade_type === 'optimization_validation' ? '参数验证' : '初始验证'}
+                                <span class="badge ${log.trade_type === 'optimization_validation' ? 'bg-warning' : log.trade_type === 'simulation' ? 'bg-info' : 'bg-secondary'} me-1">
+                                    ${log.trade_type === 'optimization_validation' ? '参数验证' : log.trade_type === 'simulation' ? '策略验证' : '初始验证'}
                                 </span>
                                 ${this.formatTime(log.timestamp)}
                             </td>
