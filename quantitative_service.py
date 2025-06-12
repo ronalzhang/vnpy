@@ -3538,7 +3538,8 @@ class QuantitativeService:
                     return 'sell'
                 # 如果卖信号过多（比例<0.5:1），强制生成买信号  
                 elif current_balance_ratio < 0.5:
-                    print(f"✅ 策略{strategy_id[-4:]}强制平衡：买入信号（纠正卖买失衡 1:{1/current_balance_ratio:.1f}）")
+                    ratio_display = f"1:{1/current_balance_ratio:.1f}" if current_balance_ratio > 0 else "1:∞"
+                    print(f"✅ 策略{strategy_id[-4:]}强制平衡：买入信号（纠正卖买失衡 {ratio_display}）")
                     return 'buy'
                 # 🔥 新增：检查全局买卖失衡，强制纠正
                 else:
