@@ -2529,7 +2529,7 @@ class QuantitativeService:
         
         template = self.strategy_templates[strategy_type]
         # 🔥 修复：使用完整格式的策略ID，而不是短格式
-        strategy_id = f"STRAT_{strategy_type.upper()}_{uuid.uuid4().hex[:8]}"
+        strategy_id = f"STRAT_{strategy_type.upper()}_{uuid.uuid4().hex.upper()}"
         
         # 🎯 使用统一配置的默认参数，而不是随机生成
         parameters = get_strategy_default_parameters(strategy_type)
@@ -5043,19 +5043,29 @@ class QuantitativeService:
                 print(f"fallback查询也失败: {e2}")
                 return []
     
-    def get_strategy_optimization_logs(self, strategy_id, limit=100):
-        """获取策略优化记录"""
+    def get_strategy_optimization_logs(self, strategy_id, limit=None):
+        """获取策略优化记录 - 🔥 修复：移除数量限制，显示全部优化日志"""
         try:
             cursor = self.conn.cursor()
             # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
-            query = f'''
-                SELECT strategy_id, optimization_type, old_parameters, new_parameters, 
-                       trigger_reason, target_success_rate, timestamp
-                FROM strategy_optimization_logs 
-                WHERE strategy_id = %s
-                ORDER BY timestamp DESC
-                LIMIT {limit}
-            '''
+            # 🔥 用户要求：显示全部详细优化日志，不再限制数量
+            if limit:
+                query = f'''
+                    SELECT strategy_id, optimization_type, old_parameters, new_parameters, 
+                           trigger_reason, target_success_rate, timestamp
+                    FROM strategy_optimization_logs 
+                    WHERE strategy_id = %s
+                    ORDER BY timestamp DESC
+                    LIMIT {limit}
+                '''
+            else:
+                query = '''
+                    SELECT strategy_id, optimization_type, old_parameters, new_parameters, 
+                           trigger_reason, target_success_rate, timestamp
+                    FROM strategy_optimization_logs 
+                    WHERE strategy_id = %s
+                    ORDER BY timestamp DESC
+                '''
             cursor.execute(query, (strategy_id,))
             
             logs = []
@@ -8164,8 +8174,23 @@ class EvolutionaryStrategyEngine:
                 dominant, recessive = parent2, parent1
             
             child = dominant.copy()
-            child['id'] = str(uuid.uuid4())[:8]
-            child['name'] = f"交叉_{dominant.get('name', 'A')[:5]}x{recessive.get('name', 'B')[:5]}_{child['id']}"
+            child['id'] = str(uuid.uuid4())
+            # 🔥 修复策略名称过长问题：限制总长度并避免重复"交叉_"前缀
+            dominant_name = dominant.get('name', 'A')
+            recessive_name = recessive.get('name', 'B')
+            
+            # 如果父策略名已包含"交叉_"，则只取核心部分
+            if '交叉_' in dominant_name:
+                dominant_core = dominant_name.split('_')[-1][:5]  # 取最后部分，避免重复
+            else:
+                dominant_core = dominant_name[:5]
+                
+            if '交叉_' in recessive_name:
+                recessive_core = recessive_name.split('_')[-1][:5]
+            else:
+                recessive_core = recessive_name[:5]
+            
+            child['name'] = f"MIX_{dominant_core}x{recessive_core}_{child['id'][:8]}"
             
             # 🧬 智能参数交叉
             params = {}
@@ -8222,7 +8247,7 @@ class EvolutionaryStrategyEngine:
         
         # 🔥 修复：使用完整UUID格式而非短ID
         import uuid
-        strategy_id = f"STRAT_{strategy_type.upper()}_{uuid.uuid4().hex[:8].upper()}"
+        strategy_id = f"STRAT_{strategy_type.upper()}_{uuid.uuid4().hex.upper()}"
         
         # 增强的随机策略创建 (在现有基础上添加代数信息)
         new_generation = self.current_generation + 1

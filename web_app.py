@@ -1460,7 +1460,7 @@ def quantitative_strategies():
             # 生成策略ID
             import uuid
             # 🔥 修复：使用完整UUID格式而非短ID
-            strategy_id = f"STRAT_{data['type'].upper()}_{uuid.uuid4().hex[:8].upper()}"
+            strategy_id = f"STRAT_{data['type'].upper()}_{uuid.uuid4().hex.upper()}"
             
             # 直接插入数据库
             conn = get_db_connection()
@@ -3130,7 +3130,7 @@ def create_strategy():
         # 生成策略ID
         import uuid
         # 🔥 修复：使用完整UUID格式而非短ID
-        strategy_id = f"STRAT_{data['type'].upper()}_{uuid.uuid4().hex[:8].upper()}"
+        strategy_id = f"STRAT_{data['type'].upper()}_{uuid.uuid4().hex.upper()}"
         
         # 创建策略配置
         strategy_config = {

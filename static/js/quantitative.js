@@ -498,10 +498,10 @@ class QuantitativeSystem {
         }
     }
 
-    // 显示策略配置弹窗
+    // 显示策略配置弹窗 - 🔥 修复：统一使用实时数据，确保策略卡和参数页数据同步
     async showStrategyConfig(strategyId) {
         try {
-            // 获取策略详情
+            // 🔥 获取最新的实时策略数据，确保和策略卡数据同步
             const response = await fetch(`/api/quantitative/strategies/${strategyId}`);
             const data = await response.json();
             
@@ -511,6 +511,9 @@ class QuantitativeSystem {
             }
             
             const strategy = data.data;
+            
+            // 🔥 同时从策略卡中获取当前显示的数据，确保一致性
+            const strategyFromCard = this.strategies.find(s => s.id === strategyId);
             
             // 填充基本信息
             document.getElementById('strategyId').value = strategy.id;
@@ -522,16 +525,30 @@ class QuantitativeSystem {
             // 生成参数表单
             this.generateParameterForm(strategy.type, strategy.parameters);
             
-            // 🔥 后端已统一返回百分比格式，前端只需直接使用
+            // 🔥 修复数据同步：优先使用API实时数据，确保策略卡和参数页显示一致
+            // 如果API数据和卡片数据不一致，使用最新的API数据并更新卡片
             const totalReturn = strategy.total_return || 0;
             const winRate = strategy.win_rate || 0;
             const totalTrades = strategy.total_trades || 0;
             const dailyReturn = strategy.daily_return || 0;
+            const finalScore = strategy.final_score || 0;
             
+            // 🔥 统一数据格式：确保参数页和策略卡使用相同的数据计算方式
             document.getElementById('strategyTotalReturn').textContent = `${(totalReturn * 100).toFixed(2)}%`;
             document.getElementById('strategyWinRate').textContent = `${winRate.toFixed(1)}%`;
             document.getElementById('strategyTotalTrades').textContent = totalTrades;
-            document.getElementById('strategyDailyReturn').textContent = `${(dailyReturn * 100).toFixed(2)}%`;
+            document.getElementById('strategyDailyReturn').textContent = `${(dailyReturn * 100).toFixed(3)}%`;
+            
+            // 🔥 如果发现数据不同步，更新本地策略数据以保持一致性
+            if (strategyFromCard) {
+                strategyFromCard.total_return = totalReturn;
+                strategyFromCard.win_rate = winRate;
+                strategyFromCard.total_trades = totalTrades;
+                strategyFromCard.daily_return = dailyReturn;
+                strategyFromCard.final_score = finalScore;
+                
+                console.log(`✅ 已同步策略 ${strategyId} 的数据，确保卡片和参数页一致`);
+            }
             
             // 绑定保存事件
             this.bindConfigEvents(strategyId);
