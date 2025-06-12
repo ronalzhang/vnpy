@@ -3440,35 +3440,55 @@ class QuantitativeService:
     
     def _determine_signal_type(self, strategy, has_position, buy_generated, sell_generated, 
                               buy_needed, sell_allowed, current_balance):
-        """智能决定信号类型"""
+        """🔧 强化信号类型决策，确保验证交易能正常生成"""
         
-        # 🎯 优先生成买入信号（如果余额充足且买入信号不足）
-        if buy_generated < buy_needed and current_balance > 1.0:
+        strategy_id = strategy.get('id', 'UNKNOWN')
+        strategy_score = strategy.get('final_score', 50)
+        strategy_type = strategy.get('type', 'momentum')
+        
+        print(f"🔧 策略{strategy_id[-4:]}信号决策: 评分={strategy_score:.1f}, 类型={strategy_type}, 余额={current_balance:.2f}")
+        print(f"📊 需要买入{buy_needed}个(已生成{buy_generated}个), 允许卖出{sell_allowed}个(已生成{sell_generated}个), 持仓={has_position}")
+        
+        # 🔧 验证交易优先（不受余额限制）
+        # 低分策略需要验证交易来提升评分
+        if strategy_score < 65:
+            if buy_generated < buy_needed:
+                print(f"✅ 策略{strategy_id[-4:]}验证交易买入信号（低分策略无余额限制）")
+                return 'buy'
+            elif sell_generated < sell_allowed:
+                print(f"✅ 策略{strategy_id[-4:]}验证交易卖出信号（低分策略无余额限制）")
+                return 'sell'
+        
+        # 🎯 高评分策略优先生成买入信号
+        if buy_generated < buy_needed:
             # 📊 根据策略评分和类型倾向买入
-            score = strategy.get('final_score', 0)
-            strategy_type = strategy.get('type', '')
-            
-            # 高分策略更容易生成买入信号
-            if score >= 80 or strategy_type in ['momentum', 'breakout', 'grid_trading']:
+            if strategy_score >= 80 or strategy_type in ['momentum', 'breakout', 'grid_trading']:
+                print(f"✅ 策略{strategy_id[-4:]}高分/优势类型买入信号")
+                return 'buy'
+            # 📈 中等评分策略（余额要求降低）
+            elif strategy_score >= 60 and current_balance > 0.1:  # 降低余额要求
+                print(f"✅ 策略{strategy_id[-4:]}中等评分买入信号（低余额要求）")
                 return 'buy'
         
         # 🔴 生成卖出信号（如果有持仓且卖出信号未达上限）
         if has_position and sell_generated < sell_allowed:
             # 📈 低分策略或均值回归策略倾向卖出
-            score = strategy.get('final_score', 0)
-            strategy_type = strategy.get('type', '')
-            
-            if score < 70 or strategy_type == 'mean_reversion':
+            if strategy_score < 70 or strategy_type == 'mean_reversion':
+                print(f"✅ 策略{strategy_id[-4:]}基于评分/类型的卖出信号")
                 return 'sell'
         
-                # ⚖️ 基于真实数据的智能决策（保持系统活跃）
-        # 🔥 不使用随机概率，改为基于策略表现和市场条件的智能决策
+        # ⚖️ 基于交易条件的智能决策（核心逻辑）
         if self._should_execute_trade_based_on_conditions(strategy, current_balance):
-            if buy_generated < buy_needed and current_balance > 0.5:
-                return 'buy'
+            if buy_generated < buy_needed:
+                # 🔧 验证交易/进化需要：即使余额为0也要生成信号
+                if strategy_score < 65 or current_balance > 0.1:  # 验证交易或有少量余额
+                    print(f"✅ 策略{strategy_id[-4:]}条件决策买入信号")
+                    return 'buy'
             elif has_position and sell_generated < sell_allowed:
+                print(f"✅ 策略{strategy_id[-4:]}条件决策卖出信号")
                 return 'sell'
         
+        print(f"⏭️ 策略{strategy_id[-4:]}跳过信号生成")
         return 'skip'
     
     def _execute_pending_signals(self):
@@ -3539,23 +3559,36 @@ class QuantitativeService:
             if not current_price or current_price <= 0:
                 return None
             
-            # 💰 计算交易数量（小资金优化）
+            # 💰 计算交易数量（验证交易优化，支持0余额）
+            strategy_score = strategy.get('final_score', 50)
+            
             if signal_type == 'buy':
-                trade_amount = min(
-                    current_balance * 0.06,  # 6%的余额
-                    1.5,  # 最大1.5 USDT
-                    current_balance - 0.5  # 至少保留0.5 USDT
-                )
-                trade_amount = max(0.5, trade_amount)  # 最少0.5 USDT
+                # 🔧 验证交易：即使余额为0也要生成信号
+                if strategy_score < 65:  # 验证交易
+                    trade_amount = 0.5  # 固定验证交易金额
+                    print(f"💰 策略{strategy_id[-4:]}验证交易买入: 固定金额{trade_amount} USDT")
+                elif current_balance > 0:  # 真实交易
+                    trade_amount = min(
+                        current_balance * 0.06,  # 6%的余额
+                        1.5,  # 最大1.5 USDT
+                        current_balance - 0.1  # 至少保留0.1 USDT（降低要求）
+                    )
+                    trade_amount = max(0.1, trade_amount)  # 最少0.1 USDT（降低要求）
+                    print(f"💰 策略{strategy_id[-4:]}真实交易买入: 金额{trade_amount} USDT (余额{current_balance:.2f})")
+                else:  # 余额为0但需要生成买入信号（验证场景）
+                    trade_amount = 0.1  # 最小验证金额
+                    print(f"💰 策略{strategy_id[-4:]}零余额验证买入: 金额{trade_amount} USDT")
+                
                 quantity = trade_amount / current_price
             else:
                 # 卖出时使用策略参数
                 parameters = strategy.get('parameters', {})
                 if isinstance(parameters, dict):
-                    quantity = parameters.get('quantity', 0.5)
+                    quantity = parameters.get('quantity', 0.1)  # 降低默认值
                 else:
                     # 如果parameters不是字典，使用默认值
-                    quantity = 0.5
+                    quantity = 0.1  # 降低默认值
+                print(f"💰 策略{strategy_id[-4:]}卖出数量: {quantity}")
             
             # 🎯 计算置信度（优化版本）
             base_confidence = 0.7
