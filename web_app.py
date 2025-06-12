@@ -2002,52 +2002,33 @@ def get_strategy_optimization_logs(strategy_id):
 
 @app.route('/api/quantitative/positions', methods=['GET'])
 def get_quantitative_positions():
-    """获取真实持仓信息 - 直接调用交易所API"""
+    """获取真实持仓信息 - 使用账户余额数据"""
     try:
-        # 🔥 获取真实持仓数据，使用与account-info相同的逻辑
-        exchange_clients = init_api_clients()
+        # 使用和account-info相同的逻辑获取余额
+        balance = safe_get_account_balance()
+        
+        if balance is None:
+            return jsonify({
+                "success": True,
+                "message": "暂无持仓",
+                "data": []
+            })
+        
+        # 将余额转换为持仓格式
         positions = []
-        
-        for exchange_name, client in exchange_clients.items():
-            if client:
-                try:
-                    if exchange_name == 'binance':
-                        # 获取币安现货账户余额
-                        balance = client.fetch_balance()
-                        for symbol, data in balance['total'].items():
-                            if data > 0:  # 只显示有余额的币种
-                                # 获取当前价格
-                                try:
-                                    if symbol != 'USDT':
-                                        ticker = client.fetch_ticker(f"{symbol}/USDT")
-                                        current_price = ticker['last']
-                                    else:
-                                        current_price = 1.0
-                                except:
-                                    current_price = 0.0
-                                
-                                position = {
-                                    'symbol': symbol,
-                                    'quantity': float(data),
-                                    'avg_price': current_price,  # 现货没有成本价，使用当前价
-                                    'current_price': current_price,
-                                    'unrealized_pnl': 0.0,  # 现货没有未实现盈亏
-                                    'realized_pnl': 0.0,
-                                    'exchange': exchange_name
-                                }
-                                positions.append(position)
-                    
-                    elif exchange_name == 'okx':
-                        # OKX持仓逻辑（如果需要的话）
-                        pass
-                        
-                except Exception as ex:
-                    print(f"获取{exchange_name}持仓失败: {ex}")
-                    continue
-        
-        # 如果没有获取到任何持仓，返回空列表
-        if not positions:
-            positions = []
+        if isinstance(balance, dict):
+            for symbol, amount in balance.items():
+                if amount and amount > 0:  # 只显示有余额的资产
+                    position = {
+                        'symbol': symbol,
+                        'quantity': float(amount),
+                        'avg_price': 1.0,  # 稳定币价格为1
+                        'current_price': 1.0,
+                        'unrealized_pnl': 0.0,  # 稳定币不计算未实现损益
+                        'realized_pnl': 0.0,
+                        'exchange': 'binance'
+                    }
+                    positions.append(position)
         
         return jsonify({
             "success": True,
@@ -2060,8 +2041,9 @@ def get_quantitative_positions():
         import traceback
         traceback.print_exc()
         return jsonify({
-            "status": "error",
-            "message": f"获取持仓信息失败: {str(e)}"
+            "success": False,
+            "message": f"获取持仓信息失败: {str(e)}",
+            "data": []
         }), 500
 
 @app.route('/api/quantitative/signals', methods=['GET'])
