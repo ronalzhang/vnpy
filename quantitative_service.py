@@ -10662,8 +10662,7 @@ class EvolutionaryStrategyEngine:
             # 5. 更新策略评分
             cursor.execute('''
                 UPDATE strategies 
-                SET final_score = %s, win_rate = %s, total_return = %s,
-                    updated_time = NOW()
+                SET final_score = %s, win_rate = %s, total_return = %s
                 WHERE id = %s
             ''', (scs_score, win_rate, total_pnl, strategy_id))
             
