@@ -3607,37 +3607,40 @@ class QuantitativeService:
             self.conn.commit()
             
             # 🔄 如果是已执行的交易，调用交易周期匹配引擎
-            if executed and hasattr(self, 'evolution_engine'):
-                cursor.execute('SELECT symbol FROM strategies WHERE id = %s', (strategy_id,))
-                symbol_result = cursor.fetchone()
-                symbol = symbol_result[0] if symbol_result else 'BTCUSDT'
-                
-                new_trade = {
-                    'id': exchange_order_id,
-                    'strategy_id': strategy_id,
-                    'signal_type': signal_type,
-                    'symbol': symbol,
-                    'price': price,
-                    'quantity': quantity,
-                    'pnl': pnl
-                }
-                
-                cycle_result = self.evolution_engine._match_and_close_trade_cycles(strategy_id, new_trade)
-                
-                if cycle_result:
-                    if cycle_result['action'] == 'opened':
-                        print(f"🔄 策略{strategy_id} 开启交易周期: {cycle_result['cycle_id']}")
-                    elif cycle_result['action'] == 'closed':
-                        mrot_score = cycle_result['mrot_score']
-                        cycle_pnl = cycle_result['cycle_pnl']
-                        holding_minutes = cycle_result['holding_minutes']
+                if executed and hasattr(self, 'evolution_engine'):
+                    cursor.execute('SELECT symbol FROM strategies WHERE id = %s', (strategy_id,))
+                    symbol_result = cursor.fetchone()
+                    symbol = symbol_result[0] if symbol_result else 'BTCUSDT'
+                    
+                    new_trade = {
+                        'id': exchange_order_id,
+                        'strategy_id': strategy_id,
+                        'signal_type': signal_type,
+                        'symbol': symbol,
+                        'price': price,
+                        'quantity': quantity,
+                        'pnl': pnl
+                    }
+                    
+                    try:
+                        cycle_result = self.evolution_engine._match_and_close_trade_cycles(strategy_id, new_trade)
                         
-                        print(f"✅ 策略{strategy_id} 完成交易周期: MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟, 盈亏{cycle_pnl:.2f}U")
-                        
-                        # 🎯 触发基于交易周期的评分更新和智能进化决策
-                        self.evolution_engine._update_strategy_score_after_cycle_completion(
-                            strategy_id, cycle_pnl, mrot_score, holding_minutes
-                        )
+                        if cycle_result:
+                            if cycle_result['action'] == 'opened':
+                                print(f"🔄 策略{strategy_id} 开启交易周期: {cycle_result['cycle_id']}")
+                            elif cycle_result['action'] == 'closed':
+                                mrot_score = cycle_result['mrot_score']
+                                cycle_pnl = cycle_result['cycle_pnl']
+                                holding_minutes = cycle_result['holding_minutes']
+                                
+                                print(f"✅ 策略{strategy_id} 完成交易周期: MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟, 盈亏{cycle_pnl:.2f}U")
+                                
+                                # 🎯 触发基于交易周期的SCS评分更新和智能进化决策
+                                self.evolution_engine._update_strategy_score_after_cycle_completion(
+                                    strategy_id, cycle_pnl, mrot_score, holding_minutes
+                                )
+                    except Exception as e:
+                        print(f"❌ 交易周期处理失败: {e}")
             
             # 记录交易类型日志
             if rows_affected > 0:
@@ -3944,8 +3947,9 @@ class QuantitativeService:
                     
                     # 🎯 策略评分更新（基于交易周期完成）
                     if cycle_info.get('cycle_completed'):
-                        self._update_strategy_score_after_cycle(
-                            strategy_id, estimated_pnl, cycle_info.get('mrot_score', 0)
+                        self._update_strategy_score_after_cycle_completion(
+                            strategy_id, estimated_pnl, cycle_info.get('mrot_score', 0), 
+                            cycle_info.get('holding_minutes', 0)
                         )
                     
                     executed_count += 1
@@ -10525,18 +10529,28 @@ class EvolutionaryStrategyEngine:
                 # 计算交易周期指标
                 open_trade_id = open_trade[0]
                 cycle_id = open_trade[1]
-                open_price = float(open_trade[2])
-                quantity = float(open_trade[3])
-                open_time = open_trade[4]
+                open_price = float(open_trade[2]) if open_trade[2] is not None else 0.0
+                quantity = float(open_trade[3]) if open_trade[3] is not None else 0.0
+                open_time = open_trade[4] if open_trade[4] is not None else datetime.now()
                 close_price = float(new_trade['price'])
                 close_time = datetime.now()
                 
+                # 确保open_time是datetime对象
+                if isinstance(open_time, str):
+                    try:
+                        from dateutil import parser
+                        open_time = parser.parse(open_time)
+                    except:
+                        open_time = datetime.now()
+                elif open_time is None:
+                    open_time = datetime.now()
+                
                 # 计算周期盈亏和持有分钟数
-                cycle_pnl = (close_price - open_price) * quantity
-                holding_minutes = int((close_time - open_time).total_seconds() / 60)
+                cycle_pnl = float((close_price - open_price) * quantity)
+                holding_minutes = max(1, int((close_time - open_time).total_seconds() / 60))
                 
                 # 计算MRoT（分钟回报率）
-                mrot_score = cycle_pnl / max(holding_minutes, 1)  # 避免除零
+                mrot_score = float(cycle_pnl / holding_minutes)
                 
                 # 更新开仓记录
                 cursor.execute('''
@@ -10617,11 +10631,11 @@ class EvolutionaryStrategyEngine:
             
             # 2. 计算MRoT相关指标
             total_cycles = len(completed_cycles)
-            total_pnl = sum(cycle[0] for cycle in completed_cycles)
-            avg_mrot = sum(cycle[1] for cycle in completed_cycles) / total_cycles
-            avg_holding_minutes = sum(cycle[2] for cycle in completed_cycles) / total_cycles
-            profitable_cycles = sum(1 for cycle in completed_cycles if cycle[0] > 0)
-            win_rate = profitable_cycles / total_cycles
+            total_pnl = float(sum(float(cycle[0]) if cycle[0] is not None else 0.0 for cycle in completed_cycles))
+            avg_mrot = float(sum(float(cycle[1]) if cycle[1] is not None else 0.0 for cycle in completed_cycles) / total_cycles)
+            avg_holding_minutes = float(sum(float(cycle[2]) if cycle[2] is not None else 0.0 for cycle in completed_cycles) / total_cycles)
+            profitable_cycles = sum(1 for cycle in completed_cycles if cycle[0] is not None and float(cycle[0]) > 0)
+            win_rate = float(profitable_cycles / total_cycles)
             
             # 3. 计算SCS综合评分
             scs_score = self._calculate_scs_comprehensive_score(
