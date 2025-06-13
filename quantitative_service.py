@@ -3560,34 +3560,106 @@ class QuantitativeService:
             return {'cycle_id': None, 'holding_minutes': 0, 'mrot_score': 0, 'cycle_completed': False}
     
     def log_enhanced_strategy_trade(self, strategy_id, signal_type, price, quantity, confidence, 
-                                   executed=1, pnl=0.0, trade_type="验证交易", cycle_id=None, 
-                                   holding_minutes=0, mrot_score=0, is_validation=True):
-        """📝 记录增强的策略交易日志（包含交易类型和周期信息）"""
+                                   executed=1, pnl=0.0, trade_type=None, cycle_id=None, 
+                                   holding_minutes=0, mrot_score=0, is_validation=None):
+        """📝 统一的策略交易日志记录方法（合并原log_strategy_trade功能）"""
         try:
-            # 先调用原有的日志记录方法
-            self.log_strategy_trade(strategy_id, signal_type, price, quantity, confidence, executed, pnl)
+            # 🔧 自动判断交易类型和验证状态
+            if trade_type is None or is_validation is None:
+                # 获取策略评分，根据分数决定交易模式
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT final_score FROM strategies WHERE id = %s", (strategy_id,))
+                strategy_result = cursor.fetchone()
+                strategy_score = strategy_result[0] if strategy_result else 0
+                
+                # 根据策略分数和系统设置决定交易类型
+                cursor.execute("SELECT auto_trading_enabled, real_trading_enabled FROM system_status ORDER BY updated_at DESC LIMIT 1")
+                status_result = cursor.fetchone()
+                auto_trading_enabled = status_result[0] if status_result else False
+                real_trading_enabled = status_result[1] if status_result else False
+                
+                # 🔧 修复交易类型判断：正确设置trade_type字段
+                if strategy_score >= self.real_trading_threshold and auto_trading_enabled:
+                    # 高分策略且开启自动交易：真实交易模式
+                    trade_type = '真实交易'
+                    is_validation = False
+                    is_real_money = False  # 默认纸面交易
+                    
+                    # 真实资金交易条件：≥85分 + 手动启用真实资金交易
+                    if strategy_score >= 85 and real_trading_enabled:
+                        is_real_money = True
+                else:
+                    # 所有其他情况：验证交易模式（策略验证和参数调整测试）
+                    trade_type = '验证交易'
+                    is_validation = True
+                    is_real_money = False
+            else:
+                # 使用传入的参数
+                is_real_money = not is_validation
             
-            # 增强日志记录：添加交易类型和周期信息
-            # 🔧 修复PostgreSQL语法：使用子查询替代ORDER BY LIMIT
-            enhanced_query = """
+            # 生成交易ID
+            exchange_order_id = f"{'REAL' if not is_validation else 'VER'}_{strategy_id}_{int(time.time())}"
+            
+            # 🔧 更新现有信号记录，而不是插入新记录
+            cursor = self.conn.cursor()
+            update_query = '''
                 UPDATE trading_signals 
-                SET trade_type = %s, cycle_id = %s, holding_minutes = %s, 
-                    mrot_score = %s, is_validation = %s
-                WHERE id = (
-                    SELECT id FROM trading_signals 
-                    WHERE strategy_id = %s AND signal_type = %s AND price = %s 
-                    AND timestamp >= NOW() - INTERVAL '1 minute'
-                    ORDER BY timestamp DESC LIMIT 1
-                )
-            """
+                SET executed = %s, expected_return = %s, cycle_id = %s, 
+                    holding_minutes = %s, mrot_score = %s
+                WHERE strategy_id = %s AND signal_type = %s AND price = %s 
+                AND timestamp >= NOW() - INTERVAL '2 minutes'
+                ORDER BY timestamp DESC LIMIT 1
+            '''
             
-            self.db_manager.execute_query(enhanced_query, (
-                trade_type, cycle_id, holding_minutes, mrot_score, is_validation,
+            cursor.execute(update_query, (
+                executed, pnl, cycle_id, holding_minutes, mrot_score,
                 strategy_id, signal_type, price
             ))
+            rows_affected = cursor.rowcount
+            self.conn.commit()
+            
+            # 🔄 如果是已执行的交易，调用交易周期匹配引擎
+            if executed and hasattr(self, 'evolution_engine'):
+                cursor.execute('SELECT symbol FROM strategies WHERE id = %s', (strategy_id,))
+                symbol_result = cursor.fetchone()
+                symbol = symbol_result[0] if symbol_result else 'BTCUSDT'
+                
+                new_trade = {
+                    'id': exchange_order_id,
+                    'strategy_id': strategy_id,
+                    'signal_type': signal_type,
+                    'symbol': symbol,
+                    'price': price,
+                    'quantity': quantity,
+                    'pnl': pnl
+                }
+                
+                cycle_result = self.evolution_engine._match_and_close_trade_cycles(strategy_id, new_trade)
+                
+                if cycle_result:
+                    if cycle_result['action'] == 'opened':
+                        print(f"🔄 策略{strategy_id} 开启交易周期: {cycle_result['cycle_id']}")
+                    elif cycle_result['action'] == 'closed':
+                        mrot_score = cycle_result['mrot_score']
+                        cycle_pnl = cycle_result['cycle_pnl']
+                        holding_minutes = cycle_result['holding_minutes']
+                        
+                        print(f"✅ 策略{strategy_id} 完成交易周期: MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟, 盈亏{cycle_pnl:.2f}U")
+                        
+                        # 🎯 触发基于交易周期的评分更新和智能进化决策
+                        self.evolution_engine._update_strategy_score_after_cycle_completion(
+                            strategy_id, cycle_pnl, mrot_score, holding_minutes
+                        )
+            
+            # 记录交易类型日志
+            if rows_affected > 0:
+                trade_status = "💰真实交易" if not is_validation else "🔬验证交易"
+                print(f"📝 更新{trade_status}记录: {strategy_id[-4:]} | {signal_type.upper()} | ¥{pnl:.4f}")
+            else:
+                print(f"⚠️ 未找到匹配的信号记录进行更新: {strategy_id[-4:]}")
             
         except Exception as e:
-            print(f"❌ 记录增强交易日志失败: {e}")
+            print(f"❌ 记录交易日志失败: {e}")
     
     def _update_strategy_score_after_cycle(self, strategy_id, cycle_pnl, mrot_score):
         """🎯 基于交易周期完成更新策略评分"""
@@ -4115,11 +4187,32 @@ class QuantitativeService:
                 print(f"❌ 信号格式错误: {type(signal)}")
                 return False
             
-            # 使用数据库管理器保存信号
+            # 🔧 判断交易类型和验证标记
+            strategy_id = signal.get('strategy_id')
+            strategy_score = 50.0  # 默认分数
+            
+            # 获取策略评分
+            try:
+                strategy_query = "SELECT final_score FROM strategies WHERE id = %s"
+                result = self.db_manager.execute_query(strategy_query, (strategy_id,), fetch_one=True)
+                if result:
+                    strategy_score = float(result[0])
+            except Exception as e:
+                print(f"⚠️ 获取策略评分失败: {e}")
+            
+            # 🔧 正确设置交易类型和验证标记
+            if strategy_score >= self.real_trading_threshold:
+                trade_type = "真实交易"
+                is_validation = False
+            else:
+                trade_type = "验证交易"
+                is_validation = True
+            
+            # 使用数据库管理器保存信号（包含完整字段）
             query = '''
                 INSERT INTO trading_signals 
-                (id, strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed, priority)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (id, strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed, priority, trade_type, is_validation)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             '''
             
             params = (
@@ -4132,10 +4225,13 @@ class QuantitativeService:
                 signal.get('confidence', 0.0),
                 signal.get('timestamp'),
                 signal.get('executed', 0),
-                signal.get('priority', 'normal')
+                signal.get('priority', 'normal'),
+                trade_type,
+                is_validation
             )
             
             self.db_manager.execute_query(query, params)
+            print(f"✅ 保存{trade_type}信号: {strategy_id[-4:]} | {signal.get('signal_type').upper()}")
             return True
             
         except Exception as e:
@@ -5360,104 +5456,7 @@ class QuantitativeService:
             print(f"获取策略优化日志失败: {e}")
             return []
     
-    def log_strategy_trade(self, strategy_id, signal_type, price, quantity, confidence, executed=0, pnl=0.0):
-        """记录策略交易日志 - 根据策略分数决定交易类型"""
-        try:
-            cursor = self.conn.cursor()
-            
-            # 获取策略评分，根据分数决定交易模式
-            cursor.execute("SELECT final_score FROM strategies WHERE id = %s", (strategy_id,))
-            strategy_result = cursor.fetchone()
-            strategy_score = strategy_result[0] if strategy_result else 0
-            
-            # 🔥 修复65分门槛逻辑：验证交易和真实交易的区分
-            # 根据策略分数和系统设置决定交易类型
-            cursor.execute("SELECT auto_trading_enabled, real_trading_enabled FROM system_status ORDER BY updated_at DESC LIMIT 1")
-            status_result = cursor.fetchone()
-            auto_trading_enabled = status_result[0] if status_result else False
-            real_trading_enabled = status_result[1] if status_result else False
-            
-            # 🔧 修复交易类型判断：正确设置trade_type字段
-            if strategy_score >= self.real_trading_threshold and auto_trading_enabled:
-                # 高分策略且开启自动交易：真实交易模式（纸面交易）
-                trade_type = '真实交易'
-                is_real_money = False  # 默认纸面交易
-                exchange_order_id = f"REAL_{strategy_id}_{int(time.time())}"
-                
-                # 真实资金交易条件：≥85分 + 手动启用真实资金交易
-                if strategy_score >= 85 and real_trading_enabled:
-                    is_real_money = True
-                    exchange_order_id = f"MONEY_{strategy_id}_{int(time.time())}"
-            else:
-                # 所有其他情况：验证交易模式（策略验证和参数调整测试）
-                trade_type = '验证交易'
-                is_real_money = False
-                exchange_order_id = f"VER_{strategy_id}_{int(time.time())}"
-            
-            cursor.execute('''
-                INSERT INTO strategy_trade_logs 
-                (strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp, 
-                 trade_type, is_real_money, exchange_order_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s)
-            ''', (
-                strategy_id,
-                signal_type,
-                price,
-                quantity,
-                confidence,
-                executed,
-                pnl,
-                trade_type,
-                is_real_money,
-                exchange_order_id
-            ))
-            self.conn.commit()
-            
-            # 🔄 如果是已执行的交易，调用交易周期匹配引擎
-            if executed and hasattr(self, 'evolution_engine'):
-                cursor.execute('SELECT symbol FROM strategies WHERE id = %s', (strategy_id,))
-                symbol_result = cursor.fetchone()
-                symbol = symbol_result[0] if symbol_result else 'BTCUSDT'
-                
-                new_trade = {
-                    'id': exchange_order_id,
-                    'strategy_id': strategy_id,
-                    'signal_type': signal_type,
-                    'symbol': symbol,
-                    'price': price,
-                    'quantity': quantity,
-                    'pnl': pnl
-                }
-                
-                cycle_result = self.evolution_engine._match_and_close_trade_cycles(strategy_id, new_trade)
-                
-                if cycle_result:
-                    if cycle_result['action'] == 'opened':
-                        print(f"🔄 策略{strategy_id} 开启交易周期: {cycle_result['cycle_id']}")
-                    elif cycle_result['action'] == 'closed':
-                        mrot_score = cycle_result['mrot_score']
-                        cycle_pnl = cycle_result['cycle_pnl']
-                        holding_minutes = cycle_result['holding_minutes']
-                        
-                        print(f"✅ 策略{strategy_id} 完成交易周期: MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟, 盈亏{cycle_pnl:.2f}U")
-                        
-                        # 🎯 触发基于交易周期的评分更新和智能进化决策
-                        self.evolution_engine._update_strategy_score_after_cycle_completion(
-                            strategy_id, cycle_pnl, mrot_score, holding_minutes
-                        )
-            
-            # 记录交易类型日志
-            if is_real_money:
-                trade_status = "💰真实资金"
-            elif trade_type == 'verification':
-                trade_status = "🔬策略验证"
-            else:
-                trade_status = "📊真实交易"
-            
-            print(f"{trade_status} | 策略:{strategy_id} | {signal_type} | 价格:{price} | 数量:{quantity} | 盈亏:{pnl} | 置信度:{confidence}")
-            
-        except Exception as e:
-            print(f"记录策略交易日志失败: {e}")
+            # ✅ 已统一使用log_enhanced_strategy_trade方法记录所有交易日志
     
     def init_strategies(self):
         """初始化策略 - 新版本：直接使用数据库，无需内存字典"""
@@ -8109,14 +8108,15 @@ class EvolutionaryStrategyEngine:
                     validation_trades.append(trade_result)
                     
                     # 保存到数据库
-                    self.log_strategy_trade(
+                    self.quantitative_service.log_enhanced_strategy_trade(
                         strategy_id=strategy_id,
                         signal_type=trade_result['signal_type'],
                         price=trade_result['price'],
                         quantity=trade_result['quantity'],
                         confidence=trade_result['confidence'],
                         executed=1,  # 验证交易默认执行
-                        pnl=trade_result['pnl']
+                        pnl=trade_result['pnl'],
+                        is_validation=True  # 明确标记为验证交易
                     )
                     
                     print(f"✅ 验证交易{i+1}: {trade_result['signal_type'].upper()}, 盈亏: {trade_result['pnl']:.4f}U")
@@ -9349,14 +9349,15 @@ class EvolutionaryStrategyEngine:
             validation_amount = self._get_validation_amount_by_stage(strategy_id, symbol)
             validation_quantity = validation_amount / current_price
                 
-            self.log_strategy_trade(
+            self.quantitative_service.log_enhanced_strategy_trade(
                 strategy_id=strategy_id,
                 signal_type=signal_type.lower(),
                 price=current_price,
                 quantity=validation_quantity,  # 使用更有意义的验证交易数量
                 confidence=confidence,
                 executed=1,  # 验证交易默认执行
-                pnl=pnl
+                pnl=pnl,
+                is_validation=True  # 明确标记为验证交易
             )
             
             return {
