@@ -837,21 +837,34 @@ def get_exchange_prices():
                     # OKX交易所API返回的订单簿格式可能与标准不同，需要特殊处理
                     if exchange_id == 'okx':
                         try:
-                            # OKX可能返回[price, amount, ...]格式
-                            if len(orderbook['bids'][0]) > 2:
-                                bid_price = float(orderbook['bids'][0][0])
-                                ask_price = float(orderbook['asks'][0][0])
-                            else:
-                                bid_price = orderbook['bids'][0][0]
-                                ask_price = orderbook['asks'][0][0]
+                            # 安全检查订单簿数据
+                            if not orderbook.get('bids') or not orderbook.get('asks'):
+                                continue
+                            if len(orderbook['bids']) == 0 or len(orderbook['asks']) == 0:
+                                continue
+                            if not orderbook['bids'][0] or not orderbook['asks'][0]:
+                                continue
                                 
-                            # 计算深度（前5档挂单量）
-                            if len(orderbook['bids'][0]) > 2:
-                                bid_depth = sum(float(item[1]) for item in orderbook['bids'][:5])
-                                ask_depth = sum(float(item[1]) for item in orderbook['asks'][:5])
-                            else:
-                                bid_depth = sum(amount for price, amount in orderbook['bids'][:5])
-                                ask_depth = sum(amount for price, amount in orderbook['asks'][:5])
+                            # OKX可能返回[price, amount, ...]格式，安全处理
+                            bid_item = orderbook['bids'][0]
+                            ask_item = orderbook['asks'][0]
+                            
+                            # 确保数据不为None再进行处理
+                            if bid_item[0] is None or ask_item[0] is None:
+                                continue
+                                
+                            bid_price = float(bid_item[0])
+                            ask_price = float(ask_item[0])
+                                
+                            # 计算深度（前5档挂单量），安全处理
+                            bid_depth = 0
+                            ask_depth = 0
+                            for item in orderbook['bids'][:5]:
+                                if item and len(item) > 1 and item[1] is not None:
+                                    bid_depth += float(item[1])
+                            for item in orderbook['asks'][:5]:
+                                if item and len(item) > 1 and item[1] is not None:
+                                    ask_depth += float(item[1])
                         except Exception as e:
                             print(f"处理OKX订单簿格式出错: {e}")
                             continue
