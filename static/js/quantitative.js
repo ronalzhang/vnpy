@@ -351,9 +351,6 @@ class QuantitativeSystem {
                                 <small class="text-muted">${strategy.symbol} • ${strategy.evolution_display || `第${generation}代第${round}轮`}</small>
                             </div>
                             <div class="text-end">
-                                <span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'} mb-1">
-                                    ${strategy.enabled ? '运行中' : '已停止'}
-                                </span><br>
                                 <span class="badge ${tradingBadgeClass}">
                                     ${tradingStatus}
                                 </span>

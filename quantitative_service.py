@@ -1407,6 +1407,1230 @@ class TrendFollowingStrategy(QuantitativeStrategy):
         return (current - low) / (high - low)
 
 class AutomatedStrategyManager:
+    """🤖 自动化策略管理器"""
+    
+    def __init__(self, quantitative_service):
+        """初始化自动化策略管理器"""
+        self.quantitative_service = quantitative_service
+        # 增强导入保护机制
+        pass
+    
+    def manage_strategies(self):
+        """管理策略的主方法"""
+    timestamp: datetime
+
+class DatabaseManager:
+    """数据库管理类 - 使用PostgreSQL适配器"""
+    
+    def __init__(self, db_path: str = "quantitative.db"):
+        self.db_path = db_path  # 保持兼容性
+        self.db_adapter = get_db_adapter()
+        self.conn = self.db_adapter.connection
+        print("✅ 使用PostgreSQL数据库管理器")
+    
+    def execute_query(self, query: str, params: tuple = (), fetch_one: bool = False, fetch_all: bool = False):
+        """执行SQL查询 - 使用PostgreSQL适配器"""
+        try:
+            return self.db_adapter.execute_query(query, params, fetch_one, fetch_all)
+        except Exception as e:
+            print(f"PostgreSQL查询失败: {e}")
+            return None
+    
+    def init_database(self):
+        """初始化数据库表"""
+        try:
+            # 确保PostgreSQL连接已建立
+            cursor = self.conn.cursor()
+            
+            # 创建系统状态表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS system_status (
+                    key TEXT PRIMARY KEY,
+                    value TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 创建策略表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategies (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    symbol TEXT,
+                    type TEXT,
+                    enabled INTEGER DEFAULT 0,
+                    parameters TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 创建交易信号表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS trading_signals (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TEXT,
+                    symbol TEXT,
+                    signal_type TEXT,
+                    price REAL,
+                    confidence REAL,
+                    executed INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 创建策略交易日志表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_trade_logs (
+                    id SERIAL PRIMARY KEY,
+                    strategy_id TEXT,
+                    signal_id TEXT,
+                    symbol TEXT,
+                    signal_type TEXT,
+                    price REAL,
+                    quantity REAL,
+                    pnl REAL DEFAULT 0,
+                    executed INTEGER DEFAULT 0,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 创建持仓表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS positions (
+                    id SERIAL PRIMARY KEY,
+                    symbol TEXT,
+                    quantity REAL,
+                    avg_price REAL,
+                    unrealized_pnl REAL DEFAULT 0,
+                    side TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 创建账户余额历史表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS account_balance_history (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    total_balance REAL,
+                    available_balance REAL,
+                    frozen_balance REAL,
+                    daily_pnl REAL DEFAULT 0,
+                    daily_return REAL DEFAULT 0,
+                    cumulative_return REAL DEFAULT 0,
+                    total_trades INTEGER DEFAULT 0,
+                    milestone_note TEXT
+                )
+            ''')
+            
+            # 创建操作日志表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS operation_logs (
+                    id SERIAL PRIMARY KEY,
+                    operation_type TEXT,
+                    operation_detail TEXT,
+                    result TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 策略评分历史表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_score_history (
+                    id SERIAL PRIMARY KEY,
+                    strategy_id TEXT,
+                    score REAL,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 创建模拟结果表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS simulation_results (
+                    id SERIAL PRIMARY KEY,
+                    strategy_id TEXT,
+                    result_data TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 🔄 扩展trading_signals表，添加交易周期相关字段（使用现有字段结构）
+            # 检查并添加必要的交易周期字段
+            try:
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS cycle_id TEXT')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS cycle_status TEXT DEFAULT \'open\'')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS open_time TIMESTAMP')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS close_time TIMESTAMP')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS holding_minutes INTEGER')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS mrot_score REAL')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS paired_signal_id TEXT')
+                print("✅ 交易周期字段添加完成")
+            except Exception as e:
+                print(f"⚠️ 交易周期字段添加失败（可能已存在）: {e}")
+            
+            # 创建交易周期相关索引（在trading_signals表上）
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_trading_cycle_status ON trading_signals(cycle_status)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_trading_cycle_id ON trading_signals(cycle_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_trading_strategy_cycle ON trading_signals(strategy_id, cycle_status)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_trading_mrot_score ON trading_signals(mrot_score DESC)')
+            
+            self.conn.commit()
+            print("✅ 数据库表初始化和交易周期字段扩展完成")
+            
+            # 插入初始资产记录（如果没有的话）
+            cursor.execute('SELECT COUNT(*) FROM account_balance_history')
+            count_result = cursor.fetchone()
+            # PostgreSQL返回字典类型，使用字典访问方式
+            count = count_result['count'] if count_result else 0
+            if count == 0:
+                current_balance = self._get_current_balance()
+                self.record_balance_history(
+                    total_balance=current_balance,
+                    available_balance=current_balance,
+                    milestone_note="系统初始化"
+                )
+                print(f"✅ 初始资产记录已创建: {current_balance}U")
+            
+        except Exception as e:
+            print(f"❌ 初始化数据库失败: {e}")
+            traceback.print_exc()
+        
+    def record_balance_history(self, total_balance: float, available_balance: float = None, 
+                             frozen_balance: float = None, daily_pnl: float = None,
+                             daily_return: float = None, milestone_note: str = None):
+        """记录账户资产历史"""
+        try:
+            conn = self.conn
+            cursor = conn.cursor()
+            
+            # 计算累计收益率
+            first_record = self.db_manager.execute_query(
+                "SELECT total_balance FROM account_balance_history ORDER BY timestamp ASC LIMIT 1",
+                fetch_one=True
+            )
+            initial_balance = first_record['total_balance'] if first_record else 10.0  # 默认起始资金10U
+            
+            cumulative_return = ((total_balance - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
+            
+            # 获取总交易次数
+            total_trades_result = self.db_manager.execute_query(
+                "SELECT COUNT(*) FROM strategy_trade_logs WHERE executed = 1", 
+                fetch_one=True
+            )
+            total_trades = total_trades_result['count'] if total_trades_result else 0
+            
+            cursor.execute('''
+                INSERT INTO account_balance_history 
+                (timestamp, total_balance, available_balance, frozen_balance, daily_pnl, 
+                 daily_return, cumulative_return, total_trades, milestone_note)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ''', (
+                datetime.now().isoformat(),
+                total_balance,
+                available_balance or total_balance,
+                frozen_balance or 0,
+                daily_pnl or 0,
+                daily_return or 0,
+                cumulative_return,
+                total_trades,
+                milestone_note
+            ))
+            
+            conn.commit()
+            if conn and not conn.closed:
+                conn.close()
+            
+            # 检查里程碑
+            self._check_balance_milestones(total_balance)
+            
+        except Exception as e:
+            print(f"记录资产历史失败: {e}")
+
+    def _check_balance_milestones(self, current_balance: float):
+        """检查资产里程碑"""
+        milestones = [
+            (50, "突破50U！小有成就"),
+            (100, "达到100U！百元大关"),
+            (500, "突破500U！稳步增长"),
+            (1000, "达到1000U！千元里程碑"),
+            (5000, "突破5000U！资金规模化"),
+            (10000, "达到1万U！五位数资产"),
+            (50000, "突破5万U！资产快速增长"),
+            (100000, "达到10万U！六位数资产！")
+        ]
+        
+        for amount, note in milestones:
+            if current_balance >= amount:
+                # 检查是否已记录此里程碑
+                conn = psycopg2.connect(
+                    host="localhost",
+                    database="quantitative",
+                    user="quant_user", 
+                    password="123abc74531"
+                )
+                cursor = conn.cursor()
+                milestone_result = self.db_manager.execute_query(
+                    "SELECT COUNT(*) FROM account_balance_history WHERE milestone_note = %s", 
+                    (note,),
+                    fetch_one=True
+                )
+                milestone_count = milestone_result['count'] if milestone_result else 0
+                if milestone_count == 0:
+                    # 记录里程碑
+                    self.record_balance_history(
+                        total_balance=current_balance,
+                        milestone_note=note
+                    )
+                    print(f"🎉 资产里程碑达成：{note}")
+                conn.close()
+
+
+
+class QuantitativeStrategy:
+    """量化策略基类"""
+    
+    def __init__(self, config: StrategyConfig):
+        self.config = config
+        self.is_running = False
+        self.last_signal_time = None
+        
+    def start(self):
+        """启动策略"""
+        self.is_running = True
+        logger.info(f"策略 {self.config.name} 已启动")
+        
+    def stop(self):
+        """停止策略"""
+        self.is_running = False
+        logger.info(f"策略 {self.config.name} 已停止")
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """生成交易信号（子类实现）"""
+        raise NotImplementedError
+        
+    def update_parameters(self, parameters: Dict[str, Any]):
+        """更新策略参数"""
+        self.config.parameters.update(parameters)
+        self.config.updated_time = datetime.now()
+
+class MomentumStrategy(QuantitativeStrategy):
+    """动量策略 - 优化版本，追求高收益"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.volume_history = []
+        self.rsi_values = []
+        self.macd_values = []
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """基于多重技术指标的动量策略 - 优化版"""
+        if not self.is_running:
+            return None
+            
+        current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        
+        self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
+        
+        # 保留最近N个价格点
+        lookback_period = self.config.parameters.get('lookback_period', 20)
+        if len(self.price_history) > lookback_period * 3:  # 保留更多历史数据
+            self.price_history.pop(0)
+            self.volume_history.pop(0)
+            
+        if len(self.price_history) < lookback_period:
+            return None
+            
+        # 确保pandas已导入
+        _ensure_pandas()
+        
+        # 计算多重技术指标
+        prices = pd.Series(self.price_history)
+        volumes = pd.Series(self.volume_history)
+        
+        # 1. 动量指标
+        returns = prices.pct_change().dropna()
+        momentum = returns.rolling(window=min(10, len(returns))).mean().iloc[-1]
+        
+        # 2. RSI指标
+        rsi = self._calculate_rsi(prices, period=14)
+        
+        # 3. MACD指标
+        macd_line, signal_line = self._calculate_macd(prices)
+        
+        # 4. 成交量确认
+        volume_ma = volumes.rolling(window=min(20, len(volumes))).mean().iloc[-1]
+        volume_ratio = current_volume / volume_ma if volume_ma > 0 else 1
+        
+        # 5. 价格突破
+        high_20 = prices.rolling(window=20).max().iloc[-1]
+        low_20 = prices.rolling(window=20).min().iloc[-1]
+        price_position = (current_price - low_20) / (high_20 - low_20) if high_20 > low_20 else 0.5
+        
+        # 综合信号判断 - 多重确认机制
+        threshold = self.config.parameters.get('momentum_threshold', self.config.parameters.get('threshold', 0.001))
+        quantity = self.config.parameters.get('quantity', 1.0)
+        
+        # 强烈买入信号条件 (追求高收益)
+        strong_buy_conditions = [
+            momentum > threshold * 2,  # 强劲动量
+            rsi < 30,  # 超卖后反弹
+            macd_line > signal_line,  # MACD金叉
+            volume_ratio > 1.5,  # 成交量放大
+            price_position > 0.8  # 价格接近高点突破
+        ]
+        
+        # 强烈卖出信号条件
+        strong_sell_conditions = [
+            momentum < -threshold * 2,  # 强劲下跌动量
+            rsi > 70,  # 超买后回调
+            macd_line < signal_line,  # MACD死叉
+            volume_ratio > 1.5,  # 成交量放大确认
+            price_position < 0.2  # 价格接近低点破位
+        ]
+        
+        # 计算信号强度和置信度
+        buy_score = sum(strong_buy_conditions)
+        sell_score = sum(strong_sell_conditions)
+        
+        signal_type = None
+        confidence = 0
+        adjusted_quantity = quantity
+        
+        if buy_score >= 3:  # 至少3个指标确认买入
+            signal_type = SignalType.BUY
+            confidence = min(buy_score / 5.0, 1.0)
+            # 高置信度时增加仓位
+            adjusted_quantity = quantity * (1 + confidence)
+        elif sell_score >= 3:  # 至少3个指标确认卖出
+            signal_type = SignalType.SELL
+            confidence = min(sell_score / 5.0, 1.0)
+            adjusted_quantity = quantity * (1 + confidence)
+        else:
+            return None
+            
+        signal = TradingSignal(
+            id=int(time.time() * 1000),
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=datetime.now(),
+            executed=0
+        )
+        
+        return signal
+    
+    def _calculate_rsi(self, prices, period: int = 14) -> float:
+        """计算RSI指标"""
+        if len(prices) < period + 1:
+            return 50.0  # 默认中性值
+        
+        deltas = prices.diff()
+        gain = deltas.where(deltas > 0, 0).rolling(window=period).mean()
+        loss = -deltas.where(deltas < 0, 0).rolling(window=period).mean()
+        
+        if loss.iloc[-1] == 0:  # 防止除零错误
+            return 100.0
+            
+        rs = gain.iloc[-1] / loss.iloc[-1]
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+    
+    def _calculate_macd(self, prices) -> tuple:
+        """计算MACD指标"""
+        if len(prices) < 26:
+            return 0, 0
+            
+        exp1 = prices.ewm(span=12).mean()
+        exp2 = prices.ewm(span=26).mean()
+        macd_line = exp1 - exp2
+        signal_line = macd_line.ewm(span=9).mean()
+        
+        return macd_line.iloc[-1], signal_line.iloc[-1]
+
+class MeanReversionStrategy(QuantitativeStrategy):
+    """均值回归策略 - 优化版本，动态参数调整"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.volume_history = []
+        self.volatility_history = []
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """基于动态布林带和波动率的均值回归策略"""
+        if not self.is_running:
+            return None
+            
+        current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        
+        self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
+        
+        lookback_period = self.config.parameters.get('lookback_period', 20)
+        if len(self.price_history) > lookback_period * 2:
+            self.price_history.pop(0)
+            self.volume_history.pop(0)
+            
+        if len(self.price_history) < lookback_period:
+            return None
+            
+        # 确保pandas已导入
+        _ensure_pandas()
+        
+        # 计算动态技术指标
+        prices = pd.Series(self.price_history)
+        volumes = pd.Series(self.volume_history)
+        
+        # 1. 动态布林带计算
+        volatility = self._calculate_volatility(prices)
+        self.volatility_history.append(volatility)
+        if len(self.volatility_history) > 10:
+            self.volatility_history.pop(0)
+            
+        # 根据市场波动率动态调整布林带宽度
+        base_std_multiplier = self.config.parameters.get('std_multiplier', 2.0)
+        volatility_factor = self._get_volatility_factor()
+        dynamic_std_multiplier = base_std_multiplier * volatility_factor
+        
+        sma = prices.rolling(window=lookback_period).mean().iloc[-1]
+        std = prices.rolling(window=lookback_period).std().iloc[-1]
+        
+        upper_band = sma + dynamic_std_multiplier * std
+        lower_band = sma - dynamic_std_multiplier * std
+        middle_band = sma
+        
+        # 2. 计算均值回归强度
+        distance_from_mean = abs(current_price - middle_band) / std if std > 0 else 0
+        
+        # 3. 成交量分析
+        volume_ma = volumes.rolling(window=min(10, len(volumes))).mean().iloc[-1]
+        volume_ratio = current_volume / volume_ma if volume_ma > 0 else 1
+        
+        # 4. 短期趋势确认
+        short_ma = prices.rolling(window=5).mean().iloc[-1]
+        medium_ma = prices.rolling(window=10).mean().iloc[-1]
+        
+        # 5. 波动率突破确认
+        volatility_breakout = volatility > (sum(self.volatility_history) / len(self.volatility_history)) * 1.5 if self.volatility_history else False
+        
+        quantity = self.config.parameters.get('quantity', 1.0)
+        
+        # 高置信度信号条件
+        signal_type = None
+        confidence = 0
+        adjusted_quantity = quantity
+        
+        # 强力买入信号 (价格大幅偏离下轨)
+        if current_price < lower_band:
+            # 计算偏离程度
+            deviation_ratio = (lower_band - current_price) / (upper_band - lower_band)
+            
+            # 确认条件
+            buy_confirmations = [
+                deviation_ratio > 0.1,  # 显著偏离下轨
+                short_ma < medium_ma,  # 短期下跌确认
+                volume_ratio > 1.2,  # 成交量增加
+                distance_from_mean > 1.5,  # 距离均值较远
+                volatility_breakout  # 波动率突破
+            ]
+            
+            confirmation_count = sum(buy_confirmations)
+            if confirmation_count >= 3:
+                signal_type = SignalType.BUY
+                confidence = min(confirmation_count / 5.0 + deviation_ratio, 1.0)
+                # 根据偏离程度和确认强度调整仓位
+                adjusted_quantity = quantity * (1 + deviation_ratio + confidence * 0.5)
+                
+        # 强力卖出信号 (价格大幅偏离上轨)
+        elif current_price > upper_band:
+            # 计算偏离程度
+            deviation_ratio = (current_price - upper_band) / (upper_band - lower_band)
+            
+            # 确认条件
+            sell_confirmations = [
+                deviation_ratio > 0.1,  # 显著偏离上轨
+                short_ma > medium_ma,  # 短期上涨确认
+                volume_ratio > 1.2,  # 成交量增加
+                distance_from_mean > 1.5,  # 距离均值较远
+                volatility_breakout  # 波动率突破
+            ]
+            
+            confirmation_count = sum(sell_confirmations)
+            if confirmation_count >= 3:
+                signal_type = SignalType.SELL
+                confidence = min(confirmation_count / 5.0 + deviation_ratio, 1.0)
+                adjusted_quantity = quantity * (1 + deviation_ratio + confidence * 0.5)
+        
+        if signal_type is None:
+            return None
+            
+        signal = TradingSignal(
+            id=int(time.time() * 1000),
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=datetime.now(),
+            executed=0
+        )
+        
+        return signal
+    
+    def _calculate_volatility(self, prices) -> float:
+        """计算价格波动率"""
+        if len(prices) < 2:
+            return 0.01  # 默认低波动率
+            
+        returns = prices.pct_change().dropna()
+        if len(returns) == 0:
+            return 0.01
+            
+        return returns.std() if returns.std() > 0 else 0.01
+    
+    def _get_volatility_factor(self) -> float:
+        """根据波动率历史调整布林带宽度"""
+        if not self.volatility_history:
+            return 1.0
+            
+        current_vol = self.volatility_history[-1]
+        avg_vol = sum(self.volatility_history) / len(self.volatility_history)
+        
+        # 高波动时扩大布林带，低波动时缩小布林带
+        if current_vol > avg_vol * 1.5:
+            return 1.3  # 扩大30%
+        elif current_vol < avg_vol * 0.7:
+            return 0.8  # 缩小20%
+        else:
+            return 1.0  # 保持不变
+
+class BreakoutStrategy(QuantitativeStrategy):
+    """突破策略 - 优化版本，多重确认机制"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.volume_history = []
+        self.high_history = []
+        self.low_history = []
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """基于多重确认的突破策略"""
+        if not self.is_running:
+            return None
+            
+        current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        current_high = price_data.get('high', current_price)
+        current_low = price_data.get('low', current_price)
+        
+        self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
+        self.high_history.append(current_high)
+        self.low_history.append(current_low)
+        
+        lookback_period = self.config.parameters.get('lookback_period', 20)
+        if len(self.price_history) > lookback_period * 2:
+            self.price_history.pop(0)
+            self.volume_history.pop(0)
+            self.high_history.pop(0)
+            self.low_history.pop(0)
+            
+        if len(self.price_history) < lookback_period:
+            return None
+            
+        # 确保pandas已导入
+        _ensure_pandas()
+        
+        # 计算多重技术指标
+        prices = pd.Series(self.price_history)
+        volumes = pd.Series(self.volume_history)
+        highs = pd.Series(self.high_history)
+        lows = pd.Series(self.low_history)
+        
+        # 1. 动态支撑阻力计算
+        resistance_periods = [10, 20, 50]  # 多时间框架
+        support_periods = [10, 20, 50]
+        
+        resistances = [highs.rolling(window=min(p, len(highs))).max().iloc[-1] for p in resistance_periods]
+        supports = [lows.rolling(window=min(p, len(lows))).min().iloc[-1] for p in support_periods]
+        
+        # 取最强阻力和支撑
+        key_resistance = max(resistances)
+        key_support = min(supports)
+        
+        # 2. 成交量突破确认
+        volume_ma_short = volumes.rolling(window=min(10, len(volumes))).mean().iloc[-1]
+        volume_ma_long = volumes.rolling(window=min(20, len(volumes))).mean().iloc[-1]
+        volume_ratio = current_volume / volume_ma_short if volume_ma_short > 0 else 1
+        volume_trend = volume_ma_short / volume_ma_long if volume_ma_long > 0 else 1
+        
+        # 3. 价格动量分析
+        price_momentum = self._calculate_momentum(prices, period=10)
+        price_acceleration = self._calculate_acceleration(prices, period=5)
+        
+        # 4. 突破幅度计算
+        breakout_threshold = self.config.parameters.get('breakout_threshold', 0.01)
+        quantity = self.config.parameters.get('quantity', 1.0)
+        
+        # 5. 市场结构分析
+        higher_highs = self._count_higher_highs(highs, period=10)
+        lower_lows = self._count_lower_lows(lows, period=10)
+        
+        signal_type = None
+        confidence = 0
+        adjusted_quantity = quantity
+        
+        # 向上突破确认
+        upward_breakout_conditions = [
+            current_price > key_resistance * (1 + breakout_threshold),  # 价格突破
+            volume_ratio > 2.0,  # 成交量爆发
+            volume_trend > 1.1,  # 成交量趋势向上
+            price_momentum > 0.005,  # 正向动量
+            price_acceleration > 0,  # 价格加速
+            higher_highs >= 2,  # 形成上升趋势
+            current_price > prices.rolling(window=5).mean().iloc[-1]  # 短期均线确认
+        ]
+        
+        # 向下突破确认
+        downward_breakout_conditions = [
+            current_price < key_support * (1 - breakout_threshold),  # 价格跌破
+            volume_ratio > 2.0,  # 成交量爆发
+            volume_trend > 1.1,  # 成交量趋势向上
+            price_momentum < -0.005,  # 负向动量
+            price_acceleration < 0,  # 价格加速下跌
+            lower_lows >= 2,  # 形成下降趋势
+            current_price < prices.rolling(window=5).mean().iloc[-1]  # 短期均线确认
+        ]
+        
+        upward_score = sum(upward_breakout_conditions)
+        downward_score = sum(downward_breakout_conditions)
+        
+        # 强力突破信号 (至少5个条件确认)
+        if upward_score >= 5:
+            signal_type = SignalType.BUY
+            confidence = min(upward_score / 7.0, 1.0)
+            
+            # 计算突破强度
+            breakout_strength = (current_price - key_resistance) / key_resistance
+            adjusted_quantity = quantity * (1 + confidence + breakout_strength * 2)
+            
+        elif downward_score >= 5:
+            signal_type = SignalType.SELL
+            confidence = min(downward_score / 7.0, 1.0)
+            
+            # 计算突破强度
+            breakout_strength = (key_support - current_price) / key_support
+            adjusted_quantity = quantity * (1 + confidence + breakout_strength * 2)
+        
+        if signal_type is None:
+            return None
+            
+        signal = TradingSignal(
+            id=int(time.time() * 1000),
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=datetime.now(),
+            executed=0
+        )
+        
+        return signal
+    
+    def _calculate_momentum(self, prices, period: int = 10) -> float:
+        """计算动量指标"""
+        if len(prices) < period + 1:
+            return 0.0
+            
+        start_price = prices.iloc[-period-1]
+        end_price = prices.iloc[-1]
+        
+        if start_price == 0:  # 防止除零错误
+            return 0.0
+            
+        return (end_price - start_price) / start_price
+    
+    def _calculate_acceleration(self, prices, period: int = 5) -> float:
+        """计算加速度指标"""
+        if len(prices) < period * 2:
+            return 0.0
+            
+        recent_momentum = self._calculate_momentum(prices.iloc[-period:], period // 2)
+        past_momentum = self._calculate_momentum(prices.iloc[-period*2:-period], period // 2)
+        
+        return recent_momentum - past_momentum
+    
+    def _count_higher_highs(self, highs, period: int = 10) -> int:
+        """计算近期创新高次数"""
+        if len(highs) < period:
+            return 0
+        recent_highs = highs.iloc[-period:]
+        count = 0
+        for i in range(1, len(recent_highs)):
+            if recent_highs.iloc[i] > recent_highs.iloc[i-1]:
+                count += 1
+        return count
+    
+    def _count_lower_lows(self, lows, period: int = 10) -> int:
+        """计算近期创新低次数"""
+        if len(lows) < period:
+            return 0
+        recent_lows = lows.iloc[-period:]
+        count = 0
+        for i in range(1, len(recent_lows)):
+            if recent_lows.iloc[i] < recent_lows.iloc[i-1]:
+                count += 1
+        return count
+
+class GridTradingStrategy(QuantitativeStrategy):
+    """网格交易策略 - 适合横盘震荡市场，稳定获利"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.grid_levels = []
+        self.last_trade_price = None
+        self.position_count = 0
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """网格交易信号生成"""
+        if not self.is_running:
+            return None
+            
+        current_price = price_data.get('price', 0)
+        self.price_history.append(current_price)
+        
+        # 保持价格历史
+        lookback_period = self.config.parameters.get('lookback_period', 100)
+        if len(self.price_history) > lookback_period:
+            self.price_history.pop(0)
+            
+        if len(self.price_history) < 50:  # 需要足够数据来计算网格
+            return None
+            
+        # 计算网格参数
+        grid_spacing = self.config.parameters.get('grid_spacing', 0.02)  # 2%网格间距
+        grid_count = self.config.parameters.get('grid_count', 10)  # 网格数量
+        quantity = self.config.parameters.get('quantity', 1.0)
+        
+        # 确保pandas已导入
+        _ensure_pandas()
+        
+        # 动态计算网格中心价格
+        prices = pd.Series(self.price_history)
+        center_price = prices.median()  # 使用中位数作为中心
+        
+        # 生成网格级别
+        if not self.grid_levels:
+            self._generate_grid_levels(center_price, grid_spacing, grid_count)
+        
+        # 检查价格是否触及网格线
+        signal_type = None
+        confidence = 0.8  # 网格策略置信度固定较高
+        
+        for i, level in enumerate(self.grid_levels):
+            price_diff = abs(current_price - level) / level
+            
+            # 价格接近网格线（0.1%容差）
+            if price_diff < 0.001:
+                # 判断买卖方向
+                if current_price <= center_price and (not self.last_trade_price or current_price < self.last_trade_price * 0.98):
+                    # 在中心价格以下且价格下跌时买入
+                    signal_type = SignalType.BUY
+                    self.last_trade_price = current_price
+                    self.position_count += 1
+                elif current_price >= center_price and (not self.last_trade_price or current_price > self.last_trade_price * 1.02):
+                    # 在中心价格以上且价格上涨时卖出
+                    signal_type = SignalType.SELL
+                    self.last_trade_price = current_price
+                    self.position_count -= 1
+                break
+        
+        if signal_type is None:
+            return None
+            
+        # 根据位置调整交易量
+        adjusted_quantity = quantity * min(1 + abs(self.position_count) * 0.1, 3.0)  # 最多放大3倍
+            
+        signal = TradingSignal(
+            id=int(time.time() * 1000),
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=datetime.now(),
+            executed=0
+        )
+        
+        return signal
+    
+    def _generate_grid_levels(self, center_price: float, spacing: float, count: int):
+        """生成网格级别"""
+        self.grid_levels = []
+        for i in range(-count//2, count//2 + 1):
+            level = center_price * (1 + i * spacing)
+            self.grid_levels.append(level)
+        self.grid_levels.sort()
+
+class HighFrequencyStrategy(QuantitativeStrategy):
+    """高频交易策略 - 追求小幅价差快速获利"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.volume_history = []
+        self.last_signal_time = None
+        self.micro_trend_history = []
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """高频交易信号生成"""
+        if not self.is_running:
+            return None
+            
+        current_time = datetime.now()
+        current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        
+        # 高频策略需要限制信号频率
+        if self.last_signal_time and (current_time - self.last_signal_time).total_seconds() < 30:
+            return None
+            
+        self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
+        
+        # 只保留最近的短期数据
+        max_history = 30  # 只看最近30个数据点
+        if len(self.price_history) > max_history:
+            self.price_history.pop(0)
+            self.volume_history.pop(0)
+            
+        if len(self.price_history) < 10:
+            return None
+            
+        # 确保pandas已导入
+        _ensure_pandas()
+        
+        # 计算微观市场指标
+        prices = pd.Series(self.price_history)
+        volumes = pd.Series(self.volume_history)
+        
+        # 1. 微趋势识别
+        micro_trend = self._calculate_micro_trend(prices)
+        self.micro_trend_history.append(micro_trend)
+        if len(self.micro_trend_history) > 10:
+            self.micro_trend_history.pop(0)
+        
+        # 2. 短期动量
+        short_momentum = (prices.iloc[-1] - prices.iloc[-3]) / prices.iloc[-3] if len(prices) >= 3 else 0
+        
+        # 3. 成交量激增
+        volume_spike = self._detect_volume_spike(volumes)
+        
+        # 4. 价格微波动
+        price_volatility = prices.rolling(window=5).std().iloc[-1] if len(prices) >= 5 else 0
+        volatility_threshold = self.config.parameters.get('volatility_threshold', 0.001)
+        
+        # 5. 订单簿不平衡模拟（基于价格变化速度）
+        order_imbalance = self._estimate_order_imbalance(prices, volumes)
+        
+        quantity = self.config.parameters.get('quantity', 0.5)  # 高频交易使用较小仓位
+        min_profit_threshold = self.config.parameters.get('min_profit', 0.0005)  # 0.05%最小利润
+        
+        signal_type = None
+        confidence = 0
+        
+        # 高频买入条件
+        hf_buy_conditions = [
+            short_momentum > min_profit_threshold,  # 正向动量
+            volume_spike,  # 成交量激增
+            price_volatility > volatility_threshold,  # 足够波动
+            order_imbalance > 0.6,  # 买单占优
+            micro_trend > 0.5,  # 微趋势向上
+        ]
+        
+        # 高频卖出条件
+        hf_sell_conditions = [
+            short_momentum < -min_profit_threshold,  # 负向动量
+            volume_spike,  # 成交量激增
+            price_volatility > volatility_threshold,  # 足够波动
+            order_imbalance < 0.4,  # 卖单占优
+            micro_trend < 0.5,  # 微趋势向下
+        ]
+        
+        buy_score = sum(hf_buy_conditions)
+        sell_score = sum(hf_sell_conditions)
+        
+        if buy_score >= 4:  # 至少4个条件确认
+            signal_type = SignalType.BUY
+            confidence = min(buy_score / 5.0 + abs(short_momentum) * 100, 1.0)
+        elif sell_score >= 4:
+            signal_type = SignalType.SELL
+            confidence = min(sell_score / 5.0 + abs(short_momentum) * 100, 1.0)
+        
+        if signal_type is None:
+            return None
+            
+        self.last_signal_time = current_time
+        
+        # 高频策略根据信号强度调整仓位
+        adjusted_quantity = quantity * (1 + confidence * 2)
+        
+        signal = TradingSignal(
+            id=int(time.time() * 1000),
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=current_time,
+            executed=0
+        )
+        
+        return signal
+    
+    def _calculate_micro_trend(self, prices) -> float:
+        """计算微趋势（0-1，0.5为中性）"""
+        if len(prices) < 5:
+            return 0.5
+        recent_slope = (prices.iloc[-1] - prices.iloc[-5]) / prices.iloc[-5]
+        return max(0, min(1, 0.5 + recent_slope * 100))  # 标准化到0-1范围
+    
+    def _detect_volume_spike(self, volumes) -> bool:
+        """检测成交量激增"""
+        if len(volumes) < 5:
+            return False
+        current_vol = volumes.iloc[-1]
+        avg_vol = volumes.iloc[-5:-1].mean()
+        return current_vol > avg_vol * 2.0
+    
+    def _estimate_order_imbalance(self, prices, volumes) -> float:
+        """估算订单不平衡"""
+        if len(prices) < 2 or len(volumes) < 2:
+            return 0.0
+            
+        price_changes = prices.diff().dropna()
+        volume_changes = volumes.diff().dropna()
+        
+        if len(price_changes) == 0 or volume_changes.sum() == 0:
+            return 0.0
+            
+        # 简化的订单不平衡估算
+        buy_volume = volume_changes[price_changes > 0].sum()
+        sell_volume = volume_changes[price_changes < 0].sum()
+        
+        total_volume = buy_volume + abs(sell_volume)
+        if total_volume == 0:  # 防止除零错误
+            return 0.0
+            
+        return (buy_volume - abs(sell_volume)) / total_volume
+
+class TrendFollowingStrategy(QuantitativeStrategy):
+    """趋势跟踪策略 - 捕获长期趋势获得大幅收益"""
+    
+    def __init__(self, config: StrategyConfig):
+        super().__init__(config)
+        self.price_history = []
+        self.volume_history = []
+        self.trend_strength_history = []
+        self.position_state = "neutral"  # neutral, long, short
+        
+    def generate_signal(self, price_data: Dict[str, Any]) -> Optional[TradingSignal]:
+        """趋势跟踪信号生成"""
+        if not self.is_running:
+            return None
+            
+        current_price = price_data.get('price', 0)
+        current_volume = price_data.get('volume', 0)
+        
+        self.price_history.append(current_price)
+        self.volume_history.append(current_volume)
+        
+        lookback_period = self.config.parameters.get('lookback_period', 50)
+        if len(self.price_history) > lookback_period * 2:
+            self.price_history.pop(0)
+            self.volume_history.pop(0)
+            
+        if len(self.price_history) < lookback_period:
+            return None
+            
+        # 确保pandas已导入
+        _ensure_pandas()
+        
+        # 计算多重趋势指标
+        prices = pd.Series(self.price_history)
+        volumes = pd.Series(self.volume_history)
+        
+        # 1. 多重移动平均线
+        ma_short = prices.rolling(window=10).mean().iloc[-1]
+        ma_medium = prices.rolling(window=20).mean().iloc[-1]
+        ma_long = prices.rolling(window=50).mean().iloc[-1]
+        
+        # 2. 趋势强度计算
+        trend_strength = self._calculate_trend_strength(prices)
+        self.trend_strength_history.append(trend_strength)
+        if len(self.trend_strength_history) > 20:
+            self.trend_strength_history.pop(0)
+        
+        # 3. ADX指标计算（趋势强度）
+        adx = self._calculate_adx(prices, period=14)
+        
+        # 4. 成交量确认
+        volume_ma = volumes.rolling(window=20).mean().iloc[-1]
+        volume_ratio = current_volume / volume_ma if volume_ma > 0 else 1
+        
+        # 5. 价格相对位置
+        price_position = self._calculate_price_position(prices, period=50)
+        
+        quantity = self.config.parameters.get('quantity', 2.0)  # 趋势策略使用较大仓位
+        trend_threshold = self.config.parameters.get('trend_threshold', 0.02)  # 2%趋势阈值
+        
+        signal_type = None
+        confidence = 0
+        
+        # 强烈上涨趋势确认
+        uptrend_conditions = [
+            ma_short > ma_medium > ma_long,  # 均线多头排列
+            current_price > ma_short * (1 + trend_threshold),  # 价格远离短期均线
+            trend_strength > 0.7,  # 强趋势
+            adx > 25,  # ADX确认趋势强度
+            volume_ratio > 1.1,  # 成交量确认
+            price_position > 0.7,  # 价格处于高位区域
+            self.position_state != "long"  # 避免重复信号
+        ]
+        
+        # 强烈下跌趋势确认
+        downtrend_conditions = [
+            ma_short < ma_medium < ma_long,  # 均线空头排列
+            current_price < ma_short * (1 - trend_threshold),  # 价格远离短期均线
+            trend_strength < 0.3,  # 弱趋势（下跌）
+            adx > 25,  # ADX确认趋势强度
+            volume_ratio > 1.1,  # 成交量确认
+            price_position < 0.3,  # 价格处于低位区域
+            self.position_state != "short"  # 避免重复信号
+        ]
+        
+        uptrend_score = sum(uptrend_conditions)
+        downtrend_score = sum(downtrend_conditions)
+        
+        if uptrend_score >= 5:  # 强烈上涨趋势
+            signal_type = SignalType.BUY
+            confidence = min(uptrend_score / 7.0, 1.0)
+            self.position_state = "long"
+        elif downtrend_score >= 5:  # 强烈下跌趋势
+            signal_type = SignalType.SELL
+            confidence = min(downtrend_score / 7.0, 1.0)
+            self.position_state = "short"
+        
+        if signal_type is None:
+            return None
+            
+        # 趋势策略根据趋势强度大幅调整仓位
+        trend_multiplier = abs(trend_strength - 0.5) * 4  # 0-2倍数
+        adjusted_quantity = quantity * (1 + trend_multiplier + confidence)
+        
+        signal = TradingSignal(
+            id=int(time.time() * 1000),
+            strategy_id=self.config.id,
+            symbol=self.config.symbol,
+            signal_type=signal_type,
+            price=current_price,
+            quantity=adjusted_quantity,
+            confidence=confidence,
+            timestamp=datetime.now(),
+            executed=0
+        )
+        
+        return signal
+    
+    def _calculate_trend_strength(self, prices) -> float:
+        """计算趋势强度（0-1）"""
+        # 确保pandas和numpy已导入
+        _ensure_pandas()
+        
+        if len(prices) < 20:
+            return 0.5
+        
+        # 计算线性回归斜率
+        x = np.arange(len(prices))
+        y = prices.values
+        slope, _ = np.polyfit(x, y, 1)
+        
+        # 标准化斜率到0-1范围
+        normalized_slope = np.tanh(slope / np.mean(y) * 1000)  # 放大并限制范围
+        return (normalized_slope + 1) / 2  # 转换到0-1范围
+    
+    def _calculate_adx(self, prices, period: int = 14) -> float:
+        """计算ADX指标"""
+        # 确保pandas和numpy已导入
+        _ensure_pandas()
+        
+        if len(prices) < period + 1:
+            return 25.0  # 默认中性值
+            
+        high = prices.rolling(window=2).max()
+        low = prices.rolling(window=2).min()
+        close = prices
+        
+        # 计算True Range
+        tr1 = high - low
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        
+        # 计算DM
+        dm_plus = (high - high.shift()).where((high - high.shift()) > (low.shift() - low), 0)
+        dm_minus = (low.shift() - low).where((low.shift() - low) > (high - high.shift()), 0)
+        
+        # 计算DI
+        tr_sum = tr.rolling(window=period).sum()
+        dm_plus_sum = dm_plus.rolling(window=period).sum()
+        dm_minus_sum = dm_minus.rolling(window=period).sum()
+        
+        if tr_sum.iloc[-1] == 0:  # 防止除零错误
+            return 25.0
+            
+        di_plus = dm_plus_sum / tr_sum * 100
+        di_minus = dm_minus_sum / tr_sum * 100
+        
+        if (di_plus.iloc[-1] + di_minus.iloc[-1]) == 0:  # 防止除零错误
+            return 25.0
+            
+        dx = abs(di_plus - di_minus) / (di_plus + di_minus) * 100
+        adx = dx.rolling(window=period).mean()
+        
+        return adx.iloc[-1] if not pd.isna(adx.iloc[-1]) else 25.0
+    
+    def _calculate_price_position(self, prices, period: int = 50) -> float:
+        """计算价格在区间中的位置"""
+        if len(prices) < period:
+            return 0.5  # 默认中间位置
+            
+        recent_prices = prices.tail(period)
+        current = prices.iloc[-1]
+        high = recent_prices.max()
+        low = recent_prices.min()
+        
+        if high == low:  # 防止除零错误
+            return 0.5
+            
+        return (current - low) / (high - low)
+
+class AutomatedStrategyManager:
 
     def _safe_get_strategy_attr(self, strategy, attr_path, default=None):
         """安全获取策略属性，支持嵌套路径"""
@@ -3573,10 +4797,14 @@ class QuantitativeService:
                 strategy_score = strategy_result[0] if strategy_result else 0
                 
                 # 根据策略分数和系统设置决定交易类型
-                cursor.execute("SELECT auto_trading_enabled, real_trading_enabled FROM system_status ORDER BY updated_at DESC LIMIT 1")
+                cursor.execute("SELECT value FROM system_status WHERE key = 'auto_trading_enabled' ORDER BY timestamp DESC LIMIT 1")
                 status_result = cursor.fetchone()
                 auto_trading_enabled = status_result[0] if status_result else False
-                real_trading_enabled = status_result[1] if status_result else False
+                
+                # 获取真实交易开关状态 
+                cursor.execute("SELECT value FROM system_status WHERE key = 'real_trading_enabled' ORDER BY timestamp DESC LIMIT 1")
+                real_status_result = cursor.fetchone()
+                real_trading_enabled = real_status_result[0] if real_status_result else False
                 
                 # 🔧 修复交易类型判断：正确设置trade_type字段
                 if strategy_score >= self.real_trading_threshold and auto_trading_enabled:
@@ -3662,11 +4890,17 @@ class QuantitativeService:
             print(f"❌ 记录交易日志失败: {e}")
     
     def _update_strategy_score_after_cycle(self, strategy_id, cycle_pnl, mrot_score):
-        """🎯 基于交易周期完成更新策略评分"""
+        """🎯 基于交易周期完成更新策略评分 - 使用统一评分更新系统"""
         try:
-            # 调用现有的评分更新方法
+            # 🔥 使用统一评分更新系统，删除重复逻辑
             signal_type = 'buy' if cycle_pnl > 0 else 'sell'
-            self.update_strategy_score_after_validation(strategy_id, cycle_pnl, signal_type)
+            self.evolution_engine._unified_strategy_score_update(
+                strategy_id=strategy_id,
+                trigger_event="trade_cycle_completed",
+                trade_pnl=cycle_pnl,
+                signal_type=signal_type,
+                reason=f"周期PnL: {cycle_pnl:.4f}, MRoT: {mrot_score:.4f}"
+            )
             
         except Exception as e:
             print(f"❌ 更新策略周期评分失败: {e}")
@@ -10647,156 +11881,27 @@ class EvolutionaryStrategyEngine:
     
     def _update_strategy_score_after_cycle_completion(self, strategy_id: str, cycle_pnl: float, 
                                                     mrot_score: float, holding_minutes: int):
-        """📊 交易周期完成后更新策略评分 - 阶段三核心功能"""
+        """📊 交易周期完成后更新策略评分 - 统一调用评分更新系统"""
         try:
-            # 获取策略最近的交易周期数据
-            conn = psycopg2.connect(
-                host="localhost",
-                database="quantitative", 
-                user="quant_user",
-                password="123abc74531"
-            )
-            cursor = conn.cursor()
-            
-            # 获取最近10个完整交易周期的MRoT数据
-            cursor.execute('''
-                SELECT mrot_score, holding_minutes, expected_return
-                FROM trading_signals 
-                WHERE strategy_id = %s AND cycle_status = 'closed' AND mrot_score IS NOT NULL
-                ORDER BY timestamp DESC LIMIT 10
-            ''', (strategy_id,))
-            
-            recent_cycles = cursor.fetchall()
-            conn.close()
-            
-            if not recent_cycles:
-                return
-            
-            # 计算平均MRoT和策略效率等级
-            avg_mrot = sum(cycle[0] for cycle in recent_cycles) / len(recent_cycles)
-            
-            # 根据您修改的MRoT评级标准计算新的策略评分
-            efficiency_grade = self._calculate_mrot_efficiency_grade(avg_mrot)
-            
-            # 使用新的SCS综合评分公式
-            new_score = self._calculate_scs_comprehensive_score(
-                strategy_id, avg_mrot, recent_cycles
+            # 🔥 使用统一评分更新系统
+            new_score = self._unified_strategy_score_update(
+                strategy_id=strategy_id,
+                trigger_event="trade_cycle_completed",
+                trade_pnl=cycle_pnl,
+                signal_type="cycle_close",
+                reason=f"MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟"
             )
             
-            # 触发智能进化决策
-            self._intelligent_evolution_decision_based_on_mrot(
-                strategy_id, avg_mrot, efficiency_grade, new_score
-            )
+            # 🔥 基于新评分触发智能进化决策
+            updated_stats = self._get_strategy_performance_stats(strategy_id)
+            self._intelligent_evolution_decision(strategy_id, new_score, updated_stats)
             
-            print(f"✅ 策略{strategy_id}交易周期完成：MRoT={avg_mrot:.4f}, 效率等级={efficiency_grade}, 新评分={new_score:.2f}")
+            print(f"✅ 策略{strategy_id}交易周期完成：MRoT={mrot_score:.4f}, 新评分={new_score:.2f}")
             
         except Exception as e:
             print(f"❌ 周期完成后评分更新失败: {e}")
     
-    def _calculate_mrot_efficiency_grade(self, avg_mrot: float) -> str:
-        """🏆 根据平均MRoT计算效率等级 - 使用您修改的标准"""
-        if avg_mrot >= 0.5:
-            return "A级(超高效)"
-        elif avg_mrot >= 0.1:
-            return "B级(高效)" 
-        elif avg_mrot >= 0.01:
-            return "C级(中效)"
-        elif avg_mrot > 0:
-            return "D级(低效)"
-        else:
-            return "F级(负效)"
-    
-    def _calculate_scs_comprehensive_score(self, strategy_id: str, avg_mrot: float, 
-                                         recent_cycles: List[tuple]) -> float:
-        """📈 计算SCS综合评分（Strategy Comprehensive Score）- 阶段四核心功能"""
-        try:
-            # 基础分 = 平均MRoT × 100 × 权重系数 (40%)
-            base_score = avg_mrot * 100 * 0.4
-            
-            # 效率分 (35%) = 胜率×50% + 交易频次适应性×30% + 资金利用率×20%
-            profitable_cycles = sum(1 for cycle in recent_cycles if cycle[2] > 0)
-            win_rate = profitable_cycles / len(recent_cycles) if recent_cycles else 0
-            
-            # 交易频次适应性：平均持有时间越短越好（目标<30分钟）
-            avg_holding_minutes = sum(cycle[1] for cycle in recent_cycles) / len(recent_cycles)
-            frequency_adaptability = max(0, (30 - avg_holding_minutes) / 30) * 100
-            
-            # 资金利用率：基于平均盈利金额
-            avg_profit = sum(abs(cycle[2]) for cycle in recent_cycles) / len(recent_cycles)
-            capital_utilization = min(100, avg_profit * 10)  # 限制最高100分
-            
-            efficiency_score = (win_rate * 50 + frequency_adaptability * 30 + capital_utilization * 20) / 100 * 0.35
-            
-            # 稳定性分 (15%) = 连续盈利周期数 / 总周期数
-            consecutive_profitable = 0
-            max_consecutive = 0
-            for cycle in recent_cycles:
-                if cycle[2] > 0:
-                    consecutive_profitable += 1
-                    max_consecutive = max(max_consecutive, consecutive_profitable)
-                else:
-                    consecutive_profitable = 0
-            
-            stability_score = (max_consecutive / len(recent_cycles)) * 100 * 0.15
-            
-            # 风险控制分 (10%) = MAX(0, 100 - 最大连续亏损分钟数/10)
-            max_consecutive_loss_minutes = 0
-            current_loss_minutes = 0
-            for cycle in recent_cycles:
-                if cycle[2] < 0:
-                    current_loss_minutes += cycle[1]
-                    max_consecutive_loss_minutes = max(max_consecutive_loss_minutes, current_loss_minutes)
-                else:
-                    current_loss_minutes = 0
-            
-            risk_control_score = max(0, 100 - max_consecutive_loss_minutes / 10) * 0.1
-            
-            # SCS综合评分
-            scs_score = base_score + efficiency_score + stability_score + risk_control_score
-            
-            # 保存新评分到数据库
-            self._save_strategy_score_history(strategy_id, scs_score)
-            
-            return min(100, max(0, scs_score))  # 限制在0-100范围内
-            
-        except Exception as e:
-            print(f"❌ SCS综合评分计算失败: {e}")
-            return 50.0  # 默认评分
-    
-    def _intelligent_evolution_decision_based_on_mrot(self, strategy_id: str, avg_mrot: float, 
-                                                    efficiency_grade: str, current_score: float):
-        """🧬 基于MRoT的智能进化决策 - 阶段五核心功能"""
-        try:
-            if avg_mrot >= 0.5:  # A级策略
-                action = "protect_and_fine_tune"
-                self._protect_and_fine_tune_strategy(strategy_id, current_score, {})
-            elif avg_mrot >= 0.1:  # B级策略  
-                action = "consolidate_advantage"
-                self._consolidate_advantage_strategy(strategy_id, current_score, {})
-            elif avg_mrot >= 0.01:  # C级策略
-                action = "moderate_optimization"
-                self._moderate_optimization_strategy(strategy_id, current_score, {})
-            elif avg_mrot > 0:  # D级策略
-                action = "aggressive_optimization"
-                self._aggressive_optimization_strategy(strategy_id, current_score, {})
-            else:  # F级策略
-                action = "eliminate_or_major_mutation"
-                self._eliminate_or_mutate_poor_strategy(strategy_id, current_score)
-            
-            print(f"🧬 策略{strategy_id}进化决策：{efficiency_grade} -> {action}")
-            
-        except Exception as e:
-            print(f"❌ 智能进化决策失败: {e}")
-    
-    def _eliminate_or_mutate_poor_strategy(self, strategy_id: str, current_score: float):
-        """🔥 淘汰或重大变异低效策略"""
-        try:
-            # 对于F级策略，进行激进的参数重构
-            print(f"🔥 策略{strategy_id}执行重大变异（F级策略优化）")
-            # 这里可以调用现有的激进优化方法
-            self._aggressive_optimization_strategy(strategy_id, current_score, {})
-        except Exception as e:
-            print(f"❌ 策略淘汰/变异失败: {e}")
+
 
     def _load_configuration_from_db(self):
         """从数据库加载配置参数"""
