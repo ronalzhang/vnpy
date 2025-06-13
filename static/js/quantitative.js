@@ -321,14 +321,16 @@ class QuantitativeSystem {
                 scoreStatus = '⚠️ 待优化';
             }
             
-            // 🔥 交易状态 - 完全基于真实数据，不再区分模拟
+            // 🔥 交易状态 - 基于自动交易开关和策略分数
             let tradingStatus, tradingBadgeClass;
             if (strategy.enabled) {
-                if (score >= 65) {
+                // 检查自动交易开关状态
+                const autoTradingEnabled = this.systemStatus?.auto_trading_enabled || false;
+                if (autoTradingEnabled && score >= 65) {
                     tradingStatus = '真实交易';
                     tradingBadgeClass = 'bg-success';
                 } else {
-                    tradingStatus = '策略验证';  // 更准确的标签：低分策略在真实环境中模拟交易验证
+                    tradingStatus = '验证交易';  // 所有低于65分或自动交易关闭时都是验证交易
                     tradingBadgeClass = 'bg-warning';
                 }
             } else {
@@ -448,10 +450,11 @@ class QuantitativeSystem {
         this.showMessage('策略启动中...', 'info');
         
         try {
-            // 根据策略分数决定启动模式
+            // 根据策略分数和自动交易开关决定启动模式
             const score = strategy.final_score || 0;
-            const mode = score >= 65 ? 'real' : 'verification';
-            const modeText = score >= 65 ? '真实交易' : '策略验证';
+            const autoTradingEnabled = this.systemStatus?.auto_trading_enabled || false;
+            const mode = (autoTradingEnabled && score >= 65) ? 'real' : 'verification';
+            const modeText = (autoTradingEnabled && score >= 65) ? '真实交易' : '验证交易';
             
             // 调用后端API启动策略
             const response = await fetch(`/api/quantitative/strategies/${strategy.id}/start`, {
