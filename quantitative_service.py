@@ -8617,11 +8617,17 @@ class EvolutionaryStrategyEngine:
             # 5. 生成新策略（变异和交叉）
             new_strategies = self._generate_new_strategies(elites, survivors)
             
-            # 🔧 修复：正确更新世代信息 - 立即保存到全局状态
+            # 🔧 修复：正确更新世代信息 - 10轮一代，代数上限9999
             self.current_cycle += 1
-            if self.current_cycle > 3:  # 每3轮为一代，加快进化速度
-                self.current_generation += 1
-                self.current_cycle = 1
+            if self.current_cycle > 10:  # 每10轮为一代，符合用户要求
+                if self.current_generation < 9999:  # 代数上限9999
+                    self.current_generation += 1
+                    self.current_cycle = 1
+                else:
+                    # 达到代数上限，重置为第1代第1轮
+                    print("🔄 已达到代数上限9999，重置为第1代第1轮")
+                    self.current_generation = 1
+                    self.current_cycle = 1
             
             # 🔧 立即更新到数据库和全局状态
             self._save_generation_state()
