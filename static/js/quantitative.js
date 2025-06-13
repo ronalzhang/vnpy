@@ -903,13 +903,13 @@ class QuantitativeSystem {
         
         // 🔧 修复：基于is_validation字段正确分类交易日志
         const realTrades = currentLogs.filter(log => 
-            log.is_validation === false || log.trade_type === 'real_trading' || log.trade_type === '真实交易'
+            log.trade_type === 'real_trading'
         );
         const validationTrades = currentLogs.filter(log => 
-            log.is_validation === true || log.trade_type === 'simulation' ||
+            log.trade_type === 'score_verification' ||
             log.trade_type === 'optimization_validation' || 
             log.trade_type === 'initialization_validation' ||
-            log.trade_type === '验证交易'
+            log.trade_type === 'periodic_validation'
         );
         
         tbody.innerHTML = [
@@ -956,13 +956,13 @@ class QuantitativeSystem {
         const realCount = realTrades.length;
         const validationCount = validationTrades.length;
         const totalReal = this.tradeLogs.filter(log => 
-            log.is_validation === false || log.trade_type === 'real_trading' || log.trade_type === '真实交易'
+            log.trade_type === 'real_trading'
         ).length;
         const totalValidation = this.tradeLogs.filter(log => 
-            log.is_validation === true || log.trade_type === 'simulation' ||
+            log.trade_type === 'score_verification' ||
             log.trade_type === 'optimization_validation' || 
             log.trade_type === 'initialization_validation' ||
-            log.trade_type === '验证交易'
+            log.trade_type === 'periodic_validation'
         ).length;
         
         const statsRow = `
