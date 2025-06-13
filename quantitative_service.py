@@ -5278,7 +5278,7 @@ class QuantitativeService:
                     'trade_label': trade_label,
                     'validation_id': validation_id,
                     'parameters_used': parameters_used,
-                    'is_validation': trade_type != 'real_trading'
+                    'is_validation': trade_type == '验证交易' or trade_type == 'verification'
                 })
             
             print(f"🔍 策略{strategy_id[-4:]}交易日志: {len(logs)}条记录 (包含验证交易)")
@@ -5377,10 +5377,10 @@ class QuantitativeService:
             auto_trading_enabled = status_result[0] if status_result else False
             real_trading_enabled = status_result[1] if status_result else False
             
-            # 判断交易类型：验证交易 vs 真实交易
+            # 🔧 修复交易类型判断：正确设置trade_type字段
             if strategy_score >= self.real_trading_threshold and auto_trading_enabled:
                 # 高分策略且开启自动交易：真实交易模式（纸面交易）
-                trade_type = 'real'
+                trade_type = '真实交易'
                 is_real_money = False  # 默认纸面交易
                 exchange_order_id = f"REAL_{strategy_id}_{int(time.time())}"
                 
@@ -5390,7 +5390,7 @@ class QuantitativeService:
                     exchange_order_id = f"MONEY_{strategy_id}_{int(time.time())}"
             else:
                 # 所有其他情况：验证交易模式（策略验证和参数调整测试）
-                trade_type = 'verification'
+                trade_type = '验证交易'
                 is_real_money = False
                 exchange_order_id = f"VER_{strategy_id}_{int(time.time())}"
             

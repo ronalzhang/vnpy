@@ -904,14 +904,15 @@ class QuantitativeSystem {
         const endIndex = startIndex + this.tradeLogsPerPage;
         const currentLogs = this.tradeLogs.slice(startIndex, endIndex);
         
-        // 🔧 修复：正确分类交易日志，包含所有类型
+        // 🔧 修复：基于is_validation字段正确分类交易日志
         const realTrades = currentLogs.filter(log => 
-            log.executed === true || log.trade_type === 'real_trading'
+            log.is_validation === false || log.trade_type === 'real_trading' || log.trade_type === '真实交易'
         );
         const validationTrades = currentLogs.filter(log => 
-            log.executed === false || log.trade_type === 'simulation' ||
+            log.is_validation === true || log.trade_type === 'simulation' ||
             log.trade_type === 'optimization_validation' || 
-            log.trade_type === 'initialization_validation'
+            log.trade_type === 'initialization_validation' ||
+            log.trade_type === '验证交易'
         );
         
         tbody.innerHTML = [
@@ -957,11 +958,14 @@ class QuantitativeSystem {
         // 🔧 添加统计信息
         const realCount = realTrades.length;
         const validationCount = validationTrades.length;
-        const totalReal = this.tradeLogs.filter(log => log.executed === true || log.trade_type === 'real_trading').length;
+        const totalReal = this.tradeLogs.filter(log => 
+            log.is_validation === false || log.trade_type === 'real_trading' || log.trade_type === '真实交易'
+        ).length;
         const totalValidation = this.tradeLogs.filter(log => 
-            log.executed === false || log.trade_type === 'simulation' ||
+            log.is_validation === true || log.trade_type === 'simulation' ||
             log.trade_type === 'optimization_validation' || 
-            log.trade_type === 'initialization_validation'
+            log.trade_type === 'initialization_validation' ||
+            log.trade_type === '验证交易'
         ).length;
         
         const statsRow = `
