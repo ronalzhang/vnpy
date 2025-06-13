@@ -10669,13 +10669,13 @@ class EvolutionaryStrategyEngine:
             # 6. 记录评分变化日志
             cursor.execute('''
                 INSERT INTO strategy_optimization_logs 
-                (strategy_id, optimization_type, trigger_reason, old_score, new_score, 
+                (strategy_id, optimization_type, trigger_reason, new_score, 
                  optimization_result, created_time)
-                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                VALUES (%s, %s, %s, %s, %s, NOW())
             ''', (
                 strategy_id, 'SCS_CYCLE_SCORING', 
                 f'交易周期完成: PNL={cycle_pnl:.4f}, MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟',
-                0.0, scs_score,
+                scs_score,
                 f'SCS评分: {scs_score:.1f}, MRoT等级: {efficiency_grade}级({grade_description}), 胜率: {win_rate*100:.1f}%, 平均MRoT: {avg_mrot:.4f}'
             ))
             
@@ -10785,31 +10785,37 @@ class EvolutionaryStrategyEngine:
                                                     scs_score: float, completed_cycles: List):
         """🧠 基于MRoT的智能进化决策 - 按照文档要求实现"""
         try:
-            if avg_mrot >= 0.5:  # A级策略
+            # 确定MRoT效率等级
+            if avg_mrot >= 0.5:
+                efficiency_grade = 'A'
                 decision = "protect_and_fine_tune"
                 action = "保护并微调"
                 self._protect_and_fine_tune_strategy(strategy_id, scs_score, {
                     'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
                 })
-            elif avg_mrot >= 0.1:  # B级策略
+            elif avg_mrot >= 0.1:
+                efficiency_grade = 'B'
                 decision = "consolidate_advantage"
                 action = "巩固优势"
                 self._consolidate_advantage_strategy(strategy_id, scs_score, {
                     'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
                 })
-            elif avg_mrot >= 0.01:  # C级策略
+            elif avg_mrot >= 0.01:
+                efficiency_grade = 'C'
                 decision = "moderate_optimization"
                 action = "适度优化"
                 self._moderate_optimization_strategy(strategy_id, scs_score, {
                     'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
                 })
-            elif avg_mrot > 0:  # D级策略
+            elif avg_mrot > 0:
+                efficiency_grade = 'D'
                 decision = "aggressive_optimization"
                 action = "激进优化"
                 self._aggressive_optimization_strategy(strategy_id, scs_score, {
                     'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
                 })
-            else:  # F级策略
+            else:
+                efficiency_grade = 'F'
                 decision = "eliminate_or_mutate"
                 action = "淘汰或重大变异"
                 self._fallback_and_mark_for_evolution(strategy_id, {})
