@@ -1433,6 +1433,7 @@ class AutomatedStrategyManager:
         self.quantitative_service = quantitative_service  # ⭐ 修复属性名不匹配问题
         # ⭐ 修复db_manager属性缺失问题
         self.db_manager = quantitative_service.db_manager
+        self.real_trading_threshold = quantitative_service.real_trading_threshold  # 🔧 添加真实交易门槛
         self.initial_capital = 10000  # 初始资金10000 USDT
         self.monthly_target = 1.0  # 月收益目标100%
         self.risk_limit = 0.05  # 单次风险限制5%
@@ -3567,13 +3568,17 @@ class QuantitativeService:
             self.log_strategy_trade(strategy_id, signal_type, price, quantity, confidence, executed, pnl)
             
             # 增强日志记录：添加交易类型和周期信息
+            # 🔧 修复PostgreSQL语法：使用子查询替代ORDER BY LIMIT
             enhanced_query = """
                 UPDATE trading_signals 
                 SET trade_type = %s, cycle_id = %s, holding_minutes = %s, 
                     mrot_score = %s, is_validation = %s
-                WHERE strategy_id = %s AND signal_type = %s AND price = %s 
-                AND timestamp >= NOW() - INTERVAL '1 minute'
-                ORDER BY timestamp DESC LIMIT 1
+                WHERE id = (
+                    SELECT id FROM trading_signals 
+                    WHERE strategy_id = %s AND signal_type = %s AND price = %s 
+                    AND timestamp >= NOW() - INTERVAL '1 minute'
+                    ORDER BY timestamp DESC LIMIT 1
+                )
             """
             
             self.db_manager.execute_query(enhanced_query, (
