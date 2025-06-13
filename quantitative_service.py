@@ -2398,9 +2398,7 @@ class QuantitativeService:
             db_manager = DatabaseManager()
             db_manager.init_database()
         
-        # 临时跳过策略初始化，直接启动服务
-        print("⚠️ 临时跳过策略初始化，直接启动服务")
-        # self.init_strategies()
+        self.init_strategies()
         
         # ⭐ 初始化strategies属性（兼容旧代码）
         self.strategies = {}  # 保持向后兼容性
