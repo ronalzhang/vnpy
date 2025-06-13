@@ -331,14 +331,19 @@ class DatabaseManager:
                 )
             ''')
             
-            # 扩展strategy_trade_logs表，添加交易周期相关字段
-            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS cycle_id TEXT')
-            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS cycle_status TEXT DEFAULT \'open\'')
-            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS open_time TIMESTAMP')
-            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS close_time TIMESTAMP')
-            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS holding_minutes INTEGER')
-            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS mrot_score REAL')
-            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS paired_trade_id TEXT')
+            # 🔄 扩展trading_signals表，添加交易周期相关字段（使用现有字段结构）
+            # 检查并添加必要的交易周期字段
+            try:
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS cycle_id TEXT')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS cycle_status TEXT DEFAULT \'open\'')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS open_time TIMESTAMP')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS close_time TIMESTAMP')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS holding_minutes INTEGER')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS mrot_score REAL')
+                cursor.execute('ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS paired_signal_id TEXT')
+                print("✅ 交易周期字段添加完成")
+            except Exception as e:
+                print(f"⚠️ 交易周期字段添加失败（可能已存在）: {e}")
             
             # 创建交易周期相关索引
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_cycle_status ON strategy_trade_logs(cycle_status)')
@@ -10276,7 +10281,7 @@ class EvolutionaryStrategyEngine:
                 # 买入信号：创建新的开仓记录
                 cycle_id = f"CYCLE_{strategy_id}_{int(time.time() * 1000)}"
                 cursor.execute('''
-                    UPDATE strategy_trade_logs 
+                    UPDATE trading_signals 
                     SET cycle_id = %s, cycle_status = 'open', open_time = %s
                     WHERE id = %s
                 ''', (cycle_id, datetime.now(), new_trade['id']))
@@ -10289,7 +10294,7 @@ class EvolutionaryStrategyEngine:
                 # 卖出信号：查找最早的开仓记录进行配对
                 cursor.execute('''
                     SELECT id, cycle_id, price, quantity, open_time, timestamp
-                    FROM strategy_trade_logs 
+                    FROM trading_signals 
                     WHERE strategy_id = %s AND symbol = %s AND signal_type = 'buy' 
                     AND cycle_status = 'open' AND executed = 1
                     ORDER BY timestamp ASC LIMIT 1
@@ -10318,18 +10323,18 @@ class EvolutionaryStrategyEngine:
                 
                 # 更新开仓记录
                 cursor.execute('''
-                    UPDATE strategy_trade_logs 
+                    UPDATE trading_signals 
                     SET cycle_status = 'closed', close_time = %s, 
-                        holding_minutes = %s, mrot_score = %s, paired_trade_id = %s
+                        holding_minutes = %s, mrot_score = %s, paired_signal_id = %s
                     WHERE id = %s
                 ''', (close_time, holding_minutes, mrot_score, new_trade['id'], open_trade_id))
                 
                 # 更新平仓记录
                 cursor.execute('''
-                    UPDATE strategy_trade_logs 
+                    UPDATE trading_signals 
                     SET cycle_id = %s, cycle_status = 'closed', open_time = %s,
                         close_time = %s, holding_minutes = %s, mrot_score = %s, 
-                        paired_trade_id = %s, pnl = %s
+                        paired_signal_id = %s, expected_return = %s
                     WHERE id = %s
                 ''', (cycle_id, open_time, close_time, holding_minutes, mrot_score, 
                       open_trade_id, cycle_pnl, new_trade['id']))
@@ -10371,8 +10376,8 @@ class EvolutionaryStrategyEngine:
             
             # 获取最近10个完整交易周期的MRoT数据
             cursor.execute('''
-                SELECT mrot_score, holding_minutes, pnl
-                FROM strategy_trade_logs 
+                SELECT mrot_score, holding_minutes, expected_return
+                FROM trading_signals 
                 WHERE strategy_id = %s AND cycle_status = 'closed' AND mrot_score IS NOT NULL
                 ORDER BY timestamp DESC LIMIT 10
             ''', (strategy_id,))
