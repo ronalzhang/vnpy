@@ -1587,15 +1587,20 @@ class QuantitativeSystem {
 
     // 更新管理配置表单
     updateManagementForm() {
-        const form = document.getElementById('strategyManagementForm');
-        if (!form) return;
-
-        Object.keys(managementConfig).forEach(key => {
-            const input = form.querySelector(`#${key}`);
-            if (input) {
-                input.value = managementConfig[key];
-            }
-        });
+        if (managementConfig) {
+            document.getElementById('evolutionInterval').value = managementConfig.evolutionInterval || 10;
+            document.getElementById('maxStrategies').value = managementConfig.maxStrategies || 20;
+            document.getElementById('realTradingScore').value = managementConfig.realTradingScore || 65;
+            document.getElementById('minTrades').value = managementConfig.minTrades || 10;
+            document.getElementById('minWinRate').value = managementConfig.minWinRate || 65;
+            document.getElementById('minProfit').value = managementConfig.minProfit || 0;
+            document.getElementById('maxDrawdown').value = managementConfig.maxDrawdown || 10;
+            document.getElementById('minSharpeRatio').value = managementConfig.minSharpeRatio || 1.0;
+            document.getElementById('maxPositionSize').value = managementConfig.maxPositionSize || 100;
+            document.getElementById('stopLossPercent').value = managementConfig.stopLossPercent || 5;
+            document.getElementById('eliminationDays').value = managementConfig.eliminationDays || 7;
+            document.getElementById('minScore').value = managementConfig.minScore || 50;
+        }
     }
 
     // 驼峰转连字符
@@ -1606,33 +1611,25 @@ class QuantitativeSystem {
     // 保存管理配置
     async saveManagementConfig() {
         try {
-            const form = document.getElementById('strategyManagementForm');
-            if (!form) {
-                console.error('策略管理表单不存在');
-                return;
-            }
-
-            // 收集表单数据
-            const newConfig = {};
-            
-            // 🔥 手动获取所有输入值（修复自动保存问题）
-            ['evolutionInterval', 'maxStrategies', 'minTrades', 'minWinRate', 'minProfit',
-             'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 'stopLossPercent', 
-             'eliminationDays', 'minScore'].forEach(key => {
-                const input = form.querySelector(`#${key}`);
-                if (input) {
-                    const value = parseFloat(input.value);
-                    newConfig[key] = isNaN(value) ? 0 : value;
-                    console.log(`收集配置 ${key}: ${newConfig[key]}`);
-                }
-            });
-
-            console.log('准备保存的配置:', newConfig);
+            const updatedConfig = {
+                evolutionInterval: parseInt(document.getElementById('evolutionInterval').value) || 10,
+                maxStrategies: parseInt(document.getElementById('maxStrategies').value) || 20,
+                realTradingScore: parseFloat(document.getElementById('realTradingScore').value) || 65,
+                minTrades: parseInt(document.getElementById('minTrades').value) || 10,
+                minWinRate: parseFloat(document.getElementById('minWinRate').value) || 65,
+                minProfit: parseFloat(document.getElementById('minProfit').value) || 0,
+                maxDrawdown: parseFloat(document.getElementById('maxDrawdown').value) || 10,
+                minSharpeRatio: parseFloat(document.getElementById('minSharpeRatio').value) || 1.0,
+                maxPositionSize: parseFloat(document.getElementById('maxPositionSize').value) || 100,
+                stopLossPercent: parseFloat(document.getElementById('stopLossPercent').value) || 5,
+                eliminationDays: parseInt(document.getElementById('eliminationDays').value) || 7,
+                minScore: parseFloat(document.getElementById('minScore').value) || 50
+            };
 
             const response = await fetch('/api/quantitative/management-config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ config: newConfig })
+                body: JSON.stringify({ config: updatedConfig })
             });
 
             const data = await response.json();
@@ -1640,7 +1637,7 @@ class QuantitativeSystem {
             
             if (data.success) {
                 // 🔥 立即更新本地配置
-                Object.assign(managementConfig, newConfig);
+                Object.assign(managementConfig, updatedConfig);
                 console.log('本地配置已更新:', managementConfig);
                 
                 this.showMessage('配置保存成功并同步到后端', 'success');
@@ -1662,6 +1659,7 @@ class QuantitativeSystem {
         const defaultConfig = {
             evolutionInterval: 10,
             maxStrategies: 20,
+            realTradingScore: 65,
             minTrades: 10,
             minWinRate: 65,
             minProfit: 0,
@@ -1711,7 +1709,7 @@ class QuantitativeSystem {
         // 🔥 添加实时保存功能 - 当输入框失去焦点时自动保存
         const form = document.getElementById('strategyManagementForm');
         if (form) {
-            ['evolutionInterval', 'maxStrategies', 'minTrades', 'minWinRate', 'minProfit',
+            ['evolutionInterval', 'maxStrategies', 'realTradingScore', 'minTrades', 'minWinRate', 'minProfit',
              'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 'stopLossPercent', 
              'eliminationDays', 'minScore'].forEach(key => {
                 const input = form.querySelector(`#${key}`);

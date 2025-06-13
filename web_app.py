@@ -3682,51 +3682,39 @@ def manage_strategy_config():
             running_result = cursor.fetchone()
             actual_running_strategies = running_result[0] if running_result else 0
             
-            cursor.execute("""
-                SELECT AVG(final_score) FROM strategies WHERE enabled = 1 AND final_score > 0
-            """)
-            avg_result = cursor.fetchone()
-            avg_score = avg_result[0] if avg_result and avg_result[0] else 50
+            # 构建配置字典
+            config = {}
+            for key, value in config_rows:
+                try:
+                    # 尝试转换为数字
+                    config[key] = float(value) if '.' in value else int(value)
+                except ValueError:
+                    config[key] = value
             
-            # 获取实际交易统计参数
-            cursor.execute("""
-                SELECT 
-                    AVG(CASE WHEN expected_return > 0 THEN expected_return ELSE 0 END) as avg_profit,
-                    COUNT(CASE WHEN expected_return > 0 THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0) as win_rate
-                FROM trading_signals 
-                WHERE timestamp >= NOW() - INTERVAL '7 days'
-            """)
-            trade_stats = cursor.fetchone()
-            actual_avg_profit = trade_stats[0] or 0 if trade_stats else 0
-            actual_win_rate = trade_stats[1] or 65 if trade_stats else 65
-            
-            # 🔧 修复：与后端quantitative_service.py的EvolutionaryStrategyEngine保持完全一致
-            actual_config = {
-                'evolutionInterval': 10,  # 🔧 与后端evolution_config保持一致：10分钟
-                'maxStrategies': 50,  # 🔧 与后端max_strategies保持一致
-                'minTrades': 20,  # 🔧 与后端策略交易标准保持一致
-                'minWinRate': 75,  # 🔧 与后端胜率要求保持一致
-                'minProfit': 100,  # 🔧 与后端最低收益要求保持一致
-                'maxDrawdown': 2,  # 🔧 与后端风控标准保持一致
-                'minSharpeRatio': 1,  # 🔧 与后端夏普比率要求保持一致
-                'maxPositionSize': 100,  # 🔧 与后端仓位管理保持一致
-                'stopLossPercent': 3,  # 🔧 与后端止损设置保持一致
-                'eliminationDays': 7,  # 🔧 与后端淘汰周期保持一致
-                'minScore': 40  # 🔧 与后端elimination_threshold保持一致
+            # 设置默认值
+            default_config = {
+                'evolutionInterval': 10,
+                'maxStrategies': 20,
+                'realTradingScore': 65.0,
+                'minTrades': 10,
+                'minWinRate': 65.0,
+                'minProfit': 0.0,
+                'maxDrawdown': 10.0,
+                'minSharpeRatio': 1.0,
+                'maxPositionSize': 100.0,
+                'stopLossPercent': 5.0,
+                'eliminationDays': 7,
+                'minScore': 50.0
             }
             
-            # 合并数据库保存的自定义配置
-            current_config = actual_config.copy()
-            for key, value in config_rows:
-                if key in current_config:
-                    try:
-                        current_config[key] = float(value)
-                    except:
-                        current_config[key] = value
+            # 合并默认配置和数据库配置
+            for key, default_value in default_config.items():
+                if key not in config:
+                    config[key] = default_value
             
             return jsonify({
                 'success': True,
-                'config': current_config
+                'config': config
             })
             
         elif request.method == 'POST':
@@ -3745,6 +3733,20 @@ def manage_strategy_config():
                     ON CONFLICT (config_key) 
                     DO UPDATE SET config_value = EXCLUDED.config_value, updated_at = CURRENT_TIMESTAMP
                 """, (key, str(value)))
+            
+            # 如果保存了真实交易分值门槛，立即通知quantitative_service
+            if 'realTradingScore' in new_config and quantitative_service:
+                try:
+                    quantitative_service.update_real_trading_threshold(float(new_config['realTradingScore']))
+                except Exception as e:
+                    print(f"更新真实交易门槛失败: {e}")
+            
+            # 如果保存了进化频率，立即通知quantitative_service
+            if 'evolutionInterval' in new_config and quantitative_service:
+                try:
+                    quantitative_service.update_evolution_interval(int(new_config['evolutionInterval']))
+                except Exception as e:
+                    print(f"更新进化频率失败: {e}")
             
             conn.commit()
             

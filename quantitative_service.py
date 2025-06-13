@@ -2357,7 +2357,7 @@ class QuantitativeService:
         # 初始化配置
         self.fund_allocation_config = {
             'max_active_strategies': 2,
-            'min_score_for_trading': 65.0,  # 65分开始交易
+            'min_score_for_trading': 65.0,  # 65分开始交易，将通过数据库配置动态更新
             'fund_allocation_method': 'fitness_based',
             'risk_management_enabled': True,
             'auto_rebalancing': True,
@@ -2365,6 +2365,14 @@ class QuantitativeService:
             'high_frequency_evolution': True,  # 启用高频进化
             'evolution_acceleration': True  # 启用进化加速
         }
+        
+        # 设置默认的真实交易门槛和进化频率
+        self.real_trading_threshold = 65.0
+        self.evolution_interval = 10  # 默认10分钟
+        
+        # 配置化参数，支持动态更新
+        self.real_trading_threshold = 65.0  # 真实交易分数阈值
+        self.evolution_interval = 10  # 进化频率（分钟）
         
         # 加载配置和初始化
         self.load_config()
@@ -2411,6 +2419,9 @@ class QuantitativeService:
         self._init_strategy_templates()
         
         print("✅ QuantitativeService 初始化完成")
+        
+        # 从数据库加载配置
+        self._load_configuration_from_db()
     
     def _init_strategy_templates(self):
         """初始化策略参数模板 - 使用统一配置"""
@@ -2704,11 +2715,11 @@ class QuantitativeService:
                     win_rate=real_win_rate, 
                     total_trades=real_total_trades
                 )
-                qualified = current_score >= 65.0  # 提高到65分门槛
+                qualified = current_score >= self.real_trading_threshold  # 使用配置的交易门槛
             else:
                 # 没有真实交易数据，使用初始评分
                 current_score = initial_score
-                qualified = initial_score >= 65.0  # 提高到65分门槛
+                qualified = initial_score >= self.real_trading_threshold  # 使用配置的交易门槛
             
             result = {
                 'final_score': current_score,
@@ -3632,7 +3643,7 @@ class QuantitativeService:
         
         # 🔧 验证交易优先（不受余额限制），确保买卖平衡
         # 低分策略需要验证交易来提升评分
-        if strategy_score < 65:
+        if strategy_score < self.real_trading_threshold:
             # 🔥 修复：确保买卖信号平衡生成，优先生成买入，但要保证有卖出
             if buy_generated < buy_needed and sell_generated < sell_allowed:
                 # 🔥 修复：强制买卖信号平衡，纠正极端不平衡问题
@@ -3737,7 +3748,7 @@ class QuantitativeService:
         if self._should_execute_trade_based_on_conditions(strategy, current_balance):
             if buy_generated < buy_needed:
                 # 🔧 验证交易/进化需要：即使余额为0也要生成信号
-                if strategy_score < 65 or current_balance > 0.1:  # 验证交易或有少量余额
+                if strategy_score < self.real_trading_threshold or current_balance > 0.1:  # 验证交易或有少量余额
                     print(f"✅ 策略{strategy_id[-4:]}条件决策买入信号")
                     return 'buy'
             elif has_position and sell_generated < sell_allowed:
@@ -3793,7 +3804,7 @@ class QuantitativeService:
                         strategy_name = signal[9] if len(signal) > 9 else strategy_id
                     
                     # 🎯 核心逻辑：区分验证交易和真实交易
-                    is_validation_trade = strategy_score < 65
+                    is_validation_trade = strategy_score < self.real_trading_threshold
                     trade_type = "验证交易" if is_validation_trade else "真实交易"
                     
                     # 🔒 安全机制：验证交易始终执行，真实交易需要手动开启
@@ -3895,7 +3906,7 @@ class QuantitativeService:
             
             if signal_type == 'buy':
                 # 🔧 验证交易：即使余额为0也要生成信号，使用更有意义的验证金额
-                if strategy_score < 65:  # 验证交易
+                if strategy_score < self.real_trading_threshold:  # 验证交易
                     # 🔥 使用渐进式验证交易金额系统
                     trade_amount = self.evolution_engine._get_validation_amount_by_stage(strategy_id, strategy['symbol'])
                     stage = self.evolution_engine._get_strategy_validation_stage(strategy_id)
@@ -4003,7 +4014,7 @@ class QuantitativeService:
                 return True
             
             # 条件2：验证交易强制执行（低分策略需要验证数据提高评分）
-            if final_score < 65:
+            if final_score < self.real_trading_threshold:
                 print(f"✅ 策略{strategy_id[-4:]}验证交易强制执行")
                 return True
             
@@ -4066,7 +4077,7 @@ class QuantitativeService:
                 return True
             
             # 条件3：验证交易必须执行（低分策略需要验证数据）
-            if strategy_score < 65:
+            if strategy_score < self.real_trading_threshold:
                 print(f"✅ 策略{strategy_id[-4:]}低分验证交易强制执行")
                 return True
             
@@ -10778,6 +10789,116 @@ class EvolutionaryStrategyEngine:
             self._aggressive_optimization_strategy(strategy_id, current_score, {})
         except Exception as e:
             print(f"❌ 策略淘汰/变异失败: {e}")
+
+    def _load_configuration_from_db(self):
+        """从数据库加载配置参数"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # 从strategy_management_config表获取配置
+            cursor.execute("SELECT config_key, config_value FROM strategy_management_config")
+            config_rows = cursor.fetchall()
+            
+            for key, value in config_rows:
+                try:
+                    numeric_value = float(value) if '.' in value else int(value)
+                    
+                    if key == 'realTradingScore':
+                        old_threshold = self.real_trading_threshold
+                        self.real_trading_threshold = numeric_value
+                        self.fund_allocation_config['min_score_for_trading'] = numeric_value
+                        print(f"✅ 更新真实交易阈值: {old_threshold} → {numeric_value}")
+                        
+                    elif key == 'evolutionInterval':
+                        old_interval = self.evolution_interval
+                        self.evolution_interval = numeric_value
+                        print(f"✅ 更新进化频率: {old_interval} → {numeric_value} 分钟")
+                        
+                        # 更新进化引擎的频率
+                        if self.evolution_engine:
+                            self.evolution_engine.evolution_interval = numeric_value
+                            
+                except ValueError:
+                    print(f"⚠️ 配置参数 {key} 值 {value} 无法转换为数字")
+                    
+        except Exception as e:
+            print(f"⚠️ 从数据库加载配置失败: {e}")
+
+    def update_real_trading_threshold(self, new_threshold: float):
+        """更新真实交易分数阈值"""
+        try:
+            old_threshold = self.real_trading_threshold
+            self.real_trading_threshold = new_threshold
+            self.fund_allocation_config['min_score_for_trading'] = new_threshold
+            
+            # 更新进化引擎的配置
+            if hasattr(self, 'evolution_engine') and self.evolution_engine:
+                self.evolution_engine.real_trading_threshold = new_threshold
+            
+            print(f"✅ 实时更新真实交易阈值: {old_threshold} → {new_threshold}")
+            
+            # 触发策略重新评估
+            self._reevaluate_strategies_trading_status()
+            
+        except Exception as e:
+            print(f"❌ 更新真实交易阈值失败: {e}")
+
+    def update_evolution_interval(self, new_interval: int):
+        """更新进化频率"""
+        try:
+            old_interval = self.evolution_interval
+            self.evolution_interval = new_interval
+            
+            # 更新进化引擎的频率
+            if hasattr(self, 'evolution_engine') and self.evolution_engine:
+                self.evolution_engine.evolution_interval = new_interval
+                print(f"✅ 实时更新进化频率: {old_interval} → {new_interval} 分钟")
+                
+                # 如果进化引擎正在运行，重启以应用新频率
+                if hasattr(self.evolution_engine, 'restart_with_new_interval'):
+                    self.evolution_engine.restart_with_new_interval(new_interval)
+            
+        except Exception as e:
+            print(f"❌ 更新进化频率失败: {e}")
+
+    def _reevaluate_strategies_trading_status(self):
+        """重新评估所有策略的交易状态"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # 获取所有策略
+            cursor.execute("SELECT id, final_score FROM strategies WHERE enabled = 1")
+            strategies = cursor.fetchall()
+            
+            updated_count = 0
+            for strategy_id, final_score in strategies:
+                # 根据新的阈值更新策略的交易资格
+                qualified = final_score >= self.real_trading_threshold
+                
+                # 更新数据库中的qualified_for_trading字段（如果存在）
+                try:
+                    cursor.execute("""
+                        UPDATE strategies 
+                        SET qualified_for_trading = %s 
+                        WHERE id = %s
+                    """, (qualified, strategy_id))
+                    updated_count += 1
+                except:
+                    # 如果字段不存在，忽略错误
+                    pass
+            
+            print(f"✅ 重新评估了 {updated_count} 个策略的交易状态（阈值: {self.real_trading_threshold}）")
+            
+        except Exception as e:
+            print(f"⚠️ 重新评估策略交易状态失败: {e}")
+
+    def get_current_configuration(self) -> dict:
+        """获取当前配置"""
+        return {
+            'realTradingScore': self.real_trading_threshold,
+            'evolutionInterval': self.evolution_interval,
+            'minScoreForTrading': self.fund_allocation_config.get('min_score_for_trading', 65.0)
+        }
 
 def main():
     """主程序入口"""
