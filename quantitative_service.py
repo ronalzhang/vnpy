@@ -2417,7 +2417,8 @@ class QuantitativeService:
         
         # 从数据库加载配置（如果需要）
         try:
-            self._load_configuration_from_db()
+            print("⚠️ 临时跳过配置加载，使用默认配置")
+            # self._load_configuration_from_db()
         except Exception as e:
             print(f"⚠️ 配置加载失败，使用默认配置: {e}")
     
