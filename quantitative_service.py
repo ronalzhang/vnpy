@@ -4411,8 +4411,8 @@ class QuantitativeService:
         try:
             query = '''
                 SELECT COUNT(*) as total, 
-                       SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as wins
-                FROM strategy_trade_logs 
+                       SUM(CASE WHEN expected_return > 0 THEN 1 ELSE 0 END) as wins
+                FROM trading_signals 
                 WHERE strategy_id = %s AND executed = 1
             '''
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
@@ -4430,7 +4430,7 @@ class QuantitativeService:
         """计算真实交易次数"""
         try:
             query = '''
-                SELECT COUNT(*) as count FROM strategy_trade_logs 
+                SELECT COUNT(*) as count FROM trading_signals 
                 WHERE strategy_id = %s AND executed = 1
             '''
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
@@ -4444,7 +4444,7 @@ class QuantitativeService:
         """计算真实策略收益率"""
         try:
             query = '''
-                SELECT SUM(pnl) as total_pnl FROM strategy_trade_logs 
+                SELECT SUM(expected_return) as total_pnl FROM trading_signals 
                 WHERE strategy_id = %s AND executed = 1
             '''
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
@@ -5628,10 +5628,10 @@ class QuantitativeService:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT COUNT(*) as total_trades,
-                       SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as winning_trades,
-                       AVG(pnl) as avg_pnl,
-                       SUM(pnl) as total_pnl
-                FROM strategy_trade_logs 
+                       SUM(CASE WHEN expected_return > 0 THEN 1 ELSE 0 END) as winning_trades,
+                       AVG(expected_return) as avg_pnl,
+                       SUM(expected_return) as total_pnl
+                FROM trading_signals 
                 WHERE strategy_id = %s AND timestamp > NOW() - INTERVAL '7 days'
             ''', (strategy_id,))
             
@@ -6545,8 +6545,8 @@ class QuantitativeService:
             # 🔧 fallback：尝试旧格式查询
             try:
                 cursor.execute(f'''
-                    SELECT strategy_id, signal_type, price, quantity, confidence, executed, pnl, timestamp
-                    FROM strategy_trade_logs 
+                                SELECT strategy_id, signal_type, price, quantity, confidence, executed, expected_return, timestamp
+            FROM trading_signals 
                     WHERE strategy_id = %s
                     ORDER BY timestamp DESC
                     LIMIT {limit}
@@ -7309,8 +7309,8 @@ class StrategySimulator:
         """获取策略的真实历史交易数据"""
         try:
             query = """
-            SELECT signal_type, price, quantity, confidence, pnl, timestamp
-            FROM trading_logs 
+            SELECT signal_type, price, quantity, confidence, expected_return, timestamp
+            FROM trading_signals 
             WHERE strategy_id = %s AND executed = 1 
             AND timestamp >= NOW() - INTERVAL '{} days'
             ORDER BY timestamp ASC
@@ -7325,7 +7325,7 @@ class StrategySimulator:
                     'price': float(row[1]),
                     'quantity': float(row[2]),
                     'confidence': float(row[3]),
-                    'pnl': float(row[4]) if row[4] is not None else 0.0,
+                    'expected_return': float(row[4]) if row[4] is not None else 0.0,
                     'timestamp': row[5]
                 })
             
@@ -7339,8 +7339,8 @@ class StrategySimulator:
         """获取策略的最近真实交易数据"""
         try:
             query = """
-            SELECT signal_type, price, quantity, confidence, pnl, timestamp
-            FROM trading_logs 
+            SELECT signal_type, price, quantity, confidence, expected_return, timestamp
+            FROM trading_signals 
             WHERE strategy_id = %s AND executed = 1 
             AND timestamp >= NOW() - INTERVAL '{} days'
             ORDER BY timestamp DESC
@@ -7355,7 +7355,7 @@ class StrategySimulator:
                     'price': float(row[1]),
                     'quantity': float(row[2]), 
                     'confidence': float(row[3]),
-                    'pnl': float(row[4]) if row[4] is not None else 0.0,
+                    'expected_return': float(row[4]) if row[4] is not None else 0.0,
                     'timestamp': row[5]
                 })
             
@@ -9489,7 +9489,7 @@ class EvolutionaryStrategyEngine:
     def _count_real_strategy_trades(self, strategy_id: str) -> int:
         """🔧 计算策略的真实交易数量"""
         try:
-            with self.quantitative_service.get_db_connection() as conn:
+            with self.get_db_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT COUNT(*) 
@@ -10939,7 +10939,7 @@ class EvolutionaryStrategyEngine:
             # 🔧 只有在有历史交易数据的情况下才计算预期收益
             try:
                 cursor = self.quantitative_service.db_manager.execute_query(
-                    "SELECT AVG(pnl) as avg_pnl FROM trading_signals WHERE strategy_id = %s AND executed = 1 AND pnl != 0",
+                    "SELECT AVG(expected_return) as avg_pnl FROM trading_signals WHERE strategy_id = %s AND executed = 1 AND expected_return != 0",
                     (strategy_id,), fetch_one=True
                 )
                 if cursor and cursor[0] is not None:

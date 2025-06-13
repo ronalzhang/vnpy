@@ -1942,7 +1942,6 @@ def toggle_strategy(strategy_id):
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/quantitative/strategies/<strategy_id>/trade-logs', methods=['GET'])
-@app.route('/api/quantitative/strategy-trade-logs/<strategy_id>', methods=['GET'])
 def get_strategy_trade_logs(strategy_id):
     """获取策略交易日志 - 统一查询trading_signals表"""
     try:
@@ -3206,7 +3205,6 @@ def create_strategy():
         return jsonify({"success": False, "message": str(e)})
 
 @app.route('/api/quantitative/auto-trading', methods=['GET', 'POST'])
-@app.route('/api/quantitative/toggle-auto-trading', methods=['POST'])  # 🔧 兼容旧路由
 def manage_auto_trading():
     """🔥 统一的自动交易管理API - 移除重复定义"""
     try:
