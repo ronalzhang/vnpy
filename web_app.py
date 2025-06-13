@@ -1942,6 +1942,7 @@ def toggle_strategy(strategy_id):
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/quantitative/strategies/<strategy_id>/trade-logs', methods=['GET'])
+@app.route('/api/quantitative/strategy-trade-logs/<strategy_id>', methods=['GET'])
 def get_strategy_trade_logs(strategy_id):
     """获取策略交易日志 - 统一查询trading_signals表"""
     try:
@@ -1953,8 +1954,7 @@ def get_strategy_trade_logs(strategy_id):
         # 🔥 统一查询trading_signals表，包含所有交易记录（验证+真实）
         query = """
             SELECT timestamp, symbol, signal_type, price, quantity, 
-                   expected_return, executed, id, strategy_id, confidence,
-                   risk_level, strategy_score, priority, trade_type
+                   expected_return, executed, id, strategy_id, confidence
             FROM trading_signals 
             WHERE strategy_id = %s OR strategy_id LIKE %s
             ORDER BY timestamp DESC
@@ -1976,7 +1976,7 @@ def get_strategy_trade_logs(strategy_id):
             executed = bool(row[6]) if row[6] is not None else False
             record_id = row[7] if row[7] is not None else 0
             confidence = float(row[9]) if row[9] is not None else 0.75
-            trade_type = row[13] if len(row) > 13 else 'simulation'
+            trade_type = 'verification' if not executed else 'real'
             
             logs.append({
                 'timestamp': timestamp,

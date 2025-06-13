@@ -4837,7 +4837,6 @@ class QuantitativeService:
                     holding_minutes = %s, mrot_score = %s
                 WHERE strategy_id = %s AND signal_type = %s AND price = %s 
                 AND timestamp >= NOW() - INTERVAL '2 minutes'
-                ORDER BY timestamp DESC LIMIT 1
             '''
             
             cursor.execute(update_query, (
