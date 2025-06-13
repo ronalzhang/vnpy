@@ -3607,7 +3607,7 @@ class QuantitativeService:
             self.conn.commit()
             
             # 🔄 如果是已执行的交易，调用交易周期匹配引擎
-                if executed and hasattr(self, 'evolution_engine'):
+            if executed and hasattr(self, 'evolution_engine'):
                     cursor.execute('SELECT symbol FROM strategies WHERE id = %s', (strategy_id,))
                     symbol_result = cursor.fetchone()
                     symbol = symbol_result[0] if symbol_result else 'BTCUSDT'
