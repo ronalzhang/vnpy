@@ -10804,7 +10804,6 @@ class EvolutionaryStrategyEngine:
                     if key == 'realTradingScore':
                         old_threshold = self.real_trading_threshold
                         self.real_trading_threshold = numeric_value
-                        self.fund_allocation_config['min_score_for_trading'] = numeric_value
                         print(f"✅ 更新真实交易阈值: {old_threshold} → {numeric_value}")
                         
                     elif key == 'evolutionInterval':
@@ -10827,7 +10826,6 @@ class EvolutionaryStrategyEngine:
         try:
             old_threshold = self.real_trading_threshold
             self.real_trading_threshold = new_threshold
-            self.fund_allocation_config['min_score_for_trading'] = new_threshold
             
             # 更新进化引擎的配置
             if hasattr(self, 'evolution_engine') and self.evolution_engine:
