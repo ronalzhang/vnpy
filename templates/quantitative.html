@@ -640,15 +640,32 @@
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <label for="maxPositionSize" class="form-label">最大仓位 (USDT)</label>
                                         <input type="number" class="form-control" id="maxPositionSize" value="100" min="10" max="10000" step="10">
                                         <div class="form-text">单个策略的最大仓位金额</div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <label for="stopLossPercent" class="form-label">止损百分比 (%)</label>
                                         <input type="number" class="form-control" id="stopLossPercent" value="5" min="1" max="20" step="0.1">
                                         <div class="form-text">全局止损触发的亏损百分比</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="takeProfitPercent" class="form-label">止盈百分比 (%)</label>
+                                        <input type="number" class="form-control" id="takeProfitPercent" value="4" min="1" max="15" step="0.1">
+                                        <div class="form-text">全局止盈触发的盈利百分比</div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-6">
+                                        <label for="maxHoldingMinutes" class="form-label">最大持仓时间 (分钟)</label>
+                                        <input type="number" class="form-control" id="maxHoldingMinutes" value="30" min="5" max="120" step="5">
+                                        <div class="form-text">超过此时间且有盈利将触发时间止盈</div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="minProfitForTimeStop" class="form-label">时间止盈最低收益 (%)</label>
+                                        <input type="number" class="form-control" id="minProfitForTimeStop" value="1" min="0.1" max="5" step="0.1">
+                                        <div class="form-text">时间止盈触发的最低收益率</div>
                                     </div>
                                 </div>
                             </div>

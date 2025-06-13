@@ -5475,6 +5475,12 @@ class QuantitativeService:
         
         # 🔴 生成卖出信号（如果有持仓且卖出信号未达上限）
         if has_position and sell_generated < sell_allowed:
+            # 🎯 新增：基于止盈条件的卖出信号（优先级最高）
+            take_profit_signal = self._check_take_profit_condition(strategy, strategy_id)
+            if take_profit_signal:
+                print(f"🎯 策略{strategy_id[-4:]}止盈触发卖出信号")
+                return 'sell'
+            
             # 📈 低分策略或均值回归策略倾向卖出
             if strategy_score < 70 or strategy_type == 'mean_reversion':
                 print(f"✅ 策略{strategy_id[-4:]}基于评分/类型的卖出信号")
@@ -5493,6 +5499,85 @@ class QuantitativeService:
         
         print(f"⏭️ 策略{strategy_id[-4:]}跳过信号生成")
         return 'skip'
+    
+    def _check_take_profit_condition(self, strategy, strategy_id):
+        """🎯 检查止盈条件，决定是否生成卖出信号"""
+        try:
+            # 获取策略参数中的止盈设置
+            parameters = strategy.get('parameters', {})
+            if isinstance(parameters, str):
+                import json
+                try:
+                    parameters = json.loads(parameters)
+                except:
+                    parameters = {}
+            
+            # 获取止盈百分比（默认4%）
+            take_profit_pct = parameters.get('take_profit_pct', parameters.get('take_profit', 4.0))
+            
+            # 获取策略的最近买入记录（作为持仓成本）
+            recent_buy_query = """
+                SELECT price, quantity, timestamp 
+                FROM trading_signals 
+                WHERE strategy_id = %s AND signal_type = 'buy' AND executed = 1
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """
+            recent_buy = self.db_manager.execute_query(recent_buy_query, (strategy_id,), fetch_one=True)
+            
+            if not recent_buy:
+                return False  # 没有买入记录，无法计算止盈
+            
+            # 提取买入价格
+            if isinstance(recent_buy, (list, tuple)):
+                buy_price = float(recent_buy[0])
+                buy_time = recent_buy[2]
+            else:
+                buy_price = float(recent_buy.price)
+                buy_time = recent_buy.timestamp
+            
+            # 获取当前价格
+            symbol = strategy.get('symbol', 'BTCUSDT')
+            current_price = self._get_current_price(symbol)
+            
+            if not current_price:
+                return False  # 无法获取当前价格
+            
+            # 计算收益率
+            profit_pct = ((current_price - buy_price) / buy_price) * 100
+            
+            # 检查是否达到止盈条件
+            if profit_pct >= take_profit_pct:
+                print(f"🎯 策略{strategy_id[-4:]}止盈触发: 买入价{buy_price:.4f}, 当前价{current_price:.4f}, 收益{profit_pct:.2f}% >= 目标{take_profit_pct:.2f}%")
+                return True
+            
+            # 检查持仓时间，如果持仓超过30分钟且有盈利，也考虑止盈
+            import datetime
+            if isinstance(buy_time, str):
+                buy_time = datetime.datetime.fromisoformat(buy_time.replace('Z', '+00:00'))
+            
+            holding_minutes = (datetime.datetime.now(datetime.timezone.utc) - buy_time).total_seconds() / 60
+            
+            if holding_minutes > 30 and profit_pct > 1.0:  # 持仓超过30分钟且有1%以上盈利
+                print(f"🕐 策略{strategy_id[-4:]}时间止盈: 持仓{holding_minutes:.1f}分钟, 收益{profit_pct:.2f}%")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ 检查止盈条件失败: {e}")
+            return False
+    
+    def _get_current_price(self, symbol):
+        """获取当前价格"""
+        try:
+            if hasattr(self, 'exchange_clients') and 'binance' in self.exchange_clients:
+                ticker = self.exchange_clients['binance'].fetch_ticker(symbol)
+                return float(ticker['last'])
+            return None
+        except Exception as e:
+            print(f"❌ 获取{symbol}当前价格失败: {e}")
+            return None
     
     def _execute_pending_signals(self):
         """🎯 智能执行交易信号：验证交易始终执行，真实交易需手动开启"""
@@ -10442,17 +10527,22 @@ class EvolutionaryStrategyEngine:
             # 🔧 第一步：分析策略当前表现
             strategy_stats = self._get_strategy_performance_stats(strategy_id)
             
-            # 🎯 智能决策：根据真实表现确定是否需要优化（进一步放宽条件）
+            # 🎯 持续优化策略：根据文档要求，策略应持续优化直到接近100分
+            # 移除限制性触发条件，让优化成为持续过程
             needs_optimization = (
-                strategy_stats['win_rate'] < 70 or           # 胜率低于70%（进一步放宽）
-                strategy_stats['total_pnl'] < -3 or          # 总亏损超过3（进一步放宽）
-                strategy_stats['sharpe_ratio'] < 1.2 or      # 夏普比率太低（进一步放宽）
-                fitness < 75                                 # 适应度评分低于75（进一步放宽）
+                fitness < 95  # 只要评分低于95分就继续优化，目标是100分
             )
             
-            # 🔥 新增：即使表现良好也有30%概率进行优化（增强系统活力）
+            # 🔥 增强优化频率：根据评分等级调整优化概率
             import random
-            random_optimization = random.random() < 0.3  # 30%随机优化概率
+            if fitness < 50:
+                random_optimization = random.random() < 0.8  # 低分策略80%概率优化
+            elif fitness < 70:
+                random_optimization = random.random() < 0.6  # 中分策略60%概率优化
+            elif fitness < 85:
+                random_optimization = random.random() < 0.4  # 高分策略40%概率优化
+            else:
+                random_optimization = random.random() < 0.2  # 顶级策略20%概率微调
             
             if not needs_optimization and not random_optimization:
                 print(f"✅ 策略{strategy_id[-4:]}表现良好，无需优化 (胜率{strategy_stats['win_rate']:.1f}%, 盈亏{strategy_stats['total_pnl']:.2f})")
