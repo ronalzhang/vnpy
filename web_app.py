@@ -1363,7 +1363,7 @@ def quantitative_strategies():
                            SUM(expected_return) as total_pnl,
                            AVG(expected_return) as avg_pnl
                     FROM trading_signals
-                    WHERE strategy_id = %s AND expected_return IS NOT NULL
+                    WHERE strategy_id = %s AND expected_return IS NOT NULL AND executed = true
                 """, (sid,))
                 
                 trade_stats = cursor.fetchone()
@@ -2041,13 +2041,22 @@ def get_strategy_optimization_logs(strategy_id):
         logs = []
         
         for row in rows:
+            # 🔥 修复：正确解析参数JSON字符串
+            try:
+                import json
+                old_params = json.loads(row[4]) if row[4] and row[4] != '{}' else {}
+                new_params = json.loads(row[5]) if row[5] and row[5] != '{}' else {}
+            except (json.JSONDecodeError, TypeError):
+                old_params = {}
+                new_params = {}
+            
             logs.append({
                 'id': row[0],
                 'strategy_id': row[1],
                 'generation': row[2] if row[2] else 1,
                 'optimization_type': row[3] or 'parameter_adjustment',
-                'old_parameters': row[4] or '{}',
-                'new_parameters': row[5] or '{}',
+                'old_parameters': old_params,  # 🔥 修复：返回解析后的字典对象
+                'new_parameters': new_params,  # 🔥 修复：返回解析后的字典对象
                 'trigger_reason': row[6] or '无触发原因',
                 'timestamp': row[7].strftime('%Y-%m-%d %H:%M:%S') if row[7] else '',
                 'target_success_rate': float(row[8]) if row[8] else 0.0,
