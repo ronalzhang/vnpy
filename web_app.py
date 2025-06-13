@@ -1975,11 +1975,8 @@ def get_strategy_trade_logs(strategy_id):
             executed = bool(row[6]) if row[6] is not None else False
             record_id = row[7] if row[7] is not None else 0
             confidence = float(row[9]) if row[9] is not None else 0.75
-            # 🔧 修复：根据executed状态正确设置trade_type
-            if executed:
-                trade_type = 'real_trading'  # 真实交易
-            else:
-                trade_type = 'verification'  # 验证交易
+            # 🔧 修复：当前系统应该都是验证交易，不根据executed状态判断
+            trade_type = 'verification'  # 验证交易
             
             logs.append({
                 'timestamp': timestamp,

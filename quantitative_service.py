@@ -9,30 +9,16 @@
 from safe_ccxt import get_safe_ccxt
 # 增强导入保护机制
 import sys
-import signal
 import time
 
 def safe_module_import(module_name, timeout=10):
-    """安全的模块导入，带超时保护"""
-    def timeout_handler(signum, frame):
-        raise TimeoutError(f"导入模块 {module_name} 超时")
-    
+    """安全的模块导入，简化版本"""
     try:
-        if hasattr(signal, 'SIGALRM'):
-            original_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(timeout)
-        
         module = __import__(module_name)
         return module
-        
-    except (TimeoutError, KeyboardInterrupt, ImportError) as e:
+    except (ImportError, Exception) as e:
         print(f"⚠️ 模块 {module_name} 导入失败: {e}")
         return None
-    finally:
-        if hasattr(signal, 'SIGALRM'):
-            signal.alarm(0)
-            if 'original_handler' in locals():
-                signal.signal(signal.SIGALRM, original_handler)
 
 # 预先尝试导入可能问题的模块
 for module in ['ccxt', 'requests', 'pandas', 'numpy']:
@@ -96,21 +82,7 @@ def _ensure_pandas():
 
 # 策略类型枚举
 
-# 添加信号保护防止KeyboardInterrupt
-import signal
-import sys
-
-def signal_handler(sig, frame):
-    """安全的信号处理器"""
-    print(f"\n⚠️ 接收到信号 {sig}，正在安全退出...")
-    # 不立即退出，让程序自然结束
-    return
-
-# 设置信号处理器
-if hasattr(signal, 'SIGINT'):
-    signal.signal(signal.SIGINT, signal_handler)
-if hasattr(signal, 'SIGTERM'):
-    signal.signal(signal.SIGTERM, signal_handler)
+# 移除signal相关代码，避免在非主线程中使用signal模块
 
 class StrategyType(Enum):
     MOMENTUM = "momentum"          # 动量策略
@@ -3221,17 +3193,32 @@ class QuantitativeService:
             return 0
 
     def _calculate_real_strategy_return(self, strategy_id):
-        """计算真实策略收益率"""
+        """计算真实策略收益率 - 修复异常收益数据"""
         try:
             query = '''
-                SELECT SUM(expected_return) as total_pnl FROM trading_signals 
+                SELECT SUM(expected_return) as total_pnl, COUNT(*) as trade_count 
+                FROM trading_signals 
                 WHERE strategy_id = %s AND executed = 1
             '''
             result = self.db_manager.execute_query(query, (strategy_id,), fetch_one=True)
-            total_pnl = result.get('total_pnl', 0.0) if result else 0.0
+            total_pnl = float(result.get('total_pnl', 0.0)) if result else 0.0
+            trade_count = int(result.get('trade_count', 0)) if result else 0
             
-            # 计算收益率（假设初始资金为100）
-            return total_pnl / 100.0 if total_pnl else 0.0
+            # 🔧 修复：限制收益率在合理范围内
+            if trade_count == 0:
+                return 0.0
+            
+            # 🔧 修复：使用更合理的基准资金计算收益率
+            # 假设每笔交易使用10 USDT，总投入 = 交易次数 * 10
+            base_capital = max(trade_count * 10.0, 100.0)  # 至少100 USDT基准
+            
+            # 计算收益率并限制在合理范围内 (-100% 到 +500%)
+            return_rate = total_pnl / base_capital if base_capital > 0 else 0.0
+            
+            # 🔧 限制收益率在合理范围内
+            return_rate = max(-1.0, min(return_rate, 5.0))  # -100% 到 +500%
+            
+            return return_rate
             
         except Exception as e:
             print(f"计算策略收益率失败: {e}")
@@ -10545,8 +10532,8 @@ class EvolutionaryStrategyEngine:
                 elif open_time is None:
                     open_time = datetime.now()
                 
-                # 计算周期盈亏和持有分钟数
-                cycle_pnl = float((close_price - open_price) * quantity)
+                # 计算周期盈亏和持有分钟数 - 确保数据类型一致性
+                cycle_pnl = float((float(close_price) - float(open_price)) * float(quantity))
                 holding_minutes = max(1, int((close_time - open_time).total_seconds() / 60))
                 
                 # 计算MRoT（分钟回报率）
