@@ -3214,37 +3214,58 @@ def manage_auto_trading():
             data = request.get_json()
             enabled = data.get('enabled', False)
             
-            if quantitative_service:
-                # ⭐ 设置自动交易状态
-                quantitative_service.set_auto_trading(enabled)
+            # ⭐ 直接操作数据库状态（前后端分离架构）
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
                 
-                # ⭐ 同步到数据库状态
-                quantitative_service.update_system_status(
-                    auto_trading_enabled=enabled,
-                    notes=f'自动交易已{"开启" if enabled else "关闭"}'
-                )
+                # 更新系统状态表
+                status_message = f'自动交易已{"开启" if enabled else "关闭"}'
+                cursor.execute("""
+                    UPDATE system_status 
+                    SET auto_trading_enabled = %s, 
+                        updated_at = CURRENT_TIMESTAMP,
+                        notes = %s
+                    WHERE id = 1
+                """, (enabled, status_message))
+                
+                # 如果记录不存在，创建一个
+                if cursor.rowcount == 0:
+                    cursor.execute("""
+                        INSERT INTO system_status (id, auto_trading_enabled, notes, created_at, updated_at)
+                        VALUES (1, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """, (enabled, status_message))
+                
+                conn.commit()
+                conn.close()
                 
                 return jsonify({
                     'success': True,
                     'enabled': enabled,
-                    'message': f'自动交易已{"开启" if enabled else "关闭"}'
+                    'message': status_message
                 })
-            else:
-                return jsonify({'success': False, 'error': '量化服务未初始化'})
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'数据库操作失败: {str(e)}'})
         
         else:  # GET
-            if quantitative_service:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
                 # ⭐ 从数据库读取自动交易状态
-                db_status = quantitative_service.get_system_status_from_db()
-                auto_trading_enabled = db_status.get('auto_trading_enabled', False)
+                cursor.execute("SELECT auto_trading_enabled FROM system_status WHERE id = 1")
+                result = cursor.fetchone()
+                conn.close()
+                
+                auto_trading_enabled = result[0] if result else False
                 
                 return jsonify({
                     'success': True,
                     'enabled': auto_trading_enabled,
                     'data_source': 'database'
                 })
-            else:
-                return jsonify({'success': False, 'enabled': False, 'error': '量化服务未初始化'})
+            except Exception as e:
+                return jsonify({'success': False, 'enabled': False, 'error': f'数据库查询失败: {str(e)}'})
                 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e), 'enabled': False})
