@@ -2715,13 +2715,13 @@ class AutomatedStrategyManager:
             total_trades = strategy.get('total_trades', 0)
             
             # 计算夏普比率
-            sharpe_ratio = self.quantitative_service._calculate_sharpe_ratio(strategy_id)
+            sharpe_ratio = self._calculate_sharpe_ratio(strategy_id)
             
             # 计算最大回撤
-            max_drawdown = self.quantitative_service._calculate_max_drawdown(strategy_id)
+            max_drawdown = self._calculate_max_drawdown(strategy_id)
             
             # 计算盈利因子
-            profit_factor = self.quantitative_service._calculate_profit_factor(strategy_id)
+            profit_factor = self._calculate_profit_factor(strategy_id)
             
             # 综合评分 (0-100)
             score = self.quantitative_service._calculate_strategy_score(
@@ -2741,7 +2741,7 @@ class AutomatedStrategyManager:
                 'max_drawdown': max_drawdown,
                 'profit_factor': profit_factor,
                 'score': score,
-                'capital_allocation': self.quantitative_service._get_current_allocation(strategy_id),
+                'capital_allocation': self._get_current_allocation(strategy_id),
                 # ⭐ 添加策略参数持久化数据
                 'parameters': strategy.get('parameters', {}),
                 'qualified_for_trading': strategy.get('qualified_for_trading', False)
@@ -2782,7 +2782,7 @@ class AutomatedStrategyManager:
                 allocations[strategy_id] = total_capital * 0.02  # 2%
         
         # 更新策略资金分配
-        self.quantitative_service._update_capital_allocations(allocations)
+        self._update_capital_allocations(allocations)
         
         logger.info(f"资金再平衡完成，前3名策略: {[perf['name'] for _, perf in high_performers]}")
     
@@ -2892,10 +2892,10 @@ class AutomatedStrategyManager:
     def _risk_management(self):
         """风险管理"""
         # 检查总体风险敞口
-        total_exposure = self.quantitative_service._calculate_total_exposure()
+        total_exposure = self._calculate_total_exposure()
         
         if total_exposure > self.initial_capital * 3:  # 总敞口超过3倍资金
-            self.quantitative_service._reduce_position_sizes()
+            self._reduce_position_sizes()
             logger.warning("总风险敞口过高，已减少仓位")
         
         # ⭐ 使用统一API检查单一策略风险
@@ -2904,9 +2904,9 @@ class AutomatedStrategyManager:
             for strategy in strategies_response.get('data', []):
                 strategy_id = strategy.get('id')
                 if strategy_id:
-                    strategy_risk = self.quantitative_service._calculate_strategy_risk(strategy_id)
+                    strategy_risk = self._calculate_strategy_risk(strategy_id)
                     if strategy_risk > self.risk_limit:
-                        self.quantitative_service._limit_strategy_position(strategy_id)
+                        self._limit_strategy_position(strategy_id)
                         logger.warning(f"策略 {strategy_id} 风险过高，已限制仓位")
     
     def _strategy_selection(self, performances: Dict[str, Dict]):
