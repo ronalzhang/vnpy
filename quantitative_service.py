@@ -3263,41 +3263,7 @@ class AutomatedStrategyManager:
         except Exception as e:
             print(f"❌ 保存策略参数失败 {strategy_id}: {e}")
     
-    def _record_parameter_optimization(self, strategy_id: int, parameters: Dict, new_score: float):
-        """记录参数优化历史"""
-        try:
-            # 🔥 统一使用strategy_optimization_logs表记录优化历史
-            # ⭐ 使用统一API获取旧参数和评分
-            strategy_response = self.quantitative_service.get_strategy(strategy_id)
-            old_strategy = strategy_response.get('data', {}) if strategy_response.get('success', False) else {}
-            old_parameters = old_strategy.get('parameters', {})
-            old_score = old_strategy.get('final_score', 0)
-            
-            # 插入优化记录到统一表
-            import json
-            query = """
-            INSERT INTO strategy_optimization_logs 
-            (strategy_id, optimization_type, old_parameters, new_parameters, 
-             old_score, new_score, improvement, trigger_reason, timestamp)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            
-            improvement = new_score - old_score
-            
-            self.quantitative_service.db_manager.execute_query(query, (
-                strategy_id,
-                '自动优化',
-                json.dumps(old_parameters),
-                json.dumps(parameters),
-                old_score,
-                new_score,
-                improvement,
-                '参数持久化',
-                datetime.now().isoformat()
-            ))
-            
-        except Exception as e:
-            print(f"❌ 记录参数优化历史失败: {e}")
+
     
     def _risk_management(self):
         """风险管理"""
@@ -10537,27 +10503,14 @@ class EvolutionaryStrategyEngine:
                 fitness < 95  # 只要评分低于95分就继续优化，目标是100分
             )
             
-            # 🔥 基于前端配置的进化更新间隔控制优化频率
-            import random
-            evolution_interval_minutes = getattr(self, 'evolution_interval', 10)  # 默认10分钟
+            # 🔥 持续优化策略：所有分数段都需要优化，低分提升，高分验证真实性
+            needs_optimization = fitness < 95  # 95分以下都需要持续优化
             
-            # 根据进化间隔和评分等级动态调整优化概率
-            base_probability = 1.0 / evolution_interval_minutes  # 基础概率与间隔成反比
-            
-            if fitness < 50:
-                random_optimization = random.random() < (base_probability * 4)  # 低分策略4倍频率
-            elif fitness < 70:
-                random_optimization = random.random() < (base_probability * 2)  # 中分策略2倍频率
-            elif fitness < 85:
-                random_optimization = random.random() < base_probability  # 高分策略基础频率
-            else:
-                random_optimization = random.random() < (base_probability * 0.5)  # 顶级策略减半频率
-            
-            if not needs_optimization and not random_optimization:
-                print(f"✅ 策略{strategy_id[-4:]}表现良好，无需优化 (胜率{strategy_stats['win_rate']:.1f}%, 盈亏{strategy_stats['total_pnl']:.2f})")
+            if not needs_optimization:
+                print(f"✅ 策略{strategy_id[-4:]}已达到95分优化目标 (胜率{strategy_stats['win_rate']:.1f}%, 盈亏{strategy_stats['total_pnl']:.2f})")
                 return
             
-            optimization_reason = "性能需要提升" if needs_optimization else "随机系统优化"
+            optimization_reason = "持续优化提升" if fitness < 65 else "高分验证真实性"
             print(f"🚨 策略{strategy_id[-4:]}需要优化({optimization_reason}): 胜率{strategy_stats['win_rate']:.1f}%, 盈亏{strategy_stats['total_pnl']:.2f}, 夏普{strategy_stats['sharpe_ratio']:.2f}")
             
             # 🔧 第二步：检查最近是否有相同的优化记录 - 进一步缩短重复检查时间
@@ -10603,15 +10556,15 @@ class EvolutionaryStrategyEngine:
                             real_changes.append(change)
                     
                     if real_changes:
-                        # 🔧 第四步：参数优化验证交易 - 完整闭环的核心
-                        print(f"🧪 策略{strategy_id[-4:]}开始参数优化验证交易...")
+                        # 🔧 第四步：参数优化验证交易 - 每次参数调整的关键验证
+                        print(f"🧪 策略{strategy_id[-4:]}开始参数调整验证交易...")
                         validation_passed = self._validate_parameter_optimization(
                             strategy_id, current_params, new_parameters, real_changes
                         )
                         
-                        # 🔧 第五步：根据验证结果决定是否应用新参数
+                        # 🔧 第五步：根据验证结果决定是否应用新参数 - 验证交易是确认修改成功的关键
                         if validation_passed:
-                            print(f"✅ 策略{strategy_id[-4:]}参数优化验证通过，应用新参数")
+                            print(f"✅ 策略{strategy_id[-4:]}参数调整验证交易通过，应用新参数")
                             self._apply_validated_parameters(strategy_id, new_parameters, real_changes)
                             
                             # 🔥 检查是否应该升级验证阶段
@@ -10639,7 +10592,7 @@ class EvolutionaryStrategyEngine:
                             except Exception as e:
                                 print(f"❌ 检查验证阶段升级失败: {e}")
                         else:
-                            print(f"❌ 策略{strategy_id[-4:]}参数优化验证失败，保持原参数")
+                            print(f"❌ 策略{strategy_id[-4:]}参数调整验证交易失败，保持原参数")
                             self._handle_optimization_validation_failure(strategy_id, current_params, real_changes)
                     else:
                         print(f"⚠️ 策略{strategy_id[-4:]}无有效优化（重复或变化太小）")
@@ -10650,7 +10603,7 @@ class EvolutionaryStrategyEngine:
                 print(f"⚠️ 使用备用参数优化方案")
                 optimized_params = self._force_parameter_mutation(current_params, fitness, force=True, aggressive=True)
                 
-                # 🔧 备用方案也需要验证
+                # 🔧 备用方案也需要验证交易 - 每次参数调整都必须验证
                 if optimized_params != current_params:
                     backup_changes = [{'parameter': 'backup_optimization', 'from': 'current', 'to': 'optimized'}]
                     validation_passed = self._validate_parameter_optimization(
@@ -10662,9 +10615,9 @@ class EvolutionaryStrategyEngine:
                             "UPDATE strategies SET parameters = %s WHERE id = %s",
                             (json.dumps(optimized_params), strategy_id)
                         )
-                        print(f"✅ 策略{strategy_id[-4:]}备用优化验证通过并应用")
+                        print(f"✅ 策略{strategy_id[-4:]}备用参数调整验证交易通过并应用")
                     else:
-                        print(f"❌ 策略{strategy_id[-4:]}备用优化验证失败")
+                        print(f"❌ 策略{strategy_id[-4:]}备用参数调整验证交易失败")
         
         except Exception as e:
             print(f"❌ 策略参数优化闭环失败: {e}")
