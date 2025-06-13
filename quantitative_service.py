@@ -2394,7 +2394,10 @@ class QuantitativeService:
         # ⭐ 初始化策略参数模板
         self._init_strategy_templates()
         
-        print("✅ QuantitativeService 初始化完成")
+        # 🎯 初始化SCS评分系统数据库结构
+        self._ensure_trade_cycles_table()
+        
+        print("✅ QuantitativeService 初始化完成 (包含SCS评分系统)")
         
         # 从数据库加载配置（如果需要）
         try:
@@ -3668,15 +3671,41 @@ class QuantitativeService:
                 )
             """)
             
-            # 确保trading_signals表有新字段
-            self.db_manager.execute_query("""
-                ALTER TABLE trading_signals 
-                ADD COLUMN IF NOT EXISTS trade_type VARCHAR(20) DEFAULT '验证交易',
-                ADD COLUMN IF NOT EXISTS cycle_id VARCHAR(100),
-                ADD COLUMN IF NOT EXISTS holding_minutes INTEGER DEFAULT 0,
-                ADD COLUMN IF NOT EXISTS mrot_score DECIMAL(18,8) DEFAULT 0,
-                ADD COLUMN IF NOT EXISTS is_validation BOOLEAN DEFAULT true
-            """)
+            # 确保trading_signals表有SCS评分系统所需字段
+            cycle_fields = [
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS trade_type VARCHAR(20) DEFAULT '验证交易'",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS cycle_id VARCHAR(100)",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS cycle_status VARCHAR(20) DEFAULT 'open'",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS open_time TIMESTAMP",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS close_time TIMESTAMP",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS holding_minutes INTEGER DEFAULT 0",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS mrot_score DECIMAL(18,8) DEFAULT 0",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS paired_signal_id INTEGER",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS cycle_pnl DECIMAL(18,8) DEFAULT 0",
+                "ALTER TABLE trading_signals ADD COLUMN IF NOT EXISTS is_validation BOOLEAN DEFAULT true"
+            ]
+            
+            for field_sql in cycle_fields:
+                try:
+                    self.db_manager.execute_query(field_sql)
+                except Exception as e:
+                    print(f"添加字段失败 (可能已存在): {e}")
+            
+            # 创建索引优化SCS评分查询性能
+            indexes = [
+                "CREATE INDEX IF NOT EXISTS idx_cycle_status ON trading_signals(cycle_status)",
+                "CREATE INDEX IF NOT EXISTS idx_strategy_cycle ON trading_signals(strategy_id, cycle_id)",
+                "CREATE INDEX IF NOT EXISTS idx_mrot_score ON trading_signals(mrot_score DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_cycle_completion ON trading_signals(strategy_id, cycle_status, close_time)"
+            ]
+            
+            for index_sql in indexes:
+                try:
+                    self.db_manager.execute_query(index_sql)
+                except Exception as e:
+                    print(f"创建索引失败 (可能已存在): {e}")
+            
+            print("✅ SCS评分系统数据库结构优化完成")
             
         except Exception as e:
             print(f"❌ 创建交易周期表失败: {e}")
@@ -10538,7 +10567,7 @@ class EvolutionaryStrategyEngine:
                 conn.commit()
                 conn.close()
                 
-                # 触发基于交易周期的评分更新
+                # 触发基于交易周期的SCS评分更新
                 self._update_strategy_score_after_cycle_completion(
                     strategy_id, cycle_pnl, mrot_score, holding_minutes
                 )
@@ -10557,7 +10586,223 @@ class EvolutionaryStrategyEngine:
                 conn.close()
             return None
     
-    # 🔥 删除重复的评分更新方法 - 使用统一的_unified_strategy_score_update
+    def _update_strategy_score_after_cycle_completion(self, strategy_id: str, cycle_pnl: float, 
+                                                    mrot_score: float, holding_minutes: int):
+        """🎯 基于交易周期完成的SCS评分更新 - 按照系统升级需求文档实现"""
+        try:
+            conn = psycopg2.connect(
+                host="localhost",
+                database="quantitative", 
+                user="quant_user",
+                password="123abc74531"
+            )
+            cursor = conn.cursor()
+            
+            # 1. 获取策略的所有已完成交易周期
+            cursor.execute('''
+                SELECT cycle_pnl, mrot_score, holding_minutes, close_time
+                FROM trading_signals 
+                WHERE strategy_id = %s AND cycle_status = 'closed' 
+                AND mrot_score IS NOT NULL
+                ORDER BY close_time DESC
+            ''', (strategy_id,))
+            
+            completed_cycles = cursor.fetchall()
+            
+            if not completed_cycles:
+                conn.close()
+                return
+            
+            # 2. 计算MRoT相关指标
+            total_cycles = len(completed_cycles)
+            total_pnl = sum(cycle[0] for cycle in completed_cycles)
+            avg_mrot = sum(cycle[1] for cycle in completed_cycles) / total_cycles
+            avg_holding_minutes = sum(cycle[2] for cycle in completed_cycles) / total_cycles
+            profitable_cycles = sum(1 for cycle in completed_cycles if cycle[0] > 0)
+            win_rate = profitable_cycles / total_cycles
+            
+            # 3. 计算SCS综合评分
+            scs_score = self._calculate_scs_comprehensive_score(
+                avg_mrot, win_rate, total_cycles, avg_holding_minutes, completed_cycles
+            )
+            
+            # 4. 确定MRoT效率等级
+            if avg_mrot >= 0.5:
+                efficiency_grade = 'A'
+                grade_description = '超高效'
+            elif avg_mrot >= 0.1:
+                efficiency_grade = 'B' 
+                grade_description = '高效'
+            elif avg_mrot >= 0.01:
+                efficiency_grade = 'C'
+                grade_description = '中效'
+            elif avg_mrot > 0:
+                efficiency_grade = 'D'
+                grade_description = '低效'
+            else:
+                efficiency_grade = 'F'
+                grade_description = '负效'
+            
+            # 5. 更新策略评分
+            cursor.execute('''
+                UPDATE strategies 
+                SET final_score = %s, win_rate = %s, total_return = %s,
+                    updated_time = NOW()
+                WHERE id = %s
+            ''', (scs_score, win_rate, total_pnl, strategy_id))
+            
+            # 6. 记录评分变化日志
+            cursor.execute('''
+                INSERT INTO strategy_optimization_logs 
+                (strategy_id, optimization_type, trigger_reason, old_score, new_score, 
+                 optimization_result, created_time)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            ''', (
+                strategy_id, 'SCS_CYCLE_SCORING', 
+                f'交易周期完成: PNL={cycle_pnl:.4f}, MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟',
+                0.0, scs_score,
+                f'SCS评分: {scs_score:.1f}, MRoT等级: {efficiency_grade}级({grade_description}), 胜率: {win_rate*100:.1f}%, 平均MRoT: {avg_mrot:.4f}'
+            ))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"🎯 策略{strategy_id} SCS评分更新: {scs_score:.1f}分 (MRoT: {avg_mrot:.4f}, 等级: {efficiency_grade})")
+            
+            # 7. 触发智能进化决策
+            self._intelligent_evolution_decision_based_on_mrot(strategy_id, avg_mrot, scs_score, completed_cycles)
+            
+        except Exception as e:
+            print(f"❌ SCS评分更新失败: {e}")
+            if conn:
+                conn.close()
+
+    def _calculate_scs_comprehensive_score(self, avg_mrot: float, win_rate: float, 
+                                         total_cycles: int, avg_holding_minutes: float, 
+                                         completed_cycles: List) -> float:
+        """📊 计算SCS综合评分 - 严格按照文档公式实现"""
+        try:
+            # 动态权重调整机制
+            if total_cycles < 10:  # 验证期
+                weights = {'base': 0.30, 'efficiency': 0.40, 'stability': 0.20, 'risk': 0.10}
+            elif total_cycles < 50:  # 成长期  
+                weights = {'base': 0.40, 'efficiency': 0.35, 'stability': 0.15, 'risk': 0.10}
+            else:  # 成熟期
+                weights = {'base': 0.45, 'efficiency': 0.30, 'stability': 0.15, 'risk': 0.10}
+            
+            # 1. 基础分 = 平均MRoT × 100 × 权重系数
+            base_score = avg_mrot * 100
+            if base_score > 100:  # 限制基础分上限
+                base_score = 100 + (base_score - 100) * 0.1  # 超过100分的部分按10%计算
+            base_score = max(0, min(150, base_score))  # 基础分范围0-150
+            
+            # 2. 效率分 = (胜率 × 50%) + (交易频次适应性 × 30%) + (资金利用率 × 20%)
+            win_rate_component = win_rate * 100 * 0.5  # 胜率组件
+            
+            # 交易频次适应性 (理想频次: 每天2-4个周期)
+            daily_cycles = total_cycles / 7  # 假设7天数据
+            if 2 <= daily_cycles <= 4:
+                frequency_component = 100 * 0.3
+            elif 1 <= daily_cycles < 2 or 4 < daily_cycles <= 6:
+                frequency_component = 80 * 0.3
+            elif daily_cycles < 1 or daily_cycles > 6:
+                frequency_component = 60 * 0.3
+            else:
+                frequency_component = 40 * 0.3
+            
+            # 资金利用率 (基于平均持有时间)
+            if avg_holding_minutes <= 30:  # 理想持有时间
+                capital_efficiency = 100 * 0.2
+            elif avg_holding_minutes <= 60:
+                capital_efficiency = 80 * 0.2
+            elif avg_holding_minutes <= 120:
+                capital_efficiency = 60 * 0.2
+            else:
+                capital_efficiency = 40 * 0.2
+            
+            efficiency_score = win_rate_component + frequency_component + capital_efficiency
+            
+            # 3. 稳定性分 = (连续盈利周期数 / 总周期数) × 100
+            consecutive_profitable = 0
+            max_consecutive = 0
+            current_consecutive = 0
+            
+            for cycle in completed_cycles:
+                if cycle[0] > 0:  # 盈利周期
+                    current_consecutive += 1
+                    max_consecutive = max(max_consecutive, current_consecutive)
+                else:
+                    current_consecutive = 0
+            
+            stability_score = (max_consecutive / total_cycles) * 100 if total_cycles > 0 else 0
+            
+            # 4. 风险控制分 = MAX(0, 100 - 最大连续亏损分钟数/10)
+            max_consecutive_loss_minutes = 0
+            current_loss_minutes = 0
+            
+            for cycle in completed_cycles:
+                if cycle[0] <= 0:  # 亏损周期
+                    current_loss_minutes += cycle[2]  # 累加持有分钟数
+                else:
+                    max_consecutive_loss_minutes = max(max_consecutive_loss_minutes, current_loss_minutes)
+                    current_loss_minutes = 0
+            
+            risk_control_score = max(0, 100 - max_consecutive_loss_minutes / 10)
+            
+            # 5. 计算最终SCS评分
+            scs_score = (
+                base_score * weights['base'] +
+                efficiency_score * weights['efficiency'] +
+                stability_score * weights['stability'] +
+                risk_control_score * weights['risk']
+            )
+            
+            # 确保评分在0-100范围内
+            scs_score = max(0.0, min(100.0, scs_score))
+            
+            return scs_score
+            
+        except Exception as e:
+            print(f"❌ SCS评分计算失败: {e}")
+            return 0.0
+
+    def _intelligent_evolution_decision_based_on_mrot(self, strategy_id: str, avg_mrot: float, 
+                                                    scs_score: float, completed_cycles: List):
+        """🧠 基于MRoT的智能进化决策 - 按照文档要求实现"""
+        try:
+            if avg_mrot >= 0.5:  # A级策略
+                decision = "protect_and_fine_tune"
+                action = "保护并微调"
+                self._protect_and_fine_tune_strategy(strategy_id, scs_score, {
+                    'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
+                })
+            elif avg_mrot >= 0.1:  # B级策略
+                decision = "consolidate_advantage"
+                action = "巩固优势"
+                self._consolidate_advantage_strategy(strategy_id, scs_score, {
+                    'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
+                })
+            elif avg_mrot >= 0.01:  # C级策略
+                decision = "moderate_optimization"
+                action = "适度优化"
+                self._moderate_optimization_strategy(strategy_id, scs_score, {
+                    'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
+                })
+            elif avg_mrot > 0:  # D级策略
+                decision = "aggressive_optimization"
+                action = "激进优化"
+                self._aggressive_optimization_strategy(strategy_id, scs_score, {
+                    'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
+                })
+            else:  # F级策略
+                decision = "eliminate_or_major_mutation"
+                action = "淘汰或重大变异"
+                self._fallback_and_mark_for_evolution(strategy_id, {})
+            
+            print(f"🧠 策略{strategy_id} 智能进化决策: {action} (MRoT: {avg_mrot:.4f})")
+            
+        except Exception as e:
+            print(f"❌ 智能进化决策失败: {e}")
 
     def _micro_adjust_parameters(self, strategy_id: str, original_params: Dict, adjustment_rate: float = 0.05) -> Dict:
         """🔧 微调参数 - 5%幅度的细微调整"""
