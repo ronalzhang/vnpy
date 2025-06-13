@@ -5166,7 +5166,16 @@ class QuantitativeService:
                     if cycle_result['action'] == 'opened':
                         print(f"🔄 策略{strategy_id} 开启交易周期: {cycle_result['cycle_id']}")
                     elif cycle_result['action'] == 'closed':
-                        print(f"✅ 策略{strategy_id} 完成交易周期: MRoT={cycle_result['mrot_score']:.4f}, 持有{cycle_result['holding_minutes']}分钟, 盈亏{cycle_result['cycle_pnl']:.2f}U")
+                        mrot_score = cycle_result['mrot_score']
+                        cycle_pnl = cycle_result['cycle_pnl']
+                        holding_minutes = cycle_result['holding_minutes']
+                        
+                        print(f"✅ 策略{strategy_id} 完成交易周期: MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟, 盈亏{cycle_pnl:.2f}U")
+                        
+                        # 🎯 触发基于交易周期的评分更新和智能进化决策
+                        self.evolution_engine._update_strategy_score_after_cycle_completion(
+                            strategy_id, cycle_pnl, mrot_score, holding_minutes
+                        )
             
             # 记录交易类型日志
             if is_real_money:
