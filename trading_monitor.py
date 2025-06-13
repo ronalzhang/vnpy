@@ -102,7 +102,8 @@ class TradingMonitor:
             """ % minutes)
             
             result = cursor.fetchone()
-            print(f"{period_name}: 总日志{result[0]}条 | 模拟{result[1]}次 | 真实{result[2]}次 | 已执行{result[3]}次")
+            if result:
+                print(f"{period_name}: 总日志{result['total']}条 | 模拟{result['simulation']}次 | 真实{result['real']}次 | 已执行{result['executed']}次")
         
         # 2. 检查策略活跃状态
         cursor.execute("""
@@ -136,9 +137,9 @@ class TradingMonitor:
         signal_result = cursor.fetchone()
         if signal_result:
             print(f"\n📡 信号生成统计:")
-            print(f"  总信号数: {signal_result[0]}")
-            print(f"  已执行信号: {signal_result[1]}")
-            print(f"  最近1小时: {signal_result[2]}")
+            print(f"  总信号数: {signal_result['total_signals']}")
+            print(f"  已执行信号: {signal_result['executed_signals']}")
+            print(f"  最近1小时: {signal_result['recent_signals']}")
         
         return active_strategies
     
@@ -153,20 +154,22 @@ class TradingMonitor:
             SELECT COUNT(*) FROM trading_signals 
             WHERE timestamp > NOW() - INTERVAL '30 minutes'
         """)
-        recent_signals = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        recent_signals = result['count'] if result else 0
         
         if recent_signals == 0:
             print("❌ 问题1: 最近30分钟没有生成任何交易信号")
             
             # 检查策略是否启用
             cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
-            enabled_strategies = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            enabled_strategies = result['count'] if result else 0
             print(f"   启用的策略数量: {enabled_strategies}")
             
             # 检查自动交易是否开启
             cursor.execute("SELECT auto_trading_enabled FROM system_status ORDER BY updated_at DESC LIMIT 1")
             auto_trading = cursor.fetchone()
-            auto_status = auto_trading[0] if auto_trading else False
+            auto_status = auto_trading['auto_trading_enabled'] if auto_trading else False
             print(f"   自动交易状态: {'开启' if auto_status else '关闭'}")
             
         # 检查交易执行情况
@@ -179,10 +182,10 @@ class TradingMonitor:
         """)
         pending_result = cursor.fetchone()
         
-        if pending_result[0] > 0:
-            print(f"❌ 问题2: 有{pending_result[0]}个未执行的信号")
-            if pending_result[1] > 0:
-                print(f"   其中{pending_result[1]}个信号已超过10分钟未执行")
+        if pending_result and pending_result['pending_signals'] > 0:
+            print(f"❌ 问题2: 有{pending_result['pending_signals']}个未执行的信号")
+            if pending_result['old_pending'] > 0:
+                print(f"   其中{pending_result['old_pending']}个信号已超过10分钟未执行")
         
         # 检查余额是否充足
         cursor.execute("""
@@ -192,7 +195,8 @@ class TradingMonitor:
         """)
         balance_result = cursor.fetchone()
         if balance_result:
-            total, available = balance_result
+            total = balance_result['total_balance']
+            available = balance_result['available_balance']
             print(f"💰 当前余额: 总额{total}U, 可用{available}U")
             if available and available < 10:
                 print("❌ 问题3: 可用余额不足10U，可能影响交易")
@@ -243,7 +247,8 @@ class TradingMonitor:
             SELECT COUNT(*) FROM trading_signals 
             WHERE timestamp > NOW() - INTERVAL '1 hour'
         """)
-        recent_signals = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        recent_signals = result['count'] if result else 0
         
         if recent_signals < 5:
             suggestions.append("1. 信号生成频率过低，建议：")
@@ -258,7 +263,7 @@ class TradingMonitor:
         """)
         strategy_diversity = cursor.fetchone()
         
-        if strategy_diversity and strategy_diversity[0] < 3:
+        if strategy_diversity and strategy_diversity['types'] < 3:
             suggestions.append("2. 策略类型单一，建议：")
             suggestions.append("   - 启用更多不同类型的策略")
             suggestions.append("   - 平衡动量、均值回归、网格等策略")
@@ -272,8 +277,8 @@ class TradingMonitor:
         """)
         execution_stats = cursor.fetchone()
         
-        if execution_stats and execution_stats[0] > 0:
-            execution_rate = execution_stats[1] / execution_stats[0] * 100
+        if execution_stats and execution_stats['total_signals'] > 0:
+            execution_rate = execution_stats['executed'] / execution_stats['total_signals'] * 100
             if execution_rate < 80:
                 suggestions.append(f"3. 信号执行率偏低({execution_rate:.1f}%)，建议：")
                 suggestions.append("   - 检查交易所连接状态")

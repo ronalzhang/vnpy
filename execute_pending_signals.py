@@ -21,7 +21,8 @@ def execute_pending_signals():
     
     # 检查pending信号
     cursor.execute("SELECT COUNT(*) FROM trading_signals WHERE executed = 0")
-    pending_count = cursor.fetchone()[0]
+    result = cursor.fetchone()
+    pending_count = result['count'] if result else 0
     print(f"待执行信号数量: {pending_count}")
     
     if pending_count == 0:

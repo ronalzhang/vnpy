@@ -381,9 +381,11 @@ class DatabaseManager:
             cursor = conn.cursor()
             
             # 计算累计收益率
-            cursor.execute("SELECT total_balance FROM account_balance_history ORDER BY timestamp ASC LIMIT 1")
-            first_record = cursor.fetchone()
-            initial_balance = first_record[0] if first_record else 10.0  # 默认起始资金10U
+            first_record = self.db_manager.execute_query(
+                "SELECT total_balance FROM account_balance_history ORDER BY timestamp ASC LIMIT 1",
+                fetch_one=True
+            )
+            initial_balance = first_record['total_balance'] if first_record else 10.0  # 默认起始资金10U
             
             cumulative_return = ((total_balance - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
             
@@ -444,12 +446,12 @@ class DatabaseManager:
                     password="123abc74531"
                 )
                 cursor = conn.cursor()
-                cursor.execute(
+                milestone_result = self.db_manager.execute_query(
                     "SELECT COUNT(*) FROM account_balance_history WHERE milestone_note = %s", 
-                    (note,)
+                    (note,),
+                    fetch_one=True
                 )
-                milestone_result = cursor.fetchone()
-                milestone_count = milestone_result[0] if milestone_result else 0
+                milestone_count = milestone_result['count'] if milestone_result else 0
                 if milestone_count == 0:
                     # 记录里程碑
                     self.record_balance_history(
@@ -1871,14 +1873,17 @@ class AutomatedStrategyManager:
                 WHERE strategy_id = %s AND status = 'executed'
             """, (strategy_id,))
             
-            result = cursor.fetchone()
-            cursor.close()
-            conn.close()
+            result = self.db_manager.execute_query("""
+                SELECT SUM(CASE WHEN realized_pnl > 0 THEN realized_pnl ELSE 0 END) as total_profit,
+                       SUM(CASE WHEN realized_pnl < 0 THEN ABS(realized_pnl) ELSE 0 END) as total_loss
+                FROM trading_orders 
+                WHERE strategy_id = %s AND status = 'executed'
+            """, (strategy_id,), fetch_one=True)
             
-            if not result or result[1] is None or result[1] == 0:  # 防止除零错误
+            if not result or result['total_loss'] is None or result['total_loss'] == 0:  # 防止除零错误
                 return 1.0
                 
-            return result[0] / result[1] if result[0] and result[1] else 1.0
+            return result['total_profit'] / result['total_loss'] if result['total_profit'] and result['total_loss'] else 1.0
         except Exception as e:
             print(f"计算盈利因子失败: {e}")
             return 1.0
@@ -4078,10 +4083,10 @@ class QuantitativeService:
             
             result = cursor.fetchone()
             
-            if result and result[0] > 0:
-                success_rate = result[1] / result[0]
+            if result and result['total_trades'] > 0:
+                success_rate = result['successful_trades'] / result['total_trades']
                 return {
-                    'total_trades': result[0],
+                    'total_trades': result['total_trades'],
                     'success_rate': success_rate,
                     'avg_pnl': result[2] or 0,
                     'total_pnl': result[3] or 0

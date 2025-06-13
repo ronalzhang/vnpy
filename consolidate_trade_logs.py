@@ -31,7 +31,8 @@ def consolidate_trade_logs():
         print("\n📊 检查当前表状态...")
         
         cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs")
-        strategy_logs_count = cursor.fetchone()[0]
+        result = cursor.fetchone()
+        strategy_logs_count = result['count'] if result else 0
         print(f"  strategy_trade_logs: {strategy_logs_count} 条记录")
         
         cursor.execute("SELECT COUNT(*) FROM trading_signals") 
