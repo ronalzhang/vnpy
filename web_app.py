@@ -402,7 +402,10 @@ def init_api_clients():
                             print(f"测试 {exchange_id} API连接...")
                             # 测试获取价格数据（不需要账户权限）
                             test_ticker = client.fetch_ticker('BTC/USDT')
-                            print(f"初始化 {exchange_id} API客户端成功 - BTC价格: {test_ticker['last']}")
+                            if test_ticker and 'last' in test_ticker and test_ticker['last']:
+                                print(f"初始化 {exchange_id} API客户端成功 - BTC价格: {test_ticker['last']}")
+                            else:
+                                print(f"初始化 {exchange_id} API客户端成功 - 价格数据格式异常")
                             exchange_clients[exchange_id] = client
                             if exchange_id == 'okx':
                                 print(f"🎉 OKX已成功添加到exchange_clients中！")
@@ -710,13 +713,28 @@ def get_okx_balance(client):
     """获取OKX余额的替代方法"""
     try:
         balance = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
-        funding_accounts = client.private_get_asset_balances({'ccy': ''})
         
+        # 安全调用OKX API，处理可能的None返回值
+        funding_accounts = client.private_get_asset_balances({'ccy': ''})
+        if not funding_accounts or not isinstance(funding_accounts, dict):
+            print("⚠️ OKX API返回数据格式异常")
+            return balance
+            
         for asset in funding_accounts.get('data', []):
+            if not asset or not isinstance(asset, dict):
+                continue
+                
             symbol = asset.get('ccy')
-            available = float(asset.get('availBal', 0))
-            frozen = float(asset.get('frozenBal', 0))
-            total = available + frozen
+            if not symbol:  # 防止symbol为None
+                continue
+                
+            # 安全转换数值，防止None值
+            try:
+                available = float(asset.get('availBal', 0) or 0)
+                frozen = float(asset.get('frozenBal', 0) or 0)
+                total = available + frozen
+            except (ValueError, TypeError):
+                continue
             
             if symbol == 'USDT':
                 balance["USDT"] = round(total, 2)
@@ -725,8 +743,12 @@ def get_okx_balance(client):
             elif total > 0:
                 price = 0
                 try:
-                    ticker = client.fetch_ticker(f"{symbol}/USDT")
-                    price = ticker['last']
+                    # 确保symbol不为None再进行字符串拼接
+                    if symbol and isinstance(symbol, str):
+                        ticker = client.fetch_ticker(f"{symbol}/USDT")
+                        price = ticker['last'] if ticker and 'last' in ticker else 0
+                    else:
+                        price = 0
                 except:
                     # 使用估计价格
                     price_estimate = {
@@ -734,7 +756,7 @@ def get_okx_balance(client):
                         'DOGE': 0.15, 'ADA': 0.5, 'DOT': 7, 'AVAX': 35,
                         'SHIB': 0.00003
                     }
-                    price = price_estimate.get(symbol, 0)
+                    price = price_estimate.get(symbol, 0) if symbol else 0
                 
                 if price > 0:
                     value = round(total * price, 2)

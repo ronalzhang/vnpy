@@ -4200,12 +4200,12 @@ class QuantitativeService:
             except Exception as e:
                 print(f"⚠️ 获取策略评分失败: {e}")
             
-            # 🔧 正确设置交易类型和验证标记
+            # 🔧 正确设置交易类型和验证标记（使用数据库约束允许的英文值）
             if strategy_score >= self.real_trading_threshold:
-                trade_type = "真实交易"
+                trade_type = "real_trading"
                 is_validation = False
             else:
-                trade_type = "验证交易"
+                trade_type = "score_verification"  # 验证交易使用score_verification类型
                 is_validation = True
             
             # 使用数据库管理器保存信号（包含完整字段）
@@ -4231,7 +4231,8 @@ class QuantitativeService:
             )
             
             self.db_manager.execute_query(query, params)
-            print(f"✅ 保存{trade_type}信号: {strategy_id[-4:]} | {signal.get('signal_type').upper()}")
+            trade_type_cn = "真实交易" if trade_type == "real_trading" else "验证交易"
+            print(f"✅ 保存{trade_type_cn}信号: {strategy_id[-4:]} | {signal.get('signal_type').upper()}")
             return True
             
         except Exception as e:
@@ -5331,12 +5332,12 @@ class QuantitativeService:
         try:
             cursor = self.conn.cursor()
             
-            # 🔧 修复：查询包含trade_type等验证交易相关字段
+            # 🔧 修复：直接查询trading_signals表，包含is_validation字段
             query = f'''
-                SELECT strategy_id, signal_type, price, quantity, confidence, executed, pnl, 
-                       timestamp, trade_type, validation_id, parameters_used,
-                       COALESCE(trade_type, 'real_trading') as trade_category
-                FROM strategy_trade_logs 
+                SELECT strategy_id, signal_type, price, quantity, confidence, executed, 
+                       COALESCE(expected_return, 0) as pnl, timestamp, 
+                       trade_type, is_validation
+                FROM trading_signals 
                 WHERE strategy_id = %s
                 ORDER BY timestamp DESC
                 LIMIT {limit}
@@ -5345,36 +5346,38 @@ class QuantitativeService:
             
             logs = []
             for row in cursor.fetchall():
-                trade_type = row[8] if row[8] else 'real_trading'
-                validation_id = row[9] if row[9] else None
-                parameters_used = row[10] if row[10] else None
+                strategy_id = row[0]
+                signal_type = row[1]
+                price = float(row[2]) if row[2] else 0.0
+                quantity = float(row[3]) if row[3] else 0.0
+                confidence = float(row[4]) if row[4] else 0.0
+                executed = bool(row[5])
+                pnl = float(row[6]) if row[6] is not None else 0.0
+                timestamp = row[7]
+                trade_type = row[8]  # 保持数据库原始值
+                is_validation = bool(row[9]) if row[9] is not None else False
                 
-                # 🔧 标记交易类型
-                if trade_type == 'optimization_validation':
-                    trade_label = '🔬 参数验证交易'
-                elif trade_type == 'initialization_validation':
-                    trade_label = '🚀 初始化验证交易'
-                elif trade_type == 'periodic_validation':
-                    trade_label = '🔄 定期验证交易'
-                elif trade_type == 'score_verification':
-                    trade_label = '📊 分数验证交易'
+                # 🔧 根据is_validation字段确定交易标签和中文类型
+                if is_validation:
+                    trade_label = '🔬 验证交易'
+                    trade_type_cn = '验证交易'
                 else:
                     trade_label = '💰 真实交易'
+                    trade_type_cn = '真实交易'
                 
                 logs.append({
-                    'strategy_id': row[0],
-                    'signal_type': row[1],
-                    'price': float(row[2]),
-                    'quantity': float(row[3]),
-                    'confidence': float(row[4]),
-                    'executed': bool(row[5]),
-                    'pnl': float(row[6]) if row[6] is not None else 0.0,
-                    'timestamp': row[7],
-                    'trade_type': trade_type,
+                    'strategy_id': strategy_id,
+                    'signal_type': signal_type,
+                    'price': price,
+                    'quantity': quantity,
+                    'confidence': confidence,
+                    'executed': executed,
+                    'pnl': pnl,
+                    'timestamp': timestamp,
+                    'trade_type': trade_type_cn,  # 中文显示
+                    'trade_type_en': trade_type,  # 英文原值
                     'trade_label': trade_label,
-                    'validation_id': validation_id,
-                    'parameters_used': parameters_used,
-                    'is_validation': trade_type == '验证交易' or trade_type == 'verification'
+                    'is_validation': is_validation
                 })
             
             print(f"🔍 策略{strategy_id[-4:]}交易日志: {len(logs)}条记录 (包含验证交易)")
