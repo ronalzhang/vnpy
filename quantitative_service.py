@@ -331,8 +331,22 @@ class DatabaseManager:
                 )
             ''')
             
+            # 扩展strategy_trade_logs表，添加交易周期相关字段
+            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS cycle_id TEXT')
+            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS cycle_status TEXT DEFAULT \'open\'')
+            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS open_time TIMESTAMP')
+            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS close_time TIMESTAMP')
+            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS holding_minutes INTEGER')
+            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS mrot_score REAL')
+            cursor.execute('ALTER TABLE strategy_trade_logs ADD COLUMN IF NOT EXISTS paired_trade_id TEXT')
+            
+            # 创建交易周期相关索引
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_cycle_status ON strategy_trade_logs(cycle_status)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_strategy_cycle ON strategy_trade_logs(strategy_id, cycle_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_mrot_score ON strategy_trade_logs(mrot_score DESC)')
+            
             self.conn.commit()
-            print("✅ 数据库表初始化完成")
+            print("✅ 数据库表初始化和交易周期字段扩展完成")
             
             # 插入初始资产记录（如果没有的话）
             cursor.execute('SELECT COUNT(*) FROM account_balance_history')
@@ -5124,6 +5138,30 @@ class QuantitativeService:
             ))
             self.conn.commit()
             
+            # 🔄 如果是已执行的交易，调用交易周期匹配引擎
+            if executed and hasattr(self, 'evolution_engine'):
+                cursor.execute('SELECT symbol FROM strategies WHERE id = %s', (strategy_id,))
+                symbol_result = cursor.fetchone()
+                symbol = symbol_result[0] if symbol_result else 'BTCUSDT'
+                
+                new_trade = {
+                    'id': exchange_order_id,
+                    'strategy_id': strategy_id,
+                    'signal_type': signal_type,
+                    'symbol': symbol,
+                    'price': price,
+                    'quantity': quantity,
+                    'pnl': pnl
+                }
+                
+                cycle_result = self.evolution_engine._match_and_close_trade_cycles(strategy_id, new_trade)
+                
+                if cycle_result:
+                    if cycle_result['action'] == 'opened':
+                        print(f"🔄 策略{strategy_id} 开启交易周期: {cycle_result['cycle_id']}")
+                    elif cycle_result['action'] == 'closed':
+                        print(f"✅ 策略{strategy_id} 完成交易周期: MRoT={cycle_result['mrot_score']:.4f}, 持有{cycle_result['holding_minutes']}分钟, 盈亏{cycle_result['cycle_pnl']:.2f}U")
+            
             # 记录交易类型日志
             if is_real_money:
                 trade_status = "💰真实资金"
@@ -5619,8 +5657,11 @@ class QuantitativeService:
 
     def _calculate_strategy_score(self, total_return: float, win_rate: float, 
                                 sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> float:
-        """🎯 重新设计的严格评分系统 - 现实的策略评估标准"""
+        """📈 计算策略综合评分 (0-100) - 集成新的SCS交易周期评分系统"""
         try:
+            # 🔄 优先尝试使用新的SCS评分系统（如果有交易周期数据且有进化引擎）
+            # 注意：由于传统方法缺少strategy_id参数，这里暂时保持传统评分的完整性
+            # 新的SCS评分主要在_update_strategy_score_after_cycle_completion中使用
             # 🔥 严格权重分配 - 更现实的评分标准
             weights = {
                 'win_rate': 0.30,      # 胜率权重
@@ -10215,6 +10256,258 @@ class EvolutionaryStrategyEngine:
             trade_pnl=pnl,
             signal_type=signal_type
         )
+    
+    def _match_and_close_trade_cycles(self, strategy_id: str, new_trade: Dict) -> Optional[Dict]:
+        """🔄 匹配并关闭交易周期（FIFO原则）- 阶段二核心功能"""
+        import time
+        try:
+            conn = psycopg2.connect(
+                host="localhost",
+                database="quantitative", 
+                user="quant_user",
+                password="123abc74531"
+            )
+            cursor = conn.cursor()
+            
+            signal_type = new_trade['signal_type']
+            symbol = new_trade['symbol']
+            
+            if signal_type == 'buy':
+                # 买入信号：创建新的开仓记录
+                cycle_id = f"CYCLE_{strategy_id}_{int(time.time() * 1000)}"
+                cursor.execute('''
+                    UPDATE strategy_trade_logs 
+                    SET cycle_id = %s, cycle_status = 'open', open_time = %s
+                    WHERE id = %s
+                ''', (cycle_id, datetime.now(), new_trade['id']))
+                
+                conn.commit()
+                conn.close()
+                return {'action': 'opened', 'cycle_id': cycle_id}
+                
+            elif signal_type == 'sell':
+                # 卖出信号：查找最早的开仓记录进行配对
+                cursor.execute('''
+                    SELECT id, cycle_id, price, quantity, open_time, timestamp
+                    FROM strategy_trade_logs 
+                    WHERE strategy_id = %s AND symbol = %s AND signal_type = 'buy' 
+                    AND cycle_status = 'open' AND executed = 1
+                    ORDER BY timestamp ASC LIMIT 1
+                ''', (strategy_id, symbol))
+                
+                open_trade = cursor.fetchone()
+                if not open_trade:
+                    conn.close()
+                    return None
+                
+                # 计算交易周期指标
+                open_trade_id = open_trade[0]
+                cycle_id = open_trade[1]
+                open_price = float(open_trade[2])
+                quantity = float(open_trade[3])
+                open_time = open_trade[4]
+                close_price = float(new_trade['price'])
+                close_time = datetime.now()
+                
+                # 计算周期盈亏和持有分钟数
+                cycle_pnl = (close_price - open_price) * quantity
+                holding_minutes = int((close_time - open_time).total_seconds() / 60)
+                
+                # 计算MRoT（分钟回报率）
+                mrot_score = cycle_pnl / max(holding_minutes, 1)  # 避免除零
+                
+                # 更新开仓记录
+                cursor.execute('''
+                    UPDATE strategy_trade_logs 
+                    SET cycle_status = 'closed', close_time = %s, 
+                        holding_minutes = %s, mrot_score = %s, paired_trade_id = %s
+                    WHERE id = %s
+                ''', (close_time, holding_minutes, mrot_score, new_trade['id'], open_trade_id))
+                
+                # 更新平仓记录
+                cursor.execute('''
+                    UPDATE strategy_trade_logs 
+                    SET cycle_id = %s, cycle_status = 'closed', open_time = %s,
+                        close_time = %s, holding_minutes = %s, mrot_score = %s, 
+                        paired_trade_id = %s, pnl = %s
+                    WHERE id = %s
+                ''', (cycle_id, open_time, close_time, holding_minutes, mrot_score, 
+                      open_trade_id, cycle_pnl, new_trade['id']))
+                
+                conn.commit()
+                conn.close()
+                
+                # 触发基于交易周期的评分更新
+                self._update_strategy_score_after_cycle_completion(
+                    strategy_id, cycle_pnl, mrot_score, holding_minutes
+                )
+                
+                return {
+                    'action': 'closed',
+                    'cycle_id': cycle_id,
+                    'cycle_pnl': cycle_pnl,
+                    'holding_minutes': holding_minutes,
+                    'mrot_score': mrot_score
+                }
+                
+        except Exception as e:
+            print(f"❌ 交易周期匹配失败: {e}")
+            if conn:
+                conn.close()
+            return None
+    
+    def _update_strategy_score_after_cycle_completion(self, strategy_id: str, cycle_pnl: float, 
+                                                    mrot_score: float, holding_minutes: int):
+        """📊 交易周期完成后更新策略评分 - 阶段三核心功能"""
+        try:
+            # 获取策略最近的交易周期数据
+            conn = psycopg2.connect(
+                host="localhost",
+                database="quantitative", 
+                user="quant_user",
+                password="123abc74531"
+            )
+            cursor = conn.cursor()
+            
+            # 获取最近10个完整交易周期的MRoT数据
+            cursor.execute('''
+                SELECT mrot_score, holding_minutes, pnl
+                FROM strategy_trade_logs 
+                WHERE strategy_id = %s AND cycle_status = 'closed' AND mrot_score IS NOT NULL
+                ORDER BY timestamp DESC LIMIT 10
+            ''', (strategy_id,))
+            
+            recent_cycles = cursor.fetchall()
+            conn.close()
+            
+            if not recent_cycles:
+                return
+            
+            # 计算平均MRoT和策略效率等级
+            avg_mrot = sum(cycle[0] for cycle in recent_cycles) / len(recent_cycles)
+            
+            # 根据您修改的MRoT评级标准计算新的策略评分
+            efficiency_grade = self._calculate_mrot_efficiency_grade(avg_mrot)
+            
+            # 使用新的SCS综合评分公式
+            new_score = self._calculate_scs_comprehensive_score(
+                strategy_id, avg_mrot, recent_cycles
+            )
+            
+            # 触发智能进化决策
+            self._intelligent_evolution_decision_based_on_mrot(
+                strategy_id, avg_mrot, efficiency_grade, new_score
+            )
+            
+            print(f"✅ 策略{strategy_id}交易周期完成：MRoT={avg_mrot:.4f}, 效率等级={efficiency_grade}, 新评分={new_score:.2f}")
+            
+        except Exception as e:
+            print(f"❌ 周期完成后评分更新失败: {e}")
+    
+    def _calculate_mrot_efficiency_grade(self, avg_mrot: float) -> str:
+        """🏆 根据平均MRoT计算效率等级 - 使用您修改的标准"""
+        if avg_mrot >= 0.5:
+            return "A级(超高效)"
+        elif avg_mrot >= 0.1:
+            return "B级(高效)" 
+        elif avg_mrot >= 0.01:
+            return "C级(中效)"
+        elif avg_mrot > 0:
+            return "D级(低效)"
+        else:
+            return "F级(负效)"
+    
+    def _calculate_scs_comprehensive_score(self, strategy_id: str, avg_mrot: float, 
+                                         recent_cycles: List[tuple]) -> float:
+        """📈 计算SCS综合评分（Strategy Comprehensive Score）- 阶段四核心功能"""
+        try:
+            # 基础分 = 平均MRoT × 100 × 权重系数 (40%)
+            base_score = avg_mrot * 100 * 0.4
+            
+            # 效率分 (35%) = 胜率×50% + 交易频次适应性×30% + 资金利用率×20%
+            profitable_cycles = sum(1 for cycle in recent_cycles if cycle[2] > 0)
+            win_rate = profitable_cycles / len(recent_cycles) if recent_cycles else 0
+            
+            # 交易频次适应性：平均持有时间越短越好（目标<30分钟）
+            avg_holding_minutes = sum(cycle[1] for cycle in recent_cycles) / len(recent_cycles)
+            frequency_adaptability = max(0, (30 - avg_holding_minutes) / 30) * 100
+            
+            # 资金利用率：基于平均盈利金额
+            avg_profit = sum(abs(cycle[2]) for cycle in recent_cycles) / len(recent_cycles)
+            capital_utilization = min(100, avg_profit * 10)  # 限制最高100分
+            
+            efficiency_score = (win_rate * 50 + frequency_adaptability * 30 + capital_utilization * 20) / 100 * 0.35
+            
+            # 稳定性分 (15%) = 连续盈利周期数 / 总周期数
+            consecutive_profitable = 0
+            max_consecutive = 0
+            for cycle in recent_cycles:
+                if cycle[2] > 0:
+                    consecutive_profitable += 1
+                    max_consecutive = max(max_consecutive, consecutive_profitable)
+                else:
+                    consecutive_profitable = 0
+            
+            stability_score = (max_consecutive / len(recent_cycles)) * 100 * 0.15
+            
+            # 风险控制分 (10%) = MAX(0, 100 - 最大连续亏损分钟数/10)
+            max_consecutive_loss_minutes = 0
+            current_loss_minutes = 0
+            for cycle in recent_cycles:
+                if cycle[2] < 0:
+                    current_loss_minutes += cycle[1]
+                    max_consecutive_loss_minutes = max(max_consecutive_loss_minutes, current_loss_minutes)
+                else:
+                    current_loss_minutes = 0
+            
+            risk_control_score = max(0, 100 - max_consecutive_loss_minutes / 10) * 0.1
+            
+            # SCS综合评分
+            scs_score = base_score + efficiency_score + stability_score + risk_control_score
+            
+            # 保存新评分到数据库
+            self._save_strategy_score_history(strategy_id, scs_score)
+            
+            return min(100, max(0, scs_score))  # 限制在0-100范围内
+            
+        except Exception as e:
+            print(f"❌ SCS综合评分计算失败: {e}")
+            return 50.0  # 默认评分
+    
+    def _intelligent_evolution_decision_based_on_mrot(self, strategy_id: str, avg_mrot: float, 
+                                                    efficiency_grade: str, current_score: float):
+        """🧬 基于MRoT的智能进化决策 - 阶段五核心功能"""
+        try:
+            if avg_mrot >= 0.5:  # A级策略
+                action = "protect_and_fine_tune"
+                self._protect_and_fine_tune_strategy(strategy_id, current_score, {})
+            elif avg_mrot >= 0.1:  # B级策略  
+                action = "consolidate_advantage"
+                self._consolidate_advantage_strategy(strategy_id, current_score, {})
+            elif avg_mrot >= 0.01:  # C级策略
+                action = "moderate_optimization"
+                self._moderate_optimization_strategy(strategy_id, current_score, {})
+            elif avg_mrot > 0:  # D级策略
+                action = "aggressive_optimization"
+                self._aggressive_optimization_strategy(strategy_id, current_score, {})
+            else:  # F级策略
+                action = "eliminate_or_major_mutation"
+                self._eliminate_or_mutate_poor_strategy(strategy_id, current_score)
+            
+            print(f"🧬 策略{strategy_id}进化决策：{efficiency_grade} -> {action}")
+            
+        except Exception as e:
+            print(f"❌ 智能进化决策失败: {e}")
+    
+    def _eliminate_or_mutate_poor_strategy(self, strategy_id: str, current_score: float):
+        """🔥 淘汰或重大变异低效策略"""
+        try:
+            # 对于F级策略，进行激进的参数重构
+            print(f"🔥 策略{strategy_id}执行重大变异（F级策略优化）")
+            # 这里可以调用现有的激进优化方法
+            self._aggressive_optimization_strategy(strategy_id, current_score, {})
+        except Exception as e:
+            print(f"❌ 策略淘汰/变异失败: {e}")
 
 def main():
     """主程序入口"""
