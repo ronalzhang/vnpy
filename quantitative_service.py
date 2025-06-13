@@ -9137,15 +9137,15 @@ class EvolutionaryStrategyEngine:
             )
             cursor = conn.cursor()
             
-            # 首先尝试从trading_signals表获取交易数据（统一表）
+            # 🔧 修复：使用正确的字段名expected_return而不是pnl
             cursor.execute("""
                 SELECT 
                     COUNT(*) as total_trades,
-                    COUNT(CASE WHEN pnl > 0 THEN 1 END) as winning_trades,
-                    SUM(pnl) as total_pnl,
-                    AVG(pnl) as avg_pnl,
-                    MIN(pnl) as min_pnl,
-                    MAX(pnl) as max_pnl
+                    COUNT(CASE WHEN expected_return > 0 THEN 1 END) as winning_trades,
+                    SUM(expected_return) as total_pnl,
+                    AVG(expected_return) as avg_pnl,
+                    MIN(expected_return) as min_pnl,
+                    MAX(expected_return) as max_pnl
                 FROM trading_signals 
                 WHERE strategy_id = %s AND executed = 1 AND timestamp >= NOW() - INTERVAL '30 days'
             """, (strategy_id,))
@@ -9167,7 +9167,22 @@ class EvolutionaryStrategyEngine:
                 max_drawdown = abs(min_pnl or 0) / 100 if min_pnl else 0.05
                 max_drawdown = min(max_drawdown, 0.5)  # 限制在50%以内
                 
-                print(f"📊 策略{strategy_id[-4:]}真实数据: 交易{total_trades}次, 胜率{win_rate:.1f}%, 总盈亏{total_pnl or 0:.2f}")
+                # 🔧 计算profit_factor (盈利交易总和 / 亏损交易总和)
+                cursor.execute("""
+                    SELECT 
+                        SUM(CASE WHEN expected_return > 0 THEN expected_return ELSE 0 END) as total_profit,
+                        SUM(CASE WHEN expected_return < 0 THEN ABS(expected_return) ELSE 0 END) as total_loss
+                    FROM trading_signals 
+                    WHERE strategy_id = %s AND executed = 1 AND timestamp >= NOW() - INTERVAL '30 days'
+                """, (strategy_id,))
+                profit_loss = cursor.fetchone()
+                
+                if profit_loss and profit_loss[1] and profit_loss[1] > 0:
+                    profit_factor = float(profit_loss[0] or 0) / float(profit_loss[1])
+                else:
+                    profit_factor = 1.0  # 默认值
+                
+                print(f"📊 策略{strategy_id[-4:]}真实数据: 交易{total_trades}次, 胜率{win_rate:.1f}%, 总盈亏{total_pnl or 0:.2f}, 盈亏比{profit_factor:.2f}")
                 
                 conn.close()
                 return {
@@ -9175,6 +9190,7 @@ class EvolutionaryStrategyEngine:
                     'win_rate': float(win_rate),
                     'sharpe_ratio': float(sharpe_ratio),
                     'max_drawdown': float(max_drawdown),
+                    'profit_factor': float(profit_factor),
                     'total_trades': int(total_trades)
                 }
             else:
@@ -9193,8 +9209,9 @@ class EvolutionaryStrategyEngine:
                     estimated_pnl = (final_score or 50 - 50) * 2  # 50分对应0盈亏
                     estimated_sharpe = (final_score or 50 - 30) / 40  # 30-70分对应0-1夏普比率
                     estimated_drawdown = max(0.02, (70 - (final_score or 50)) / 200)  # 分数越低回撤越大
+                    estimated_profit_factor = max(0.5, min(2.0, (final_score or 50) / 50))  # 基于评分估算盈亏比
                     
-                    print(f"📊 策略{strategy_id[-4:]}仿真数据: 评分{final_score or 50:.1f}分, 估算胜率{estimated_win_rate:.1f}%")
+                    print(f"📊 策略{strategy_id[-4:]}仿真数据: 评分{final_score or 50:.1f}分, 估算胜率{estimated_win_rate:.1f}%, 盈亏比{estimated_profit_factor:.2f}")
                     
                     conn.close()
                     return {
@@ -9202,6 +9219,7 @@ class EvolutionaryStrategyEngine:
                         'win_rate': float(estimated_win_rate),
                         'sharpe_ratio': float(estimated_sharpe),
                         'max_drawdown': float(estimated_drawdown),
+                        'profit_factor': float(estimated_profit_factor),
                         'total_trades': 5  # 新策略假设5次交易
                     }
             
@@ -9222,6 +9240,7 @@ class EvolutionaryStrategyEngine:
             'win_rate': 50.0,
             'sharpe_ratio': 0.5,
             'max_drawdown': 0.1,
+            'profit_factor': 1.0,
             'total_trades': 1
         }
     
@@ -11256,13 +11275,17 @@ class EvolutionaryStrategyEngine:
             else:
                 # 🔧 获取最新交易统计并计算新评分 - 直接调用统一的评分计算方法
                 updated_stats = self._get_strategy_performance_stats(strategy_id)
-                # 🔥 直接调用第7078行的统一评分计算方法，避免重复代码调用
+                # 🔥 计算profit_factor并调用统一评分计算方法
+                profit_factor = updated_stats.get('profit_factor', 1.0)
+                if profit_factor == 0:
+                    profit_factor = 1.0  # 避免除零错误
+                
                 new_score = self.quantitative_service._calculate_strategy_score(
                     updated_stats['total_pnl'], 
                     updated_stats['win_rate'], 
                     updated_stats['sharpe_ratio'],
                     updated_stats['max_drawdown'],
-                    updated_stats['profit_factor'],
+                    profit_factor,
                     updated_stats['total_trades']
                 )
             
