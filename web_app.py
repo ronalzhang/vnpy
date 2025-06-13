@@ -241,6 +241,15 @@ def calculate_strategy_volatility(strategy_id):
         print(f"计算波动率失败: {e}")
         return 0.0
 
+def _get_strategy_trade_mode(score, enabled):
+    """根据策略分数和启用状态确定交易模式"""
+    if not enabled:
+        return '已停止'
+    elif score >= 65.0:
+        return '真实交易'
+    else:
+        return '验证交易'
+
 # 导入套利系统模块
 try:
     from integrate_arbitrage import init_arbitrage_system
@@ -1356,12 +1365,12 @@ def quantitative_strategies():
                     print(f"解包策略数据失败: {e}, row: {row}")
                     continue
                 
-                # 🔥 修复win_rate计算逻辑：正确计算真实成功率和收益
+                # 🔥 修复win_rate计算逻辑：正确计算真实成功率和收益，过滤异常值
                 cursor.execute("""
                     SELECT COUNT(*) as total_trades,
-                           COUNT(CASE WHEN expected_return > 0 THEN 1 END) as wins,
-                           SUM(expected_return) as total_pnl,
-                           AVG(expected_return) as avg_pnl
+                           COUNT(CASE WHEN expected_return > 0 AND expected_return <= 100 THEN 1 END) as wins,
+                           SUM(CASE WHEN expected_return BETWEEN -100 AND 100 THEN expected_return ELSE 0 END) as total_pnl,
+                           AVG(CASE WHEN expected_return BETWEEN -100 AND 100 THEN expected_return ELSE 0 END) as avg_pnl
                     FROM trading_signals
                     WHERE strategy_id = %s AND expected_return IS NOT NULL AND executed = 1
                 """, (sid,))
@@ -1423,17 +1432,23 @@ def quantitative_strategies():
                     from strategy_parameters_config import get_strategy_default_parameters
                     parsed_params = get_strategy_default_parameters(stype)
 
-                # 🔧 计算收益率 - 修复荒谬收益率问题
+                # 🔥 修复收益率计算逻辑 - 使用正确的百分比计算
                 total_return_percentage = 0.0
                 daily_return = 0.0
-                if calculated_total_trades > 0 and calculated_total_pnl != 0:
-                    # 🔥 修复：计算真实收益率，而不是直接使用盈亏金额
-                    # 基准资金 = 交易次数 * 每笔交易平均资金（假设10 USDT）
-                    base_capital = max(calculated_total_trades * 10.0, 100.0)
-                    total_return_percentage = (float(calculated_total_pnl) / base_capital) * 100  # 转换为百分比
+                if calculated_total_trades > 0:
+                    # 🔥 修复：直接使用盈亏金额作为收益率百分比（因为expected_return已经是百分比形式）
+                    # 如果calculated_total_pnl是累计的百分比收益，直接使用
+                    if calculated_total_pnl != 0:
+                        # 如果是小数形式的收益率，转换为百分比
+                        if abs(calculated_total_pnl) < 10:  # 小于10认为是小数形式
+                            total_return_percentage = float(calculated_total_pnl) * 100
+                        else:
+                            total_return_percentage = float(calculated_total_pnl)
+                    else:
+                        total_return_percentage = 0.0
                     
-                    # 限制收益率在合理范围内 (-100% 到 +500%)
-                    total_return_percentage = max(-100.0, min(total_return_percentage, 500.0))
+                    # 限制收益率在合理范围内 (-100% 到 +100%)
+                    total_return_percentage = max(-100.0, min(total_return_percentage, 100.0))
                     
                     # 获取策略首次和最新交易时间计算日收益率
                     cursor.execute("""
@@ -1471,7 +1486,7 @@ def quantitative_strategies():
                     'profit_factor': round(profit_factor, 2), # ⭐ 盈亏比
                     'volatility': round(volatility, 4),       # ⭐ 波动率
                     'evolution_display': evolution_display,
-                    'trade_mode': '验证交易' if enabled else '暂停中'  # 🔥 修复：统一显示验证交易
+                    'trade_mode': _get_strategy_trade_mode(float(score) if score else 0.0, bool(enabled))  # 🔥 修复：根据分数和状态正确显示交易模式
                 }
                 
                 strategies.append(strategy)
@@ -1982,8 +1997,15 @@ def get_strategy_trade_logs(strategy_id):
             executed = bool(row[6]) if row[6] is not None else False
             record_id = row[7] if row[7] is not None else 0
             confidence = float(row[9]) if row[9] is not None else 0.75
-            # 🔧 修复：当前系统应该都是验证交易，不根据executed状态判断
-            trade_type = 'verification'  # 验证交易
+            # 🔥 修复：根据实际情况判断交易类型和状态
+            # 检查策略分数来判断是否为真实交易
+            cursor.execute("SELECT final_score FROM strategies WHERE id = %s", (strategy_id,))
+            strategy_score_result = cursor.fetchone()
+            strategy_score = float(strategy_score_result[0]) if strategy_score_result and strategy_score_result[0] else 0.0
+            
+            # 根据策略分数和系统设置判断交易类型
+            is_real_money = strategy_score >= 65.0 and executed  # 65分以上且已执行的才是真实交易
+            trade_type = 'real_trading' if is_real_money else 'verification'
             
             logs.append({
                 'timestamp': timestamp,
@@ -1996,7 +2018,7 @@ def get_strategy_trade_logs(strategy_id):
                 'confidence': confidence,
                 'id': record_id,
                 'trade_type': trade_type,
-                'is_real_money': False,  # 🔥 修复：所有交易都是验证交易，不是真实资金交易
+                'is_real_money': is_real_money,  # 🔥 修复：根据策略分数正确判断
                 'validation_id': str(record_id)[-6:] if record_id else None
             })
         
