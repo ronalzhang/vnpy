@@ -3224,7 +3224,7 @@ def manage_auto_trading():
                 cursor.execute("""
                     UPDATE system_status 
                     SET auto_trading_enabled = %s, 
-                        updated_at = CURRENT_TIMESTAMP,
+                        last_updated = CURRENT_TIMESTAMP,
                         notes = %s
                     WHERE id = 1
                 """, (enabled, status_message))
@@ -3232,8 +3232,8 @@ def manage_auto_trading():
                 # 如果记录不存在，创建一个
                 if cursor.rowcount == 0:
                     cursor.execute("""
-                        INSERT INTO system_status (id, auto_trading_enabled, notes, created_at, updated_at)
-                        VALUES (1, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        INSERT INTO system_status (id, auto_trading_enabled, notes, last_updated)
+                        VALUES (1, %s, %s, CURRENT_TIMESTAMP)
                     """, (enabled, status_message))
                 
                 conn.commit()
