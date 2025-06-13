@@ -1407,18 +1407,6 @@ class TrendFollowingStrategy(QuantitativeStrategy):
             
         return (current - low) / (high - low)
 
-class AutomatedStrategyManager:
-    """🤖 自动化策略管理器"""
-    
-    def __init__(self, quantitative_service):
-        """初始化自动化策略管理器"""
-        self.quantitative_service = quantitative_service
-        # 增强导入保护机制
-        pass
-    
-    def manage_strategies(self):
-        """管理策略的主方法"""
-    timestamp: datetime
 
 class DatabaseManager:
     """数据库管理类 - 使用PostgreSQL适配器"""
