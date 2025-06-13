@@ -78,6 +78,7 @@ import traceback
 import logging
 from db_config import get_db_adapter
 import psycopg2  # 🔧 全局导入修复，解决"name 'psycopg2' is not defined"错误
+import random  # 🔧 添加random模块导入，用于智能重试机制
 
 # 全局变量用于延迟导入
 pd = None
@@ -11906,6 +11907,246 @@ class EvolutionaryStrategyEngine:
             
         except Exception as e:
             print(f"❌ 周期完成后评分更新失败: {e}")
+
+    def _micro_adjust_parameters(self, strategy_id: str, original_params: Dict, adjustment_rate: float = 0.05) -> Dict:
+        """🔧 微调参数 - 5%幅度的细微调整"""
+        try:
+            adjusted_params = original_params.copy()
+            
+            for param_name, param_value in original_params.items():
+                if isinstance(param_value, (int, float)) and param_value > 0:
+                    # 随机选择增加或减少
+                    direction = random.choice([-1, 1])
+                    adjustment = param_value * adjustment_rate * direction
+                    
+                    new_value = param_value + adjustment
+                    
+                    # 确保参数在合理范围内
+                    if param_name in ['rsi_period', 'lookback_period', 'ma_period']:
+                        new_value = max(5, min(50, int(new_value)))
+                    elif param_name in ['threshold', 'profit_target', 'stop_loss']:
+                        new_value = max(0.001, min(0.1, new_value))
+                    elif param_name in ['grid_spacing', 'volatility_threshold']:
+                        new_value = max(0.0001, min(0.05, new_value))
+                    
+                    adjusted_params[param_name] = new_value
+                    
+            print(f"🔧 策略{strategy_id}微调参数: {adjustment_rate*100}%幅度")
+            return adjusted_params
+            
+        except Exception as e:
+            print(f"❌ 微调参数失败: {e}")
+            return original_params
+
+    def _reverse_adjust_parameters(self, strategy_id: str, original_params: Dict, adjustment_rate: float = 0.10) -> Dict:
+        """🔄 反向调整参数 - 10%幅度的反向优化"""
+        try:
+            adjusted_params = original_params.copy()
+            
+            for param_name, param_value in original_params.items():
+                if isinstance(param_value, (int, float)) and param_value > 0:
+                    # 基于参数类型进行反向调整
+                    if param_name in ['rsi_overbought', 'upper_threshold']:
+                        # 超买阈值降低
+                        new_value = param_value * (1 - adjustment_rate)
+                    elif param_name in ['rsi_oversold', 'lower_threshold']:
+                        # 超卖阈值提高
+                        new_value = param_value * (1 + adjustment_rate)
+                    elif param_name in ['profit_target']:
+                        # 利润目标适度降低
+                        new_value = param_value * (1 - adjustment_rate * 0.5)
+                    elif param_name in ['stop_loss']:
+                        # 止损适度收紧
+                        new_value = param_value * (1 - adjustment_rate * 0.3)
+                    else:
+                        # 其他参数随机反向调整
+                        direction = random.choice([-1, 1])
+                        new_value = param_value * (1 + direction * adjustment_rate)
+                    
+                    # 参数范围限制
+                    if param_name in ['rsi_period', 'lookback_period', 'ma_period']:
+                        new_value = max(5, min(50, int(new_value)))
+                    elif param_name in ['threshold', 'profit_target', 'stop_loss']:
+                        new_value = max(0.001, min(0.1, new_value))
+                    elif param_name in ['grid_spacing', 'volatility_threshold']:
+                        new_value = max(0.0001, min(0.05, new_value))
+                    
+                    adjusted_params[param_name] = new_value
+                    
+            print(f"🔄 策略{strategy_id}反向调整参数: {adjustment_rate*100}%幅度")
+            return adjusted_params
+            
+        except Exception as e:
+            print(f"❌ 反向调整参数失败: {e}")
+            return original_params
+
+    def _execute_retry_validation(self, strategy_id: str, retry_params: Dict, retry_attempt: int) -> Optional[Dict]:
+        """🔄 执行重试验证交易"""
+        try:
+            # 获取策略信息
+            strategy = self._get_strategy_by_id(int(strategy_id))
+            if not strategy:
+                return None
+                
+            strategy_type = strategy.get('strategy_type', 'momentum')
+            symbol = strategy.get('symbol', 'BTC-USDT')
+            
+            # 生成验证交易
+            validation_result = self._execute_validation_trade(
+                strategy_id, strategy_type, symbol, retry_params
+            )
+            
+            if validation_result:
+                validation_result['retry_attempt'] = retry_attempt
+                validation_result['retry_params'] = retry_params
+                print(f"✅ 策略{strategy_id}重试{retry_attempt}验证完成: PnL={validation_result.get('pnl', 0):.4f}")
+            else:
+                print(f"❌ 策略{strategy_id}重试{retry_attempt}验证失败")
+                
+            return validation_result
+            
+        except Exception as e:
+            print(f"❌ 重试验证执行失败: {e}")
+            return None
+
+    def _log_successful_retry(self, strategy_id: str, retry_attempt: int, retry_result: Dict, final_score: float):
+        """📝 记录成功的重试"""
+        try:
+            conn = psycopg2.connect(
+                host="localhost",
+                database="quantitative",
+                user="quant_user",
+                password="123abc74531"
+            )
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                INSERT INTO parameter_optimization_retries 
+                (strategy_id, retry_attempt, retry_pnl, retry_score, retry_success, retry_time, final_score)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ''', (
+                strategy_id, retry_attempt, 
+                retry_result.get('pnl', 0), retry_result.get('score', 0),
+                1, datetime.now(), final_score
+            ))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"✅ 策略{strategy_id}重试{retry_attempt}成功记录: 最终评分={final_score:.2f}")
+            
+        except Exception as e:
+            print(f"❌ 记录成功重试失败: {e}")
+
+    def _update_retry_record(self, strategy_id: str, retry_attempt: int, retry_success: bool, retry_pnl: float = 0):
+        """📊 更新重试记录"""
+        try:
+            conn = psycopg2.connect(
+                host="localhost",
+                database="quantitative",
+                user="quant_user",
+                password="123abc74531"
+            )
+            cursor = conn.cursor()
+            
+            # 确保重试记录表存在
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS parameter_optimization_retries (
+                    id SERIAL PRIMARY KEY,
+                    strategy_id TEXT NOT NULL,
+                    retry_attempt INTEGER NOT NULL,
+                    retry_pnl REAL DEFAULT 0,
+                    retry_score REAL DEFAULT 0,
+                    retry_success INTEGER DEFAULT 0,
+                    retry_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    final_score REAL DEFAULT 0
+                )
+            ''')
+            
+            cursor.execute('''
+                INSERT INTO parameter_optimization_retries 
+                (strategy_id, retry_attempt, retry_pnl, retry_success, retry_time)
+                VALUES (%s, %s, %s, %s, %s)
+            ''', (strategy_id, retry_attempt, retry_pnl, int(retry_success), datetime.now()))
+            
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            print(f"❌ 更新重试记录失败: {e}")
+
+    def _fallback_and_mark_for_evolution(self, strategy_id: str, original_params: Dict):
+        """🔄 回退并标记进化"""
+        try:
+            # 恢复原始参数
+            self._apply_validated_parameters(strategy_id, original_params, [])
+            
+            # 标记策略需要进化
+            conn = psycopg2.connect(
+                host="localhost",
+                database="quantitative",
+                user="quant_user",
+                password="123abc74531"
+            )
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                UPDATE strategies 
+                SET needs_evolution = 1, evolution_priority = 'high',
+                    last_optimization_failed = 1
+                WHERE id = %s
+            ''', (strategy_id,))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"🔄 策略{strategy_id}参数回退完成，标记为高优先级进化")
+            
+        except Exception as e:
+            print(f"❌ 回退并标记进化失败: {e}")
+
+    def _emergency_parameter_rollback(self, strategy_id: str, safe_params: Dict):
+        """🚨 紧急参数回滚"""
+        try:
+            # 立即回滚到安全参数
+            self._apply_validated_parameters(strategy_id, safe_params, [])
+            
+            # 记录紧急回滚
+            conn = psycopg2.connect(
+                host="localhost",
+                database="quantitative",
+                user="quant_user",
+                password="123abc74531"
+            )
+            cursor = conn.cursor()
+            
+            # 确保紧急回滚表存在
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS emergency_rollbacks (
+                    id SERIAL PRIMARY KEY,
+                    strategy_id TEXT NOT NULL,
+                    rollback_reason TEXT,
+                    rollback_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    safe_parameters TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                INSERT INTO emergency_rollbacks 
+                (strategy_id, rollback_reason, rollback_time, safe_parameters)
+                VALUES (%s, %s, %s, %s)
+            ''', (
+                strategy_id, "Parameter optimization failed after retries",
+                datetime.now(), json.dumps(safe_params)
+            ))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"🚨 策略{strategy_id}紧急参数回滚完成")
+            
+        except Exception as e:
+            print(f"❌ 紧急参数回滚失败: {e}")
     
 
 
