@@ -6502,7 +6502,7 @@ class ParameterOptimizer:
         print(f"✅ 参数优化器初始化完成，支持{len(self.optimization_directions)}个参数的智能优化")
         
     def calculate_performance_score(self, strategy_stats):
-        """计算策略综合表现评分 - 统一使用主评分方法"""
+        """计算策略综合表现评分 - 直接实现评分逻辑"""
         try:
             # 获取策略统计数据
             total_return = float(strategy_stats.get('total_return', 0))
@@ -6512,22 +6512,37 @@ class ParameterOptimizer:
             profit_factor = float(strategy_stats.get('profit_factor', 1.5))
             total_trades = int(strategy_stats.get('total_trades', 0))
             
-            # 创建临时的QuantitativeService实例来使用统一评分方法
-            # 注意：这里使用简化的方式，实际应该通过依赖注入
-            from quantitative_service import QuantitativeService
-            temp_service = QuantitativeService()
+            # 直接实现评分计算，避免循环导入
+            # 基础分 (40%)
+            base_score = min(100, max(0, total_return * 2 + 50))
             
-            return temp_service._calculate_strategy_score(
-                total_return=total_return,
-                win_rate=win_rate,
-                sharpe_ratio=sharpe_ratio,
-                max_drawdown=max_drawdown,
-                profit_factor=profit_factor,
-                total_trades=total_trades
+            # 胜率分 (25%)
+            win_rate_score = win_rate * 100
+            
+            # 夏普比率分 (20%)
+            sharpe_score = min(100, max(0, sharpe_ratio * 50))
+            
+            # 风险控制分 (15%)
+            risk_score = max(0, 100 - max_drawdown * 1000)
+            
+            # 综合评分
+            final_score = (
+                base_score * 0.40 +
+                win_rate_score * 0.25 +
+                sharpe_score * 0.20 +
+                risk_score * 0.15
             )
             
+            # 交易次数调整
+            if total_trades < 10:
+                final_score *= 0.8  # 交易次数不足，降低评分
+            elif total_trades > 100:
+                final_score *= 1.1  # 交易次数充足，提升评分
+                
+            return max(0, min(100, final_score))
+            
         except Exception as e:
-            logger.error(f"计算性能评分失败: {e}")
+            print(f"计算性能评分失败: {e}")
             return 50  # 默认中等评分
     
     def optimize_parameters_intelligently(self, strategy_id, current_params, strategy_stats):

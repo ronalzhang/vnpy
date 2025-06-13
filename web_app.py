@@ -1989,7 +1989,7 @@ def get_strategy_trade_logs(strategy_id):
                 'confidence': confidence,
                 'id': record_id,
                 'trade_type': trade_type,
-                'is_real_money': executed,
+                'is_real_money': False,  # 🔥 修复：所有交易都是验证交易，不是真实资金交易
                 'validation_id': str(record_id)[-6:] if record_id else None
             })
         
