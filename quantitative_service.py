@@ -1576,7 +1576,7 @@ class AutomatedStrategyManager:
             total_trades = performance.get('total_trades', 0)
             
             # 🎯 根据评分选择不同的优化策略
-            if score < 65.0:  # 低分策略：激进优化
+            if score < self.real_trading_threshold:  # 低分策略：激进优化
                 if total_trades > 10:
                     self._advanced_parameter_optimization(strategy_id, performance)
                 else:
@@ -2357,7 +2357,6 @@ class QuantitativeService:
         # 初始化配置
         self.fund_allocation_config = {
             'max_active_strategies': 2,
-            'min_score_for_trading': 65.0,  # 65分开始交易，将通过数据库配置动态更新
             'fund_allocation_method': 'fitness_based',
             'risk_management_enabled': True,
             'auto_rebalancing': True,
@@ -2366,11 +2365,7 @@ class QuantitativeService:
             'evolution_acceleration': True  # 启用进化加速
         }
         
-        # 设置默认的真实交易门槛和进化频率
-        self.real_trading_threshold = 65.0
-        self.evolution_interval = 10  # 默认10分钟
-        
-        # 配置化参数，支持动态更新
+        # 设置默认的真实交易门槛和进化频率（配置化参数，支持动态更新）
         self.real_trading_threshold = 65.0  # 真实交易分数阈值
         self.evolution_interval = 10  # 进化频率（分钟）
         
@@ -2420,11 +2415,8 @@ class QuantitativeService:
         
         print("✅ QuantitativeService 初始化完成")
         
-        # 从数据库加载配置（如果方法存在）
-        try:
-            self._load_configuration_from_db()
-        except AttributeError:
-            print("⚠️ 配置加载方法未实现，使用默认配置")
+        # 从数据库加载配置
+        self._load_configuration_from_db()
     
     def _init_strategy_templates(self):
         """初始化策略参数模板 - 使用统一配置"""
@@ -4480,7 +4472,7 @@ class QuantitativeService:
                             'total_return': float(row.get('total_return', 0)),
                             'total_trades': int(row.get('total_trades', 0)),
                             'daily_return': self._calculate_strategy_daily_return(row['id'], float(row.get('total_return', 0))),
-                            'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,  # 🔧 修复门槛：65分以上符合真实交易条件
+                            'qualified_for_trading': float(row.get('final_score', 0)) >= self.real_trading_threshold,  # 🔧 修复门槛：使用配置的真实交易门槛
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
                             'data_source': self._get_strategy_evolution_display(row['id']),
@@ -4515,7 +4507,7 @@ class QuantitativeService:
                             'total_return': float(row.get('total_return', 0)),
                             'total_trades': int(row.get('total_trades', 0)),
                             'daily_return': self._calculate_strategy_daily_return(row.get('id', ''), float(row.get('total_return', 0))),
-                            'qualified_for_trading': float(row.get('final_score', 0)) >= 65.0,  # 🔧 修复门槛：65分以上符合真实交易条件
+                            'qualified_for_trading': float(row.get('final_score', 0)) >= self.real_trading_threshold,  # 🔧 修复门槛：使用配置的真实交易门槛
                             'created_time': row.get('created_at', ''),
                             'last_updated': row.get('updated_at', ''),
                             'data_source': self._get_strategy_evolution_display(row.get('id', '')),
@@ -4534,7 +4526,7 @@ class QuantitativeService:
             
             print(f"✅ 从PostgreSQL查询到 {len(strategies_list)} 个策略")
             qualified_count = sum(1 for s in strategies_list if s['qualified_for_trading'])
-            print(f"🎯 其中 {qualified_count} 个策略符合真实交易条件(≥65分) - 验证交易不受此限制")
+            print(f"🎯 其中 {qualified_count} 个策略符合真实交易条件(≥{self.real_trading_threshold}分) - 验证交易不受此限制")
             
             return {'success': True, 'data': strategies_list}
             
@@ -5377,7 +5369,7 @@ class QuantitativeService:
             real_trading_enabled = status_result[1] if status_result else False
             
             # 判断交易类型：验证交易 vs 真实交易
-            if strategy_score >= 65 and auto_trading_enabled:
+            if strategy_score >= self.real_trading_threshold and auto_trading_enabled:
                 # 高分策略且开启自动交易：真实交易模式（纸面交易）
                 trade_type = 'real'
                 is_real_money = False  # 默认纸面交易
@@ -7269,7 +7261,7 @@ class EvolutionaryStrategyEngine:
             'crossover_rate': 0.75,  # 提高交叉率
             'elite_ratio': 0.15,  # 保留最好的15%
             'elimination_threshold': float(db_config.get('minScore', 45.0)),  # 从数据库获取淘汰阈值
-            'trading_threshold': float(db_config.get('minWinRate', 65.0)),  # 从数据库获取交易阈值
+            'trading_threshold': float(db_config.get('realTradingScore', 65.0)),  # 从数据库获取真实交易阈值
             'precision_threshold': 80.0,  # 80分开始精细化优化
             'min_trades': int(db_config.get('minTrades', 10)),  # 从数据库获取最小交易次数
             'min_profit': float(db_config.get('minProfit', 0)),  # 从数据库获取最小收益
@@ -9999,7 +9991,7 @@ class EvolutionaryStrategyEngine:
                 decision = self._protect_and_fine_tune_strategy(strategy_id, current_score, current_stats)
                 print(f"🏆 策略{strategy_id[-4:]}表现优秀，采用保护性微调策略")
                 
-            elif score_change >= 2 and current_score >= 65:
+            elif score_change >= 2 and current_score >= self.real_trading_threshold:
                 # 评分稳步提升且合格 - 巩固优势
                 decision = self._consolidate_advantage_strategy(strategy_id, current_score, current_stats)
                 print(f"📈 策略{strategy_id[-4:]}稳步改善，采用巩固优势策略")
@@ -10251,7 +10243,7 @@ class EvolutionaryStrategyEngine:
         try:
             print("🔍 开始定期验证高分策略...")
             
-            # 🔧 查找需要验证的高分策略（≥65分且距离上次验证超过24小时）
+            # 🔧 查找需要验证的高分策略（≥配置门槛且距离上次验证超过24小时）
             cursor = self.quantitative_service.conn.cursor()
             cursor.execute("""
                 SELECT s.id, s.final_score, s.parameters, s.type, s.symbol,
@@ -10263,12 +10255,12 @@ class EvolutionaryStrategyEngine:
                         SELECT MAX(timestamp) FROM high_score_validation hsv2 
                         WHERE hsv2.strategy_id = s.id AND hsv2.validation_type = 'periodic_check'
                     )
-                WHERE s.final_score >= 65 
+                WHERE s.final_score >= %s 
                     AND s.enabled = true
                     AND (hsv.next_validation IS NULL OR hsv.next_validation <= NOW())
                 ORDER BY s.final_score DESC
                 LIMIT 10
-            """)
+            """, (self.quantitative_service.real_trading_threshold,))
             
             strategies_to_validate = cursor.fetchall()
             
@@ -10900,7 +10892,7 @@ class EvolutionaryStrategyEngine:
         return {
             'realTradingScore': self.real_trading_threshold,
             'evolutionInterval': self.evolution_interval,
-            'minScoreForTrading': self.fund_allocation_config.get('min_score_for_trading', 65.0)
+            'minScoreForTrading': self.real_trading_threshold
         }
 
 def main():
