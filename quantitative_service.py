@@ -3473,6 +3473,9 @@ class QuantitativeService:
     def _handle_trade_cycle_pairing(self, strategy_id, signal_type, price, quantity, pnl, is_validation):
         """🔄 处理交易周期配对（开仓-平仓系统）"""
         try:
+            import time
+            from datetime import datetime
+            
             cycle_info = {'cycle_id': None, 'holding_minutes': 0, 'mrot_score': 0, 'cycle_completed': False}
             
             if signal_type == 'buy':
@@ -3502,8 +3505,6 @@ class QuantitativeService:
                 
                 if open_cycle:
                     # 计算持有时间和MRoT
-                    from datetime import datetime
-                    import time
                     
                     if isinstance(open_cycle, dict):
                         cycle_id = open_cycle['cycle_id']
@@ -3585,6 +3586,7 @@ class QuantitativeService:
                 is_real_money = not is_validation
             
             # 生成交易ID
+            import time
             exchange_order_id = f"{'REAL' if not is_validation else 'VER'}_{strategy_id}_{int(time.time())}"
             
             # 🔧 更新现有信号记录，而不是插入新记录
@@ -10795,11 +10797,11 @@ class EvolutionaryStrategyEngine:
                     'avg_mrot': avg_mrot, 'total_cycles': len(completed_cycles)
                 })
             else:  # F级策略
-                decision = "eliminate_or_major_mutation"
+                decision = "eliminate_or_mutate"
                 action = "淘汰或重大变异"
                 self._fallback_and_mark_for_evolution(strategy_id, {})
             
-            print(f"🧠 策略{strategy_id} 智能进化决策: {action} (MRoT: {avg_mrot:.4f})")
+            print(f"🧠 策略{strategy_id} 智能进化决策: {action} (MRoT: {avg_mrot:.4f}, 等级: {efficiency_grade})")
             
         except Exception as e:
             print(f"❌ 智能进化决策失败: {e}")
