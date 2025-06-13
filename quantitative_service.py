@@ -2749,16 +2749,7 @@ class AutomatedStrategyManager:
         
         return performances
     
-    def _calculate_strategy_score(self, total_return: float, win_rate: float, 
-                                sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> float:
-        """🔥 调用统一的评分计算函数 - 避免重复代码"""
-        try:
-            return self.quantitative_service._calculate_strategy_score(
-                total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor, total_trades
-            )
-        except Exception as e:
-            print(f"计算策略评分出错: {e}")
-            return 0.0
+    # 🔥 删除重复的评分计算方法 - 使用第7177行的统一实现
 
     def _rebalance_capital(self, performances: Dict[str, Dict]):
         """动态资金再平衡 - 优秀策略获得更多资金"""
@@ -2865,47 +2856,34 @@ class AutomatedStrategyManager:
     def _record_parameter_optimization(self, strategy_id: int, parameters: Dict, new_score: float):
         """记录参数优化历史"""
         try:
-            # 创建参数优化历史表
-            self.quantitative_service.db_manager.execute_query("""
-                CREATE TABLE IF NOT EXISTS parameter_optimization_history (
-                    id SERIAL PRIMARY KEY,
-                    strategy_id TEXT,
-                    optimization_time TIMESTAMP,
-                    old_parameters TEXT,
-                    new_parameters TEXT,
-                    old_score REAL,
-                    new_score REAL,
-                    optimization_type TEXT,
-                    improvement REAL
-                )
-            """)
-            
+            # 🔥 统一使用strategy_optimization_logs表记录优化历史
             # ⭐ 使用统一API获取旧参数和评分
             strategy_response = self.quantitative_service.get_strategy(strategy_id)
             old_strategy = strategy_response.get('data', {}) if strategy_response.get('success', False) else {}
             old_parameters = old_strategy.get('parameters', {})
             old_score = old_strategy.get('final_score', 0)
             
-            # 插入优化记录
+            # 插入优化记录到统一表
             import json
             query = """
-            INSERT INTO parameter_optimization_history 
-            (strategy_id, optimization_time, old_parameters, new_parameters, 
-             old_score, new_score, optimization_type, improvement)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO strategy_optimization_logs 
+            (strategy_id, optimization_type, old_parameters, new_parameters, 
+             old_score, new_score, improvement, trigger_reason, timestamp)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             
             improvement = new_score - old_score
             
             self.quantitative_service.db_manager.execute_query(query, (
                 strategy_id,
-                datetime.now().isoformat(),
+                '自动优化',
                 json.dumps(old_parameters),
                 json.dumps(parameters),
                 old_score,
                 new_score,
-                '自动优化',
-                improvement
+                improvement,
+                '参数持久化',
+                datetime.now().isoformat()
             ))
             
         except Exception as e:
@@ -4889,21 +4867,7 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 记录交易日志失败: {e}")
     
-    def _update_strategy_score_after_cycle(self, strategy_id, cycle_pnl, mrot_score):
-        """🎯 基于交易周期完成更新策略评分 - 使用统一评分更新系统"""
-        try:
-            # 🔥 使用统一评分更新系统，删除重复逻辑
-            signal_type = 'buy' if cycle_pnl > 0 else 'sell'
-            self.evolution_engine._unified_strategy_score_update(
-                strategy_id=strategy_id,
-                trigger_event="trade_cycle_completed",
-                trade_pnl=cycle_pnl,
-                signal_type=signal_type,
-                reason=f"周期PnL: {cycle_pnl:.4f}, MRoT: {mrot_score:.4f}"
-            )
-            
-        except Exception as e:
-            print(f"❌ 更新策略周期评分失败: {e}")
+    # 🔥 删除重复的评分更新方法 - 使用统一的_unified_strategy_score_update
     
     def _ensure_trade_cycles_table(self):
         """确保交易周期表存在"""
@@ -6074,48 +6038,7 @@ class QuantitativeService:
         # 现在系统默认仅使用真实数据，不再需要配置检查
         return True
     
-    def _calculate_strategy_score_with_real_data(self, strategy_id: int, 
-                                               real_return: float, real_win_rate: float, 
-                                               real_trades: int, initial_score: float) -> float:
-        """基于真实交易数据计算当前评分"""
-        if real_trades == 0:
-            # 没有真实交易，返回初始评分
-            return initial_score
-        
-        # 基于真实交易表现调整评分
-        performance_factor = 1.0
-        
-        # 收益率调整 (±20分)
-        if real_return > 0.1:  # 收益率 > 10%
-            performance_factor += 0.2
-        elif real_return > 0.05:  # 收益率 > 5%
-            performance_factor += 0.1
-        elif real_return < -0.1:  # 收益率 < -10%
-            performance_factor -= 0.2
-        elif real_return < -0.05:  # 收益率 < -5%
-            performance_factor -= 0.1
-        
-        # 成功率调整 (±15分)
-        if real_win_rate > 0.8:  # 成功率 > 80%
-            performance_factor += 0.15
-        elif real_win_rate > 0.6:  # 成功率 > 60%
-            performance_factor += 0.05
-        elif real_win_rate < 0.4:  # 成功率 < 40%
-            performance_factor -= 0.15
-        elif real_win_rate < 0.5:  # 成功率 < 50%
-            performance_factor -= 0.05
-        
-        # 交易频率调整 (±5分)
-        if real_trades > 100:
-            performance_factor += 0.05
-        elif real_trades < 10:
-            performance_factor -= 0.05
-        
-        # 计算最终评分
-        adjusted_score = initial_score * performance_factor
-        
-        # 限制评分范围 [0, 100]
-        return max(0, min(100, adjusted_score))
+    # 🔥 删除重复的评分计算方法 - 使用第7177行的统一实现
 
     def _get_latest_simulation_result(self, strategy_id: int) -> Dict:
         """获取策略的最新模拟结果"""
@@ -7114,30 +7037,7 @@ class QuantitativeService:
             print(f"获取余额失败: {e}")
             return 0.0
 
-    def _calculate_strategy_score_with_history(self, strategy_id, total_return: float, win_rate: float, 
-                                            sharpe_ratio: float, max_drawdown: float, profit_factor: float, total_trades: int = 0) -> Dict:
-        """计算策略综合评分并记录历史变化"""
-        
-        # 计算当前评分
-        current_score = self._calculate_strategy_score(total_return, win_rate, sharpe_ratio, max_drawdown, profit_factor, total_trades)
-        
-        # 获取历史评分
-        previous_score = self._get_previous_strategy_score(strategy_id)
-        
-        # 计算评分变化
-        score_change = current_score - previous_score if previous_score > 0 else 0
-        change_direction = "up" if score_change > 0 else "down" if score_change < 0 else "stable"
-        
-        # 保存当前评分到历史
-        self._save_strategy_score_history(strategy_id, current_score)
-        
-        return {
-            'current_score': round(current_score, 1),
-            'previous_score': round(previous_score, 1) if previous_score > 0 else None,
-            'score_change': round(abs(score_change), 1),
-            'change_direction': change_direction,
-            'trend_color': 'gold' if change_direction == 'up' else 'gray' if change_direction == 'down' else 'blue'
-        }
+    # 🔥 删除重复的评分计算方法 - 使用第7177行的统一实现
 
     def _get_previous_strategy_score(self, strategy_id: int) -> float:
         """获取策略的上一次评分"""
@@ -11354,8 +11254,9 @@ class EvolutionaryStrategyEngine:
                 new_score = force_score
                 updated_stats = self._get_strategy_performance_stats(strategy_id)
             else:
-                # 🔧 获取最新交易统计并计算新评分
+                # 🔧 获取最新交易统计并计算新评分 - 直接调用统一的评分计算方法
                 updated_stats = self._get_strategy_performance_stats(strategy_id)
+                # 🔥 直接调用第7078行的统一评分计算方法，避免重复代码调用
                 new_score = self.quantitative_service._calculate_strategy_score(
                     updated_stats['total_pnl'], 
                     updated_stats['win_rate'], 
@@ -11777,14 +11678,7 @@ class EvolutionaryStrategyEngine:
         except Exception as e:
             print(f"❌ 应用高分策略评分调整失败: {e}")
 
-    def update_strategy_score_after_validation(self, strategy_id: str, pnl: float, signal_type: str):
-        """🔥 验证交易后更新策略评分 - 使用统一评分更新系统"""
-        return self._unified_strategy_score_update(
-            strategy_id=strategy_id,
-            trigger_event='validation_trade_executed',
-            trade_pnl=pnl,
-            signal_type=signal_type
-        )
+    # 🔥 删除重复的评分更新方法 - 使用统一的_unified_strategy_score_update
     
     def _match_and_close_trade_cycles(self, strategy_id: str, new_trade: Dict) -> Optional[Dict]:
         """🔄 匹配并关闭交易周期（FIFO原则）- 阶段二核心功能"""
@@ -11909,27 +11803,7 @@ class EvolutionaryStrategyEngine:
                 conn.close()
             return None
     
-    def _update_strategy_score_after_cycle_completion(self, strategy_id: str, cycle_pnl: float, 
-                                                    mrot_score: float, holding_minutes: int):
-        """📊 交易周期完成后更新策略评分 - 统一调用评分更新系统"""
-        try:
-            # 🔥 使用统一评分更新系统
-            new_score = self._unified_strategy_score_update(
-                strategy_id=strategy_id,
-                trigger_event="trade_cycle_completed",
-                trade_pnl=cycle_pnl,
-                signal_type="cycle_close",
-                reason=f"MRoT={mrot_score:.4f}, 持有{holding_minutes}分钟"
-            )
-            
-            # 🔥 基于新评分触发智能进化决策
-            updated_stats = self._get_strategy_performance_stats(strategy_id)
-            self._intelligent_evolution_decision(strategy_id, new_score, updated_stats)
-            
-            print(f"✅ 策略{strategy_id}交易周期完成：MRoT={mrot_score:.4f}, 新评分={new_score:.2f}")
-            
-        except Exception as e:
-            print(f"❌ 周期完成后评分更新失败: {e}")
+    # 🔥 删除重复的评分更新方法 - 使用统一的_unified_strategy_score_update
 
     def _micro_adjust_parameters(self, strategy_id: str, original_params: Dict, adjustment_rate: float = 0.05) -> Dict:
         """🔧 微调参数 - 5%幅度的细微调整"""
@@ -12043,14 +11917,17 @@ class EvolutionaryStrategyEngine:
             )
             cursor = conn.cursor()
             
+            # 🔥 统一记录到strategy_optimization_logs表
             cursor.execute('''
-                INSERT INTO parameter_optimization_retries 
-                (strategy_id, retry_attempt, retry_pnl, retry_score, retry_success, retry_time, final_score)
+                INSERT INTO strategy_optimization_logs 
+                (strategy_id, optimization_type, trigger_reason, old_score, new_score, 
+                 improvement, timestamp)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             ''', (
-                strategy_id, retry_attempt, 
-                retry_result.get('pnl', 0), retry_result.get('score', 0),
-                1, datetime.now(), final_score
+                strategy_id, f'重试{retry_attempt}', 
+                f"重试PnL: {retry_result.get('pnl', 0):.4f}",
+                retry_result.get('score', 0), final_score,
+                final_score - retry_result.get('score', 0), datetime.now()
             ))
             
             conn.commit()
@@ -12072,25 +11949,17 @@ class EvolutionaryStrategyEngine:
             )
             cursor = conn.cursor()
             
-            # 确保重试记录表存在
+            # 🔥 统一记录到strategy_optimization_logs表
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS parameter_optimization_retries (
-                    id SERIAL PRIMARY KEY,
-                    strategy_id TEXT NOT NULL,
-                    retry_attempt INTEGER NOT NULL,
-                    retry_pnl REAL DEFAULT 0,
-                    retry_score REAL DEFAULT 0,
-                    retry_success INTEGER DEFAULT 0,
-                    retry_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    final_score REAL DEFAULT 0
-                )
-            ''')
-            
-            cursor.execute('''
-                INSERT INTO parameter_optimization_retries 
-                (strategy_id, retry_attempt, retry_pnl, retry_success, retry_time)
-                VALUES (%s, %s, %s, %s, %s)
-            ''', (strategy_id, retry_attempt, retry_pnl, int(retry_success), datetime.now()))
+                INSERT INTO strategy_optimization_logs 
+                (strategy_id, optimization_type, trigger_reason, old_score, new_score, 
+                 improvement, timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ''', (
+                strategy_id, f'重试记录{retry_attempt}', 
+                f"重试结果: {'成功' if retry_success else '失败'}, PnL: {retry_pnl:.4f}",
+                0, retry_pnl, retry_pnl, datetime.now()
+            ))
             
             conn.commit()
             conn.close()
