@@ -1792,18 +1792,52 @@ def strategy_detail(strategy_id):
                     }
                 }
             
-            # 🔥 修复win_rate计算逻辑：只计算已执行的交易，且盈利判断也必须基于已执行的交易
+            # 🔥 修复win_rate计算逻辑：使用与策略列表API完全一致的计算方法
             cursor.execute("""
-                SELECT COUNT(*) as executed_trades,
-                       COUNT(CASE WHEN expected_return > 0 THEN 1 END) as wins
+                SELECT COUNT(*) as total_trades,
+                       COUNT(CASE WHEN expected_return > 0 AND expected_return <= 100 THEN 1 END) as wins,
+                       SUM(CASE WHEN expected_return BETWEEN -100 AND 100 THEN expected_return ELSE 0 END) as total_pnl,
+                       AVG(CASE WHEN expected_return BETWEEN -100 AND 100 THEN expected_return ELSE 0 END) as avg_pnl
                 FROM trading_signals
-                WHERE strategy_id = %s AND executed = 1
+                WHERE strategy_id = %s AND expected_return IS NOT NULL AND executed = 1
             """, (strategy_id,))
             
             trade_stats = cursor.fetchone()
-            total_trades = trade_stats[0] if trade_stats else 0
-            wins = trade_stats[1] if trade_stats else 0
+            total_trades = trade_stats[0] if trade_stats and len(trade_stats) >= 1 else 0
+            wins = trade_stats[1] if trade_stats and len(trade_stats) >= 2 else 0
+            calculated_total_pnl = trade_stats[2] if trade_stats and len(trade_stats) >= 3 else 0.0
+            calculated_avg_pnl = trade_stats[3] if trade_stats and len(trade_stats) >= 4 else 0.0
             calculated_win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+            
+            # 🔥 计算总收益率 - 与策略列表API保持完全一致
+            total_return_percentage = 0.0
+            daily_return = 0.0
+            if total_trades > 0 and calculated_total_pnl is not None:
+                # 假设每笔交易平均投入50 USDT（验证交易金额）
+                average_investment_per_trade = 50.0
+                total_investment = total_trades * average_investment_per_trade
+                
+                if total_investment > 0:
+                    total_return_percentage = (float(calculated_total_pnl) / total_investment)
+                else:
+                    total_return_percentage = 0.0
+                
+                # 严格限制收益率在合理范围内 (-0.5 到 +0.5，即-50%到+50%)
+                total_return_percentage = max(-0.5, min(total_return_percentage, 0.5))
+                
+                # 计算日收益率
+                cursor.execute("""
+                    SELECT MIN(timestamp) as first_trade, MAX(timestamp) as last_trade
+                    FROM trading_signals 
+                    WHERE strategy_id = %s AND expected_return IS NOT NULL
+                """, (strategy_id,))
+                date_range = cursor.fetchone()
+                if date_range and date_range[0] and date_range[1]:
+                    from datetime import datetime
+                    first_date = date_range[0] if isinstance(date_range[0], datetime) else datetime.fromisoformat(str(date_range[0]))
+                    last_date = date_range[1] if isinstance(date_range[1], datetime) else datetime.fromisoformat(str(date_range[1]))
+                    days_active = max(1, (last_date - first_date).days)
+                    daily_return = total_return_percentage / days_active if days_active > 0 else 0.0
             
             # 🔧 调试输出
             print(f"📊 策略详情API - {strategy_id}: 已执行={total_trades}, 盈利={wins}, 计算成功率={calculated_win_rate:.2f}%")
@@ -1815,10 +1849,13 @@ def strategy_detail(strategy_id):
                 'type': row[3],
                 'enabled': bool(row[4]),
                 'parameters': parameters,
-                'final_score': row[6] or 0.0,
-                'win_rate': round(calculated_win_rate, 2),  # 🔥 使用计算后的百分比格式，与策略列表保持一致
-                'total_return': row[8] or 0.0,
-                'total_trades': total_trades,  # 🔥 使用真实的交易次数
+                'final_score': float(row[6]) if row[6] else 0.0,
+                'win_rate': round(calculated_win_rate, 2),  # 🔥 使用重新计算的成功率
+                'total_return': round(total_return_percentage, 2),  # 🔥 使用重新计算的总收益率
+                'daily_return': round(daily_return, 6),  # 🔥 添加日收益率
+                'total_trades': total_trades,  # 🔥 使用重新计算的交易次数
+                'total_pnl': float(calculated_total_pnl) if calculated_total_pnl else 0.0,  # 🔥 添加总盈亏
+                'avg_pnl': float(calculated_avg_pnl) if calculated_avg_pnl else 0.0,  # 🔥 添加平均盈亏
                 'created_at': row[10].isoformat() if row[10] else None,
                 'updated_at': row[11].isoformat() if row[11] else None
             }
