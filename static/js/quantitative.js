@@ -904,15 +904,12 @@ class QuantitativeSystem {
         const endIndex = startIndex + this.tradeLogsPerPage;
         const currentLogs = this.tradeLogs.slice(startIndex, endIndex);
         
-        // 🔧 修复：基于is_validation字段正确分类交易日志
+        // 🔥 修复：基于API实际返回的数据格式正确分类交易日志
         const realTrades = currentLogs.filter(log => 
-            log.trade_type === 'real_trading'
+            log.is_real_money === true
         );
         const validationTrades = currentLogs.filter(log => 
-            log.trade_type === 'score_verification' ||
-            log.trade_type === 'optimization_validation' || 
-            log.trade_type === 'initialization_validation' ||
-            log.trade_type === 'periodic_validation'
+            log.trade_type === 'verification' || log.is_real_money === false
         );
         
         tbody.innerHTML = [
@@ -959,13 +956,10 @@ class QuantitativeSystem {
         const realCount = realTrades.length;
         const validationCount = validationTrades.length;
         const totalReal = this.tradeLogs.filter(log => 
-            log.trade_type === 'real_trading'
+            log.is_real_money === true
         ).length;
         const totalValidation = this.tradeLogs.filter(log => 
-            log.trade_type === 'score_verification' ||
-            log.trade_type === 'optimization_validation' || 
-            log.trade_type === 'initialization_validation' ||
-            log.trade_type === 'periodic_validation'
+            log.trade_type === 'verification' || log.is_real_money === false
         ).length;
         
         const statsRow = `
