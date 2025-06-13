@@ -1363,7 +1363,7 @@ def quantitative_strategies():
                            SUM(expected_return) as total_pnl,
                            AVG(expected_return) as avg_pnl
                     FROM trading_signals
-                    WHERE strategy_id = %s AND expected_return IS NOT NULL AND executed = true
+                    WHERE strategy_id = %s AND expected_return IS NOT NULL AND executed = 1
                 """, (sid,))
                 
                 trade_stats = cursor.fetchone()
