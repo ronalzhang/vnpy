@@ -2420,8 +2420,11 @@ class QuantitativeService:
         
         print("✅ QuantitativeService 初始化完成")
         
-        # 从数据库加载配置
-        self._load_configuration_from_db()
+        # 从数据库加载配置（如果方法存在）
+        try:
+            self._load_configuration_from_db()
+        except AttributeError:
+            print("⚠️ 配置加载方法未实现，使用默认配置")
     
     def _init_strategy_templates(self):
         """初始化策略参数模板 - 使用统一配置"""
