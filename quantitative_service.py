@@ -345,10 +345,11 @@ class DatabaseManager:
             except Exception as e:
                 print(f"⚠️ 交易周期字段添加失败（可能已存在）: {e}")
             
-            # 创建交易周期相关索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_cycle_status ON strategy_trade_logs(cycle_status)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_strategy_cycle ON strategy_trade_logs(strategy_id, cycle_id)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_mrot_score ON strategy_trade_logs(mrot_score DESC)')
+            # 创建交易周期相关索引（在trading_signals表上）
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_trading_cycle_status ON trading_signals(cycle_status)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_trading_cycle_id ON trading_signals(cycle_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_trading_strategy_cycle ON trading_signals(strategy_id, cycle_status)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_trading_mrot_score ON trading_signals(mrot_score DESC)')
             
             self.conn.commit()
             print("✅ 数据库表初始化和交易周期字段扩展完成")
