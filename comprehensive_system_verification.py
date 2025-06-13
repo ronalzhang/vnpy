@@ -44,8 +44,8 @@ class SystemVerification:
         self.verification_report['summary']['total_tests'] += 1
         if status.lower() == 'warning':
             self.verification_report['summary']['warnings'] += 1
-        else:
-            self.verification_report['summary'][status.lower()] += 1
+        elif status.lower() in ['pass', 'fail']:
+            self.verification_report['summary'][status.lower() + 'ed'] += 1
         
         # 实时输出
         status_emoji = {'PASS': '✅', 'FAIL': '❌', 'WARNING': '⚠️'}
@@ -205,9 +205,9 @@ class SystemVerification:
         
         summary = self.verification_report['summary']
         total = summary['total_tests']
-        passed = summary['passed']
-        failed = summary['failed']
-        warnings = summary['warnings']
+        passed = summary.get('passed', 0)
+        failed = summary.get('failed', 0)
+        warnings = summary.get('warnings', 0)
         
         print(f"总测试数: {total}")
         print(f"✅ 通过: {passed} ({passed/total*100:.1f}%)")
