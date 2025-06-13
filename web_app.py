@@ -1432,22 +1432,23 @@ def quantitative_strategies():
                     from strategy_parameters_config import get_strategy_default_parameters
                     parsed_params = get_strategy_default_parameters(stype)
 
-                # 🔥 修复收益率计算逻辑 - 使用合理的收益率计算
+                # 🔥 修复收益率计算逻辑 - expected_return已经是百分比形式，不需要再乘100
                 total_return_percentage = 0.0
                 daily_return = 0.0
                 if calculated_total_trades > 0 and calculated_total_pnl is not None:
-                    # 🔥 修复：expected_return字段已经是USDT金额，需要转换为百分比
-                    # 假设每笔交易平均投入50 USDT，计算收益率
+                    # expected_return字段存储的是USDT金额（如-0.013750），需要转换为百分比
+                    # 假设每笔交易平均投入50 USDT（验证交易金额）
                     average_investment_per_trade = 50.0
                     total_investment = calculated_total_trades * average_investment_per_trade
                     
                     if total_investment > 0:
-                        total_return_percentage = (float(calculated_total_pnl) / total_investment) * 100
+                        # 🔥 修复：去掉多余的×100，expected_return已经是合理的小数值
+                        total_return_percentage = (float(calculated_total_pnl) / total_investment)
                     else:
                         total_return_percentage = 0.0
                     
-                    # 严格限制收益率在合理范围内 (-100% 到 +100%)
-                    total_return_percentage = max(-100.0, min(total_return_percentage, 100.0))
+                    # 严格限制收益率在合理范围内 (-0.5 到 +0.5，即-50%到+50%)
+                    total_return_percentage = max(-0.5, min(total_return_percentage, 0.5))
                     
                     # 获取策略首次和最新交易时间计算日收益率
                     cursor.execute("""
@@ -1964,72 +1965,145 @@ def toggle_strategy(strategy_id):
 
 @app.route('/api/quantitative/strategies/<strategy_id>/trade-logs', methods=['GET'])
 def get_strategy_trade_logs(strategy_id):
-    """获取策略交易日志 - 统一查询trading_signals表"""
+    """获取策略交易周期日志 - 按照买入卖出配对显示完整交易周期"""
     try:
-        limit = int(request.args.get('limit', 200))
+        limit = int(request.args.get('limit', 100))
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 🔥 统一查询trading_signals表，包含所有交易记录（验证+真实）
-        query = """
-            SELECT timestamp, symbol, signal_type, price, quantity, 
-                   expected_return, executed, id, strategy_id, confidence
-            FROM trading_signals 
-            WHERE strategy_id = %s OR strategy_id LIKE %s
-            ORDER BY timestamp DESC
+        # 🔥 重新设计：首先尝试查询交易周期数据
+        cursor.execute("""
+            SELECT cycle_id, buy_timestamp, sell_timestamp, symbol, 
+                   buy_price, sell_price, quantity, cycle_pnl, 
+                   holding_minutes, mrot_score, cycle_status
+            FROM trade_cycles 
+            WHERE strategy_id = %s AND cycle_status = 'completed'
+            ORDER BY sell_timestamp DESC 
             LIMIT %s
-        """
-        cursor.execute(query, (strategy_id, f'%{strategy_id}%', limit))
+        """, (strategy_id, limit))
         
-        rows = cursor.fetchall()
-        logs = []
+        cycle_records = cursor.fetchall()
         
-        for row in rows:
-            # 安全的字段访问
-            timestamp = row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else ''
-            symbol = row[1] or ''
-            signal_type = row[2] or ''
-            price = float(row[3]) if row[3] is not None else 0.0
-            quantity = float(row[4]) if row[4] is not None else 0.0
-            pnl = float(row[5]) if row[5] is not None else 0.0
-            executed = bool(row[6]) if row[6] is not None else False
-            record_id = row[7] if row[7] is not None else 0
-            confidence = float(row[9]) if row[9] is not None else 0.75
-            # 🔥 修复：根据实际情况判断交易类型和状态
-            # 检查策略分数来判断是否为真实交易
-            cursor.execute("SELECT final_score FROM strategies WHERE id = %s", (strategy_id,))
-            strategy_score_result = cursor.fetchone()
-            strategy_score = float(strategy_score_result[0]) if strategy_score_result and strategy_score_result[0] else 0.0
+        # 获取策略分数和初始化状态
+        cursor.execute("SELECT final_score FROM strategies WHERE id = %s", (strategy_id,))
+        strategy_score_result = cursor.fetchone()
+        strategy_score = float(strategy_score_result[0]) if strategy_score_result and strategy_score_result[0] else 0.0
+        
+        # 检查是否为初始验证阶段（前3个交易周期）
+        cursor.execute("SELECT COUNT(*) FROM trade_cycles WHERE strategy_id = %s AND cycle_status = 'completed'", (strategy_id,))
+        total_completed_cycles = cursor.fetchone()[0] if cursor.fetchone() else 0
+        
+        if cycle_records:
+            # 🔥 交易周期模式 - 显示完整的买入卖出周期
+            cycles = []
+            for i, record in enumerate(cycle_records):
+                (cycle_id, buy_timestamp, sell_timestamp, symbol, 
+                 buy_price, sell_price, quantity, cycle_pnl, 
+                 holding_minutes, mrot_score, cycle_status) = record
+                
+                # 判断交易类型
+                if total_completed_cycles <= 3 and i >= (total_completed_cycles - 3):
+                    trade_type = 'initial_validation'
+                    trade_mode = '初始验证'
+                elif strategy_score >= 65.0:
+                    trade_type = 'real_trading'
+                    trade_mode = '真实交易'
+                else:
+                    trade_type = 'verification'
+                    trade_mode = '验证交易'
+                
+                # 计算收益率
+                investment_amount = buy_price * quantity if buy_price and quantity else 50.0
+                return_percentage = (cycle_pnl / investment_amount * 100) if investment_amount > 0 else 0.0
+                
+                cycles.append({
+                    'cycle_id': cycle_id,
+                    'buy_timestamp': buy_timestamp.strftime('%Y-%m-%d %H:%M:%S') if buy_timestamp else '',
+                    'sell_timestamp': sell_timestamp.strftime('%Y-%m-%d %H:%M:%S') if sell_timestamp else '',
+                    'symbol': symbol,
+                    'buy_price': float(buy_price) if buy_price else 0.0,
+                    'sell_price': float(sell_price) if sell_price else 0.0,
+                    'quantity': float(quantity) if quantity else 0.0,
+                    'cycle_pnl': float(cycle_pnl) if cycle_pnl else 0.0,
+                    'return_percentage': round(return_percentage, 4),
+                    'holding_minutes': int(holding_minutes) if holding_minutes else 0,
+                    'mrot_score': float(mrot_score) if mrot_score else 0.0,
+                    'trade_type': trade_type,
+                    'trade_mode': trade_mode,
+                    'execution_status': '已完成'
+                })
             
-            # 根据策略分数和系统设置判断交易类型
-            is_real_money = strategy_score >= 65.0 and executed  # 65分以上且已执行的才是真实交易
-            trade_type = 'real_trading' if is_real_money else 'verification'
-            
-            logs.append({
-                'timestamp': timestamp,
-                'symbol': symbol,
-                'signal_type': signal_type,
-                'price': price,
-                'quantity': quantity,
-                'pnl': pnl,
-                'executed': executed,
-                'confidence': confidence,
-                'id': record_id,
-                'trade_type': trade_type,
-                'is_real_money': is_real_money,  # 🔥 修复：根据策略分数正确判断
-                'validation_id': str(record_id)[-6:] if record_id else None
+            conn.close()
+            return jsonify({
+                "success": True,
+                "logs": cycles,
+                "display_mode": "trade_cycles",
+                "total_cycles": len(cycles)
             })
         
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "logs": logs
-        })
+        else:
+            # 🔥 向后兼容模式 - 显示单笔交易记录
+            cursor.execute("""
+                SELECT timestamp, symbol, signal_type, price, quantity, 
+                       expected_return, executed, id, confidence
+                FROM trading_signals 
+                WHERE strategy_id = %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """, (strategy_id, limit))
+            
+            rows = cursor.fetchall()
+            logs = []
+            
+            for i, row in enumerate(rows):
+                timestamp = row[0].strftime('%Y-%m-%d %H:%M:%S') if row[0] else ''
+                symbol = row[1] or ''
+                signal_type = row[2] or ''
+                price = float(row[3]) if row[3] is not None else 0.0
+                quantity = float(row[4]) if row[4] is not None else 0.0
+                pnl = float(row[5]) if row[5] is not None else 0.0
+                executed = bool(row[6]) if row[6] is not None else False
+                record_id = row[7] if row[7] is not None else 0
+                confidence = float(row[8]) if row[8] is not None else 0.75
+                
+                # 判断交易类型 - 前3笔为初始验证
+                if i < 3:
+                    trade_type = 'initial_validation'
+                    trade_mode = '初始验证'
+                elif strategy_score >= 65.0 and executed:
+                    trade_type = 'real_trading'
+                    trade_mode = '真实交易'
+                else:
+                    trade_type = 'verification'
+                    trade_mode = '验证交易'
+                
+                logs.append({
+                    'timestamp': timestamp,
+                    'symbol': symbol,
+                    'signal_type': signal_type,
+                    'price': price,
+                    'quantity': quantity,
+                    'pnl': pnl,
+                    'executed': executed,
+                    'confidence': confidence,
+                    'id': record_id,
+                    'trade_type': trade_type,
+                    'trade_mode': trade_mode,
+                    'execution_status': '已执行' if executed else '待执行'
+                })
+            
+            conn.close()
+            return jsonify({
+                "success": True,
+                "logs": logs,
+                "display_mode": "legacy_trades"
+            })
         
     except Exception as e:
         print(f"获取策略交易日志失败: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "success": False,
             "message": str(e)

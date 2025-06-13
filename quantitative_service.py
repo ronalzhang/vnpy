@@ -4337,30 +4337,55 @@ class QuantitativeService:
             print(f"自动调整策略失败: {e}")
     
     def _optimize_strategy_for_higher_success_rate(self, strategy_id, strategy):
-        """优化策略以提高成功率"""
+        """优化策略以提高成功率 - 🔥 修复：记录完整参数变化并真正更新数据库"""
         params = strategy['parameters']
+        
+        # 🔥 修复：保存原始参数的完整副本
+        old_parameters = params.copy()
         
         # 提高阈值，降低交易频率但提高质量
         if 'threshold' in params:
-            old_threshold = params['threshold']
-            params['threshold'] = min(old_threshold * 1.2, 0.05)  # 增加20%但不超过5%
+            params['threshold'] = min(params['threshold'] * 1.2, 0.05)  # 增加20%但不超过5%
             
         # 增加观察周期，提高信号稳定性
         if 'lookback_period' in params:
-            old_period = params['lookback_period']
-            params['lookback_period'] = min(old_period + 5, 50)  # 增加5但不超过50
+            params['lookback_period'] = min(params['lookback_period'] + 5, 50)  # 增加5但不超过50
             
-        # 记录优化
+        # 调整止损止盈参数
+        if 'stop_loss' in params:
+            params['stop_loss'] = max(params['stop_loss'] * 0.8, 0.02)  # 收紧止损
+        if 'take_profit' in params:
+            params['take_profit'] = min(params['take_profit'] * 1.1, 0.05)  # 适度放宽止盈
+            
+        # 🔥 修复：记录完整的参数变化
         self.log_strategy_optimization(
             strategy_id=strategy_id,
-            optimization_type="提高成功率",
-            old_parameters={'threshold': old_threshold if 'threshold' in locals() else None},
-            new_parameters={'threshold': params.get('threshold')},
-            trigger_reason="成功率低于60%",
+            optimization_type="提高成功率优化",
+            old_parameters=old_parameters,
+            new_parameters=params.copy(),
+            trigger_reason="成功率低于60%，需要提高信号质量",
             target_success_rate=70.0
         )
         
-        print(f"🎯 优化策略 {strategy_id} 以提高成功率")
+        # 🔥 修复：实际更新数据库中的策略参数
+        self._update_strategy_parameters_in_db(strategy_id, params)
+        
+        print(f"🎯 优化策略 {strategy_id} 以提高成功率: {len(old_parameters)}个参数已更新")
+    
+    def _update_strategy_parameters_in_db(self, strategy_id, new_parameters):
+        """更新数据库中的策略参数"""
+        try:
+            cursor = self.conn.cursor()
+            import json
+            cursor.execute("""
+                UPDATE strategies 
+                SET parameters = %s, updated_at = NOW()
+                WHERE id = %s
+            """, (json.dumps(new_parameters), strategy_id))
+            self.conn.commit()
+            print(f"✅ 策略 {strategy_id} 参数已更新到数据库")
+        except Exception as e:
+            print(f"❌ 更新策略参数失败: {e}")
     
     def _optimize_strategy_for_higher_return(self, strategy_id, strategy):
         """优化策略以提高收益率"""
@@ -5235,9 +5260,15 @@ class QuantitativeService:
                 'error': str(e)
             }
     def log_strategy_optimization(self, strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate):
-        """记录策略优化日志"""
+        """记录策略优化日志 - 🔥 修复：正确记录参数变化"""
         try:
+            import json
             cursor = self.conn.cursor()
+            
+            # 🔥 修复：确保参数以JSON格式存储，而不是字符串
+            old_params_json = json.dumps(old_parameters) if old_parameters else '{}'
+            new_params_json = json.dumps(new_parameters) if new_parameters else '{}'
+            
             cursor.execute('''
                 INSERT INTO strategy_optimization_logs 
                 (strategy_id, optimization_type, old_parameters, new_parameters, trigger_reason, target_success_rate, timestamp)
@@ -5245,14 +5276,15 @@ class QuantitativeService:
             ''', (
                 strategy_id,
                 optimization_type,
-                str(old_parameters),
-                str(new_parameters),
+                old_params_json,
+                new_params_json,
                 trigger_reason,
                 target_success_rate
             ))
             self.conn.commit()
+            print(f"✅ 记录策略优化日志: {strategy_id} - {optimization_type}")
         except Exception as e:
-            print(f"记录策略优化日志失败: {e}")
+            print(f"❌ 记录策略优化日志失败: {e}")
     
 
     def get_strategy_trade_logs(self, strategy_id, limit=200):
