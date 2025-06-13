@@ -1972,14 +1972,14 @@ def get_strategy_trade_logs(strategy_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 🔥 重新设计：首先尝试查询交易周期数据
+        # 🔥 重新设计：查询交易周期数据（从trading_signals表）
         cursor.execute("""
-            SELECT cycle_id, buy_timestamp, sell_timestamp, symbol, 
-                   buy_price, sell_price, quantity, cycle_pnl, 
+            SELECT cycle_id, open_time, close_time, symbol, 
+                   price, price, quantity, cycle_pnl, 
                    holding_minutes, mrot_score, cycle_status
-            FROM trade_cycles 
+            FROM trading_signals 
             WHERE strategy_id = %s AND cycle_status = 'completed'
-            ORDER BY sell_timestamp DESC 
+            ORDER BY close_time DESC 
             LIMIT %s
         """, (strategy_id, limit))
         
@@ -1991,14 +1991,15 @@ def get_strategy_trade_logs(strategy_id):
         strategy_score = float(strategy_score_result[0]) if strategy_score_result and strategy_score_result[0] else 0.0
         
         # 检查是否为初始验证阶段（前3个交易周期）
-        cursor.execute("SELECT COUNT(*) FROM trade_cycles WHERE strategy_id = %s AND cycle_status = 'completed'", (strategy_id,))
-        total_completed_cycles = cursor.fetchone()[0] if cursor.fetchone() else 0
+        cursor.execute("SELECT COUNT(*) FROM trading_signals WHERE strategy_id = %s AND cycle_status = 'completed'", (strategy_id,))
+        total_completed_cycles_result = cursor.fetchone()
+        total_completed_cycles = total_completed_cycles_result[0] if total_completed_cycles_result else 0
         
         if cycle_records:
             # 🔥 交易周期模式 - 显示完整的买入卖出周期
             cycles = []
             for i, record in enumerate(cycle_records):
-                (cycle_id, buy_timestamp, sell_timestamp, symbol, 
+                (cycle_id, open_time, close_time, symbol, 
                  buy_price, sell_price, quantity, cycle_pnl, 
                  holding_minutes, mrot_score, cycle_status) = record
                 
@@ -2019,8 +2020,8 @@ def get_strategy_trade_logs(strategy_id):
                 
                 cycles.append({
                     'cycle_id': cycle_id,
-                    'buy_timestamp': buy_timestamp.strftime('%Y-%m-%d %H:%M:%S') if buy_timestamp else '',
-                    'sell_timestamp': sell_timestamp.strftime('%Y-%m-%d %H:%M:%S') if sell_timestamp else '',
+                    'buy_timestamp': open_time.strftime('%Y-%m-%d %H:%M:%S') if open_time else '',
+                    'sell_timestamp': close_time.strftime('%Y-%m-%d %H:%M:%S') if close_time else '',
                     'symbol': symbol,
                     'buy_price': float(buy_price) if buy_price else 0.0,
                     'sell_price': float(sell_price) if sell_price else 0.0,
