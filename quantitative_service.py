@@ -11788,7 +11788,9 @@ class EvolutionaryStrategyEngine:
     
     def _match_and_close_trade_cycles(self, strategy_id: str, new_trade: Dict) -> Optional[Dict]:
         """🔄 匹配并关闭交易周期（FIFO原则）- 阶段二核心功能"""
+        from datetime import datetime
         import time
+        conn = None
         try:
             conn = psycopg2.connect(
                 host="localhost",
@@ -11804,15 +11806,27 @@ class EvolutionaryStrategyEngine:
             if signal_type == 'buy':
                 # 买入信号：创建新的开仓记录
                 cycle_id = f"CYCLE_{strategy_id}_{int(time.time() * 1000)}"
-                cursor.execute('''
-                    UPDATE trading_signals 
-                    SET cycle_id = %s, cycle_status = 'open', open_time = %s
-                    WHERE id = %s
-                ''', (cycle_id, datetime.now(), new_trade['id']))
                 
-                conn.commit()
-                conn.close()
-                return {'action': 'opened', 'cycle_id': cycle_id}
+                # 🔧 修复：查找最近的交易信号记录进行更新，而不是使用字符串ID
+                cursor.execute('''
+                    SELECT id FROM trading_signals 
+                    WHERE strategy_id = %s AND signal_type = %s 
+                    AND timestamp >= NOW() - INTERVAL '5 minutes'
+                    ORDER BY timestamp DESC LIMIT 1
+                ''', (strategy_id, signal_type))
+                
+                signal_record = cursor.fetchone()
+                if signal_record:
+                    signal_id = signal_record[0]
+                    cursor.execute('''
+                        UPDATE trading_signals 
+                        SET cycle_id = %s, cycle_status = 'open', open_time = %s
+                        WHERE id = %s
+                    ''', (cycle_id, datetime.now(), signal_id))
+                    
+                    conn.commit()
+                    conn.close()
+                    return {'action': 'opened', 'cycle_id': cycle_id}
                 
             elif signal_type == 'sell':
                 # 卖出信号：查找最早的开仓记录进行配对
@@ -11853,15 +11867,25 @@ class EvolutionaryStrategyEngine:
                     WHERE id = %s
                 ''', (close_time, holding_minutes, mrot_score, new_trade['id'], open_trade_id))
                 
-                # 更新平仓记录
+                # 查找并更新对应的卖出记录
                 cursor.execute('''
-                    UPDATE trading_signals 
-                    SET cycle_id = %s, cycle_status = 'closed', open_time = %s,
-                        close_time = %s, holding_minutes = %s, mrot_score = %s, 
-                        paired_signal_id = %s, expected_return = %s
-                    WHERE id = %s
-                ''', (cycle_id, open_time, close_time, holding_minutes, mrot_score, 
-                      open_trade_id, cycle_pnl, new_trade['id']))
+                    SELECT id FROM trading_signals 
+                    WHERE strategy_id = %s AND signal_type = %s 
+                    AND timestamp >= NOW() - INTERVAL '5 minutes'
+                    ORDER BY timestamp DESC LIMIT 1
+                ''', (strategy_id, signal_type))
+                
+                sell_record = cursor.fetchone()
+                if sell_record:
+                    sell_id = sell_record[0]
+                    cursor.execute('''
+                        UPDATE trading_signals 
+                        SET cycle_id = %s, cycle_status = 'closed', open_time = %s,
+                            close_time = %s, holding_minutes = %s, mrot_score = %s, 
+                            paired_signal_id = %s, expected_return = %s
+                        WHERE id = %s
+                    ''', (cycle_id, open_time, close_time, holding_minutes, mrot_score, 
+                          open_trade_id, cycle_pnl, sell_id))
                 
                 conn.commit()
                 conn.close()
