@@ -1976,7 +1976,11 @@ def get_strategy_trade_logs(strategy_id):
             executed = bool(row[6]) if row[6] is not None else False
             record_id = row[7] if row[7] is not None else 0
             confidence = float(row[9]) if row[9] is not None else 0.75
-            trade_type = 'verification' if not executed else 'real'
+            # 🔧 修复：根据executed状态正确设置trade_type
+            if executed:
+                trade_type = 'real_trading'  # 真实交易
+            else:
+                trade_type = 'verification'  # 验证交易
             
             logs.append({
                 'timestamp': timestamp,
@@ -3202,6 +3206,7 @@ def create_strategy():
         return jsonify({"success": False, "message": str(e)})
 
 @app.route('/api/quantitative/auto-trading', methods=['GET', 'POST'])
+@app.route('/api/quantitative/toggle-auto-trading', methods=['POST'])  # 🔧 兼容旧路由
 def manage_auto_trading():
     """🔥 统一的自动交易管理API - 移除重复定义"""
     try:

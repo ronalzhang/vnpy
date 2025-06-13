@@ -6512,7 +6512,7 @@ class QuantitativeService:
             
             # 统计交易次数
             try:
-                query = "SELECT COUNT(*) as count FROM strategy_trade_logs WHERE executed = 1"
+                query = "SELECT COUNT(*) as count FROM trading_signals WHERE executed = 1"
                 result = self.db_manager.execute_query(query, fetch_one=True)
                 total_trades = result.get('count', 0) if result else 0
             except Exception as e:
