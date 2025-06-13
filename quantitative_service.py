@@ -357,7 +357,8 @@ class DatabaseManager:
             # 插入初始资产记录（如果没有的话）
             cursor.execute('SELECT COUNT(*) FROM account_balance_history')
             count_result = cursor.fetchone()
-            count = count_result[0] if count_result else 0
+            # PostgreSQL返回字典类型，使用字典访问方式
+            count = count_result['count'] if count_result else 0
             if count == 0:
                 current_balance = self._get_current_balance()
                 self.record_balance_history(
@@ -387,9 +388,11 @@ class DatabaseManager:
             cumulative_return = ((total_balance - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
             
             # 获取总交易次数
-            cursor.execute("SELECT COUNT(*) FROM strategy_trade_logs WHERE executed = 1")
-            total_trades_result = cursor.fetchone()
-            total_trades = total_trades_result[0] if total_trades_result else 0
+            total_trades_result = self.db_manager.execute_query(
+                "SELECT COUNT(*) FROM strategy_trade_logs WHERE executed = 1", 
+                fetch_one=True
+            )
+            total_trades = total_trades_result['count'] if total_trades_result else 0
             
             cursor.execute('''
                 INSERT INTO account_balance_history 
@@ -4128,10 +4131,12 @@ class QuantitativeService:
             
             # 🔥 修复：从前端策略管理配置中动态获取maxStrategies值
             try:
-                cursor = self.conn.cursor()
-                cursor.execute("SELECT config_value FROM strategy_management_config WHERE config_key = 'maxStrategies'")
-                result = cursor.fetchone()
-                max_strategies = int(float(result[0])) if result and result[0] else 20  # 默认20个
+                result = self.db_manager.execute_query(
+                    "SELECT config_value FROM strategy_management_config WHERE config_key = 'maxStrategies'", 
+                    fetch_one=True
+                )
+                # PostgreSQL返回字典类型，统一使用字典访问方式
+                max_strategies = int(float(result['config_value'])) if result and result.get('config_value') else 20
                 print(f"🔧 从前端配置获取策略显示数量: {max_strategies}")
             except Exception as e:
                 print(f"⚠️ 获取maxStrategies配置失败，使用默认值20: {e}")
