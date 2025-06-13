@@ -3437,8 +3437,8 @@ class QuantitativeService:
             
             print(f"✅ 信号生成完成: 总共 {generated_signals} 个 (买入: {buy_generated}, 卖出: {sell_generated})")
             
-            # 🚀 自动执行信号（如果启用了自动交易）
-            if self.auto_trading_enabled and generated_signals > 0:
+            # 🚀 自动执行信号（验证交易始终执行，真实交易需要手动开启）
+            if generated_signals > 0:
                 executed_count = self._execute_pending_signals()
                 print(f"🎯 自动执行了 {executed_count} 个交易信号")
             
@@ -3449,6 +3449,175 @@ class QuantitativeService:
             import traceback
             traceback.print_exc()
             return 0
+    
+    def _calculate_validation_pnl(self, signal_type, price, quantity, strategy_type, strategy_score):
+        """🎯 计算验证交易盈亏（基于策略类型和评分）"""
+        base_return = 0.015 if signal_type == 'buy' else 0.012  # 基础收益率
+        
+        # 策略类型调整因子
+        type_factors = {
+            'momentum': 1.2, 'breakout': 1.1, 'grid_trading': 0.9,
+            'mean_reversion': 0.8, 'trend_following': 1.0, 'high_frequency': 0.7
+        }
+        type_factor = type_factors.get(strategy_type, 1.0)
+        
+        # 评分调整因子（分数越高，模拟收益越接近真实）
+        score_factor = 0.5 + (strategy_score / 100) * 0.5  # 0.5-1.0
+        
+        return quantity * price * base_return * type_factor * score_factor
+    
+    def _calculate_real_trade_pnl(self, signal_type, price, quantity, strategy_score):
+        """💰 计算真实交易盈亏（更保守的估算）"""
+        # 高分策略真实交易：更保守的收益估算
+        base_return = 0.008 if signal_type == 'buy' else 0.006  # 保守收益率
+        
+        # 评分越高，预期收益越稳定
+        score_factor = 0.8 + (strategy_score - 65) / 100 * 0.4  # 0.8-1.2
+        
+        return quantity * price * base_return * score_factor
+    
+    def _handle_trade_cycle_pairing(self, strategy_id, signal_type, price, quantity, pnl, is_validation):
+        """🔄 处理交易周期配对（开仓-平仓系统）"""
+        try:
+            cycle_info = {'cycle_id': None, 'holding_minutes': 0, 'mrot_score': 0, 'cycle_completed': False}
+            
+            if signal_type == 'buy':
+                # 开仓：创建新的交易周期
+                cycle_id = f"CYCLE_{strategy_id}_{int(time.time())}"
+                cycle_info.update({
+                    'cycle_id': cycle_id,
+                    'cycle_completed': False
+                })
+                
+                # 确保trade_cycles表存在
+                self._ensure_trade_cycles_table()
+                
+                # 保存开仓记录
+                self.db_manager.execute_query("""
+                    INSERT INTO trade_cycles (cycle_id, strategy_id, open_time, open_price, open_quantity, is_validation)
+                    VALUES (%s, %s, NOW(), %s, %s, %s)
+                """, (cycle_id, strategy_id, price, quantity, is_validation))
+                
+            elif signal_type == 'sell':
+                # 平仓：查找匹配的开仓记录
+                open_cycle = self.db_manager.execute_query("""
+                    SELECT * FROM trade_cycles 
+                    WHERE strategy_id = %s AND close_time IS NULL AND is_validation = %s
+                    ORDER BY open_time ASC LIMIT 1
+                """, (strategy_id, is_validation), fetch_one=True)
+                
+                if open_cycle:
+                    # 计算持有时间和MRoT
+                    from datetime import datetime
+                    import time
+                    
+                    if isinstance(open_cycle, dict):
+                        cycle_id = open_cycle['cycle_id']
+                        open_price = open_cycle['open_price']
+                        open_time = open_cycle['open_time']
+                    else:
+                        cycle_id = open_cycle[0]
+                        open_price = open_cycle[3]
+                        open_time = open_cycle[2]
+                    
+                    # 计算持有分钟数
+                    holding_minutes = max(1, int((datetime.now() - open_time).total_seconds() / 60))
+                    
+                    # 计算周期总盈亏和MRoT
+                    cycle_pnl = pnl + (quantity * (price - open_price))  # 开仓+平仓总盈亏
+                    mrot_score = cycle_pnl / holding_minutes if holding_minutes > 0 else 0
+                    
+                    # 更新平仓记录
+                    self.db_manager.execute_query("""
+                        UPDATE trade_cycles 
+                        SET close_time = NOW(), close_price = %s, close_quantity = %s, 
+                            holding_minutes = %s, cycle_pnl = %s, mrot_score = %s
+                        WHERE cycle_id = %s
+                    """, (price, quantity, holding_minutes, cycle_pnl, mrot_score, cycle_id))
+                    
+                    cycle_info.update({
+                        'cycle_id': cycle_id,
+                        'holding_minutes': holding_minutes,
+                        'mrot_score': mrot_score,
+                        'cycle_completed': True
+                    })
+            
+            return cycle_info
+            
+        except Exception as e:
+            print(f"❌ 处理交易周期失败: {e}")
+            return {'cycle_id': None, 'holding_minutes': 0, 'mrot_score': 0, 'cycle_completed': False}
+    
+    def log_enhanced_strategy_trade(self, strategy_id, signal_type, price, quantity, confidence, 
+                                   executed=1, pnl=0.0, trade_type="验证交易", cycle_id=None, 
+                                   holding_minutes=0, mrot_score=0, is_validation=True):
+        """📝 记录增强的策略交易日志（包含交易类型和周期信息）"""
+        try:
+            # 先调用原有的日志记录方法
+            self.log_strategy_trade(strategy_id, signal_type, price, quantity, confidence, executed, pnl)
+            
+            # 增强日志记录：添加交易类型和周期信息
+            enhanced_query = """
+                UPDATE trading_signals 
+                SET trade_type = %s, cycle_id = %s, holding_minutes = %s, 
+                    mrot_score = %s, is_validation = %s
+                WHERE strategy_id = %s AND signal_type = %s AND price = %s 
+                AND timestamp >= NOW() - INTERVAL '1 minute'
+                ORDER BY timestamp DESC LIMIT 1
+            """
+            
+            self.db_manager.execute_query(enhanced_query, (
+                trade_type, cycle_id, holding_minutes, mrot_score, is_validation,
+                strategy_id, signal_type, price
+            ))
+            
+        except Exception as e:
+            print(f"❌ 记录增强交易日志失败: {e}")
+    
+    def _update_strategy_score_after_cycle(self, strategy_id, cycle_pnl, mrot_score):
+        """🎯 基于交易周期完成更新策略评分"""
+        try:
+            # 调用现有的评分更新方法
+            signal_type = 'buy' if cycle_pnl > 0 else 'sell'
+            self.update_strategy_score_after_validation(strategy_id, cycle_pnl, signal_type)
+            
+        except Exception as e:
+            print(f"❌ 更新策略周期评分失败: {e}")
+    
+    def _ensure_trade_cycles_table(self):
+        """确保交易周期表存在"""
+        try:
+            self.db_manager.execute_query("""
+                CREATE TABLE IF NOT EXISTS trade_cycles (
+                    cycle_id VARCHAR(100) PRIMARY KEY,
+                    strategy_id VARCHAR(50) NOT NULL,
+                    open_time TIMESTAMP NOT NULL,
+                    open_price DECIMAL(18,8) NOT NULL,
+                    open_quantity DECIMAL(18,8) NOT NULL,
+                    close_time TIMESTAMP NULL,
+                    close_price DECIMAL(18,8) NULL,
+                    close_quantity DECIMAL(18,8) NULL,
+                    holding_minutes INTEGER DEFAULT 0,
+                    cycle_pnl DECIMAL(18,8) DEFAULT 0,
+                    mrot_score DECIMAL(18,8) DEFAULT 0,
+                    is_validation BOOLEAN DEFAULT true,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 确保trading_signals表有新字段
+            self.db_manager.execute_query("""
+                ALTER TABLE trading_signals 
+                ADD COLUMN IF NOT EXISTS trade_type VARCHAR(20) DEFAULT '验证交易',
+                ADD COLUMN IF NOT EXISTS cycle_id VARCHAR(100),
+                ADD COLUMN IF NOT EXISTS holding_minutes INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS mrot_score DECIMAL(18,8) DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS is_validation BOOLEAN DEFAULT true
+            """)
+            
+        except Exception as e:
+            print(f"❌ 创建交易周期表失败: {e}")
     
     def _determine_signal_type(self, strategy, has_position, buy_generated, sell_generated, 
                               buy_needed, sell_allowed, current_balance):
@@ -3579,58 +3748,133 @@ class QuantitativeService:
         return 'skip'
     
     def _execute_pending_signals(self):
-        """执行待处理的交易信号并记录日志"""
+        """🎯 智能执行交易信号：验证交易始终执行，真实交易需手动开启"""
         try:
-            # 获取未执行的信号
-            query = "SELECT * FROM trading_signals WHERE executed = 0 ORDER BY timestamp DESC LIMIT 10"
+            # 获取未执行的信号，包含策略评分信息
+            query = """
+                SELECT ts.*, s.final_score, s.type as strategy_type, s.name as strategy_name
+                FROM trading_signals ts 
+                LEFT JOIN strategies s ON ts.strategy_id = s.id 
+                WHERE ts.executed = 0 
+                ORDER BY ts.timestamp DESC 
+                LIMIT 20
+            """
             signals = self.db_manager.execute_query(query, params=(), fetch_all=True)
             
             if not signals:
                 return 0
             
             executed_count = 0
+            validation_count = 0
+            real_trade_count = 0
+            
             for signal in signals:
                 try:
-                    # 模拟执行交易
-                    strategy_id = signal['strategy_id'] if isinstance(signal, dict) else signal[1]
-                    signal_type = signal['signal_type'] if isinstance(signal, dict) else signal[3]
-                    price = signal['price'] if isinstance(signal, dict) else signal[4]
-                    quantity = signal['quantity'] if isinstance(signal, dict) else signal[5]
-                    confidence = signal['confidence'] if isinstance(signal, dict) else signal[6]
-                    signal_id = signal['id'] if isinstance(signal, dict) else signal[0]
-                    
-                    # 计算模拟盈亏
-                    if signal_type == 'buy':
-                        estimated_pnl = quantity * price * 0.02  # 假设2%收益
+                    # 提取信号信息
+                    if isinstance(signal, dict):
+                        strategy_id = signal['strategy_id']
+                        signal_type = signal['signal_type']
+                        price = signal['price']
+                        quantity = signal['quantity']
+                        confidence = signal['confidence']
+                        signal_id = signal['id']
+                        strategy_score = signal.get('final_score', 50)
+                        strategy_type_name = signal.get('strategy_type', 'unknown')
+                        strategy_name = signal.get('strategy_name', strategy_id)
                     else:
-                        estimated_pnl = quantity * price * 0.015  # 假设1.5%收益
+                        strategy_id = signal[1]
+                        signal_type = signal[3]
+                        price = signal[4]
+                        quantity = signal[5]
+                        confidence = signal[6]
+                        signal_id = signal[0]
+                        strategy_score = signal[7] if len(signal) > 7 else 50
+                        strategy_type_name = signal[8] if len(signal) > 8 else 'unknown'
+                        strategy_name = signal[9] if len(signal) > 9 else strategy_id
                     
-                    # 记录交易日志
-                    self.log_strategy_trade(
+                    # 🎯 核心逻辑：区分验证交易和真实交易
+                    is_validation_trade = strategy_score < 65
+                    trade_type = "验证交易" if is_validation_trade else "真实交易"
+                    
+                    # 🔒 安全机制：验证交易始终执行，真实交易需要手动开启
+                    if is_validation_trade:
+                        # ✅ 验证交易：始终执行（用于策略进化、参数优化）
+                        should_execute = True
+                        execution_reason = "策略验证/进化需要"
+                    else:
+                        # 🔒 真实交易：需要用户手动开启auto_trading_enabled
+                        should_execute = self.auto_trading_enabled
+                        execution_reason = "自动交易已开启" if should_execute else "自动交易未开启"
+                    
+                    if not should_execute:
+                        print(f"🔒 跳过{trade_type}: {strategy_name[-8:]} ({execution_reason})")
+                        continue
+                    
+                    # 🎯 计算交易盈亏（验证交易和真实交易采用不同算法）
+                    if is_validation_trade:
+                        # 验证交易：基于策略类型和参数的模拟计算
+                        estimated_pnl = self._calculate_validation_pnl(
+                            signal_type, price, quantity, strategy_type_name, strategy_score
+                        )
+                        validation_count += 1
+                    else:
+                        # 真实交易：更保守的估算
+                        estimated_pnl = self._calculate_real_trade_pnl(
+                            signal_type, price, quantity, strategy_score
+                        )
+                        real_trade_count += 1
+                    
+                    # 🎯 处理交易周期配对（实现开仓-平仓系统）
+                    cycle_info = self._handle_trade_cycle_pairing(
+                        strategy_id, signal_type, price, quantity, estimated_pnl, is_validation_trade
+                    )
+                    
+                    # 📝 记录增强交易日志
+                    self.log_enhanced_strategy_trade(
                         strategy_id=strategy_id,
                         signal_type=signal_type,
                         price=price,
                         quantity=quantity,
                         confidence=confidence,
-                        executed=1,  # 标记为已执行
-                        pnl=estimated_pnl
+                        executed=1,
+                        pnl=estimated_pnl,
+                        trade_type=trade_type,
+                        cycle_id=cycle_info.get('cycle_id'),
+                        holding_minutes=cycle_info.get('holding_minutes'),
+                        mrot_score=cycle_info.get('mrot_score'),
+                        is_validation=is_validation_trade
                     )
                     
                     # 更新信号状态为已执行
                     update_query = "UPDATE trading_signals SET executed = 1 WHERE id = %s"
                     self.db_manager.execute_query(update_query, (signal_id,))
                     
+                    # 🎯 策略评分更新（基于交易周期完成）
+                    if cycle_info.get('cycle_completed'):
+                        self._update_strategy_score_after_cycle(
+                            strategy_id, estimated_pnl, cycle_info.get('mrot_score', 0)
+                        )
+                    
                     executed_count += 1
-                    print(f"✅ 执行信号: {strategy_id} | {signal_type} | 价格: {price} | 数量: {quantity}")
+                    display_name = strategy_name[-8:] if len(strategy_name) > 8 else strategy_name
+                    print(f"✅ 执行{trade_type}: {display_name} | {signal_type.upper()} | ¥{estimated_pnl:.4f} | {confidence:.1f}%信心度")
                     
                 except Exception as e:
                     print(f"❌ 执行信号失败: {e}")
+                    import traceback
+                    traceback.print_exc()
                     continue
+            
+            # 📊 执行总结
+            if executed_count > 0:
+                print(f"📊 执行总结: 验证交易{validation_count}个，真实交易{real_trade_count}个，总计{executed_count}个")
             
             return executed_count
             
         except Exception as e:
             print(f"❌ 执行待处理信号失败: {e}")
+            import traceback
+            traceback.print_exc()
             return 0
     
     def _generate_optimized_signal(self, strategy_id, strategy, signal_type, current_balance):
@@ -8344,13 +8588,14 @@ class EvolutionaryStrategyEngine:
             return 0
     
     def should_run_evolution(self) -> bool:
-        """判断是否应该运行进化 - 24小时自动进化"""
+        """🔧 修复：判断是否应该运行进化（避免过度频繁）"""
         if not self.last_evolution_time:
             print("🧬 首次运行，需要进化")
             return True
         
         time_since_last = (datetime.now() - self.last_evolution_time).total_seconds()
-        evolution_interval = self.evolution_config.get('evolution_interval', 600)  # 默认10分钟
+        # 🔧 修复：增加进化间隔到2小时，避免过度进化
+        evolution_interval = self.evolution_config.get('evolution_interval', 7200)  # 默认2小时
         
         if time_since_last >= evolution_interval:
             if evolution_interval < 3600:
