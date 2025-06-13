@@ -1423,10 +1423,19 @@ def quantitative_strategies():
                     from strategy_parameters_config import get_strategy_default_parameters
                     parsed_params = get_strategy_default_parameters(stype)
 
-                # 🔧 计算日收益率 - 基于真实交易历史  
+                # 🔧 计算收益率 - 修复荒谬收益率问题
+                total_return_percentage = 0.0
                 daily_return = 0.0
                 if calculated_total_trades > 0 and calculated_total_pnl != 0:
-                    # 获取策略首次和最新交易时间
+                    # 🔥 修复：计算真实收益率，而不是直接使用盈亏金额
+                    # 基准资金 = 交易次数 * 每笔交易平均资金（假设10 USDT）
+                    base_capital = max(calculated_total_trades * 10.0, 100.0)
+                    total_return_percentage = (float(calculated_total_pnl) / base_capital) * 100  # 转换为百分比
+                    
+                    # 限制收益率在合理范围内 (-100% 到 +500%)
+                    total_return_percentage = max(-100.0, min(total_return_percentage, 500.0))
+                    
+                    # 获取策略首次和最新交易时间计算日收益率
                     cursor.execute("""
                         SELECT MIN(timestamp) as first_trade, MAX(timestamp) as last_trade
                         FROM trading_signals 
@@ -1438,9 +1447,7 @@ def quantitative_strategies():
                         first_date = date_range[0] if isinstance(date_range[0], datetime) else datetime.fromisoformat(str(date_range[0]))
                         last_date = date_range[1] if isinstance(date_range[1], datetime) else datetime.fromisoformat(str(date_range[1]))
                         days_active = max(1, (last_date - first_date).days)
-                        # 🔥 修复：使用重新计算的收益数据
-                        total_return_decimal = float(calculated_total_pnl) if calculated_total_pnl else 0.0
-                        daily_return = total_return_decimal / days_active if days_active > 0 else 0.0
+                        daily_return = total_return_percentage / days_active if days_active > 0 else 0.0
                 
                 strategy = {
                     'id': sid,
@@ -1455,7 +1462,7 @@ def quantitative_strategies():
                     'cycle': cycle,
                     'total_trades': calculated_total_trades,  # 🔥 使用重新计算的交易次数
                     'win_rate': round(win_rate_percentage, 2),   # 🔧 保持百分比形式，前端会自动处理
-                    'total_return': round(float(calculated_total_pnl) if calculated_total_pnl else 0.0, 4),  # 🔧 使用重新计算的总收益
+                    'total_return': round(total_return_percentage, 2),  # 🔥 修复：使用正确的收益率百分比
                     'daily_return': round(daily_return, 6),   # 🔧 添加daily_return字段  
                     'total_pnl': float(calculated_total_pnl) if calculated_total_pnl else 0.0,  # 🔥 使用重新计算的数据
                     'avg_pnl': float(calculated_avg_pnl) if calculated_avg_pnl else 0.0,  # 🔥 使用重新计算的数据
@@ -1464,7 +1471,7 @@ def quantitative_strategies():
                     'profit_factor': round(profit_factor, 2), # ⭐ 盈亏比
                     'volatility': round(volatility, 4),       # ⭐ 波动率
                     'evolution_display': evolution_display,
-                    'trade_mode': '真实交易' if enabled else '模拟中'
+                    'trade_mode': '验证交易' if enabled else '暂停中'  # 🔥 修复：统一显示验证交易
                 }
                 
                 strategies.append(strategy)
