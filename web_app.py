@@ -1432,22 +1432,21 @@ def quantitative_strategies():
                     from strategy_parameters_config import get_strategy_default_parameters
                     parsed_params = get_strategy_default_parameters(stype)
 
-                # 🔥 修复收益率计算逻辑 - 使用正确的百分比计算
+                # 🔥 修复收益率计算逻辑 - 使用合理的收益率计算
                 total_return_percentage = 0.0
                 daily_return = 0.0
-                if calculated_total_trades > 0:
-                    # 🔥 修复：直接使用盈亏金额作为收益率百分比（因为expected_return已经是百分比形式）
-                    # 如果calculated_total_pnl是累计的百分比收益，直接使用
-                    if calculated_total_pnl != 0:
-                        # 如果是小数形式的收益率，转换为百分比
-                        if abs(calculated_total_pnl) < 10:  # 小于10认为是小数形式
-                            total_return_percentage = float(calculated_total_pnl) * 100
-                        else:
-                            total_return_percentage = float(calculated_total_pnl)
+                if calculated_total_trades > 0 and calculated_total_pnl is not None:
+                    # 🔥 修复：expected_return字段已经是USDT金额，需要转换为百分比
+                    # 假设每笔交易平均投入50 USDT，计算收益率
+                    average_investment_per_trade = 50.0
+                    total_investment = calculated_total_trades * average_investment_per_trade
+                    
+                    if total_investment > 0:
+                        total_return_percentage = (float(calculated_total_pnl) / total_investment) * 100
                     else:
                         total_return_percentage = 0.0
                     
-                    # 限制收益率在合理范围内 (-100% 到 +100%)
+                    # 严格限制收益率在合理范围内 (-100% 到 +100%)
                     total_return_percentage = max(-100.0, min(total_return_percentage, 100.0))
                     
                     # 获取策略首次和最新交易时间计算日收益率
