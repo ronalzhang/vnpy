@@ -5374,9 +5374,11 @@ class QuantitativeService:
         print(f"🔧 策略{strategy_id[-4:]}信号决策: 评分={strategy_score:.1f}, 类型={strategy_type}, 余额={current_balance:.2f}")
         print(f"📊 需要买入{buy_needed}个(已生成{buy_generated}个), 允许卖出{sell_allowed}个(已生成{sell_generated}个), 持仓={has_position}")
         
-        # 🔧 验证交易优先（不受余额限制），确保买卖平衡
-        # 低分策略需要验证交易来提升评分
-        if strategy_score < self.real_trading_threshold:
+        # 🔧 验证交易全时段进行（不受余额和分值限制），确保买卖平衡
+        # 所有策略都需要验证交易：低分提升评分，高分验证真实性
+        validation_frequency = 1.0 if strategy_score < self.real_trading_threshold else 0.3  # 高分策略降低频率但仍验证
+        
+        if random.random() < validation_frequency:
             # 🔥 修复：强化买卖信号平衡生成，目标50:50平衡
             if buy_generated < buy_needed and sell_generated < sell_allowed:
                 # 🔥 第一层检查：检查全局买卖失衡，强制纠正（最优先）
@@ -5456,10 +5458,12 @@ class QuantitativeService:
                     print(f"✅ 策略{strategy_id[-4:]}平衡验证：卖出信号（目标50:50平衡）")
                     return 'sell'
             elif buy_generated < buy_needed:
-                print(f"✅ 策略{strategy_id[-4:]}验证交易买入信号（买入需求）")
+                validation_type = "低分验证" if strategy_score < self.real_trading_threshold else "高分验证"
+                print(f"✅ 策略{strategy_id[-4:]}{validation_type}交易买入信号（买入需求）")
                 return 'buy'
             elif sell_generated < sell_allowed:
-                print(f"✅ 策略{strategy_id[-4:]}验证交易卖出信号（卖出需求）")
+                validation_type = "低分验证" if strategy_score < self.real_trading_threshold else "高分验证"
+                print(f"✅ 策略{strategy_id[-4:]}{validation_type}交易卖出信号（卖出需求）")
                 return 'sell'
         
         # 🎯 高评分策略优先生成买入信号
@@ -5489,10 +5493,10 @@ class QuantitativeService:
         # ⚖️ 基于交易条件的智能决策（核心逻辑）
         if self._should_execute_trade_based_on_conditions(strategy, current_balance):
             if buy_generated < buy_needed:
-                # 🔧 验证交易/进化需要：即使余额为0也要生成信号
-                if strategy_score < self.real_trading_threshold or current_balance > 0.1:  # 验证交易或有少量余额
-                    print(f"✅ 策略{strategy_id[-4:]}条件决策买入信号")
-                    return 'buy'
+                # 🔧 验证交易/进化需要：即使余额为0也要生成信号（全分值策略都验证）
+                validation_type = "低分验证" if strategy_score < self.real_trading_threshold else "高分验证"
+                print(f"✅ 策略{strategy_id[-4:]}条件决策买入信号（{validation_type}）")
+                return 'buy'
             elif has_position and sell_generated < sell_allowed:
                 print(f"✅ 策略{strategy_id[-4:]}条件决策卖出信号")
                 return 'sell'
@@ -10533,16 +10537,21 @@ class EvolutionaryStrategyEngine:
                 fitness < 95  # 只要评分低于95分就继续优化，目标是100分
             )
             
-            # 🔥 增强优化频率：根据评分等级调整优化概率
+            # 🔥 基于前端配置的进化更新间隔控制优化频率
             import random
+            evolution_interval_minutes = getattr(self, 'evolution_interval', 10)  # 默认10分钟
+            
+            # 根据进化间隔和评分等级动态调整优化概率
+            base_probability = 1.0 / evolution_interval_minutes  # 基础概率与间隔成反比
+            
             if fitness < 50:
-                random_optimization = random.random() < 0.8  # 低分策略80%概率优化
+                random_optimization = random.random() < (base_probability * 4)  # 低分策略4倍频率
             elif fitness < 70:
-                random_optimization = random.random() < 0.6  # 中分策略60%概率优化
+                random_optimization = random.random() < (base_probability * 2)  # 中分策略2倍频率
             elif fitness < 85:
-                random_optimization = random.random() < 0.4  # 高分策略40%概率优化
+                random_optimization = random.random() < base_probability  # 高分策略基础频率
             else:
-                random_optimization = random.random() < 0.2  # 顶级策略20%概率微调
+                random_optimization = random.random() < (base_probability * 0.5)  # 顶级策略减半频率
             
             if not needs_optimization and not random_optimization:
                 print(f"✅ 策略{strategy_id[-4:]}表现良好，无需优化 (胜率{strategy_stats['win_rate']:.1f}%, 盈亏{strategy_stats['total_pnl']:.2f})")
