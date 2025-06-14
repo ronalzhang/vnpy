@@ -8895,9 +8895,14 @@ class EvolutionaryStrategyEngine:
             print(f"更新前端策略失败: {e}")
             return []
     
-    def get_top_strategies_for_trading(self, limit: int = 2):
+    def get_top_strategies_for_trading(self, limit: int = None):
         """获取用于自动交易的前N名真实优质策略"""
         try:
+            # 如果没有指定limit，从配置中获取
+            if limit is None:
+                config = self.get_current_configuration()
+                limit = config.get('realTradingCount', 2)
+            
             cursor = self.conn.cursor()
             
             # 优先选择有真实交易记录且表现良好的策略
@@ -8913,8 +8918,8 @@ class EvolutionaryStrategyEngine:
                 ORDER BY 
                     (COUNT(t.id) * 0.3 + s.final_score * 0.7) DESC,  -- 综合真实交易数和评分
                     s.final_score DESC
-                LIMIT {limit}
-            '''.format(limit=limit))
+                LIMIT %s
+            ''', (limit,))
             
             top_strategies = cursor.fetchall()
             
@@ -8927,8 +8932,8 @@ class EvolutionaryStrategyEngine:
                     FROM strategies s
                     WHERE s.enabled = 1 AND s.final_score >= 50
                     ORDER BY s.final_score DESC
-                    LIMIT {limit}
-                '''.format(limit=limit))
+                    LIMIT %s
+                ''', (limit,))
                 
                 additional_strategies = cursor.fetchall()
                 top_strategies.extend(additional_strategies[:limit - len(top_strategies)])

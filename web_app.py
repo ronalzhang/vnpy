@@ -3901,6 +3901,9 @@ def manage_strategy_config():
                 'evolutionInterval': 10,
                 'maxStrategies': 20,
                 'realTradingScore': 65.0,
+                'realTradingCount': 2,
+                'validationAmount': 50.0,
+                'realTradingAmount': 100.0,
                 'minTrades': 10,
                 'minWinRate': 65.0,
                 'minProfit': 0.0,
@@ -3908,6 +3911,9 @@ def manage_strategy_config():
                 'minSharpeRatio': 1.0,
                 'maxPositionSize': 100.0,
                 'stopLossPercent': 5.0,
+                'takeProfitPercent': 4.0,
+                'maxHoldingMinutes': 30,
+                'minProfitForTimeStop': 1.0,
                 'eliminationDays': 7,
                 'minScore': 50.0
             }

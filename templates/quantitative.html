@@ -601,6 +601,18 @@
                                         <div class="form-text">策略达到此分值自动进行真实交易</div>
                                     </div>
                                     <div class="col-md-4">
+                                        <label for="realTradingCount" class="form-label">真实交易策略数量</label>
+                                        <input type="number" class="form-control" id="realTradingCount" value="2" min="1" max="10">
+                                        <div class="form-text">开启真实交易时选择前几名策略</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="validationAmount" class="form-label">验证交易金额 (USDT)</label>
+                                        <input type="number" class="form-control" id="validationAmount" value="50" min="10" max="500" step="10">
+                                        <div class="form-text">策略验证交易的单笔金额</div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-4">
                                         <label for="minTrades" class="form-label">最少交易次数</label>
                                         <input type="number" class="form-control" id="minTrades" value="10" min="1" max="100">
                                         <div class="form-text">策略进入真实交易的最少交易次数</div>
@@ -609,6 +621,11 @@
                                         <label for="minWinRate" class="form-label">最低胜率 (%)</label>
                                         <input type="number" class="form-control" id="minWinRate" value="65" min="50" max="95" step="0.1">
                                         <div class="form-text">策略进入真实交易的最低胜率要求</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="realTradingAmount" class="form-label">真实交易金额 (USDT)</label>
+                                        <input type="number" class="form-control" id="realTradingAmount" value="100" min="50" max="1000" step="10">
+                                        <div class="form-text">真实交易的单笔交易金额</div>
                                     </div>
                                 </div>
                                 <div class="row mt-3">

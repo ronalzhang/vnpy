@@ -86,7 +86,7 @@ class QuantitativeSystem {
         try {
             autoTradingEnabled = !autoTradingEnabled;
             
-            const response = await fetch('/api/quantitative/toggle-auto-trading', {
+            const response = await fetch('/api/quantitative/auto-trading', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ enabled: autoTradingEnabled })
@@ -321,21 +321,17 @@ class QuantitativeSystem {
                 scoreStatus = '⚠️ 待优化';
             }
             
-            // 🔥 交易状态 - 基于自动交易开关和策略分数
+            // 🔥 交易状态 - 策略始终运行验证交易，只有开启自动交易开关后才选择前几名进行真实交易
             let tradingStatus, tradingBadgeClass;
-            if (strategy.enabled) {
-                // 检查自动交易开关状态
-                const autoTradingEnabled = this.systemStatus?.auto_trading_enabled || false;
-                if (autoTradingEnabled && score >= 65) {
-                    tradingStatus = '真实交易';
-                    tradingBadgeClass = 'bg-success';
-                } else {
-                    tradingStatus = '验证交易';  // 所有低于65分或自动交易关闭时都是验证交易
-                    tradingBadgeClass = 'bg-warning';
-                }
+            
+            // 策略理论上应该始终运行，进行验证交易
+            const autoTradingEnabled = this.systemStatus?.auto_trading_enabled || false;
+            if (autoTradingEnabled && score >= 65) {
+                tradingStatus = '真实交易';
+                tradingBadgeClass = 'bg-success';
             } else {
-                tradingStatus = '已停止';
-                tradingBadgeClass = 'bg-secondary';
+                tradingStatus = '验证交易';  // 所有策略都进行验证交易
+                tradingBadgeClass = 'bg-info';
             }
             
             return `
@@ -1718,6 +1714,9 @@ class QuantitativeSystem {
             document.getElementById('evolutionInterval').value = managementConfig.evolutionInterval || 10;
             document.getElementById('maxStrategies').value = managementConfig.maxStrategies || 20;
             document.getElementById('realTradingScore').value = managementConfig.realTradingScore || 65;
+            document.getElementById('realTradingCount').value = managementConfig.realTradingCount || 2;
+            document.getElementById('validationAmount').value = managementConfig.validationAmount || 50;
+            document.getElementById('realTradingAmount').value = managementConfig.realTradingAmount || 100;
             document.getElementById('minTrades').value = managementConfig.minTrades || 10;
             document.getElementById('minWinRate').value = managementConfig.minWinRate || 65;
             document.getElementById('minProfit').value = managementConfig.minProfit || 0;
@@ -1725,6 +1724,9 @@ class QuantitativeSystem {
             document.getElementById('minSharpeRatio').value = managementConfig.minSharpeRatio || 1.0;
             document.getElementById('maxPositionSize').value = managementConfig.maxPositionSize || 100;
             document.getElementById('stopLossPercent').value = managementConfig.stopLossPercent || 5;
+            document.getElementById('takeProfitPercent').value = managementConfig.takeProfitPercent || 4;
+            document.getElementById('maxHoldingMinutes').value = managementConfig.maxHoldingMinutes || 30;
+            document.getElementById('minProfitForTimeStop').value = managementConfig.minProfitForTimeStop || 1;
             document.getElementById('eliminationDays').value = managementConfig.eliminationDays || 7;
             document.getElementById('minScore').value = managementConfig.minScore || 50;
         }
@@ -1742,6 +1744,9 @@ class QuantitativeSystem {
                 evolutionInterval: parseInt(document.getElementById('evolutionInterval').value) || 10,
                 maxStrategies: parseInt(document.getElementById('maxStrategies').value) || 20,
                 realTradingScore: parseFloat(document.getElementById('realTradingScore').value) || 65,
+                realTradingCount: parseInt(document.getElementById('realTradingCount').value) || 2,
+                validationAmount: parseFloat(document.getElementById('validationAmount').value) || 50,
+                realTradingAmount: parseFloat(document.getElementById('realTradingAmount').value) || 100,
                 minTrades: parseInt(document.getElementById('minTrades').value) || 10,
                 minWinRate: parseFloat(document.getElementById('minWinRate').value) || 65,
                 minProfit: parseFloat(document.getElementById('minProfit').value) || 0,
@@ -1749,6 +1754,9 @@ class QuantitativeSystem {
                 minSharpeRatio: parseFloat(document.getElementById('minSharpeRatio').value) || 1.0,
                 maxPositionSize: parseFloat(document.getElementById('maxPositionSize').value) || 100,
                 stopLossPercent: parseFloat(document.getElementById('stopLossPercent').value) || 5,
+                takeProfitPercent: parseFloat(document.getElementById('takeProfitPercent').value) || 4,
+                maxHoldingMinutes: parseInt(document.getElementById('maxHoldingMinutes').value) || 30,
+                minProfitForTimeStop: parseFloat(document.getElementById('minProfitForTimeStop').value) || 1,
                 eliminationDays: parseInt(document.getElementById('eliminationDays').value) || 7,
                 minScore: parseFloat(document.getElementById('minScore').value) || 50
             };
@@ -1787,6 +1795,9 @@ class QuantitativeSystem {
             evolutionInterval: 10,
             maxStrategies: 20,
             realTradingScore: 65,
+            realTradingCount: 2,
+            validationAmount: 50,
+            realTradingAmount: 100,
             minTrades: 10,
             minWinRate: 65,
             minProfit: 0,
@@ -1794,6 +1805,9 @@ class QuantitativeSystem {
             minSharpeRatio: 1.0,
             maxPositionSize: 100,
             stopLossPercent: 5,
+            takeProfitPercent: 4,
+            maxHoldingMinutes: 30,
+            minProfitForTimeStop: 1,
             eliminationDays: 7,
             minScore: 50
         };
@@ -1836,8 +1850,9 @@ class QuantitativeSystem {
         // 🔥 添加实时保存功能 - 当输入框失去焦点时自动保存
         const form = document.getElementById('strategyManagementForm');
         if (form) {
-            ['evolutionInterval', 'maxStrategies', 'realTradingScore', 'minTrades', 'minWinRate', 'minProfit',
-             'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 'stopLossPercent', 
+            ['evolutionInterval', 'maxStrategies', 'realTradingScore', 'realTradingCount', 'validationAmount', 'realTradingAmount',
+             'minTrades', 'minWinRate', 'minProfit', 'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 
+             'stopLossPercent', 'takeProfitPercent', 'maxHoldingMinutes', 'minProfitForTimeStop',
              'eliminationDays', 'minScore'].forEach(key => {
                 const input = form.querySelector(`#${key}`);
                 if (input) {
