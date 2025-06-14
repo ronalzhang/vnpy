@@ -1463,14 +1463,14 @@ class AutomatedStrategyManager:
             win_rate = strategy.get('win_rate', 0)
             total_trades = strategy.get('total_trades', 0)
             
-            # 计算夏普比率
-            sharpe_ratio = self._calculate_sharpe_ratio(strategy_id)
+            # 计算夏普比率 - 使用简化计算
+            sharpe_ratio = self._calculate_simple_sharpe_ratio(total_return, win_rate)
             
-            # 计算最大回撤
-            max_drawdown = self._calculate_max_drawdown(strategy_id)
+            # 计算最大回撤 - 使用简化计算
+            max_drawdown = self._calculate_simple_max_drawdown(total_return, win_rate)
             
-            # 计算盈利因子
-            profit_factor = self._calculate_profit_factor(strategy_id)
+            # 计算盈利因子 - 使用简化计算
+            profit_factor = self._calculate_simple_profit_factor(total_return, win_rate, total_trades)
             
             # 综合评分 (0-100)
             score = self.quantitative_service._calculate_strategy_score(
@@ -1497,6 +1497,64 @@ class AutomatedStrategyManager:
             }
         
         return performances
+    
+    def _calculate_simple_sharpe_ratio(self, total_return: float, win_rate: float) -> float:
+        """简化的夏普比率计算"""
+        try:
+            # 基于收益率和胜率的简化夏普比率
+            if total_return <= 0:
+                return 0.0
+            
+            # 估算波动率：胜率越低，波动率越高
+            estimated_volatility = max(0.1, 1.0 - win_rate / 100.0)
+            
+            # 简化夏普比率 = 收益率 / 波动率
+            sharpe_ratio = total_return / estimated_volatility
+            
+            return max(0.0, min(sharpe_ratio, 5.0))  # 限制在0-5之间
+        except Exception as e:
+            print(f"计算夏普比率失败: {e}")
+            return 0.0
+    
+    def _calculate_simple_max_drawdown(self, total_return: float, win_rate: float) -> float:
+        """简化的最大回撤计算"""
+        try:
+            # 基于收益率和胜率估算最大回撤
+            if total_return <= 0:
+                return 0.5  # 负收益时假设50%回撤
+            
+            # 胜率越低，回撤越大
+            base_drawdown = (100 - win_rate) / 200.0  # 胜率50%时回撤25%
+            
+            # 收益率越高，回撤相对越小
+            return max(0.01, min(base_drawdown / (1 + total_return), 0.8))
+        except Exception as e:
+            print(f"计算最大回撤失败: {e}")
+            return 0.3
+    
+    def _calculate_simple_profit_factor(self, total_return: float, win_rate: float, total_trades: int) -> float:
+        """简化的盈利因子计算"""
+        try:
+            if win_rate <= 0 or total_trades <= 0:
+                return 1.0
+            
+            # 基于胜率和收益率估算盈利因子
+            win_rate_decimal = win_rate / 100.0
+            loss_rate_decimal = 1.0 - win_rate_decimal
+            
+            if loss_rate_decimal <= 0:
+                return 5.0  # 100%胜率时返回高盈利因子
+            
+            # 估算平均盈利和平均亏损比例
+            avg_win = total_return / (win_rate_decimal * total_trades) if win_rate_decimal > 0 else 0
+            avg_loss = abs(total_return - avg_win * win_rate_decimal * total_trades) / (loss_rate_decimal * total_trades) if loss_rate_decimal > 0 else 1
+            
+            profit_factor = (avg_win * win_rate_decimal) / (avg_loss * loss_rate_decimal) if avg_loss > 0 else 2.0
+            
+            return max(0.1, min(profit_factor, 10.0))  # 限制在0.1-10之间
+        except Exception as e:
+            print(f"计算盈利因子失败: {e}")
+            return 1.0
     
     # 🔥 删除重复的评分计算方法 - 使用第7177行的统一实现
 
