@@ -279,7 +279,7 @@ exchange_clients = {}
 # 数据存储
 prices_data = {}
 diff_data = []
-balances_data = {}
+# 🔧 已移除balances_data全局变量，统一使用API端点get_exchange_balances()获取余额数据
 # 历史数据文件路径
 ARBITRAGE_HISTORY_FILE = "arbitrage_history.pkl"
 # 套利机会历史记录，按交易对保存24小时数据
@@ -726,7 +726,7 @@ def get_exchange_prices():
 
 def monitor_thread(interval=5):
     """监控线程函数"""
-    global prices_data, diff_data, balances_data, status
+    global prices_data, diff_data, status  # 🔧 移除balances_data引用
     
     while True:
         try:
@@ -743,9 +743,10 @@ def monitor_thread(interval=5):
                 diff = calculate_price_differences(prices)
                 diff_data = diff
                 
-                # 强制使用真实API连接获取余额
-                balances = get_exchange_balances()
-                balances_data = balances
+                # 🔧 移除重复的余额获取，避免数据竞争
+                # balances_data 现在只通过 API 端点统一获取，避免缓存冲突
+                # balances = get_exchange_balances()  # ❌ 删除重复调用
+                # balances_data = balances            # ❌ 删除重复存储
                 
                 # 更新时间
                 status["last_update"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -3318,7 +3319,7 @@ connection_manager = CCXTConnectionManager()
 
 def cleanup_global_variables():
     """定期清理全局变量"""
-    global arbitrage_history, prices_data, diff_data, balances_data, last_cleanup_time
+    global arbitrage_history, prices_data, diff_data, last_cleanup_time  # 🔧 移除balances_data引用
     
     current_time = datetime.now()
     cutoff_time = current_time - timedelta(seconds=ARBITRAGE_HISTORY_MAX_AGE)
@@ -3853,14 +3854,12 @@ def get_performance_history():
         history = []
         current_date = datetime.now()
         
-        # 从账户API获取当前真实余额作为基准
+        # 🔧 统一数据源：从统一的余额获取函数获取当前真实余额作为基准
         try:
-            if 'binance' in exchange_clients:
-                binance_client = exchange_clients['binance']
-                balance_data = binance_client.fetch_balance()
-                current_balance = balance_data.get('total', {}).get('USDT', 15.25)
-            else:
-                current_balance = 15.25
+            # 使用统一的余额获取函数，避免重复实现
+            exchange_balances = get_exchange_balances()
+            binance_balance = exchange_balances.get('binance', {})
+            current_balance = binance_balance.get('USDT', 15.25)
         except:
             current_balance = 15.25
         
