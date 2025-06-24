@@ -537,15 +537,15 @@
                                     <div class="row">
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="binance-balance">-</h4>
+                                            <h4 id="binance-balance" class="balance-amount">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="binance-available">-</h4>
+                                            <h4 id="binance-available" class="balance-amount">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="binance-locked">-</h4>
+                                            <h4 id="binance-locked" class="balance-amount">-</h4>
                                         </div>
                                     </div>
                                 </div>
@@ -572,15 +572,15 @@
                                     <div class="row">
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="okx-balance">-</h4>
+                                            <h4 id="okx-balance" class="balance-amount">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="okx-available">-</h4>
+                                            <h4 id="okx-available" class="balance-amount">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="okx-locked">-</h4>
+                                            <h4 id="okx-locked" class="balance-amount">-</h4>
                                         </div>
                                     </div>
                                 </div>
@@ -607,15 +607,15 @@
                                     <div class="row">
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">总余额 (USDT)</h6>
-                                            <h4 id="bitget-balance">-</h4>
+                                            <h4 id="bitget-balance" class="balance-amount">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">可用 (USDT)</h6>
-                                            <h4 id="bitget-available">-</h4>
+                                            <h4 id="bitget-available" class="balance-amount">-</h4>
                                         </div>
                                         <div class="col-lg-4 col-md-4 col-sm-4">
                                             <h6 class="text-muted">锁定 (USDT)</h6>
-                                            <h4 id="bitget-locked">-</h4>
+                                            <h4 id="bitget-locked" class="balance-amount">-</h4>
                                         </div>
                                     </div>
                                 </div>
@@ -1130,11 +1130,39 @@
         }
     }
 
+    // 隐私遮盖功能
+    let privacyMode = false;
+    
+    function togglePrivacy() {
+        privacyMode = !privacyMode;
+        const button = document.getElementById('toggle-privacy');
+        const balanceElements = document.querySelectorAll('.balance-amount, .position-value');
+        
+        if (privacyMode) {
+            // 启用隐私模式
+            balanceElements.forEach(el => {
+                if (!el.classList.contains('privacy-blur')) {
+                    el.classList.add('privacy-blur');
+                }
+            });
+            button.innerHTML = '<i class="fas fa-eye-slash me-1"></i>显示';
+            button.title = '显示余额数据';
+        } else {
+            // 关闭隐私模式
+            balanceElements.forEach(el => {
+                el.classList.remove('privacy-blur');
+            });
+            button.innerHTML = '<i class="fas fa-eye me-1"></i>隐藏';
+            button.title = '隐藏余额数据';
+        }
+    }
+
     // 页面加载完成后初始化
     document.addEventListener('DOMContentLoaded', function() {
         // 绑定按钮点击事件
         document.getElementById('toggle-btn').addEventListener('click', toggleSystem);
         document.getElementById('toggle-arbitrage-btn').addEventListener('click', toggleArbitrageSystem);
+        document.getElementById('toggle-privacy').addEventListener('click', togglePrivacy);
         
         // 立即更新一次状态
         updateSystemStatus();
