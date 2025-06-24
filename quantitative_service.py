@@ -1701,6 +1701,170 @@ class AutomatedStrategyManager:
             logger.warning(f"获取策略 {strategy_id} 资金分配失败: {e}")
             return 100.0  # 默认返回100U
 
+    def _optimize_strategy_parameters(self, strategy_performances: Dict[str, Dict]):
+        """优化策略参数"""
+        try:
+            # 获取表现不佳的策略(评分低于60分)
+            poor_strategies = {
+                strategy_id: perf for strategy_id, perf in strategy_performances.items()
+                if perf['score'] < 60.0
+            }
+            
+            if not poor_strategies:
+                logger.info("没有需要优化的策略")
+                return
+                
+            logger.info(f"开始优化 {len(poor_strategies)} 个表现不佳的策略")
+            
+            for strategy_id, performance in poor_strategies.items():
+                try:
+                    # 获取策略当前参数
+                    current_params = performance.get('parameters', {})
+                    if not current_params:
+                        logger.warning(f"策略 {strategy_id} 没有参数信息，跳过优化")
+                        continue
+                    
+                    # 基于表现问题进行针对性优化
+                    optimized_params = self._optimize_parameters_based_on_performance(
+                        current_params, performance
+                    )
+                    
+                    if optimized_params != current_params:
+                        # 更新策略参数
+                        self._update_strategy_parameters(strategy_id, optimized_params)
+                        logger.info(f"✅ 已优化策略 {strategy_id} 的参数")
+                    
+                except Exception as e:
+                    logger.error(f"优化策略 {strategy_id} 参数失败: {e}")
+                    
+        except Exception as e:
+            logger.error(f"策略参数优化过程失败: {e}")
+
+    def _optimize_parameters_based_on_performance(self, current_params: Dict, performance: Dict) -> Dict:
+        """基于表现问题优化参数"""
+        try:
+            optimized_params = current_params.copy()
+            
+            # 胜率太低 - 调整入场条件
+            if performance['win_rate'] < 40:
+                if 'rsi_threshold' in optimized_params:
+                    optimized_params['rsi_threshold'] = min(optimized_params['rsi_threshold'] + 5, 80)
+                if 'entry_threshold' in optimized_params:
+                    optimized_params['entry_threshold'] = optimized_params['entry_threshold'] * 1.1
+                    
+            # 收益率太低 - 调整止盈条件
+            if performance['total_return'] < 5:
+                if 'take_profit' in optimized_params:
+                    optimized_params['take_profit'] = optimized_params['take_profit'] * 1.2
+                if 'profit_threshold' in optimized_params:
+                    optimized_params['profit_threshold'] = optimized_params['profit_threshold'] * 0.8
+                    
+            # 交易次数太少 - 降低入场门槛
+            if performance['total_trades'] < 5:
+                if 'min_volume' in optimized_params:
+                    optimized_params['min_volume'] = optimized_params['min_volume'] * 0.8
+                if 'volatility_threshold' in optimized_params:
+                    optimized_params['volatility_threshold'] = optimized_params['volatility_threshold'] * 0.9
+                    
+            return optimized_params
+            
+        except Exception as e:
+            logger.error(f"参数优化计算失败: {e}")
+            return current_params
+
+    def _update_strategy_parameters(self, strategy_id: str, new_params: Dict):
+        """更新策略参数到数据库"""
+        try:
+            import json
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                logger.error("❌ 数据库连接不可用，无法更新策略参数")
+                return
+                
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE strategies 
+                SET parameters = %s, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = %s
+            ''', (json.dumps(new_params), strategy_id))
+            
+            conn.commit()
+            logger.info(f"✅ 已更新策略 {strategy_id} 的参数")
+            
+        except Exception as e:
+            logger.error(f"❌ 更新策略参数失败: {e}")
+
+    def _strategy_selection(self, strategy_performances: Dict[str, Dict]):
+        """策略选择和启停决策"""
+        try:
+            # 启用高分策略(65分以上)
+            high_score_strategies = [
+                strategy_id for strategy_id, perf in strategy_performances.items()
+                if perf['score'] >= 65.0
+            ]
+            
+            # 停用低分策略(30分以下)
+            low_score_strategies = [
+                strategy_id for strategy_id, perf in strategy_performances.items()
+                if perf['score'] < 30.0
+            ]
+            
+            # 执行启停操作
+            for strategy_id in high_score_strategies:
+                self._enable_strategy(strategy_id)
+                
+            for strategy_id in low_score_strategies:
+                self._disable_strategy(strategy_id)
+                
+            logger.info(f"策略选择完成: 启用 {len(high_score_strategies)} 个，停用 {len(low_score_strategies)} 个")
+            
+        except Exception as e:
+            logger.error(f"策略选择失败: {e}")
+
+    def _enable_strategy(self, strategy_id: str):
+        """启用策略"""
+        try:
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                return
+                
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE strategies SET enabled = 1 WHERE id = %s
+            ''', (strategy_id,))
+            conn.commit()
+            
+        except Exception as e:
+            logger.error(f"启用策略失败: {e}")
+
+    def _disable_strategy(self, strategy_id: str):
+        """停用策略"""
+        try:
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                return
+                
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE strategies SET enabled = 0 WHERE id = %s
+            ''', (strategy_id,))
+            conn.commit()
+            
+        except Exception as e:
+            logger.error(f"停用策略失败: {e}")
+
+    def _log_management_actions(self, strategy_performances: Dict[str, Dict]):
+        """记录管理行为日志"""
+        try:
+            total_strategies = len(strategy_performances)
+            high_score_count = sum(1 for perf in strategy_performances.values() if perf['score'] >= 65)
+            low_score_count = sum(1 for perf in strategy_performances.values() if perf['score'] < 30)
+            
+            logger.info(f"管理汇总: 总策略 {total_strategies}, 高分 {high_score_count}, 低分 {low_score_count}")
+            
+        except Exception as e:
+            logger.error(f"记录管理日志失败: {e}")
+
     def _risk_management(self):
         """风险管理"""
         # 检查总体风险敞口
