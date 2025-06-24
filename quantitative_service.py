@@ -3654,6 +3654,7 @@ class QuantitativeService:
         
         # 🔧 验证交易全时段进行（不受余额和分值限制），确保买卖平衡
         # 所有策略都需要验证交易：低分提升评分，高分验证真实性
+        import random  # 移到这里避免局部变量未定义错误
         validation_frequency = 1.0 if strategy_score < self.real_trading_threshold else 0.3  # 高分策略降低频率但仍验证
         
         if random.random() < validation_frequency:
@@ -3704,7 +3705,6 @@ class QuantitativeService:
                         return 'buy'
                 
                 # 🔥 第二层检查：策略级别买卖平衡（当前策略的买卖比例）
-                import random
                 current_balance_ratio = buy_generated / max(sell_generated, 1)  # 当前买卖比例
                 
                 # 如果当前策略买信号过多（比例>1.5:1），强制生成卖信号（更严格平衡）
