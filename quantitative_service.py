@@ -1631,7 +1631,7 @@ class AutomatedStrategyManager:
                 FROM positions WHERE quantity != 0
             ''')
             result = cursor.fetchone()
-            return result['total_exposure'] if result and result['total_exposure'] else 0.0
+            return result[0] if result and result[0] else 0.0
         except Exception as e:
             logger.warning(f"计算总风险敞口失败: {e}")
             return 0.0
@@ -1659,7 +1659,7 @@ class AutomatedStrategyManager:
                 FROM positions WHERE strategy_id = %s
             ''', (strategy_id,))
             result = cursor.fetchone()
-            exposure = result['strategy_exposure'] if result and result['strategy_exposure'] else 0.0
+            exposure = result[0] if result and result[0] else 0.0
             initial_capital = getattr(self, 'initial_capital', 1000.0)  # 默认1000资金
             return exposure / initial_capital if initial_capital > 0 else 0.0
         except Exception as e:
@@ -1689,8 +1689,8 @@ class AutomatedStrategyManager:
             ''', (strategy_id,))
             result = cursor.fetchone()
             
-            if result and result['capital_allocation']:
-                return float(result['capital_allocation'])
+            if result and result[0]:
+                return float(result[0])
             else:
                 # 如果没有分配记录，返回基础分配金额
                 initial_capital = getattr(self, 'initial_capital', 1000.0)
