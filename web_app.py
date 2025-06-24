@@ -2022,77 +2022,8 @@ def get_strategy_optimization_logs(strategy_id):
             'message': f'获取失败: {str(e)}'
         }), 500
 
-@app.route('/api/quantitative/positions', methods=['GET'])
-def get_quantitative_positions():
-    """获取真实持仓信息 - 使用账户余额数据"""
-    try:
-        # 使用和account-info相同的逻辑获取币安余额  
-        if 'binance' in exchange_clients:
-            try:
-                binance_client = exchange_clients['binance']
-                balance_data = binance_client.fetch_balance()
-                print(f"💼 获取余额数据成功，包含 {len(balance_data.get('total', {}))} 个资产")
-                
-                positions = []
-                # 从total余额中获取所有非零资产
-                for symbol, amount in balance_data.get('total', {}).items():
-                    if amount and amount > 0:  # 只显示有余额的资产
-                        # 获取真实价格
-                        if symbol in ['USDT', 'USDC', 'BUSD']:
-                            # 稳定币价格为1
-                            avg_price = 1.0
-                            current_price = 1.0
-                        else:
-                            try:
-                                # 获取真实价格
-                                ticker = binance_client.fetch_ticker(f"{symbol}/USDT")
-                                current_price = float(ticker['last'])
-                                avg_price = current_price  # 简化处理，使用当前价格作为平均价格
-                            except Exception as e:
-                                print(f"获取 {symbol} 价格失败: {e}")
-                                avg_price = 1.0
-                                current_price = 1.0
-                        
-                        position = {
-                            'symbol': symbol,
-                            'quantity': float(amount),
-                            'avg_price': avg_price,
-                            'current_price': current_price,
-                            'unrealized_pnl': (current_price - avg_price) * float(amount),
-                            'realized_pnl': 0.0,
-                            'exchange': 'binance'
-                        }
-                        positions.append(position)
-                
-                return jsonify({
-                    "success": True,
-                    "data": positions,
-                    "message": f"获取到 {len(positions)} 个持仓"
-                })
-                
-            except Exception as e:
-                print(f"从币安获取持仓失败: {e}")
-                return jsonify({
-                    "success": False,
-                    "message": f"获取币安持仓失败: {str(e)}",
-                    "data": []
-                })
-        else:
-            return jsonify({
-                "success": True,
-                "message": "币安客户端未初始化，暂无持仓",
-                "data": []
-            })
-        
-    except Exception as e:
-        print(f"获取持仓信息失败: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "message": f"获取持仓信息失败: {str(e)}",
-            "data": []
-        }), 500
+# 🗑️ 删除重复的持仓API - 导致持仓数据不一致的根源已移除
+# 现在统一使用 /api/account/balances 获取持仓数据
 
 @app.route('/api/quantitative/signals', methods=['GET'])
 def get_quantitative_signals():

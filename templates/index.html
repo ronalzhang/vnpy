@@ -855,10 +855,10 @@
         table.innerHTML = positions.map(pos => `
             <tr>
                 <td>${pos.symbol || '-'}</td>
-                <td>${pos.total !== undefined ? pos.total.toFixed(8) : '-'}</td>
-                <td>${pos.available !== undefined ? pos.available.toFixed(8) : '-'}</td>
-                <td>${pos.locked !== undefined ? pos.locked.toFixed(8) : '-'}</td>
-                <td>${pos.value !== undefined ? pos.value.toFixed(2) : '-'}</td>
+                <td class="position-value">${pos.total !== undefined ? pos.total.toFixed(8) : '-'}</td>
+                <td class="position-value">${pos.available !== undefined ? pos.available.toFixed(8) : '-'}</td>
+                <td class="position-value">${pos.locked !== undefined ? pos.locked.toFixed(8) : '-'}</td>
+                <td class="position-value">${pos.value !== undefined ? pos.value.toFixed(2) : '-'}</td>
             </tr>
         `).join('');
     }
