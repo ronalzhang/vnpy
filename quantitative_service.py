@@ -1675,6 +1675,32 @@ class AutomatedStrategyManager:
         except Exception as e:
             logger.error(f"限制策略仓位失败: {e}")
 
+    def _get_current_allocation(self, strategy_id: str) -> float:
+        """获取策略当前资金分配"""
+        try:
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                logger.warning("数据库连接不可用，返回默认分配100")
+                return 100.0
+                
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT capital_allocation FROM strategies WHERE id = %s
+            ''', (strategy_id,))
+            result = cursor.fetchone()
+            
+            if result and result['capital_allocation']:
+                return float(result['capital_allocation'])
+            else:
+                # 如果没有分配记录，返回基础分配金额
+                initial_capital = getattr(self, 'initial_capital', 1000.0)
+                default_allocation = initial_capital * 0.05  # 默认5%分配
+                return default_allocation
+                
+        except Exception as e:
+            logger.warning(f"获取策略 {strategy_id} 资金分配失败: {e}")
+            return 100.0  # 默认返回100U
+
     def _risk_management(self):
         """风险管理"""
         # 检查总体风险敞口
