@@ -4226,7 +4226,9 @@ class QuantitativeService:
                 if result:
                     strategy_score = float(result[0])
             except Exception as e:
-                print(f"⚠️ 获取策略评分失败: {e}")
+                print(f"⚠️ 获取策略评分失败: {e} (策略ID: {strategy_id})")
+                # 使用默认评分并记录调试信息
+                logger.warning(f"策略评分查询失败，策略ID: {strategy_id}, 错误: {e}, 使用默认评分50.0")
             
             # 🔧 正确设置交易类型和验证标记（使用数据库约束允许的英文值）
             if strategy_score >= self.real_trading_threshold:
@@ -7463,6 +7465,12 @@ class EvolutionaryStrategyEngine:
     def _update_strategies_generation_info(self):
         """🔧 修复：强制同步所有策略的世代信息到当前世代"""
         try:
+            # 🔧 确保current_generation和current_cycle不为None或0
+            if not hasattr(self, 'current_generation') or not self.current_generation or self.current_generation <= 0:
+                self.current_generation = 1
+            if not hasattr(self, 'current_cycle') or not self.current_cycle or self.current_cycle <= 0:
+                self.current_cycle = 1
+                
             # 🎯 强制同步所有策略到当前世代 - 修复代数不更新问题
             result = self.quantitative_service.db_manager.execute_query("""
                 UPDATE strategies 
@@ -7488,8 +7496,8 @@ class EvolutionaryStrategyEngine:
                 logger.warning("世代信息同步后查询结果为空")
             
         except Exception as e:
-            logger.error(f"更新策略世代信息失败: {e}")
-            print(f"❌ 世代信息同步失败: {e}")
+            logger.error(f"更新策略世代信息失败: {e} (当前世代: {self.current_generation}, 轮次: {self.current_cycle})")
+            print(f"❌ 世代信息同步失败: {e} (当前世代: {self.current_generation}, 轮次: {self.current_cycle})")
     
     def _save_generation_state(self):
         """保存当前世代和轮次到全局状态"""
