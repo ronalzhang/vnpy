@@ -1593,6 +1593,30 @@ class AutomatedStrategyManager:
         
         logger.info(f"资金再平衡完成，前3名策略: {[perf['name'] for _, perf in high_performers]}")
     
+    def _update_capital_allocations(self, allocations: Dict[str, float]):
+        """更新策略资金分配到数据库"""
+        try:
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                logger.error("❌ 数据库连接不可用，无法更新资金分配")
+                return
+                
+            cursor = conn.cursor()
+            
+            for strategy_id, allocation in allocations.items():
+                # 更新策略表中的资金分配字段
+                cursor.execute('''
+                    UPDATE strategies 
+                    SET capital_allocation = %s, updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = %s
+                ''', (allocation, strategy_id))
+                
+            conn.commit()
+            logger.info(f"✅ 已更新 {len(allocations)} 个策略的资金分配")
+            
+        except Exception as e:
+            logger.error(f"❌ 更新资金分配失败: {e}")
+
     def _risk_management(self):
         """风险管理"""
         # 检查总体风险敞口
