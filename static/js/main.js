@@ -137,7 +137,7 @@ function updateBalanceDisplay(isPrivate) {
 function updateAllData() {
     updateMarketData();
     updateArbitrageData();
-    updateBalanceData();
+    // 🔧 删除重复的余额获取逻辑，统一使用index.html中的实现
     updateSystemStatus();
     updateServerTime();
 }
@@ -342,139 +342,11 @@ function renderArbitrageTable(opportunities) {
     }
 }
 
-// 更新余额数据
-function updateBalanceData() {
-    fetch(window.API_BASE_URL + '/api/account/balances')
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success' && data.data) {
-                renderBalanceData(data.data);
-            } else {
-                // API返回失败，显示"-"
-                renderBalanceData(null);
-            }
-        })
-        .catch(error => {
-            console.error('获取余额数据出错:', error);
-            // 网络错误，显示"-"
-            renderBalanceData(null);
-        });
-}
+// 🔧 删除重复的余额获取函数，统一使用index.html中的loadAccountBalances()实现
 
-// 渲染余额数据
-function renderBalanceData(balances) {
-    // 检查当前隐私模式状态
-    const privacyToggle = document.getElementById('toggle-privacy');
-    const isPrivate = privacyToggle ? privacyToggle.checked : false;
-    
-    // 安全显示数据的辅助函数
-    function safeDisplayBalance(elementId, value) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            if (value !== undefined && value !== null && !isNaN(value)) {
-                const formattedValue = parseFloat(value).toFixed(2);
-                element.dataset.value = formattedValue;  // 保存原始值用于隐私模式
-                element.textContent = isPrivate ? '****' : formattedValue;
-            } else {
-                element.dataset.value = '-';
-                element.textContent = '-';
-            }
-        }
-    }
-    
-    // 更新账户余额
-    if (balances) {
-        // Binance余额
-        if (balances.binance) {
-            safeDisplayBalance('binance-balance', balances.binance.total);
-            safeDisplayBalance('binance-available', balances.binance.available);
-            safeDisplayBalance('binance-locked', balances.binance.locked);
-            
-            // 更新Binance持仓
-            updatePositionsTable('binance-positions', balances.binance.positions);
-        } else {
-            // 如果没有Binance数据，设置为"-"
-            safeDisplayBalance('binance-balance', null);
-            safeDisplayBalance('binance-available', null);
-            safeDisplayBalance('binance-locked', null);
-            updatePositionsTable('binance-positions', null);
-        }
-        
-        // OKX余额
-        if (balances.okx) {
-            safeDisplayBalance('okx-balance', balances.okx.total);
-            safeDisplayBalance('okx-available', balances.okx.available);
-            safeDisplayBalance('okx-locked', balances.okx.locked);
-            
-            // 更新OKX持仓
-            updatePositionsTable('okx-positions', balances.okx.positions);
-        } else {
-            safeDisplayBalance('okx-balance', null);
-            safeDisplayBalance('okx-available', null);
-            safeDisplayBalance('okx-locked', null);
-            updatePositionsTable('okx-positions', null);
-        }
-        
-        // Bitget余额
-        if (balances.bitget) {
-            safeDisplayBalance('bitget-balance', balances.bitget.total);
-            safeDisplayBalance('bitget-available', balances.bitget.available);
-            safeDisplayBalance('bitget-locked', balances.bitget.locked);
-            
-            // 更新Bitget持仓
-            updatePositionsTable('bitget-positions', balances.bitget.positions);
-        } else {
-            safeDisplayBalance('bitget-balance', null);
-            safeDisplayBalance('bitget-available', null);
-            safeDisplayBalance('bitget-locked', null);
-            updatePositionsTable('bitget-positions', null);
-        }
-    } else {
-        // 如果没有余额数据，所有都设置为"-"
-        const exchanges = ['binance', 'okx', 'bitget'];
-        exchanges.forEach(exchange => {
-            safeDisplayBalance(`${exchange}-balance`, null);
-            safeDisplayBalance(`${exchange}-available`, null);
-            safeDisplayBalance(`${exchange}-locked`, null);
-            updatePositionsTable(`${exchange}-positions`, null);
-        });
-    }
-}
+// 🔧 删除重复的余额渲染函数，统一使用index.html中的余额显示逻辑
 
-// 更新持仓表格
-function updatePositionsTable(tableId, positions) {
-    const table = document.getElementById(tableId);
-    if (!table) return;
-    
-    // 检查当前隐私模式状态
-    const privacyToggle = document.getElementById('toggle-privacy');
-    const isPrivate = privacyToggle ? privacyToggle.checked : false;
-    
-    if (!positions || positions.length === 0) {
-        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无持仓</td></tr>';
-        return;
-    }
-
-    table.innerHTML = positions.map(pos => {
-        // 统一格式化数值为2位小数
-        const quantity = !isNaN(pos.quantity) ? parseFloat(pos.quantity).toFixed(2) : '-';
-        const avgPrice = !isNaN(pos.avg_price) ? parseFloat(pos.avg_price).toFixed(2) : '-';
-        const currentPrice = !isNaN(pos.current_price) ? parseFloat(pos.current_price).toFixed(2) : '-';
-        const unrealizedPnl = !isNaN(pos.unrealized_pnl) ? parseFloat(pos.unrealized_pnl).toFixed(2) : '-';
-        const realizedPnl = !isNaN(pos.realized_pnl) ? parseFloat(pos.realized_pnl).toFixed(2) : '-';
-        
-        return `
-        <tr>
-            <td>${pos.symbol || '-'}</td>
-            <td data-value="${pos.quantity || 0}">${isPrivate ? '****' : quantity}</td>
-            <td data-value="${pos.avg_price || 0}">${isPrivate ? '****' : avgPrice}</td>
-            <td data-value="${pos.current_price || 0}">${isPrivate ? '****' : currentPrice}</td>
-            <td data-value="${pos.unrealized_pnl || 0}" class="${(pos.unrealized_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}">${isPrivate ? '****' : unrealizedPnl}</td>
-            <td data-value="${pos.realized_pnl || 0}" class="${(pos.realized_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}">${isPrivate ? '****' : realizedPnl}</td>
-        </tr>
-    `;
-    }).join('');
-}
+// 🔧 删除重复的6列表格渲染函数，统一使用index.html中的5列表格updatePositions()函数
 
 // 删除重复的safeDisplayValue函数，统一使用formatDisplayValue
 function formatDisplayValue(value, decimals = 2, isPrivate = false) {
