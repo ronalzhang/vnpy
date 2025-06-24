@@ -7479,7 +7479,7 @@ class EvolutionaryStrategyEngine:
                 WHERE generation = %s AND cycle = %s
             """, (self.current_generation, self.current_cycle), fetch_one=True)
             
-            if updated_count and len(updated_count) > 0:
+            if updated_count and updated_count[0] is not None:
                 count = updated_count[0]
                 print(f"✅ 已同步{count}个策略到第{self.current_generation}代第{self.current_cycle}轮")
                 logger.info(f"世代信息同步成功: {count}个策略已更新")
@@ -8945,7 +8945,7 @@ class EvolutionaryStrategyEngine:
                 "SELECT current_generation FROM evolution_state WHERE id = 1",
                 fetch_one=True
             )
-            if result and result[0] and result[0] > 0:
+            if result and result[0] is not None and result[0] > 0:
                 loaded_generation = result[0]
                 print(f"📖 从evolution_state表加载世代信息: 第{loaded_generation}代")
                 logger.info(f"世代信息从数据库加载: 第{loaded_generation}代")
@@ -8956,7 +8956,7 @@ class EvolutionaryStrategyEngine:
                 "SELECT MAX(generation) FROM strategies",
                 fetch_one=True
             )
-            if result and result[0] and result[0] > 0:
+            if result and result[0] is not None and result[0] > 0:
                 loaded_generation = result[0]
                 print(f"📖 从strategies表推断世代信息: 第{loaded_generation}代")
                 logger.info(f"世代信息从strategies表推断: 第{loaded_generation}代")
@@ -8979,7 +8979,7 @@ class EvolutionaryStrategyEngine:
                 "SELECT current_cycle FROM evolution_state WHERE id = 1",
                 fetch_one=True
             )
-            if result and result[0] and result[0] > 0:
+            if result and result[0] is not None and result[0] > 0:
                 loaded_cycle = result[0]
                 print(f"📖 从evolution_state表加载轮次信息: 第{loaded_cycle}轮")
                 logger.info(f"轮次信息从数据库加载: 第{loaded_cycle}轮")
@@ -8991,7 +8991,7 @@ class EvolutionaryStrategyEngine:
                 (self.current_generation,),
                 fetch_one=True
             )
-            if result and result[0] and result[0] > 0:
+            if result and result[0] is not None and result[0] > 0:
                 loaded_cycle = result[0]
                 print(f"📖 从strategies表推断轮次信息: 第{loaded_cycle}轮")
                 logger.info(f"轮次信息从strategies表推断: 第{loaded_cycle}轮")
