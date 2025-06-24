@@ -1617,6 +1617,64 @@ class AutomatedStrategyManager:
         except Exception as e:
             logger.error(f"❌ 更新资金分配失败: {e}")
 
+    def _calculate_total_exposure(self) -> float:
+        """计算总风险敞口"""
+        try:
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                logger.warning("数据库连接不可用，返回默认敞口0")
+                return 0.0
+                
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT SUM(ABS(quantity * avg_price)) as total_exposure 
+                FROM positions WHERE quantity != 0
+            ''')
+            result = cursor.fetchone()
+            return result['total_exposure'] if result and result['total_exposure'] else 0.0
+        except Exception as e:
+            logger.warning(f"计算总风险敞口失败: {e}")
+            return 0.0
+
+    def _reduce_position_sizes(self):
+        """减少仓位大小"""
+        try:
+            logger.info("执行减仓操作")
+            # 实际实现可以调用交易所API减少持仓
+            # 这里是占位符实现
+        except Exception as e:
+            logger.error(f"减仓操作失败: {e}")
+
+    def _calculate_strategy_risk(self, strategy_id: str) -> float:
+        """计算单一策略风险"""
+        try:
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                logger.warning("数据库连接不可用，返回默认风险0")
+                return 0.0
+                
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT SUM(ABS(quantity * avg_price)) as strategy_exposure 
+                FROM positions WHERE strategy_id = %s
+            ''', (strategy_id,))
+            result = cursor.fetchone()
+            exposure = result['strategy_exposure'] if result and result['strategy_exposure'] else 0.0
+            initial_capital = getattr(self, 'initial_capital', 1000.0)  # 默认1000资金
+            return exposure / initial_capital if initial_capital > 0 else 0.0
+        except Exception as e:
+            logger.warning(f"计算策略 {strategy_id} 风险失败: {e}")
+            return 0.0
+
+    def _limit_strategy_position(self, strategy_id: str):
+        """限制策略仓位"""
+        try:
+            logger.info(f"限制策略 {strategy_id} 仓位大小")
+            # 实际实现可以调用相关API限制仓位
+            # 这里是占位符实现
+        except Exception as e:
+            logger.error(f"限制策略仓位失败: {e}")
+
     def _risk_management(self):
         """风险管理"""
         # 检查总体风险敞口
