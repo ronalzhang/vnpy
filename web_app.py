@@ -1142,13 +1142,18 @@ def quantitative_strategies():
             
             # 🚀 优化1：简化查询，只获取基础策略信息，避免复杂JOIN
             simple_query = """
-                SELECT id, name, symbol, type, enabled, final_score, 
-                       total_trades, win_rate, total_return, generation, cycle,
+                SELECT id, name, symbol, type, enabled, 
+                       COALESCE(final_score, 50.0) as final_score,
+                       COALESCE(total_trades, 0) as total_trades, 
+                       COALESCE(win_rate, 0.0) as win_rate, 
+                       COALESCE(total_return, 0.0) as total_return, 
+                       COALESCE(generation, 1) as generation, 
+                       COALESCE(cycle, 1) as cycle,
                        created_at
                 FROM strategies 
                 WHERE id LIKE 'STRAT_%' 
-                  AND final_score > 0 
-                ORDER BY final_score DESC, total_trades DESC
+                  AND COALESCE(final_score, 0) >= 0 
+                ORDER BY COALESCE(final_score, 0) DESC, COALESCE(total_trades, 0) DESC
                 LIMIT %s OFFSET %s
             """
             
@@ -1159,6 +1164,10 @@ def quantitative_strategies():
             
             for row in rows:
                 try:
+                    if len(row) < 12:
+                        print(f"⚠️ 行数据不完整: {len(row)}个字段, {row}")
+                        continue
+                        
                     sid, name, symbol, stype, enabled, score, total_trades, win_rate, total_return, generation, cycle, created_at = row
                     
                     # 🚀 优化2：使用数据库中已计算的值，避免重复计算
