@@ -1,0 +1,24 @@
+{
+  "feature_window": 50,
+  "trend_lookback": 20,
+  "volatility_window": 14,
+  "trend_strength_threshold": 0.03,
+  "volatility_threshold": 0.02,
+  "breakout_threshold": 2.5,
+  "reversal_threshold": 0.05,
+  "persist_threshold": 3,
+  "performance_history_length": 100,
+  "market_state_ttl": 12,
+  "classification_sampling_interval": 15,
+  "advanced_features_enabled": true,
+  "strategy_market_maps": {
+    "TRENDING_UP": ["trend_following", "momentum", "breakout"],
+    "TRENDING_DOWN": ["trend_following", "momentum", "breakout"],
+    "SIDEWAYS": ["mean_reversion", "grid_trading", "scalping"],
+    "VOLATILE": ["breakout", "high_frequency", "momentum"],
+    "LOW_VOLATILITY": ["scalping", "grid_trading", "mean_reversion"],
+    "BREAKOUT": ["breakout", "momentum", "high_frequency"],
+    "REVERSAL": ["mean_reversion", "pattern_recognition", "momentum"],
+    "RANGING": ["grid_trading", "mean_reversion", "arbitrage"]
+  }
+} 

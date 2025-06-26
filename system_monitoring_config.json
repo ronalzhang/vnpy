@@ -1,11 +1,31 @@
 {
   "enabled": true,
-  "check_interval": 60,
-  "alert_thresholds": {
-    "cpu_usage": 80,
-    "memory_usage": 85,
-    "error_rate": 0.05
+  "check_interval": 30,
+  "detailed_check_interval": 300,
+  "max_restarts": 5,
+  "log_rotation_size_mb": 100,
+  "log_files_to_keep": 10,
+  "resource_cleanup_interval": 3600,
+  "alert_contacts": ["system_admin"],
+  "health_check_endpoints": [
+    {
+      "name": "web服务",
+      "url": "http://localhost:8888/api/system-health",
+      "expected_status": 200,
+      "timeout": 5
+    }
+  ],
+  "recovery_actions": {
+    "web_app.py": "python3 web_app.py &",
+    "quantitative_service.py": "python3 quantitative_service.py &",
+    "auto_trading_engine.py": "python3 auto_trading_engine.py &"
   },
+  "auto_recovery_enabled": true,
+  "monitored_processes": ["python", "quantitative", "web_app", "trade"],
+  "critical_services": ["web_app.py", "quantitative_service.py", "auto_trading_engine.py"],
+  "memory_threshold": 85,
+  "cpu_threshold": 90,
+  "disk_threshold": 85,
   "notifications": {
     "email_enabled": false,
     "webhook_enabled": false

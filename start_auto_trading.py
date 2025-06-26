@@ -1,225 +1,385 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
 """
 自动交易系统启动脚本
-一键启动100U→1万U投资计划
+提供便捷的启动、监控和管理功能
+
+作者: 系统架构优化团队
+日期: 2025年6月8日
 """
 
 import os
 import sys
 import time
+import argparse
 import json
-import threading
+import logging
+import signal
+import subprocess
+import psutil
 from datetime import datetime
-from loguru import logger
+import traceback
 
-def setup_logging():
-    """设置日志配置"""
-    log_format = "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+# 设置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    handlers=[
+        logging.FileHandler('logs/launcher.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# 主组件列表
+CORE_COMPONENTS = [
+    {
+        "name": "市场环境分类器",
+        "script": "market_environment_classifier.py",
+        "required": False
+    },
+    {
+        "name": "策略资源分配器",
+        "script": "strategy_resource_allocator.py",
+        "required": False
+    },
+    {
+        "name": "自动交易引擎",
+        "script": "auto_trading_engine.py",
+        "required": True
+    }
+]
+
+# 可选组件
+OPTIONAL_COMPONENTS = [
+    {
+        "name": "稳定性监控",
+        "script": "stability_monitor.py",
+        "enable_flag": "monitor"
+    },
+    {
+        "name": "交易状态监控",
+        "script": "trading_monitor.py",
+        "enable_flag": "monitor"
+    }
+]
+
+
+def check_environment():
+    """检查环境准备情况"""
+    # 检查必要目录
+    required_dirs = ['logs', 'data', 'backups']
+    for dir_name in required_dirs:
+        if not os.path.exists(dir_name):
+            logger.info(f"创建目录: {dir_name}")
+            os.makedirs(dir_name, exist_ok=True)
     
-    logger.configure(
-        handlers=[
-            {"sink": sys.stdout, "format": log_format, "level": "INFO"},
-            {"sink": "logs/auto_trading_{time}.log", "format": log_format, "level": "DEBUG", "rotation": "1 day"}
-        ]
-    )
-
-def check_dependencies():
-    """检查依赖包"""
-    try:
-        import ccxt
-        import pandas
-        import numpy
-        logger.success("✅ 依赖包检查通过")
-        return True
-    except ImportError as e:
-        logger.error(f"❌ 缺少依赖包: {e}")
-        logger.info("请运行: pip install -r requirements.txt")
-        return False
-
-def check_config():
-    """检查配置文件"""
-    if not os.path.exists('crypto_config.json'):
-        logger.error("❌ 未找到配置文件 crypto_config.json")
+    # 检查配置文件
+    required_configs = [
+        'auto_trading_config.json',
+        'market_classifier_config.json',
+        'resource_allocator_config.json',
+        'system_monitoring_config.json'
+    ]
+    
+    missing_configs = []
+    for config_file in required_configs:
+        if not os.path.exists(config_file):
+            missing_configs.append(config_file)
+    
+    if missing_configs:
+        logger.warning(f"缺少配置文件: {', '.join(missing_configs)}")
         return False
     
-    try:
-        with open('crypto_config.json', 'r') as f:
-            config = json.load(f)
-        
-        binance_config = config.get('binance', {})
-        if not binance_config.get('api_key') or not binance_config.get('secret_key'):
-            logger.error("❌ 币安API配置不完整")
-            return False
-        
-        logger.success("✅ 配置文件检查通过")
-        return True
-    except Exception as e:
-        logger.error(f"❌ 配置文件错误: {e}")
+    # 检查数据库
+    db_file = "quantitative.db"
+    if not os.path.exists(db_file):
+        logger.warning(f"数据库文件不存在: {db_file}")
         return False
+    
+    logger.info("环境检查完成，一切就绪")
+    return True
 
-def start_web_service():
-    """启动Web服务"""
-    try:
-        from web_app import app
-        
-        # 在后台线程启动Flask应用
-        def run_flask():
-            app.run(host='0.0.0.0', port=8888, debug=False, use_reloader=False)
-        
-        flask_thread = threading.Thread(target=run_flask, daemon=True)
-        flask_thread.start()
-        
-        logger.success("✅ Web服务已启动 (端口8888)")
+
+def check_process_status(process_name):
+    """检查进程是否在运行"""
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            cmdline = ' '.join(proc.info['cmdline'] or [])
+            if process_name in cmdline:
+                return proc.info['pid']
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    return None
+
+
+def start_component(component, mode="background"):
+    """启动组件"""
+    script = component["script"]
+    
+    if check_process_status(script):
+        logger.info(f"{component['name']}已经在运行")
         return True
-    except Exception as e:
-        logger.error(f"❌ Web服务启动失败: {e}")
-        return False
-
-def start_auto_trading():
-    """启动自动交易"""
+    
     try:
-        from auto_trading_engine import get_trading_engine
+        cmd = [sys.executable, script]
         
-        # 初始化交易引擎
-        trading_engine = get_trading_engine()
-        status = trading_engine.get_status()
-        
-        logger.info(f"💰 当前余额: {status['balance']:.2f} USDT")
-        
-        if status['balance'] < 100:
-            logger.warning(f"⚠️ 余额不足100U，当前: {status['balance']:.2f} USDT")
-            logger.info("建议先充值到100U以上再启动投资计划")
-            return False
-        
-        logger.success("✅ 自动交易引擎已初始化")
-        return True
-    except Exception as e:
-        logger.error(f"❌ 自动交易引擎启动失败: {e}")
-        return False
-
-def start_investment_plan():
-    """启动投资计划"""
-    try:
-        from investment_plan import InvestmentPlan
-        
-        # 创建投资计划
-        plan = InvestmentPlan()
-        
-        # 启动计划
-        if plan.start_plan():
-            logger.success("🚀 100U→1万U投资计划已启动")
-            
-            # 显示当前阶段信息
-            phase = plan.get_current_phase()
-            logger.info(f"🎯 当前阶段: {phase['name']}")
-            logger.info(f"📈 目标收益: {phase['daily_target']*100:.1f}%/日")
-            logger.info(f"⚡ 激进模式: 最大仓位{phase['max_risk']*100:.0f}%")
-            
-            return plan
+        if mode == "foreground":
+            logger.info(f"前台启动 {component['name']}")
+            return subprocess.call(cmd)
         else:
-            logger.error("❌ 投资计划启动失败")
-            return None
-    except Exception as e:
-        logger.error(f"❌ 投资计划启动失败: {e}")
-        return None
-
-def display_status(plan):
-    """显示实时状态"""
-    try:
-        while True:
-            # 清屏
-            os.system('clear' if os.name == 'posix' else 'cls')
+            logger.info(f"后台启动 {component['name']}")
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True
+            )
             
-            print("=" * 60)
-            print("🚀 100U→1万U 自动交易系统")
-            print("=" * 60)
-            
-            # 获取整体进展
-            overall = plan.get_overall_progress()
-            phase_progress = plan.check_phase_progress()
-            
-            # 显示核心信息
-            print(f"💰 当前余额: {overall['current_balance']:.2f} USDT")
-            print(f"📈 总体增长: +{overall['total_growth']:.2f} USDT ({overall['total_growth_ratio']*100:.1f}%)")
-            print(f"🎯 完成进度: {overall['overall_completion']*100:.1f}%")
-            print(f"⏰ 运行天数: {overall['total_days']} 天")
-            print()
-            
-            # 当前阶段信息
-            print(f"🔥 {phase_progress['phase_name']}")
-            print(f"   目标: {phase_progress['start_balance']:.0f}U → {phase_progress['target_balance']:.0f}U")
-            print(f"   进展: {phase_progress['completion_ratio']*100:.1f}%")
-            print(f"   用时: {phase_progress['phase_days']}/{phase_progress['target_days']} 天")
-            
-            if phase_progress['ahead_of_schedule']:
-                print("   ✅ 超前进度！")
+            # 等待片刻，检查进程是否成功启动
+            time.sleep(2)
+            if proc.poll() is None:
+                logger.info(f"{component['name']}启动成功 (PID: {proc.pid})")
+                return True
             else:
-                print("   ⏳ 按计划进行")
-            
-            print()
-            print("💡 提示: 按 Ctrl+C 停止程序")
-            print("🌐 Web界面: http://47.236.39.134:8888/quantitative.html")
-            print("=" * 60)
-            
-            # 等待60秒更新
-            time.sleep(60)
-            
-    except KeyboardInterrupt:
-        logger.info("📴 用户手动停止程序")
+                stdout, stderr = proc.communicate()
+                logger.error(f"{component['name']}启动失败: {stderr}")
+                return False
     except Exception as e:
-        logger.error(f"状态显示错误: {e}")
+        logger.error(f"启动{component['name']}时出错: {e}")
+        return False
+
+
+def stop_component(component):
+    """停止组件"""
+    script = component["script"]
+    pid = check_process_status(script)
+    
+    if not pid:
+        logger.info(f"{component['name']}没有运行")
+        return True
+    
+    try:
+        proc = psutil.Process(pid)
+        logger.info(f"正在停止 {component['name']} (PID: {pid})")
+        
+        # 先尝试正常终止
+        proc.terminate()
+        
+        # 等待进程结束
+        gone, alive = psutil.wait_procs([proc], timeout=5)
+        
+        if alive:
+            # 强制终止
+            logger.warning(f"{component['name']}没有正常终止，强制终止")
+            for p in alive:
+                p.kill()
+        
+        logger.info(f"{component['name']}已停止")
+        return True
+    except Exception as e:
+        logger.error(f"停止{component['name']}时出错: {e}")
+        return False
+
+
+def check_status():
+    """检查所有组件状态"""
+    print("\n系统组件状态:\n" + "="*50)
+    print(f"{'组件名称':<20} {'状态':<10} {'PID':<10} {'运行时间'}")
+    print("-"*50)
+    
+    all_components = CORE_COMPONENTS + OPTIONAL_COMPONENTS
+    
+    for component in all_components:
+        script = component["script"]
+        pid = check_process_status(script)
+        
+        if pid:
+            try:
+                proc = psutil.Process(pid)
+                start_time = datetime.fromtimestamp(proc.create_time())
+                uptime = datetime.now() - start_time
+                hours, remainder = divmod(uptime.total_seconds(), 3600)
+                minutes, seconds = divmod(remainder, 60)
+                uptime_str = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+                
+                status = "运行中"
+            except:
+                status = "错误"
+                uptime_str = "N/A"
+        else:
+            status = "未运行"
+            pid = "N/A"
+            uptime_str = "N/A"
+        
+        print(f"{component['name']:<20} {status:<10} {pid:<10} {uptime_str}")
+    
+    # 检查自动交易引擎状态
+    try:
+        status_file = "data/auto_trading_status.json"
+        if os.path.exists(status_file):
+            with open(status_file, 'r') as f:
+                engine_status = json.load(f)
+                
+            print("\n自动交易引擎详细状态:\n" + "="*50)
+            print(f"状态: {engine_status.get('status', 'unknown')}")
+            print(f"市场状态: {engine_status.get('market_state', 'unknown')}")
+            print(f"活跃策略数: {engine_status.get('active_strategies', 0)}")
+            print(f"运行时间: {engine_status.get('uptime', 0)} 小时")
+            print(f"最后交易时间: {engine_status.get('last_trade_time', 'N/A')}")
+            
+            # 显示性能指标
+            performance = engine_status.get('performance', {})
+            if performance:
+                print("\n性能指标:")
+                print(f"预期收益: {performance.get('expected_return', 0)}")
+                print(f"预期风险: {performance.get('expected_risk', 0)}")
+                print(f"夏普比率: {performance.get('sharpe_ratio', 0)}")
+                print(f"胜率: {performance.get('win_rate', 0)}")
+                print(f"分散度: {performance.get('diversification', 0)}")
+            
+            # 显示错误信息
+            errors = engine_status.get('errors', [])
+            if errors:
+                print("\n最近错误:")
+                for error in errors[-3:]:  # 只显示最近3个错误
+                    print(f"- {error.get('time', '')}: {error.get('error', '')}")
+    except Exception as e:
+        print(f"\n获取引擎状态失败: {e}")
+
+
+def start_all(args):
+    """启动所有组件"""
+    logger.info("准备启动全部组件...")
+    
+    # 检查环境
+    if not args.force and not check_environment():
+        logger.error("环境检查未通过，启动终止")
+        return False
+    
+    # 先启动核心组件
+    for component in CORE_COMPONENTS:
+        if component["required"] or not args.minimal:
+            start_component(component)
+            # 等待一下，确保组件有序启动
+            time.sleep(2)
+    
+    # 启动可选组件
+    if args.monitor:
+        for component in OPTIONAL_COMPONENTS:
+            if component.get("enable_flag") == "monitor":
+                start_component(component)
+                time.sleep(1)
+    
+    logger.info("所有组件已启动")
+    return True
+
+
+def stop_all():
+    """停止所有组件"""
+    logger.info("准备停止所有组件...")
+    
+    # 按相反顺序停止组件
+    all_components = OPTIONAL_COMPONENTS + CORE_COMPONENTS
+    all_components.reverse()
+    
+    for component in all_components:
+        stop_component(component)
+        # 等待进程完全结束
+        time.sleep(1)
+    
+    logger.info("所有组件已停止")
+    return True
+
+
+def restart_all(args):
+    """重启所有组件"""
+    logger.info("准备重启所有组件...")
+    
+    stop_all()
+    time.sleep(2)
+    start_all(args)
+    
+    logger.info("所有组件已重启")
+    return True
+
+
+def backup_data():
+    """备份数据"""
+    try:
+        import shutil
+        from datetime import datetime
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_dir = f"backups/backup_{timestamp}"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # 备份数据库
+        if os.path.exists("quantitative.db"):
+            shutil.copy2("quantitative.db", f"{backup_dir}/quantitative.db")
+        
+        # 备份配置文件
+        for config_file in ['auto_trading_config.json', 'market_classifier_config.json', 
+                          'resource_allocator_config.json', 'system_monitoring_config.json']:
+            if os.path.exists(config_file):
+                shutil.copy2(config_file, f"{backup_dir}/{config_file}")
+        
+        # 备份状态文件
+        if os.path.exists("data/auto_trading_status.json"):
+            os.makedirs(f"{backup_dir}/data", exist_ok=True)
+            shutil.copy2("data/auto_trading_status.json", f"{backup_dir}/data/auto_trading_status.json")
+        
+        logger.info(f"数据已备份到: {backup_dir}")
+        return True
+    except Exception as e:
+        logger.error(f"备份数据失败: {e}")
+        return False
+
 
 def main():
     """主函数"""
-    print("🚀 启动100U→1万U自动交易系统...")
-    print()
+    parser = argparse.ArgumentParser(description="自动交易系统管理工具")
     
-    # 设置日志
-    setup_logging()
+    # 主要命令
+    command_group = parser.add_mutually_exclusive_group(required=True)
+    command_group.add_argument('--start', action='store_true', help='启动系统')
+    command_group.add_argument('--stop', action='store_true', help='停止系统')
+    command_group.add_argument('--restart', action='store_true', help='重启系统')
+    command_group.add_argument('--status', action='store_true', help='查看系统状态')
+    command_group.add_argument('--backup', action='store_true', help='备份数据')
     
-    # 创建日志目录
-    os.makedirs('logs', exist_ok=True)
+    # 额外选项
+    parser.add_argument('--force', action='store_true', help='强制启动，跳过环境检查')
+    parser.add_argument('--minimal', action='store_true', help='仅启动必需组件')
+    parser.add_argument('--monitor', action='store_true', help='启用监控组件')
     
-    logger.info("🔧 系统初始化中...")
+    args = parser.parse_args()
     
-    # 1. 检查依赖
-    if not check_dependencies():
-        sys.exit(1)
+    # 设置工作目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
     
-    # 2. 检查配置
-    if not check_config():
-        sys.exit(1)
+    # 创建必要的目录
+    os.makedirs("logs", exist_ok=True)
     
-    # 3. 启动Web服务
-    if not start_web_service():
-        logger.warning("⚠️ Web服务启动失败，但可以继续运行")
+    try:
+        if args.start:
+            start_all(args)
+        elif args.stop:
+            stop_all()
+        elif args.restart:
+            restart_all(args)
+        elif args.status:
+            check_status()
+        elif args.backup:
+            backup_data()
+    except Exception as e:
+        logger.error(f"操作失败: {e}")
+        traceback.print_exc()
+        return 1
     
-    # 等待Web服务启动
-    time.sleep(3)
-    
-    # 4. 启动自动交易
-    if not start_auto_trading():
-        sys.exit(1)
-    
-    # 5. 启动投资计划
-    plan = start_investment_plan()
-    if not plan:
-        sys.exit(1)
-    
-    logger.success("🎉 所有服务启动成功！")
-    print()
-    print("=" * 60)
-    print("🚀 100U→1万U 自动交易系统已启动")
-    print("🌐 Web管理界面: http://47.236.39.134:8888/quantitative.html")
-    print("📊 实时监控界面: http://47.236.39.134:8888")
-    print("💡 建议保持程序运行，系统将自动执行交易")
-    print("=" * 60)
-    print()
-    
-    # 显示实时状态
-    display_status(plan)
+    return 0
+
 
 if __name__ == "__main__":
-    main() 
+    sys.exit(main()) 
