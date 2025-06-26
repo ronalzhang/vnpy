@@ -1,0 +1,334 @@
+{
+  "timestamp": "2025-06-26T14:45:40.285880",
+  "overall_status": "critical",
+  "components": {
+    "\u5e02\u573a\u73af\u5883\u5206\u7c7b\u5668": {
+      "status": "fail",
+      "file_exists": true,
+      "import_status": false,
+      "functionalities": [],
+      "error": "No module named 'numpy'"
+    },
+    "\u7b56\u7565\u8d44\u6e90\u5206\u914d\u5668": {
+      "status": "fail",
+      "file_exists": true,
+      "import_status": false,
+      "functionalities": [],
+      "error": "No module named 'numpy'"
+    },
+    "\u81ea\u52a8\u4ea4\u6613\u5f15\u64ce": {
+      "status": "fail",
+      "file_exists": true,
+      "import_status": false,
+      "functionalities": [],
+      "error": "No module named 'pandas'"
+    },
+    "\u7a33\u5b9a\u6027\u76d1\u63a7": {
+      "status": "fail",
+      "file_exists": true,
+      "import_status": false,
+      "functionalities": [],
+      "error": "No module named 'psutil'"
+    },
+    "\u53c2\u6570\u7ba1\u7406\u5668": {
+      "status": "fail",
+      "file_exists": true,
+      "import_status": false,
+      "functionalities": [],
+      "error": "No module named 'numpy'"
+    }
+  },
+  "database": {
+    "status": "warning",
+    "exists": true,
+    "tables": {
+      "strategies": {
+        "exists": true,
+        "columns": 18,
+        "status": "pass",
+        "records": 0
+      },
+      "strategy_trade_logs": {
+        "exists": true,
+        "columns": 9,
+        "status": "pass",
+        "records": 0
+      },
+      "market_data": {
+        "exists": false,
+        "status": "fail"
+      },
+      "account_balance": {
+        "exists": false,
+        "status": "fail"
+      },
+      "strategy_statistics": {
+        "exists": false,
+        "status": "fail"
+      },
+      "strategy_allocations": {
+        "exists": false,
+        "status": "fail"
+      }
+    },
+    "integrity": false
+  },
+  "compatibility": {
+    "status": "warning",
+    "checks": [
+      {
+        "components": [
+          "\u5e02\u573a\u73af\u5883\u5206\u7c7b\u5668",
+          "\u7b56\u7565\u8d44\u6e90\u5206\u914d\u5668"
+        ],
+        "status": "fail",
+        "message": "\u517c\u5bb9\u6027\u68c0\u67e5\u5931\u8d25",
+        "details": "No module named 'numpy'"
+      },
+      {
+        "components": [
+          "\u81ea\u52a8\u4ea4\u6613\u5f15\u64ce"
+        ],
+        "status": "fail",
+        "message": "\u517c\u5bb9\u6027\u68c0\u67e5\u5931\u8d25",
+        "details": "No module named 'pandas'"
+      }
+    ]
+  },
+  "config": {
+    "\u5e02\u573a\u73af\u5883\u5206\u7c7b\u5668": {
+      "status": "pass",
+      "file": "market_classifier_config.json"
+    },
+    "\u7b56\u7565\u8d44\u6e90\u5206\u914d\u5668": {
+      "status": "pass",
+      "file": "resource_allocator_config.json"
+    },
+    "\u81ea\u52a8\u4ea4\u6613\u5f15\u64ce": {
+      "status": "pass",
+      "file": "auto_trading_config.json"
+    },
+    "\u7a33\u5b9a\u6027\u76d1\u63a7": {
+      "status": "pass",
+      "file": "system_monitoring_config.json"
+    }
+  },
+  "issues": [
+    {
+      "component": "dependencies",
+      "severity": "warning",
+      "message": "\u7f3a\u5c11\u4f9d\u8d56\u5305: numpy, pandas, talib, psutil, matplotlib, scipy",
+      "details": "\u8fd9\u4e9b\u5305\u53ef\u80fd\u4f1a\u5f71\u54cd\u7cfb\u7edf\u7684\u6b63\u5e38\u8fd0\u884c"
+    },
+    {
+      "component": "\u5e02\u573a\u73af\u5883\u5206\u7c7b\u5668",
+      "severity": "critical",
+      "message": "\u5e02\u573a\u73af\u5883\u5206\u7c7b\u5668 \u5bfc\u5165\u5931\u8d25",
+      "details": "No module named 'numpy'"
+    },
+    {
+      "component": "\u7b56\u7565\u8d44\u6e90\u5206\u914d\u5668",
+      "severity": "critical",
+      "message": "\u7b56\u7565\u8d44\u6e90\u5206\u914d\u5668 \u5bfc\u5165\u5931\u8d25",
+      "details": "No module named 'numpy'"
+    },
+    {
+      "component": "\u81ea\u52a8\u4ea4\u6613\u5f15\u64ce",
+      "severity": "critical",
+      "message": "\u81ea\u52a8\u4ea4\u6613\u5f15\u64ce \u5bfc\u5165\u5931\u8d25",
+      "details": "No module named 'pandas'"
+    },
+    {
+      "component": "\u7a33\u5b9a\u6027\u76d1\u63a7",
+      "severity": "warning",
+      "message": "\u7a33\u5b9a\u6027\u76d1\u63a7 \u5bfc\u5165\u5931\u8d25",
+      "details": "No module named 'psutil'"
+    },
+    {
+      "component": "\u53c2\u6570\u7ba1\u7406\u5668",
+      "severity": "critical",
+      "message": "\u53c2\u6570\u7ba1\u7406\u5668 \u5bfc\u5165\u5931\u8d25",
+      "details": "No module named 'numpy'"
+    },
+    {
+      "component": "database",
+      "severity": "error",
+      "message": "\u6570\u636e\u5e93\u7f3a\u5c11\u8868: market_data",
+      "details": "\u8fd9\u53ef\u80fd\u4f1a\u5f71\u54cd\u7cfb\u7edf\u7684\u67d0\u4e9b\u529f\u80fd"
+    },
+    {
+      "component": "database",
+      "severity": "error",
+      "message": "\u6570\u636e\u5e93\u7f3a\u5c11\u8868: account_balance",
+      "details": "\u8fd9\u53ef\u80fd\u4f1a\u5f71\u54cd\u7cfb\u7edf\u7684\u67d0\u4e9b\u529f\u80fd"
+    },
+    {
+      "component": "database",
+      "severity": "error",
+      "message": "\u6570\u636e\u5e93\u7f3a\u5c11\u8868: strategy_statistics",
+      "details": "\u8fd9\u53ef\u80fd\u4f1a\u5f71\u54cd\u7cfb\u7edf\u7684\u67d0\u4e9b\u529f\u80fd"
+    },
+    {
+      "component": "database",
+      "severity": "error",
+      "message": "\u6570\u636e\u5e93\u7f3a\u5c11\u8868: strategy_allocations",
+      "details": "\u8fd9\u53ef\u80fd\u4f1a\u5f71\u54cd\u7cfb\u7edf\u7684\u67d0\u4e9b\u529f\u80fd"
+    },
+    {
+      "component": "directory_structure",
+      "severity": "warning",
+      "message": "\u76ee\u5f55\u4e0d\u5b58\u5728: data",
+      "details": "\u5c06\u4f1a\u5728\u8fd0\u884c\u65f6\u81ea\u52a8\u521b\u5efa"
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "install_packages",
+      "message": "\u5b89\u88c5\u7f3a\u5931\u7684\u4f9d\u8d56\u5305: pip install numpy pandas talib psutil matplotlib scipy"
+    }
+  ],
+  "dependencies": {
+    "status": "warning",
+    "checked": [
+      "sqlite3",
+      "json",
+      "logging",
+      "datetime"
+    ],
+    "missing": [
+      "numpy",
+      "pandas",
+      "talib",
+      "psutil",
+      "matplotlib",
+      "scipy"
+    ]
+  },
+  "config_files": {
+    "status": "pass",
+    "files": {
+      "auto_trading_config.json": {
+        "exists": true,
+        "format": "valid",
+        "status": "pass",
+        "keys": [
+          "engine_name",
+          "database_path",
+          "check_interval",
+          "allocation_interval",
+          "market_analysis_interval",
+          "data_update_interval",
+          "strategy_update_interval",
+          "max_active_strategies",
+          "emergency_shutdown_balance",
+          "reserve_balance",
+          "enable_auto_recovery",
+          "trading_hours",
+          "exchanges",
+          "assets",
+          "quote_currency",
+          "market_reference_symbol",
+          "market_reference_exchange",
+          "enable_market_classifier",
+          "enable_resource_allocator",
+          "dry_run",
+          "test_capital",
+          "default_available_capital",
+          "log_level",
+          "advanced_settings"
+        ]
+      },
+      "market_classifier_config.json": {
+        "exists": true,
+        "format": "valid",
+        "status": "pass",
+        "keys": [
+          "feature_window",
+          "trend_lookback",
+          "volatility_window",
+          "trend_strength_threshold",
+          "volatility_threshold",
+          "breakout_threshold",
+          "reversal_threshold",
+          "persist_threshold",
+          "performance_history_length",
+          "market_state_ttl",
+          "classification_sampling_interval",
+          "advanced_features_enabled",
+          "strategy_market_maps"
+        ]
+      },
+      "resource_allocator_config.json": {
+        "exists": true,
+        "format": "valid",
+        "status": "pass",
+        "keys": [
+          "min_allocation",
+          "max_allocation",
+          "reserve_ratio",
+          "performance_window",
+          "kelly_fraction",
+          "correlation_threshold",
+          "diversity_weight",
+          "min_trades",
+          "high_score_threshold",
+          "low_score_threshold",
+          "max_strategies",
+          "database_path",
+          "dynamic_adjustment",
+          "adjustment_frequency",
+          "strategy_types_weights",
+          "market_state_weights"
+        ]
+      },
+      "system_monitoring_config.json": {
+        "exists": true,
+        "format": "valid",
+        "status": "pass",
+        "keys": [
+          "enabled",
+          "check_interval",
+          "detailed_check_interval",
+          "max_restarts",
+          "log_rotation_size_mb",
+          "log_files_to_keep",
+          "resource_cleanup_interval",
+          "alert_contacts",
+          "health_check_endpoints",
+          "recovery_actions",
+          "auto_recovery_enabled",
+          "monitored_processes",
+          "critical_services",
+          "memory_threshold",
+          "cpu_threshold",
+          "disk_threshold",
+          "notifications"
+        ]
+      }
+    }
+  },
+  "directory_structure": {
+    "status": "warning",
+    "directories": {
+      "logs": {
+        "exists": true,
+        "status": "pass"
+      },
+      "data": {
+        "exists": false,
+        "status": "warning"
+      },
+      "backups": {
+        "exists": true,
+        "status": "pass"
+      }
+    }
+  },
+  "summary": {
+    "critical_issues": 4,
+    "error_issues": 4,
+    "warning_issues": 3,
+    "total_issues": 11,
+    "duration": 0.079129
+  }
+}
