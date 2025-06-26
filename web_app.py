@@ -1124,89 +1124,58 @@ def operations_log():
 
 @app.route('/api/quantitative/strategies', methods=['GET', 'POST'])
 def quantitative_strategies():
-    """🚀 优化的策略管理API - 高性能版本"""
+    """🚀 超简化策略API - 最基础版本"""
     if not QUANTITATIVE_ENABLED:
         return jsonify({"status": "error", "message": "量化模块未启用"})
     
     if request.method == 'GET':
         try:
-            # 🚀 性能优化：只获取最优秀的策略，大幅减少数据量
-            limit = int(request.args.get('limit', 20))  # 默认只返回20个最佳策略
-            offset = int(request.args.get('offset', 0))
+            # 超简化版本 - 只返回最基础的数据
+            limit = int(request.args.get('limit', 10))
+            print(f"🚀 策略API请求: limit={limit}")
             
-            print(f"🚀 策略API请求: limit={limit}, offset={offset}")
-            
-            # 获取策略列表 - 优化查询，避免复杂JOIN
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 🚀 优化1：简化查询，只获取基础策略信息，避免复杂JOIN
+            # 最简单的查询
             simple_query = """
-                SELECT id, name, symbol, type, enabled, 
-                       COALESCE(final_score, 50.0) as final_score,
-                       COALESCE(total_trades, 0) as total_trades, 
-                       COALESCE(win_rate, 0.0) as win_rate, 
-                       COALESCE(total_return, 0.0) as total_return, 
-                       COALESCE(generation, 1) as generation, 
-                       COALESCE(cycle, 1) as cycle,
-                       created_at
+                SELECT id, name, symbol, type, enabled, final_score
                 FROM strategies 
-                WHERE id LIKE 'STRAT_%' 
-                  AND COALESCE(final_score, 0) >= 0 
-                ORDER BY COALESCE(final_score, 0) DESC, COALESCE(total_trades, 0) DESC
-                LIMIT %s OFFSET %s
+                WHERE id LIKE 'STRAT_%'
+                ORDER BY final_score DESC
+                LIMIT %s
             """
             
-            cursor.execute(simple_query, (limit, offset))
+            cursor.execute(simple_query, (limit,))
             rows = cursor.fetchall()
             
             strategies = []
             
             for row in rows:
                 try:
-                    if len(row) < 12:
-                        print(f"⚠️ 行数据不完整: {len(row)}个字段, {row}")
-                        continue
-                        
-                    sid, name, symbol, stype, enabled, score, total_trades, win_rate, total_return, generation, cycle, created_at = row
+                    sid, name, symbol, stype, enabled, score = row
                     
-                    # 🚀 优化2：使用数据库中已计算的值，避免重复计算
-                    win_rate_percentage = float(win_rate) if win_rate else 0.0
-                    total_return_percentage = float(total_return) if total_return else 0.0
-                    
-                    # 🚀 简化进化显示逻辑
-                    evolution_display = f"第{generation or 1}代第{cycle or 1}轮"
-                    
-                    # 🚀 优化3：只获取必要的参数，不加载复杂配置
-                    basic_params = {
-                        'lookback_period': 20,
-                        'threshold': 0.02,
-                        'quantity': 100,
-                        'stop_loss_pct': 2.0,
-                        'take_profit_pct': 4.0
-                    }
-                    
+                    # 超简化的策略对象
                     strategy = {
                         'id': sid,
                         'name': name,
                         'symbol': symbol,
                         'type': stype,
-                        'parameters': basic_params,  # 🚀 使用简化参数
                         'enabled': bool(enabled),
                         'final_score': float(score) if score else 0.0,
-                        'created_at': created_at.isoformat() if created_at else '',
-                        'generation': generation or 1,
-                        'cycle': cycle or 1,
-                        'total_trades': int(total_trades) if total_trades else 0,
-                        'win_rate': round(win_rate_percentage, 2),
-                        'total_return': round(total_return_percentage, 4),
-                        'daily_return': round(total_return_percentage / max(1, (total_trades or 1)), 6),
-                        'evolution_display': evolution_display,
+                        'parameters': {'quantity': 100, 'threshold': 0.02},
+                        'total_trades': 0,
+                        'win_rate': 0.0,
+                        'total_return': 0.0,
+                        'generation': 1,
+                        'cycle': 1,
+                        'evolution_display': '第1代第1轮',
                         'trade_mode': 'verification' if float(score or 0) < 65 else 'real',
-                        # 🚀 简化的指标，避免复杂计算
-                        'sharpe_ratio': round((win_rate_percentage / 100) * 2, 2),
+                        'created_at': '',
+                        'daily_return': 0.0,
+                        'sharpe_ratio': 0.0,
                         'max_drawdown': 0.05,
-                        'profit_factor': 1.5,
+                        'profit_factor': 1.0,
                         'volatility': 0.02
                     }
                     
@@ -1222,12 +1191,7 @@ def quantitative_strategies():
             
             return jsonify({
                 "status": "success", 
-                "data": {
-                    "data": strategies,  # 保持兼容性
-                    "total": len(strategies),
-                    "limit": limit,
-                    "offset": offset
-                }
+                "data": strategies
             })
             
         except Exception as e:
