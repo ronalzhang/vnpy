@@ -811,6 +811,19 @@
         </div>
     </div>
 
+    <script>
+        // 🚨 紧急测试：最基础的JavaScript执行测试
+        console.log('🔧 测试1: 基础JavaScript执行');
+        alert('🔧 测试2: alert弹窗测试');
+        
+        try {
+            document.getElementById('jsTestStatus').innerHTML = '✅ 基础JavaScript可以执行！';
+            document.getElementById('jsTestStatus').className = 'alert alert-success';
+            console.log('🔧 测试3: DOM操作成功');
+        } catch (error) {
+            console.error('🔧 测试3失败: DOM操作失败', error);
+        }
+    </script>
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
     <script>
         // 更新当前时间
