@@ -1137,16 +1137,16 @@ def quantitative_strategies():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 最简单的查询
-            simple_query = """
+            # 最简单的查询 - 避免参数绑定问题
+            simple_query = f"""
                 SELECT id, name, symbol, type, enabled, final_score
                 FROM strategies 
                 WHERE id LIKE 'STRAT_%'
                 ORDER BY final_score DESC
-                LIMIT %s
+                LIMIT {limit}
             """
             
-            cursor.execute(simple_query, (limit,))
+            cursor.execute(simple_query)
             rows = cursor.fetchall()
             
             strategies = []
