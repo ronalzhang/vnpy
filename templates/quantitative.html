@@ -221,6 +221,11 @@
                     <div class="card-body">
                         <div class="row" id="strategiesContainer">
                             <!-- 策略卡片将通过JavaScript动态生成 -->
+                            <div class="col-12">
+                                <div class="alert alert-warning" id="jsTestStatus">
+                                    🔧 正在测试JavaScript执行...
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -860,6 +865,43 @@
                 messages.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
             }
         }
+        
+        // 最简单的JavaScript测试
+        setTimeout(() => {
+            const testEl = document.getElementById('jsTestStatus');
+            if (testEl) {
+                testEl.innerHTML = '✅ JavaScript可以执行！开始检查QuantitativeSystem类...';
+                testEl.className = 'alert alert-info';
+                
+                // 测试QuantitativeSystem类
+                setTimeout(() => {
+                    if (typeof QuantitativeSystem === 'undefined') {
+                        testEl.innerHTML = '❌ QuantitativeSystem类未定义！quantitative.js可能没有正确加载';
+                        testEl.className = 'alert alert-danger';
+                    } else {
+                        testEl.innerHTML = '✅ QuantitativeSystem类存在！开始创建实例...';
+                        testEl.className = 'alert alert-success';
+                        
+                        // 测试创建实例
+                        setTimeout(() => {
+                            try {
+                                window.app = new QuantitativeSystem();
+                                testEl.innerHTML = '🎉 QuantitativeSystem实例创建成功！开始加载数据...';
+                                testEl.className = 'alert alert-success';
+                                
+                                // 手动调用loadStrategies
+                                setTimeout(() => {
+                                    window.app.loadStrategies();
+                                }, 1000);
+                            } catch (error) {
+                                testEl.innerHTML = `❌ 创建QuantitativeSystem实例失败: ${error.message}`;
+                                testEl.className = 'alert alert-danger';
+                            }
+                        }, 1000);
+                    }
+                }, 1000);
+            }
+        }, 500);
         
         document.addEventListener('DOMContentLoaded', function() {
             debugLog('🚀 DOM已加载，开始初始化量化交易系统...');
