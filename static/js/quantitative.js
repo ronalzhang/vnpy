@@ -197,9 +197,9 @@ class QuantitativeSystem {
                 const dailyReturnEl = document.getElementById('dailyReturn');
                 if (dailyReturnEl) {
                     if (dailyReturn !== undefined && dailyReturn !== null && !isNaN(dailyReturn)) {
-                        const returnPercent = dailyReturn * 100;
-                        dailyReturnEl.textContent = `${returnPercent >= 0 ? '+' : ''}${returnPercent.toFixed(2)}%`;
-                        dailyReturnEl.className = `metric-value ${returnPercent >= 0 ? 'text-success' : 'text-danger'}`;
+                        // 后端已返回百分比格式，直接使用
+                        dailyReturnEl.textContent = `${dailyReturn >= 0 ? '+' : ''}${dailyReturn.toFixed(2)}%`;
+                        dailyReturnEl.className = `metric-value ${dailyReturn >= 0 ? 'text-success' : 'text-danger'}`;
                     } else {
                         dailyReturnEl.textContent = '-';
                         dailyReturnEl.className = 'metric-value';
