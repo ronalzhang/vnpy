@@ -906,110 +906,186 @@
         let evolutionLogTimer = null;
         let managementConfig = {};
         
-        // ✅ 初始化量化交易系统
-        let app;
-        function debugLog(message) {
-            console.log(message);
-            // 同时在页面上显示调试信息
-            const container = document.getElementById('strategiesContainer');
-            if (container) {
-                const debugDiv = document.getElementById('debugInfo') || (() => {
-                    const div = document.createElement('div');
-                    div.id = 'debugInfo';
-                    div.className = 'alert alert-info';
-                    div.innerHTML = '<h6>🔧 调试信息:</h6><div id="debugMessages"></div>';
-                    container.appendChild(div);
-                    return div;
-                })();
-                const messages = document.getElementById('debugMessages');
-                messages.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
-            }
-        }
+        // ✅ 确保app是全局变量
+        window.app = null;
+        var app = null; // 用于onclick事件的直接全局变量
         
-        // 最简单的JavaScript测试
-        setTimeout(() => {
-            const testEl = document.getElementById('jsTestStatus');
-            if (testEl) {
-                testEl.innerHTML = '✅ JavaScript可以执行！开始检查QuantitativeSystem类...';
-                testEl.className = 'alert alert-info';
-                
-                // 测试QuantitativeSystem类
-                setTimeout(() => {
-                    if (typeof QuantitativeSystem === 'undefined') {
-                        testEl.innerHTML = '❌ QuantitativeSystem类未定义！quantitative.js可能没有正确加载';
-                        testEl.className = 'alert alert-danger';
-                    } else {
-                        testEl.innerHTML = '✅ QuantitativeSystem类存在！开始创建实例...';
-                        testEl.className = 'alert alert-success';
-                        
-                        // 测试创建实例
-                        setTimeout(() => {
-                            try {
-                                window.app = new QuantitativeSystem();
-                                testEl.innerHTML = '🎉 QuantitativeSystem实例创建成功！开始加载数据...';
-                                testEl.className = 'alert alert-success';
-                                
-                                // 手动调用loadStrategies
-                                setTimeout(() => {
-                                    window.app.loadStrategies();
-                                }, 1000);
-                            } catch (error) {
-                                testEl.innerHTML = `❌ 创建QuantitativeSystem实例失败: ${error.message}`;
-                                testEl.className = 'alert alert-danger';
-                            }
-                        }, 1000);
-                    }
-                }, 1000);
-            }
-        }, 500);
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            debugLog('🚀 DOM已加载，开始初始化量化交易系统...');
+        // 🔥 统一的应用初始化函数
+        function initializeApp() {
+            console.log('🚀 开始初始化量化交易系统...');
             
             // 检查QuantitativeSystem类是否存在
             if (typeof QuantitativeSystem === 'undefined') {
-                debugLog('❌ QuantitativeSystem类未定义，quantitative.js可能没有正确加载');
-                return;
+                console.error('❌ QuantitativeSystem类未定义，quantitative.js可能没有正确加载');
+                return false;
             }
             
             try {
-                app = new QuantitativeSystem();
-                debugLog('✅ 量化交易系统实例创建成功');
+                // 🔥 创建全局app实例
+                window.app = new QuantitativeSystem();
+                // 🔥 同时设置为直接全局变量，兼容onclick事件
+                app = window.app;
+                console.log('✅ 量化交易系统实例创建成功');
                 
-                // 🔥 立即测试策略API
-                debugLog('🔄 开始测试策略API...');
-                fetch('/api/quantitative/strategies?limit=3')
-                    .then(response => {
-                        debugLog(`📡 策略API响应状态: ${response.status}`);
-                        return response.json();
-                    })
-                    .then(data => {
-                        debugLog(`📊 策略API返回数据: ${JSON.stringify(data).substring(0, 200)}...`);
-                        if (data.status === 'success' && data.data) {
-                            debugLog(`✅ 成功获取${data.data.length}个策略，开始调用app.loadStrategies()`);
-                            app.loadStrategies();
-                        } else {
-                            debugLog('❌ 策略API返回数据格式不正确');
-                        }
-                    })
-                    .catch(error => {
-                        debugLog(`❌ 策略API调用失败: ${error.message}`);
-                    });
+                // 立即加载数据
+                window.app.loadSystemStatus();
+                window.app.loadStrategies();
+                window.app.loadAccountInfo();
+                window.app.loadPositions();
+                window.app.loadSignals();
                 
-                // 加载其他数据
-                setTimeout(() => {
-                    debugLog('🔄 加载系统状态和其他数据...');
-                    app.loadSystemStatus();
-                    app.loadAccountInfo();
-                    app.loadPositions();
-                    app.loadSignals();
-                }, 500);
+                // 绑定策略管理配置按钮事件
+                bindManagementConfigEvents();
                 
+                return true;
             } catch (error) {
-                debugLog(`❌ 量化交易系统初始化失败: ${error.message}`);
-                debugLog(`错误堆栈: ${error.stack}`);
+                console.error(`❌ 量化交易系统初始化失败: ${error.message}`, error);
+                return false;
             }
+        }
+        
+        // 🔥 绑定策略管理配置按钮事件
+        function bindManagementConfigEvents() {
+            // 策略管理配置按钮
+            const managementBtn = document.querySelector('button[onclick="showStrategyManagement()"]');
+            if (managementBtn) {
+                managementBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showStrategyManagement();
+                });
+            }
+            
+            // 保存配置按钮
+            const saveBtn = document.getElementById('saveManagementConfig');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function() {
+                    if (window.app) {
+                        window.app.saveManagementConfig();
+                    }
+                });
+            }
+            
+            // 重置配置按钮
+            const resetBtn = document.getElementById('resetManagementConfig');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function() {
+                    if (window.app) {
+                        window.app.resetManagementConfig();
+                    }
+                });
+            }
+        }
+        
+        // DOM加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟一点确保quantitative.js完全加载
+            setTimeout(() => {
+                const success = initializeApp();
+                
+                // 在页面上显示初始化状态
+                const testEl = document.getElementById('jsTestStatus');
+                if (testEl) {
+                    if (success) {
+                        testEl.innerHTML = '🎉 应用初始化成功！系统正常运行';
+                        testEl.className = 'alert alert-success';
+                        // 3秒后隐藏测试信息
+                        setTimeout(() => {
+                            testEl.style.display = 'none';
+                        }, 3000);
+                    } else {
+                        testEl.innerHTML = '❌ 应用初始化失败，请刷新页面重试';
+                        testEl.className = 'alert alert-danger';
+                    }
+                }
+            }, 1000);
         });
+        
+        // 🔥 全局函数定义 - 确保所有onclick事件都能正确工作
+        window.toggleSystem = function() {
+            if (window.app) {
+                window.app.toggleSystem();
+            } else {
+                console.error('❌ app对象未初始化');
+            }
+        };
+        
+        window.toggleAutoTrading = function() {
+            if (window.app) {
+                window.app.toggleAutoTrading();
+            } else {
+                console.error('❌ app对象未初始化');
+            }
+        };
+        
+        window.refreshStrategies = function() {
+            if (window.app) {
+                window.app.loadStrategies();
+            } else {
+                console.error('❌ app对象未初始化');
+            }
+        };
+        
+        window.showStrategyManagement = function() {
+            if (window.app) {
+                window.app.loadManagementConfig();
+                const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
+                modal.show();
+            } else {
+                console.error('❌ app对象未初始化');
+            }
+        };
+        
+        window.showAllLogs = function() {
+            if (window.app && window.app.allEvolutionLogs) {
+                // 初始化分页变量
+                window.app.logsCurrentPage = 1;
+                window.app.logsPerPage = 20;
+                
+                // 创建全部日志模态框
+                const modalHtml = `
+                <div class="modal fade" id="allLogsModal" tabindex="-1">
+                <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                <div class="modal-header">
+                <h5 class="modal-title">
+                <i class="fas fa-list me-2"></i>所有策略进化日志
+                <span class="badge bg-primary ms-2" id="logsTotal">共 ${window.app.allEvolutionLogs.length} 条</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                <div class="table-responsive">
+                <table class="table table-hover">
+                <thead>
+                <tr><th style="width: 20%">时间</th><th style="width: 15%">操作</th><th style="width: 65%">详情</th></tr>
+                </thead>
+                <tbody id="allLogsTableBody"></tbody>
+                </table>
+                </div>
+                </div>
+                <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+                </div>
+                </div>
+                </div>`;
+                
+                // 删除已存在的模态框
+                const existingModal = document.getElementById('allLogsModal');
+                if (existingModal) existingModal.remove();
+                
+                // 添加新模态框并显示
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                const modal = new bootstrap.Modal(document.getElementById('allLogsModal'));
+                modal.show();
+            } else {
+                console.log('暂无日志数据');
+            }
+        };
+        
+        // 确保app对象中的方法也能被全局访问
+        window.app = window.app || {};
+        
     </script>
 </body>
 </html> 
