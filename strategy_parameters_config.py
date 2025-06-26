@@ -711,6 +711,14 @@ def get_parameter_manager():
     """获取参数管理器实例"""
     return parameter_manager
 
+def get_strategy_parameter_ranges():
+    """获取策略参数范围配置"""
+    return PARAMETER_RULES
+
+def get_all_strategy_types():
+    """获取所有策略类型列表"""
+    return STRATEGY_TYPES
+
 
 if __name__ == "__main__":
     # 测试功能
