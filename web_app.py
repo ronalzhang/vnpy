@@ -1124,76 +1124,126 @@ def operations_log():
 
 @app.route('/api/quantitative/strategies', methods=['GET', 'POST'])
 def quantitative_strategies():
-    """🚀 超简化策略API - 最基础版本"""
+    """🚀 策略管理API - 使用高级策略管理器"""
     if not QUANTITATIVE_ENABLED:
         return jsonify({"status": "error", "message": "量化模块未启用"})
     
     if request.method == 'GET':
         try:
-            # 超简化版本 - 只返回最基础的数据
-            limit = int(request.args.get('limit', 10))
-            print(f"🚀 策略API请求: limit={limit}")
-            
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            # 最简单的查询 - 避免参数绑定问题
-            simple_query = f"""
-                SELECT id, name, symbol, type, enabled, final_score
-                FROM strategies 
-                WHERE id LIKE 'STRAT_%'
-                ORDER BY final_score DESC
-                LIMIT {limit}
-            """
-            
-            cursor.execute(simple_query)
-            rows = cursor.fetchall()
-            
-            strategies = []
-            
-            for row in rows:
-                try:
-                    sid, name, symbol, stype, enabled, score = row
-                    
-                    # 超简化的策略对象
-                    strategy = {
-                        'id': sid,
-                        'name': name,
-                        'symbol': symbol,
-                        'type': stype,
-                        'enabled': bool(enabled),
-                        'final_score': float(score) if score else 0.0,
-                        'parameters': {'quantity': 100, 'threshold': 0.02},
-                        'total_trades': 0,
-                        'win_rate': 0.0,
-                        'total_return': 0.0,
-                        'generation': 1,
-                        'cycle': 1,
-                        'evolution_display': '第1代第1轮',
-                        'trade_mode': 'verification' if float(score or 0) < 65 else 'real',
-                        'created_at': '',
+            # 使用高级策略管理器获取策略
+            try:
+                from advanced_strategy_manager import strategy_manager
+                
+                limit = int(request.args.get('limit', None) or 0) 
+                print(f"🚀 策略API请求: limit={limit}")
+                
+                # 使用高级管理器获取显示策略
+                strategies = strategy_manager.get_display_strategies(limit if limit > 0 else None)
+                
+                # 格式化策略数据以兼容前端
+                formatted_strategies = []
+                for strategy in strategies:
+                    formatted_strategy = {
+                        'id': strategy['id'],
+                        'name': strategy['name'],
+                        'symbol': strategy['symbol'] or 'BTC/USDT',
+                        'type': strategy['type'] or 'momentum', 
+                        'enabled': strategy['enabled'],
+                        'final_score': strategy['final_score'],
+                        'total_trades': strategy['total_trades'],
+                        'win_rate': strategy['win_rate'] * 100 if strategy['win_rate'] <= 1 else strategy['win_rate'],
+                        'total_return': strategy['total_return'],
+                        'generation': strategy['generation'],
+                        'cycle': strategy['cycle'],
+                        'evolution_display': f"第{strategy['generation']}代第{strategy['cycle']}轮",
+                        'created_at': strategy.get('created_at'),
+                        'updated_at': strategy.get('updated_at'),
+                        'trade_mode': 'real' if strategy['final_score'] >= 65 else 'verification',
                         'daily_return': 0.0,
                         'sharpe_ratio': 0.0,
                         'max_drawdown': 0.05,
                         'profit_factor': 1.0,
-                        'volatility': 0.02
+                        'volatility': 0.02,
+                        'parameters': {
+                            'lookback_period': 20,
+                            'threshold': 0.02,
+                            'quantity': 100,
+                            'stop_loss_pct': 2.0,
+                            'take_profit_pct': 4.0
+                        }
                     }
-                    
-                    strategies.append(strategy)
-                    
-                except Exception as e:
-                    print(f"⚠️ 处理策略{row[0] if row else 'unknown'}失败: {e}")
-                    continue
-            
-            conn.close()
-            
-            print(f"✅ 成功返回{len(strategies)}个策略")
-            
-            return jsonify({
-                "status": "success", 
-                "data": strategies
-            })
-            
+                    formatted_strategies.append(formatted_strategy)
+                
+                print(f"✅ 高级管理器返回 {len(formatted_strategies)} 个策略")
+                
+                return jsonify({
+                    "status": "success", 
+                    "data": formatted_strategies
+                })
+                
+            except ImportError as ie:
+                print(f"⚠️ 高级管理器不可用，使用基础查询: {ie}")
+                # 如果高级管理器不可用，回退到基础查询
+                limit = int(request.args.get('limit', 10))
+                
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                simple_query = f"""
+                    SELECT id, name, symbol, type, enabled, final_score
+                    FROM strategies 
+                    WHERE id LIKE 'STRAT_%'
+                    ORDER BY final_score DESC
+                    LIMIT {limit}
+                """
+                
+                cursor.execute(simple_query)
+                rows = cursor.fetchall()
+                
+                strategies = []
+                for row in rows:
+                    try:
+                        sid, name, symbol, stype, enabled, score = row
+                        
+                        strategy = {
+                            'id': sid,
+                            'name': name,
+                            'symbol': symbol or 'BTC/USDT',
+                            'type': stype or 'momentum',
+                            'enabled': bool(enabled),
+                            'final_score': float(score) if score else 0.0,
+                            'parameters': {'quantity': 100, 'threshold': 0.02},
+                            'total_trades': 0,
+                            'win_rate': 0.0,
+                            'total_return': 0.0,
+                            'generation': 1,
+                            'cycle': 1,
+                            'evolution_display': '第1代第1轮',
+                            'trade_mode': 'verification' if float(score or 0) < 65 else 'real',
+                            'created_at': '',
+                            'daily_return': 0.0,
+                            'sharpe_ratio': 0.0,
+                            'max_drawdown': 0.05,
+                            'profit_factor': 1.0,
+                            'volatility': 0.02
+                        }
+                        
+                        strategies.append(strategy)
+                        
+                    except Exception as e:
+                        print(f"⚠️ 处理策略{row[0] if row else 'unknown'}失败: {e}")
+                        continue
+                
+                cursor.close()
+                conn.close()
+                
+                print(f"✅ 基础查询返回{len(strategies)}个策略")
+                
+                return jsonify({
+                    "status": "success", 
+                    "data": strategies
+                })
+                
         except Exception as e:
             print(f"❌ 获取策略列表失败: {e}")
             import traceback

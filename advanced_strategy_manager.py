@@ -1,398 +1,692 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
-高级策略管理器 - 分层验证体系
-实现全自动自我迭代升级的量化交易系统
+🧠 高级策略管理器 - 完整的策略生命周期管理系统
+实现策略的自动进化、升级、淘汰、配置管理等功能
 """
 
 import time
 import json
+import logging
+import psycopg2
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
-from dataclasses import dataclass
-from enum import Enum
-
-class StrategyStatus(Enum):
-    """策略状态枚举"""
-    SIMULATION_INIT = "simulation_init"          # 模拟初始化
-    REAL_ENV_SIMULATION = "real_env_simulation"  # 真实环境模拟
-    SMALL_REAL_TRADING = "small_real_trading"    # 小额真实交易
-    FULL_REAL_TRADING = "full_real_trading"      # 正式真实交易
-    ELITE_OPTIMIZATION = "elite_optimization"    # 精英优化
-    RETIRED = "retired"                          # 退役
-
-@dataclass
-class StrategyValidation:
-    """策略验证记录"""
-    strategy_id: str
-    status: StrategyStatus
-    score: float
-    win_rate: float
-    total_return: float
-    total_trades: int
-    validation_start: datetime
-    validation_end: Optional[datetime] = None
-    real_trading_pnl: float = 0.0
-    promotion_history: List[str] = None
+from typing import Dict, List, Optional, Tuple
+from decimal import Decimal
+import threading
+import traceback
+from db_config import get_db_config
 
 class AdvancedStrategyManager:
-    """高级策略管理器"""
+    """🚀 高级策略管理器 - 全自动策略生命周期管理"""
     
-    def __init__(self, quantitative_service):
-        self.service = quantitative_service
-        self.validation_records: Dict[str, StrategyValidation] = {}
+    def __init__(self):
+        self.db_config = get_db_config()
+        self.logger = self._setup_logger()
+        self.running = False
         
-        # 分层阈值配置
-        self.thresholds = {
-            'simulation_to_real_env': 50.0,     # 模拟 → 真实环境模拟
-            'real_env_to_small_real': 65.0,     # 真实环境模拟 → 小额真实交易
-            'small_real_to_full_real': 70.0,    # 小额真实 → 正式真实交易
-            'full_real_to_elite': 80.0,         # 正式交易 → 精英优化
-            'retirement_threshold': 35.0         # 退役阈值
+        # 🎯 默认配置（可被数据库配置覆盖）
+        self.config = {
+            # 策略数量控制
+            'max_total_strategies': 150,           # 策略表最多保留150个策略
+            'optimal_strategy_count': 100,         # 最优策略数量
+            'display_strategy_count': 20,          # 前端显示数量
+            'real_trading_count': 3,               # 真实交易策略数量
+            
+            # 进化和淘汰配置
+            'evolution_interval_minutes': 15,      # 进化检查间隔
+            'elimination_cycle_hours': 24,         # 淘汰周期
+            'score_improvement_threshold': 5.0,    # 评分提升门槛
+            
+            # 质量标准
+            'real_trading_score_threshold': 65.0,  # 真实交易门槛
+            'elimination_score_threshold': 30.0,   # 淘汰门槛
+            'min_trades_for_evaluation': 10,       # 最少交易次数
+            'min_win_rate': 0.6,                   # 最低胜率
+            
+            # 风险控制
+            'max_position_size': 200.0,            # 最大仓位
+            'stop_loss_percent': 5.0,              # 止损百分比
+            'take_profit_percent': 4.0,            # 止盈百分比
+            
+            # 自动管理
+            'auto_management_enabled': True,        # 启用全自动管理
+            'strategy_rotation_enabled': True,      # 启用策略轮换
+            'auto_optimization_enabled': True       # 启用自动优化
         }
         
-        # 资金分配配置
-        self.fund_allocation = {
-            'simulation_init': 0.0,              # 纯模拟，无资金
-            'real_env_simulation': 0.0,          # 真实环境模拟，无资金
-            'small_real_trading': 0.05,          # 5%资金用于小额验证
-            'full_real_trading': 0.20,           # 20%资金用于正式交易
-            'elite_optimization': 0.30           # 30%资金用于精英策略
-        }
+        self.load_config_from_db()
         
-        # 验证周期配置 (小时)
-        self.validation_periods = {
-            'simulation_init': 24,               # 1天模拟初始化
-            'real_env_simulation': 72,           # 3天真实环境验证
-            'small_real_trading': 168,           # 7天小额真实交易验证
-            'full_real_trading': 720,            # 30天正式交易验证
-            'elite_optimization': float('inf')   # 持续优化
-        }
+    def _setup_logger(self):
+        """设置日志"""
+        logger = logging.getLogger('AdvancedStrategyManager')
+        logger.setLevel(logging.INFO)
         
-        print("🚀 高级策略管理器初始化完成")
-        print(f"📊 分层验证体系已建立")
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
         
-    def run_advanced_management_cycle(self):
-        """运行高级管理周期"""
+        return logger
+    
+    def get_db_connection(self):
+        """获取数据库连接"""
+        return psycopg2.connect(**self.db_config)
+    
+    def load_config_from_db(self):
+        """从数据库加载配置"""
         try:
-            print("\n🔄 开始高级策略管理周期...")
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
             
-            # 1. 评估所有策略当前状态
-            self._evaluate_all_strategies()
+            # 检查配置表是否存在
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'strategy_management_config'
+                )
+            """)
             
-            # 2. 检查晋升条件
-            self._check_promotion_conditions()
-            
-            # 3. 检查退役条件
-            self._check_retirement_conditions()
-            
-            # 4. 动态资金分配
-            self._dynamic_fund_allocation()
-            
-            # 5. 自动交易状态管理
-            auto_trading_should_enable = self._should_enable_auto_trading()
-            if auto_trading_should_enable != self.service.auto_trading_enabled:
-                self._toggle_auto_trading(auto_trading_should_enable)
-            
-            # 6. 生成管理报告
-            self._generate_management_report()
-            
-            print("✅ 高级策略管理周期完成")
+            if cursor.fetchone()[0]:
+                cursor.execute("SELECT config_key, config_value FROM strategy_management_config")
+                rows = cursor.fetchall()
+                
+                for key, value in rows:
+                    if key in self.config:
+                        # 根据类型转换值
+                        if isinstance(self.config[key], bool):
+                            self.config[key] = value.lower() == 'true'
+                        elif isinstance(self.config[key], int):
+                            self.config[key] = int(float(value))
+                        elif isinstance(self.config[key], float):
+                            self.config[key] = float(value)
+                        else:
+                            self.config[key] = value
+                            
+                self.logger.info("✅ 策略管理配置已从数据库加载")
+            else:
+                self.create_config_table()
+                
+            cursor.close()
+            conn.close()
             
         except Exception as e:
-            print(f"❌ 高级管理周期出错: {e}")
+            self.logger.error(f"❌ 加载配置失败: {e}")
     
-    def _evaluate_all_strategies(self):
-        """评估所有策略"""
-        strategies = self.service.get_strategies()
-        if not strategies.get('success', False):
-            return
-            
-        for strategy in strategies['data']:
-            strategy_id = strategy['id']
-            score = strategy.get('final_score', 0)
-            win_rate = strategy.get('win_rate', 0)
-            total_return = strategy.get('total_return', 0)
-            total_trades = strategy.get('total_trades', 0)
-            
-            # 更新或创建验证记录
-            if strategy_id not in self.validation_records:
-                self.validation_records[strategy_id] = StrategyValidation(
-                    strategy_id=strategy_id,
-                    status=StrategyStatus.SIMULATION_INIT,
-                    score=score,
-                    win_rate=win_rate,
-                    total_return=total_return,
-                    total_trades=total_trades,
-                    validation_start=datetime.now(),
-                    promotion_history=[]
-                )
-            else:
-                # 更新验证记录
-                record = self.validation_records[strategy_id]
-                record.score = score
-                record.win_rate = win_rate
-                record.total_return = total_return
-                record.total_trades = total_trades
-    
-    def _check_promotion_conditions(self):
-        """检查晋升条件"""
-        for strategy_id, record in self.validation_records.items():
-            current_status = record.status
-            score = record.score
-            
-            # 检查验证时间是否足够
-            validation_duration = (datetime.now() - record.validation_start).total_seconds() / 3600
-            required_duration = self.validation_periods[current_status.value]
-            
-            if validation_duration < required_duration:
-                continue  # 验证时间不够
-            
-            # 检查晋升条件
-            promoted = False
-            new_status = current_status
-            
-            if current_status == StrategyStatus.SIMULATION_INIT and score >= self.thresholds['simulation_to_real_env']:
-                new_status = StrategyStatus.REAL_ENV_SIMULATION
-                promoted = True
-                
-            elif current_status == StrategyStatus.REAL_ENV_SIMULATION and score >= self.thresholds['real_env_to_small_real']:
-                new_status = StrategyStatus.SMALL_REAL_TRADING
-                promoted = True
-                
-            elif current_status == StrategyStatus.SMALL_REAL_TRADING and score >= self.thresholds['small_real_to_full_real']:
-                # 额外检查：小额交易必须盈利
-                if record.real_trading_pnl > 0:
-                    new_status = StrategyStatus.FULL_REAL_TRADING
-                    promoted = True
-                    
-            elif current_status == StrategyStatus.FULL_REAL_TRADING and score >= self.thresholds['full_real_to_elite']:
-                new_status = StrategyStatus.ELITE_OPTIMIZATION
-                promoted = True
-            
-            if promoted:
-                self._promote_strategy(strategy_id, new_status)
-    
-    def _promote_strategy(self, strategy_id: str, new_status: StrategyStatus):
-        """晋升策略"""
-        record = self.validation_records[strategy_id]
-        old_status = record.status.value
-        
-        record.status = new_status
-        record.validation_start = datetime.now()
-        record.validation_end = datetime.now()
-        record.promotion_history.append(f"{datetime.now().isoformat()}: {old_status} → {new_status.value}")
-        
-        print(f"🎉 策略晋升: {strategy_id}")
-        print(f"   {old_status} → {new_status.value}")
-        print(f"   当前评分: {record.score:.1f}")
-        print(f"   成功率: {record.win_rate:.1%}")
-        
-        # 更新策略配置
-        self._update_strategy_configuration(strategy_id, new_status)
-    
-    def _check_retirement_conditions(self):
-        """检查退役条件"""
-        for strategy_id, record in self.validation_records.items():
-            if record.score < self.thresholds['retirement_threshold']:
-                validation_duration = (datetime.now() - record.validation_start).total_seconds() / 3600
-                
-                # 给策略足够的验证时间
-                min_validation_time = self.validation_periods[record.status.value] * 0.5
-                
-                if validation_duration >= min_validation_time:
-                    self._retire_strategy(strategy_id)
-    
-    def _retire_strategy(self, strategy_id: str):
-        """退役策略"""
-        record = self.validation_records[strategy_id]
-        record.status = StrategyStatus.RETIRED
-        
-        print(f"📤 策略退役: {strategy_id}")
-        print(f"   评分过低: {record.score:.1f} < {self.thresholds['retirement_threshold']}")
-        
-        # 停用策略
-        self.service.stop_strategy(strategy_id)
-    
-    def _should_enable_auto_trading(self) -> bool:
-        """判断是否应该启用自动交易"""
-        # 检查是否有符合真实交易条件的策略
-        real_trading_strategies = 0
-        total_real_allocation = 0.0
-        
-        for record in self.validation_records.values():
-            if record.status in [StrategyStatus.SMALL_REAL_TRADING, 
-                               StrategyStatus.FULL_REAL_TRADING, 
-                               StrategyStatus.ELITE_OPTIMIZATION]:
-                real_trading_strategies += 1
-                total_real_allocation += self.fund_allocation[record.status.value]
-        
-        # 条件1: 至少有一个策略达到真实交易阶段
-        # 条件2: 总资金分配合理
-        # 条件3: 系统健康状态良好
-        return (real_trading_strategies > 0 and 
-                total_real_allocation > 0 and 
-                self._check_system_health())
-    
-    def _check_system_health(self) -> bool:
-        """检查系统健康状态"""
+    def create_config_table(self):
+        """创建配置表"""
         try:
-            # 检查数据库连接
-            if not hasattr(self.service, 'db_manager') or self.service.db_manager is None:
-                print("⚠️ 数据库连接异常，暂停自动交易")
-                return False
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
             
-            # 检查余额获取
-            try:
-                balance = self.service._get_current_balance()
-                if balance <= 0:
-                    print("⚠️ 余额获取异常，暂停自动交易")
-                    return False
-            except:
-                print("⚠️ 余额API异常，暂停自动交易")
-                return False
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS strategy_management_config (
+                    config_key VARCHAR(100) PRIMARY KEY,
+                    config_value TEXT NOT NULL,
+                    description TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             
-            # 检查策略数量
-            strategies = self.service.get_strategies()
-            if not strategies.get('success', False) or len(strategies.get('data', [])) == 0:
-                print("⚠️ 策略获取异常，暂停自动交易")
-                return False
+            # 插入默认配置
+            for key, value in self.config.items():
+                cursor.execute("""
+                    INSERT INTO strategy_management_config (config_key, config_value, description)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (config_key) DO NOTHING
+                """, (key, str(value), f"策略管理配置: {key}"))
             
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            self.logger.info("✅ 策略管理配置表已创建")
+            
+        except Exception as e:
+            self.logger.error(f"❌ 创建配置表失败: {e}")
+    
+    def update_config(self, config_updates: Dict):
+        """更新配置到数据库"""
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            for key, value in config_updates.items():
+                if key in self.config:
+                    cursor.execute("""
+                        INSERT INTO strategy_management_config (config_key, config_value, updated_at)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT (config_key) DO UPDATE SET
+                        config_value = EXCLUDED.config_value,
+                        updated_at = EXCLUDED.updated_at
+                    """, (key, str(value)))
+                    
+                    self.config[key] = value
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            self.logger.info(f"✅ 配置已更新: {list(config_updates.keys())}")
             return True
             
         except Exception as e:
-            print(f"⚠️ 系统健康检查失败: {e}")
+            self.logger.error(f"❌ 更新配置失败: {e}")
             return False
     
-    def _toggle_auto_trading(self, enable: bool):
-        """切换自动交易状态"""
+    def get_strategy_statistics(self) -> Dict:
+        """获取策略统计信息"""
         try:
-            reason = "系统智能判断" if enable else "系统保护机制"
-            print(f"🔄 自动{'启用' if enable else '禁用'}交易 - {reason}")
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
             
-            self.service.set_auto_trading(enable)
+            # 获取总策略数
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE id LIKE 'STRAT_%'")
+            total_count = cursor.fetchone()[0]
             
-            # 记录操作日志
-            self.service._log_operation(
-                "自动交易切换",
-                f"{'启用' if enable else '禁用'}自动交易 - {reason}",
-                "success"
-            )
+            # 获取活跃策略数
+            cursor.execute("""
+                SELECT COUNT(*) FROM strategies 
+                WHERE id LIKE 'STRAT_%' AND enabled = true
+            """)
+            active_count = cursor.fetchone()[0]
+            
+            # 获取真实交易策略数
+            cursor.execute("""
+                SELECT COUNT(*) FROM strategies 
+                WHERE id LIKE 'STRAT_%' AND final_score >= %s AND enabled = true
+            """, (self.config['real_trading_score_threshold'],))
+            real_trading_count = cursor.fetchone()[0]
+            
+            # 获取验证交易策略数
+            cursor.execute("""
+                SELECT COUNT(*) FROM strategies 
+                WHERE id LIKE 'STRAT_%' AND final_score >= 45 AND final_score < %s AND enabled = true
+            """, (self.config['real_trading_score_threshold'],))
+            validation_count = cursor.fetchone()[0]
+            
+            # 获取平均评分
+            cursor.execute("""
+                SELECT COALESCE(AVG(final_score), 0) FROM strategies 
+                WHERE id LIKE 'STRAT_%' AND final_score > 0
+            """)
+            avg_score = float(cursor.fetchone()[0])
+            
+            cursor.close()
+            conn.close()
+            
+            return {
+                'total_strategies': total_count,
+                'active_strategies': active_count,
+                'real_trading_strategies': real_trading_count,
+                'validation_strategies': validation_count,
+                'average_score': round(avg_score, 2),
+                'config': self.config
+            }
             
         except Exception as e:
-            print(f"❌ 切换自动交易失败: {e}")
+            self.logger.error(f"❌ 获取策略统计失败: {e}")
+            return {}
     
-    def _dynamic_fund_allocation(self):
-        """动态资金分配"""
-        total_balance = self.service._get_current_balance()
-        
-        for strategy_id, record in self.validation_records.items():
-            if record.status == StrategyStatus.RETIRED:
-                continue
-                
-            # 计算该策略应分配的资金
-            allocation_ratio = self.fund_allocation[record.status.value]
-            allocated_amount = total_balance * allocation_ratio
+    def eliminate_poor_strategies(self) -> int:
+        """🗑️ 淘汰表现差的策略"""
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
             
-            # 更新策略资金配置
-            if allocated_amount > 0:
-                self._update_strategy_fund_allocation(strategy_id, allocated_amount)
-    
-    def _update_strategy_fund_allocation(self, strategy_id: str, allocated_amount: float):
-        """更新策略资金分配"""
-        try:
-            strategy = self.service.get_strategy(strategy_id)
-            if strategy:
-                # 更新策略的交易量参数
-                parameters = strategy.get('parameters', {})
+            current_time = datetime.now()
+            elimination_threshold = current_time - timedelta(hours=self.config['elimination_cycle_hours'])
+            
+            # 获取需要淘汰的策略
+            cursor.execute("""
+                SELECT id, name, final_score, total_trades, win_rate, total_return 
+                FROM strategies 
+                WHERE id LIKE 'STRAT_%' 
+                  AND (
+                      final_score < %s 
+                      OR (total_trades >= %s AND win_rate < %s)
+                      OR created_at < %s
+                  )
+                  AND enabled = false
+                ORDER BY final_score ASC
+            """, (
+                self.config['elimination_score_threshold'],
+                self.config['min_trades_for_evaluation'],
+                self.config['min_win_rate'],
+                elimination_threshold
+            ))
+            
+            poor_strategies = cursor.fetchall()
+            
+            # 检查总策略数，如果超过最大数量，淘汰更多策略
+            cursor.execute("SELECT COUNT(*) FROM strategies WHERE id LIKE 'STRAT_%'")
+            total_count = cursor.fetchone()[0]
+            
+            if total_count > self.config['max_total_strategies']:
+                # 需要额外淘汰的数量
+                extra_elimination = total_count - self.config['optimal_strategy_count']
                 
-                # 根据分配资金调整交易量
-                base_trade_amount = allocated_amount * 0.1  # 每次交易使用10%的分配资金
-                parameters['trade_amount'] = base_trade_amount
-                parameters['allocated_fund'] = allocated_amount
+                # 获取评分最低的策略
+                cursor.execute("""
+                    SELECT id, name, final_score 
+                    FROM strategies 
+                    WHERE id LIKE 'STRAT_%' AND enabled = false
+                    ORDER BY final_score ASC, total_trades ASC
+                    LIMIT %s
+                """, (extra_elimination,))
                 
-                self.service.update_strategy_config(strategy_id, {
-                    'parameters': parameters,
-                    'allocation_ratio': allocated_amount / self.service._get_current_balance()
-                })
-                
+                extra_poor_strategies = cursor.fetchall()
+                poor_strategies.extend(extra_poor_strategies)
+            
+            # 去重
+            strategies_to_eliminate = list(set([s[0] for s in poor_strategies]))
+            
+            eliminated_count = 0
+            for strategy_id in strategies_to_eliminate:
+                try:
+                    # 记录淘汰日志
+                    cursor.execute("""
+                        INSERT INTO strategy_logs (strategy_id, log_type, message, timestamp)
+                        VALUES (%s, 'elimination', %s, %s)
+                    """, (
+                        strategy_id,
+                        f"策略因表现不佳被自动淘汰 - 评分过低或长期无改善",
+                        current_time
+                    ))
+                    
+                    # 删除策略
+                    cursor.execute("DELETE FROM strategies WHERE id = %s", (strategy_id,))
+                    eliminated_count += 1
+                    
+                except Exception as e:
+                    self.logger.error(f"❌ 淘汰策略 {strategy_id} 失败: {e}")
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            if eliminated_count > 0:
+                self.logger.info(f"🗑️ 已淘汰 {eliminated_count} 个表现差的策略")
+            
+            return eliminated_count
+            
         except Exception as e:
-            print(f"❌ 更新策略资金分配失败 {strategy_id}: {e}")
+            self.logger.error(f"❌ 策略淘汰失败: {e}")
+            return 0
     
-    def _update_strategy_configuration(self, strategy_id: str, status: StrategyStatus):
-        """更新策略配置"""
+    def select_top_strategies_for_trading(self) -> List[Dict]:
+        """🏆 选择顶级策略进行真实交易"""
         try:
-            strategy = self.service.get_strategy(strategy_id)
-            if strategy:
-                parameters = strategy.get('parameters', {})
-                
-                # 根据状态调整策略参数
-                if status == StrategyStatus.REAL_ENV_SIMULATION:
-                    parameters['simulation_mode'] = True
-                    parameters['use_real_data'] = True
-                    parameters['risk_level'] = 'conservative'
-                    
-                elif status == StrategyStatus.SMALL_REAL_TRADING:
-                    parameters['simulation_mode'] = False
-                    parameters['use_real_data'] = True
-                    parameters['risk_level'] = 'conservative'
-                    parameters['max_position_size'] = 0.05  # 限制仓位大小
-                    
-                elif status == StrategyStatus.FULL_REAL_TRADING:
-                    parameters['simulation_mode'] = False
-                    parameters['use_real_data'] = True
-                    parameters['risk_level'] = 'moderate'
-                    parameters['max_position_size'] = 0.15
-                    
-                elif status == StrategyStatus.ELITE_OPTIMIZATION:
-                    parameters['simulation_mode'] = False
-                    parameters['use_real_data'] = True
-                    parameters['risk_level'] = 'aggressive'
-                    parameters['max_position_size'] = 0.25
-                    parameters['enable_compound_trading'] = True
-                
-                self.service.update_strategy_config(strategy_id, {
-                    'parameters': parameters,
-                    'validation_status': status.value
-                })
-                
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            # 获取达到真实交易标准的策略
+            cursor.execute("""
+                SELECT id, name, symbol, type, final_score, total_trades, win_rate, total_return
+                FROM strategies 
+                WHERE id LIKE 'STRAT_%' 
+                  AND final_score >= %s
+                  AND total_trades >= %s
+                  AND win_rate >= %s
+                  AND enabled = true
+                ORDER BY final_score DESC, total_return DESC, win_rate DESC
+                LIMIT %s
+            """, (
+                self.config['real_trading_score_threshold'],
+                self.config['min_trades_for_evaluation'],
+                self.config['min_win_rate'],
+                self.config['real_trading_count']
+            ))
+            
+            top_strategies = []
+            rows = cursor.fetchall()
+            
+            for row in rows:
+                strategy = {
+                    'id': row[0],
+                    'name': row[1],
+                    'symbol': row[2],
+                    'type': row[3],
+                    'final_score': float(row[4]) if row[4] else 0,
+                    'total_trades': int(row[5]) if row[5] else 0,
+                    'win_rate': float(row[6]) if row[6] else 0,
+                    'total_return': float(row[7]) if row[7] else 0
+                }
+                top_strategies.append(strategy)
+            
+            cursor.close()
+            conn.close()
+            
+            if top_strategies:
+                self.logger.info(f"🏆 已选择 {len(top_strategies)} 个顶级策略进行真实交易")
+            
+            return top_strategies
+            
         except Exception as e:
-            print(f"❌ 更新策略配置失败 {strategy_id}: {e}")
+            self.logger.error(f"❌ 选择顶级策略失败: {e}")
+            return []
     
-    def _generate_management_report(self):
-        """生成管理报告"""
-        print("\n📊 === 策略管理报告 ===")
+    def optimize_strategy_parameters(self, strategy_id: str) -> bool:
+        """🔧 优化策略参数"""
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            # 获取策略当前信息
+            cursor.execute("""
+                SELECT name, type, parameters, final_score, total_trades, win_rate
+                FROM strategies WHERE id = %s
+            """, (strategy_id,))
+            
+            result = cursor.fetchone()
+            if not result:
+                return False
+            
+            name, strategy_type, current_params, score, trades, win_rate = result
+            
+            # 解析当前参数
+            try:
+                params = json.loads(current_params) if current_params else {}
+            except:
+                params = {}
+            
+            # 根据策略表现决定优化方向
+            if score < 40:  # 低分策略 - 激进优化
+                optimization_factor = 0.3
+                message = "低分策略激进优化"
+            elif score < 55:  # 中等策略 - 温和优化
+                optimization_factor = 0.2
+                message = "中等策略温和优化"
+            elif score < 70:  # 高分策略 - 保守优化
+                optimization_factor = 0.1
+                message = "高分策略保守优化"
+            else:  # 顶级策略 - 微调
+                optimization_factor = 0.05
+                message = "顶级策略精细微调"
+            
+            # 优化参数
+            optimized_params = self._apply_parameter_optimization(params, optimization_factor, win_rate)
+            
+            # 更新策略参数
+            cursor.execute("""
+                UPDATE strategies 
+                SET parameters = %s, 
+                    cycle = COALESCE(cycle, 0) + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (json.dumps(optimized_params), strategy_id))
+            
+            # 记录优化日志
+            cursor.execute("""
+                INSERT INTO strategy_logs (strategy_id, log_type, message, parameters_before, parameters_after, timestamp)
+                VALUES (%s, 'optimization', %s, %s, %s, %s)
+            """, (
+                strategy_id,
+                message,
+                json.dumps(params),
+                json.dumps(optimized_params),
+                datetime.now()
+            ))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            self.logger.info(f"🔧 策略 {strategy_id} 参数已优化")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ 优化策略 {strategy_id} 失败: {e}")
+            return False
+    
+    def _apply_parameter_optimization(self, params: Dict, factor: float, win_rate: float) -> Dict:
+        """应用参数优化逻辑"""
+        optimized = params.copy()
         
-        status_counts = {}
-        for record in self.validation_records.values():
-            status = record.status.value
-            status_counts[status] = status_counts.get(status, 0) + 1
+        # 根据胜率调整参数
+        if win_rate < 0.5:  # 胜率太低
+            # 降低交易频率，提高质量
+            if 'threshold' in optimized:
+                optimized['threshold'] = min(optimized['threshold'] * (1 + factor), 0.05)
+            if 'lookback_period' in optimized:
+                optimized['lookback_period'] = max(int(optimized['lookback_period'] * (1 + factor)), 5)
         
-        for status, count in status_counts.items():
-            print(f"  {status}: {count}个策略")
+        elif win_rate > 0.8:  # 胜率很高
+            # 适当增加交易频率
+            if 'threshold' in optimized:
+                optimized['threshold'] = max(optimized['threshold'] * (1 - factor * 0.5), 0.001)
+            if 'quantity' in optimized:
+                optimized['quantity'] = min(optimized['quantity'] * (1 + factor * 0.5), 1000)
         
-        # 显示top策略
-        top_strategies = sorted(
-            self.validation_records.values(),
-            key=lambda x: x.score,
-            reverse=True
-        )[:5]
+        # 风险控制优化
+        if 'stop_loss_pct' in optimized:
+            optimized['stop_loss_pct'] = max(optimized['stop_loss_pct'] * (1 - factor * 0.1), 1.0)
         
-        print("\n🏆 Top 5 策略:")
-        for i, record in enumerate(top_strategies, 1):
-            print(f"  {i}. {record.strategy_id}: {record.score:.1f}分 [{record.status.value}]")
+        if 'take_profit_pct' in optimized:
+            optimized['take_profit_pct'] = min(optimized['take_profit_pct'] * (1 + factor * 0.1), 10.0)
         
-        print(f"\n💰 当前余额: {self.service._get_current_balance():.2f} USDT")
-        print(f"🤖 自动交易状态: {'启用' if self.service.auto_trading_enabled else '禁用'}")
-        print("=" * 50)
+        return optimized
+    
+    def run_automatic_management(self):
+        """🤖 运行全自动策略管理"""
+        if not self.config['auto_management_enabled']:
+            self.logger.info("🚫 全自动管理已禁用")
+            return
+        
+        self.running = True
+        self.logger.info("🚀 启动全自动策略管理系统")
+        
+        while self.running:
+            try:
+                start_time = time.time()
+                
+                # 1. 获取当前统计信息
+                stats = self.get_strategy_statistics()
+                self.logger.info(f"📊 当前策略统计: {stats}")
+                
+                # 2. 策略淘汰
+                eliminated = self.eliminate_poor_strategies()
+                
+                # 3. 策略优化
+                if self.config['auto_optimization_enabled']:
+                    optimized = self._run_strategy_optimization()
+                    self.logger.info(f"🔧 已优化 {optimized} 个策略")
+                
+                # 4. 选择顶级策略
+                top_strategies = self.select_top_strategies_for_trading()
+                
+                # 5. 策略轮换
+                if self.config['strategy_rotation_enabled']:
+                    rotated = self._run_strategy_rotation()
+                    self.logger.info(f"🔄 已轮换 {rotated} 个策略")
+                
+                execution_time = time.time() - start_time
+                self.logger.info(f"⏱️ 管理周期完成，耗时 {execution_time:.2f}秒")
+                
+                # 等待下一个周期
+                time.sleep(self.config['evolution_interval_minutes'] * 60)
+                
+            except Exception as e:
+                self.logger.error(f"❌ 自动管理失败: {e}")
+                traceback.print_exc()
+                time.sleep(60)  # 出错后等待1分钟再试
+    
+    def _run_strategy_optimization(self) -> int:
+        """运行策略优化"""
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            # 获取需要优化的策略
+            cursor.execute("""
+                SELECT id FROM strategies 
+                WHERE id LIKE 'STRAT_%' 
+                  AND enabled = true
+                  AND (
+                      final_score < 60 
+                      OR total_trades >= 20
+                  )
+                ORDER BY final_score ASC
+                LIMIT 10
+            """)
+            
+            strategies = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            conn.close()
+            
+            optimized_count = 0
+            for strategy_id in strategies:
+                if self.optimize_strategy_parameters(strategy_id):
+                    optimized_count += 1
+            
+            return optimized_count
+            
+        except Exception as e:
+            self.logger.error(f"❌ 策略优化失败: {e}")
+            return 0
+    
+    def _run_strategy_rotation(self) -> int:
+        """运行策略轮换"""
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            # 禁用表现差的活跃策略
+            cursor.execute("""
+                UPDATE strategies 
+                SET enabled = false, updated_at = CURRENT_TIMESTAMP
+                WHERE id LIKE 'STRAT_%' 
+                  AND enabled = true
+                  AND (
+                      final_score < 45
+                      OR (total_trades >= 15 AND win_rate < 0.5)
+                  )
+            """)
+            
+            disabled_count = cursor.rowcount
+            
+            # 启用表现好的非活跃策略
+            cursor.execute("""
+                UPDATE strategies 
+                SET enabled = true, updated_at = CURRENT_TIMESTAMP
+                WHERE id LIKE 'STRAT_%' 
+                  AND enabled = false
+                  AND final_score >= 50
+                  AND total_trades >= 5
+                ORDER BY final_score DESC
+                LIMIT %s
+            """, (min(5, max(1, disabled_count))))
+            
+            enabled_count = cursor.rowcount
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            if disabled_count > 0 or enabled_count > 0:
+                self.logger.info(f"🔄 策略轮换: 禁用{disabled_count}个, 启用{enabled_count}个")
+            
+            return disabled_count + enabled_count
+            
+        except Exception as e:
+            self.logger.error(f"❌ 策略轮换失败: {e}")
+            return 0
+    
+    def stop(self):
+        """停止自动管理"""
+        self.running = False
+        self.logger.info("🛑 全自动策略管理已停止")
+    
+    def get_config(self) -> Dict:
+        """获取当前配置"""
+        return self.config.copy()
+    
+    def get_display_strategies(self, limit: Optional[int] = None) -> List[Dict]:
+        """获取用于前端显示的策略列表"""
+        try:
+            display_limit = limit or self.config['display_strategy_count']
+            
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id, name, symbol, type, enabled, final_score, 
+                       total_trades, win_rate, total_return, generation, cycle,
+                       created_at, updated_at
+                FROM strategies 
+                WHERE id LIKE 'STRAT_%' 
+                ORDER BY final_score DESC, total_trades DESC
+                LIMIT %s
+            """, (display_limit,))
+            
+            strategies = []
+            rows = cursor.fetchall()
+            
+            for row in rows:
+                strategy = {
+                    'id': row[0],
+                    'name': row[1],
+                    'symbol': row[2],
+                    'type': row[3],
+                    'enabled': row[4],
+                    'final_score': float(row[5]) if row[5] else 0,
+                    'total_trades': int(row[6]) if row[6] else 0,
+                    'win_rate': float(row[7]) if row[7] else 0,
+                    'total_return': float(row[8]) if row[8] else 0,
+                    'generation': int(row[9]) if row[9] else 1,
+                    'cycle': int(row[10]) if row[10] else 1,
+                    'created_at': row[11].isoformat() if row[11] else None,
+                    'updated_at': row[12].isoformat() if row[12] else None
+                }
+                strategies.append(strategy)
+            
+            cursor.close()
+            conn.close()
+            
+            return strategies
+            
+        except Exception as e:
+            self.logger.error(f"❌ 获取显示策略失败: {e}")
+            return []
+
 
 # 全局实例
-advanced_manager = None
+strategy_manager = AdvancedStrategyManager()
 
-def get_advanced_manager(quantitative_service):
-    """获取高级管理器实例"""
-    global advanced_manager
-    if advanced_manager is None:
-        advanced_manager = AdvancedStrategyManager(quantitative_service)
-    return advanced_manager 
+def start_strategy_management():
+    """启动策略管理线程"""
+    if not strategy_manager.running:
+        management_thread = threading.Thread(
+            target=strategy_manager.run_automatic_management,
+            daemon=True
+        )
+        management_thread.start()
+        return True
+    return False
+
+def stop_strategy_management():
+    """停止策略管理"""
+    strategy_manager.stop()
+
+if __name__ == "__main__":
+    # 测试运行
+    print("🚀 测试高级策略管理器...")
+    
+    # 获取统计信息
+    stats = strategy_manager.get_strategy_statistics()
+    print(f"📊 策略统计: {stats}")
+    
+    # 淘汰表现差的策略
+    eliminated = strategy_manager.eliminate_poor_strategies()
+    print(f"🗑️ 已淘汰 {eliminated} 个策略")
+    
+    # 选择顶级策略
+    top_strategies = strategy_manager.select_top_strategies_for_trading()
+    print(f"🏆 顶级策略: {len(top_strategies)} 个")
+    
+    # 获取显示策略
+    display_strategies = strategy_manager.get_display_strategies(5)
+    print(f"📱 前端显示策略: {len(display_strategies)} 个") 

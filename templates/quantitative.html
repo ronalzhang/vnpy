@@ -834,8 +834,8 @@
     </script>
     <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
     <script>
-        // 🔥 全局变量声明（必须在初始化之前）
-        let systemRunning = false;
+        // 🔥 全局变量声明（必须在初始化之前，但避免重复声明）
+        // systemRunning 已在 quantitative.js 中声明
         let autoTradingEnabled = false;
         let refreshTimer = null;
         let evolutionLogTimer = null;
