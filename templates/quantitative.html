@@ -826,16 +826,8 @@
             }
         }
 
-        // 页面加载时立即更新时间和状态
+        // 页面加载时立即更新时间
         updateCurrentTime();
-        
-        // 确保页面加载时状态指示器显示正确
-        const statusIndicator = document.getElementById('system-status-indicator');
-        const statusText = document.getElementById('system-status-text');
-        if (statusIndicator && statusText) {
-            statusIndicator.className = 'status-indicator status-offline';
-            statusText.textContent = '离线';
-        }
         
         // 每秒更新时间
         setInterval(updateCurrentTime, 1000);
@@ -857,7 +849,18 @@
             try {
                 app = new QuantitativeSystem();
                 console.log('✅ 量化交易系统初始化成功！');
-                console.log('📊 策略卡即将加载...');
+                
+                // 🔥 立即加载系统状态和数据
+                setTimeout(() => {
+                    console.log('🔄 开始加载系统数据...');
+                    app.loadSystemStatus();
+                    app.loadStrategies();
+                    app.loadAccountInfo();
+                    app.loadPositions();
+                    app.loadSignals();
+                    console.log('📊 所有数据加载请求已发送');
+                }, 100);
+                
             } catch (error) {
                 console.error('❌ 量化交易系统初始化失败:', error);
                 
