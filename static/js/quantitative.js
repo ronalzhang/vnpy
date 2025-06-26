@@ -1817,6 +1817,114 @@ class QuantitativeSystem {
         this.showMessage('已恢复默认配置', 'info');
     }
 
+    // 切换全自动策略管理
+    async toggleAutoStrategyManagement(enabled) {
+        try {
+            const response = await fetch('/api/quantitative/auto-strategy-management', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: enabled })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                // 更新界面状态
+                const statusElement = document.getElementById('autoManagementStatus');
+                const configElement = document.getElementById('autoManagementConfig');
+                
+                if (enabled) {
+                    statusElement.textContent = '启用';
+                    statusElement.className = 'text-success';
+                    configElement.style.display = 'block';
+                } else {
+                    statusElement.textContent = '禁用';
+                    statusElement.className = 'text-muted';
+                    configElement.style.display = 'none';
+                }
+                
+                this.showMessage(data.message, 'success');
+                
+                // 刷新状态
+                this.loadAutoManagementStatus();
+            } else {
+                this.showMessage(data.message || '操作失败', 'error');
+                // 恢复开关状态
+                document.getElementById('autoManagementEnabled').checked = !enabled;
+            }
+        } catch (error) {
+            console.error('切换全自动策略管理失败:', error);
+            this.showMessage('切换全自动策略管理失败', 'error');
+            // 恢复开关状态
+            document.getElementById('autoManagementEnabled').checked = !enabled;
+        }
+    }
+
+    // 加载全自动策略管理状态
+    async loadAutoManagementStatus() {
+        try {
+            const response = await fetch('/api/quantitative/auto-strategy-management/status');
+            const data = await response.json();
+            
+            if (data.success) {
+                const status = data.data;
+                
+                // 更新开关状态
+                const switchElement = document.getElementById('autoManagementEnabled');
+                if (switchElement) {
+                    switchElement.checked = status.enabled || false;
+                }
+                
+                // 更新状态文本
+                const statusElement = document.getElementById('autoManagementStatus');
+                const configElement = document.getElementById('autoManagementConfig');
+                
+                if (status.enabled) {
+                    statusElement.textContent = '启用';
+                    statusElement.className = 'text-success';
+                    configElement.style.display = 'block';
+                } else {
+                    statusElement.textContent = '禁用';
+                    statusElement.className = 'text-muted';
+                    configElement.style.display = 'none';
+                }
+                
+                // 更新状态统计
+                this.safeSetText('currentActiveStrategies', status.current_active_strategies || 0);
+                this.safeSetText('realTradingStrategiesCount', status.real_trading_strategies || 0);
+                this.safeSetText('validationStrategiesCount', status.validation_strategies || 0);
+                this.safeSetText('totalStrategiesCount', status.total_strategies || 0);
+                
+                // 更新配置值
+                if (status.min_active_strategies) {
+                    const minElement = document.getElementById('minActiveStrategies');
+                    if (minElement) minElement.value = status.min_active_strategies;
+                }
+                if (status.max_active_strategies) {
+                    const maxElement = document.getElementById('maxActiveStrategies');
+                    if (maxElement) maxElement.value = status.max_active_strategies;
+                }
+                if (status.auto_enable_threshold) {
+                    const thresholdElement = document.getElementById('autoEnableThreshold');
+                    if (thresholdElement) thresholdElement.value = status.auto_enable_threshold;
+                }
+                if (status.auto_select_interval) {
+                    const intervalElement = document.getElementById('autoSelectionInterval');
+                    if (intervalElement) intervalElement.value = status.auto_select_interval / 60; // 转换为分钟
+                }
+                if (status.strategy_rotation_enabled !== undefined) {
+                    const rotationElement = document.getElementById('strategyRotationEnabled');
+                    if (rotationElement) rotationElement.checked = status.strategy_rotation_enabled;
+                }
+                
+            } else {
+                console.warn('获取全自动策略管理状态失败:', data.message);
+            }
+        } catch (error) {
+            console.error('加载全自动策略管理状态失败:', error);
+        }
+    }
+
     // ==================== 策略进化日志功能 ====================
     
     // 初始化进化日志
@@ -1846,6 +1954,17 @@ class QuantitativeSystem {
                 this.resetManagementConfig();
             });
         }
+
+        // 全自动策略管理开关
+        const autoMgmtSwitch = document.getElementById('autoManagementEnabled');
+        if (autoMgmtSwitch) {
+            autoMgmtSwitch.addEventListener('change', () => {
+                this.toggleAutoStrategyManagement(autoMgmtSwitch.checked);
+            });
+        }
+        
+        // 加载全自动策略管理状态
+        this.loadAutoManagementStatus();
 
         // 🔥 添加实时保存功能 - 当输入框失去焦点时自动保存
         const form = document.getElementById('strategyManagementForm');

@@ -245,7 +245,7 @@ def _get_strategy_trade_mode(score, enabled):
     """根据策略分数和启用状态确定交易模式"""
     if not enabled:
         return '已停止'
-    elif score >= 50.0:  # 🔧 降低真实交易门槛从65分到50分
+    elif score >= 65.0:
         return '真实交易'
     else:
         return '验证交易'
@@ -2894,7 +2894,7 @@ def select_top_strategies():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 🔧 降低真实交易标准：至少5次交易，55%+胜率，盈利≥5U，提升策略利用率
+        # 🎯 从配置页面读取真实交易标准
         query = f'''
             SELECT s.id, s.name, s.final_score,
                    COUNT(t.id) as actual_trades,
@@ -2904,9 +2904,9 @@ def select_top_strategies():
             LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = true
             WHERE s.enabled = 1
             GROUP BY s.id, s.name, s.final_score
-            HAVING COUNT(t.id) >= 5 
-                AND COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 55
-                AND COALESCE(SUM(t.expected_return), 0) >= 5.0
+            HAVING COUNT(t.id) >= 10 
+                AND COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 65
+                AND COALESCE(SUM(t.expected_return), 0) >= 10.0
             ORDER BY SUM(t.expected_return) DESC, s.final_score DESC
             LIMIT {max_strategies}
         '''
@@ -3119,6 +3119,70 @@ def create_strategy():
             
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
+
+@app.route('/api/quantitative/auto-strategy-management', methods=['POST'])
+def toggle_auto_strategy_management():
+    """启用/禁用全自动策略管理"""
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        
+        # 通过HTTP请求后端服务
+        import requests
+        response = requests.post('http://localhost:8000/toggle-auto-management', 
+                               json={'enabled': enabled}, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return jsonify({
+                "success": True,
+                "message": f"全自动策略管理已{'启用' if enabled else '禁用'}",
+                "enabled": enabled
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "后端服务响应异常"
+            }), 500
+            
+    except Exception as e:
+        print(f"切换全自动策略管理失败: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
+
+@app.route('/api/quantitative/auto-strategy-management/status', methods=['GET'])
+def get_auto_strategy_management_status():
+    """获取全自动策略管理状态"""
+    try:
+        # 通过HTTP请求后端服务
+        import requests
+        response = requests.get('http://localhost:8000/auto-management-status', timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return jsonify({
+                "success": True,
+                "data": result
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "后端服务响应异常"
+            }), 500
+            
+    except Exception as e:
+        print(f"获取全自动策略管理状态失败: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e),
+            "data": {
+                "enabled": False,
+                "current_active_strategies": 0,
+                "total_strategies": 0
+            }
+        }), 500
 
 @app.route('/api/quantitative/auto-trading', methods=['GET', 'POST'])
 def manage_auto_trading():

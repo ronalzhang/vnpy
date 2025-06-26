@@ -1980,19 +1980,30 @@ class QuantitativeService:
         }
         
         # 设置默认的真实交易门槛和进化频率（配置化参数，支持动态更新）
-        self.real_trading_threshold = 50.0  # 🔧 降低真实交易分数阈值，提升策略利用率
+        self.real_trading_threshold = 65.0  # 真实交易分数阈值（从配置页面读取）
         self.evolution_interval = 30  # 🔧 调整进化频率为30分钟，平衡效率和稳定性
         
-        # 🚀 新增全自动策略管理配置
+        # 🚀 全自动策略管理配置（手动启用）
         self.auto_strategy_management = {
-            'enabled': True,  # 启用全自动策略管理
+            'enabled': False,  # 默认禁用，需手动启用全自动管理
             'min_active_strategies': 2,  # 最少保持2个活跃策略
             'max_active_strategies': 5,  # 最多同时运行5个策略
             'auto_enable_threshold': 45.0,  # 45分以上自动启用
             'auto_select_interval': 600,  # 每10分钟自动选择一次
             'strategy_rotation_enabled': True,  # 启用策略轮换
             'rotation_interval': 3600,  # 每小时轮换一次
-            'performance_review_interval': 1800  # 每30分钟检查表现
+            'performance_review_interval': 1800,  # 每30分钟检查表现
+            'last_selection_time': 0,
+            'last_rotation_time': 0,
+            'last_review_time': 0
+        }
+        
+        # 🎯 实时门槛管理（从策略管理配置读取）
+        self.trading_thresholds = {
+            'real_trading_score': 65.0,  # 真实交易分数阈值
+            'min_trades_required': 10,   # 最少交易次数要求
+            'min_win_rate': 65.0,       # 最小胜率要求（%）
+            'min_profit_amount': 10.0   # 最小盈利金额要求
         }
         
         # 加载配置和初始化
@@ -2330,8 +2341,13 @@ class QuantitativeService:
         print("🚀 全自动策略管理线程已启动")
 
     def _auto_select_strategies(self):
-        """自动选择策略进行真实交易"""
+        """智能自动选择策略，结合配置门槛和实时数据"""
         try:
+            print("🎯 开始智能策略选择...")
+            
+            # 从数据库加载最新门槛配置
+            self._load_trading_thresholds()
+            
             strategies_response = self.get_strategies()
             if not strategies_response.get('success', False):
                 print("⚠️ 获取策略列表失败")
@@ -2339,23 +2355,46 @@ class QuantitativeService:
             
             strategies = strategies_response.get('data', [])
             
-            # 筛选合格策略（降低门槛）
+            # 🎯 使用配置门槛筛选合格策略
             qualified_strategies = []
             for strategy in strategies:
                 score = strategy.get('final_score', 0)
-                if score >= self.auto_strategy_management['auto_enable_threshold']:
+                win_rate = strategy.get('win_rate', 0)
+                total_trades = strategy.get('total_trades', 0)
+                total_return = strategy.get('total_return', 0)
+                
+                # 综合门槛检验
+                score_ok = score >= self.trading_thresholds['real_trading_score']
+                trades_ok = total_trades >= self.trading_thresholds['min_trades_required']
+                winrate_ok = win_rate >= self.trading_thresholds['min_win_rate']
+                profit_ok = (total_return * 100) >= self.trading_thresholds['min_profit_amount']
+                
+                # 满足配置门槛的策略进入真实交易候选
+                if score_ok and trades_ok and winrate_ok and profit_ok:
                     qualified_strategies.append({
                         'id': strategy['id'],
                         'name': strategy['name'],
                         'score': score,
                         'enabled': strategy.get('enabled', False),
-                        'win_rate': strategy.get('win_rate', 0),
-                        'total_return': strategy.get('total_return', 0)
+                        'win_rate': win_rate,
+                        'total_return': total_return,
+                        'trade_mode': 'real'  # 真实交易模式
+                    })
+                # 其他策略进入验证交易候选
+                elif score >= self.auto_strategy_management['auto_enable_threshold']:
+                    qualified_strategies.append({
+                        'id': strategy['id'],
+                        'name': strategy['name'],
+                        'score': score,
+                        'enabled': strategy.get('enabled', False),
+                        'win_rate': win_rate,
+                        'total_return': total_return,
+                        'trade_mode': 'validation'  # 验证交易模式
                     })
             
             if not qualified_strategies:
                 print("⚠️ 暂无合格策略，降低要求重新筛选...")
-                # 降低要求：选择评分最高的前3个策略
+                # 降低要求：选择评分最高的前3个策略进行验证交易
                 all_scores = [(s['id'], s.get('final_score', 0), s['name']) for s in strategies]
                 all_scores.sort(key=lambda x: x[1], reverse=True)
                 for sid, score, name in all_scores[:3]:
@@ -2366,16 +2405,20 @@ class QuantitativeService:
                         'score': score,
                         'enabled': strategy.get('enabled', False),
                         'win_rate': strategy.get('win_rate', 0),
-                        'total_return': strategy.get('total_return', 0)
+                        'total_return': strategy.get('total_return', 0),
+                        'trade_mode': 'validation'  # 保守验证模式
                     })
             
-            # 按综合评分排序
-            qualified_strategies.sort(key=lambda x: x['score'] * 0.7 + x['win_rate'] * 30, reverse=True)
+            # 按综合评分排序（优先真实交易策略）
+            qualified_strategies.sort(key=lambda x: (x['trade_mode'] == 'real', x['score'] * 0.7 + x['win_rate'] * 0.3), reverse=True)
             
             # 确保活跃策略数量在合理范围内
             currently_enabled = sum(1 for s in qualified_strategies if s['enabled'])
             min_active = self.auto_strategy_management['min_active_strategies']
             max_active = self.auto_strategy_management['max_active_strategies']
+            
+            real_trading_count = 0
+            validation_count = 0
             
             if currently_enabled < min_active:
                 # 启用更多策略
@@ -2383,25 +2426,66 @@ class QuantitativeService:
                 for strategy in qualified_strategies[:to_enable]:
                     if not strategy['enabled']:
                         self._enable_strategy_auto(strategy['id'])
-                        print(f"✅ 自动启用策略: {strategy['name']} (评分: {strategy['score']:.1f})")
+                        if strategy['trade_mode'] == 'real':
+                            real_trading_count += 1
+                            print(f"💰 自动启用真实交易策略: {strategy['name']} (评分: {strategy['score']:.1f})")
+                        else:
+                            validation_count += 1
+                            print(f"🔬 自动启用验证交易策略: {strategy['name']} (评分: {strategy['score']:.1f})")
                         
             elif currently_enabled > max_active:
                 # 禁用表现差的策略
                 enabled_strategies = [s for s in qualified_strategies if s['enabled']]
-                enabled_strategies.sort(key=lambda x: x['score'])
+                enabled_strategies.sort(key=lambda x: (x['trade_mode'] == 'validation', x['score']))  # 先禁用验证策略
                 to_disable = currently_enabled - max_active
                 for strategy in enabled_strategies[:to_disable]:
                     self._disable_strategy_auto(strategy['id'])
                     print(f"❌ 自动禁用策略: {strategy['name']} (评分: {strategy['score']:.1f})")
             
-            # 启用自动交易模式
-            if not self.auto_trading_enabled:
-                self.auto_trading_enabled = True
-                self.update_system_status(auto_trading_enabled=True)
-                print("🚀 自动启用自动交易模式")
+            # 统计信息
+            enabled_real = sum(1 for s in qualified_strategies if s['enabled'] and s.get('trade_mode') == 'real')
+            enabled_validation = sum(1 for s in qualified_strategies if s['enabled'] and s.get('trade_mode') == 'validation')
+            
+            print(f"📊 策略选择完成: 真实交易{enabled_real}个, 验证交易{enabled_validation}个")
+            print(f"🎯 门槛要求: 评分≥{self.trading_thresholds['real_trading_score']}, 交易≥{self.trading_thresholds['min_trades_required']}, "
+                  f"胜率≥{self.trading_thresholds['min_win_rate']}%, 盈利≥{self.trading_thresholds['min_profit_amount']}")
                 
         except Exception as e:
-            print(f"❌ 自动策略选择失败: {e}")
+            print(f"❌ 智能策略选择失败: {e}")
+
+    # 🎯 从数据库配置表加载门槛设置
+    def _load_trading_thresholds(self):
+        """从策略管理配置表读取真实交易门槛"""
+        try:
+            # 使用现有的数据库连接
+            cursor = self.conn.cursor()
+            
+            # 读取配置表中的门槛设置
+            cursor.execute('''
+                SELECT config_key, config_value FROM strategy_management_config 
+                WHERE config_key IN ('real_trading_threshold', 'min_trades_required', 
+                                     'min_win_rate', 'min_profit_amount')
+            ''')
+            
+            config_data = dict(cursor.fetchall())
+            
+            # 更新门槛设置
+            if 'real_trading_threshold' in config_data:
+                self.trading_thresholds['real_trading_score'] = float(config_data['real_trading_threshold'])
+            if 'min_trades_required' in config_data:
+                self.trading_thresholds['min_trades_required'] = int(config_data['min_trades_required'])
+            if 'min_win_rate' in config_data:
+                self.trading_thresholds['min_win_rate'] = float(config_data['min_win_rate'])
+            if 'min_profit_amount' in config_data:
+                self.trading_thresholds['min_profit_amount'] = float(config_data['min_profit_amount'])
+            
+            print(f"🎯 已加载交易门槛配置: 分数≥{self.trading_thresholds['real_trading_score']}, "
+                  f"交易≥{self.trading_thresholds['min_trades_required']}, "
+                  f"胜率≥{self.trading_thresholds['min_win_rate']}%, "
+                  f"盈利≥{self.trading_thresholds['min_profit_amount']}")
+            
+        except Exception as e:
+            print(f"⚠️ 加载门槛配置失败，使用默认值: {e}")
 
     def _auto_rotate_strategies(self):
         """自动轮换策略"""
