@@ -711,9 +711,38 @@ def get_parameter_manager():
     """获取参数管理器实例"""
     return parameter_manager
 
-def get_strategy_parameter_ranges():
-    """获取策略参数范围配置"""
-    return PARAMETER_RULES
+def get_strategy_parameter_ranges(strategy_type=None):
+    """
+    获取策略参数范围配置
+    :param strategy_type: 策略类型，如果提供则返回该策略类型的参数，否则返回所有参数
+    :return: 参数范围配置字典
+    """
+    if strategy_type is None:
+        return PARAMETER_RULES
+    
+    # 根据策略类型过滤参数
+    filtered_params = {}
+    strategy_prefix = strategy_type.split("_")[0].lower()
+    
+    for param_name, config in PARAMETER_RULES.items():
+        # 检查参数是否适用于当前策略类型
+        param_prefix = param_name.split("_")[0].lower()
+        
+        # 包含策略特定参数和通用风控参数
+        if (param_prefix == strategy_prefix or 
+            param_name in ["max_position_size", "stop_loss", "take_profit"] or
+            param_prefix in ["max", "stop", "take", "profit"]):
+            filtered_params[param_name] = config
+    
+    # 如果没有找到特定参数，返回一些基础参数
+    if not filtered_params:
+        # 返回通用参数
+        basic_params = ["max_position_size", "stop_loss", "take_profit"]
+        for param in basic_params:
+            if param in PARAMETER_RULES:
+                filtered_params[param] = PARAMETER_RULES[param]
+    
+    return filtered_params
 
 def get_all_strategy_types():
     """获取所有策略类型列表"""
