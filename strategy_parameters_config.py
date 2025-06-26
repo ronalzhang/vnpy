@@ -2,265 +2,750 @@
 # -*- coding: utf-8 -*-
 
 """
-策略参数统一配置模块
-提供所有策略类型的完整参数配置，确保前后端、数据库、进化系统完全同步
+策略参数配置 - 2.0升级版
+增强策略参数优化与进化配置
 """
 
-# 🎯 统一的策略参数配置 - 所有模块共用
-STRATEGY_PARAMETERS_CONFIG = {
-    'momentum': {
-        # 基础参数
-        'lookback_period': {'default': 20, 'range': (10, 50), 'type': 'int', 'description': '回望周期'},
-        'threshold': {'default': 0.02, 'range': (0.01, 0.05), 'type': 'float', 'description': '动量阈值'},
-        'quantity': {'default': 100, 'range': (50, 200), 'type': 'float', 'description': '交易数量'},
-        'momentum_threshold': {'default': 0.01, 'range': (0.005, 0.03), 'type': 'float', 'description': '动量检测阈值'},
-        'volume_threshold': {'default': 2.0, 'range': (1.0, 5.0), 'type': 'float', 'description': '成交量阈值'},
-        
-        # 技术指标参数 - RSI
-        'rsi_period': {'default': 14, 'range': (10, 30), 'type': 'int', 'description': 'RSI周期'},
-        'rsi_oversold': {'default': 30, 'range': (20, 40), 'type': 'int', 'description': 'RSI超卖线'},
-        'rsi_overbought': {'default': 70, 'range': (60, 80), 'type': 'int', 'description': 'RSI超买线'},
-        
-        # MACD指标参数
-        'macd_fast_period': {'default': 12, 'range': (8, 18), 'type': 'int', 'description': 'MACD快线周期'},
-        'macd_slow_period': {'default': 26, 'range': (20, 35), 'type': 'int', 'description': 'MACD慢线周期'},
-        'macd_signal_period': {'default': 9, 'range': (7, 15), 'type': 'int', 'description': 'MACD信号线周期'},
-        
-        # 价格动量参数
-        'price_momentum_period': {'default': 10, 'range': (5, 20), 'type': 'int', 'description': '价格动量周期'},
-        'volume_momentum_period': {'default': 20, 'range': (10, 30), 'type': 'int', 'description': '成交量动量周期'},
-        'price_change_filter': {'default': 0.005, 'range': (0.001, 0.02), 'type': 'float', 'description': '价格变化过滤器'},
-        
-        # 风险控制参数
-        'stop_loss_pct': {'default': 2.0, 'range': (1.0, 5.0), 'type': 'float', 'description': '止损百分比'},
-        'take_profit_pct': {'default': 4.0, 'range': (2.0, 8.0), 'type': 'float', 'description': '止盈百分比'},
-        'max_drawdown_pct': {'default': 5.0, 'range': (2.0, 10.0), 'type': 'float', 'description': '最大回撤百分比'},
-        'position_sizing': {'default': 0.1, 'range': (0.05, 0.25), 'type': 'float', 'description': '仓位大小比例'},
-        'min_hold_time': {'default': 300, 'range': (60, 1800), 'type': 'int', 'description': '最小持有时间(秒)'},
-        'max_hold_time': {'default': 3600, 'range': (1800, 7200), 'type': 'int', 'description': '最大持有时间(秒)'}
+from typing import Dict, List, Any, Tuple, Optional
+import json
+import os
+import random
+from datetime import datetime
+import numpy as np
+
+
+# 市场状态定义
+MARKET_STATES = {
+    "TRENDING_UP": "趋势上涨",
+    "TRENDING_DOWN": "趋势下跌",
+    "SIDEWAYS": "横盘震荡",
+    "VOLATILE": "高波动",
+    "LOW_VOLATILITY": "低波动",
+    "BREAKOUT": "突破",
+    "REVERSAL": "反转",
+    "RANGING": "区间震荡",
+}
+
+# 策略类型定义
+STRATEGY_TYPES = [
+    "momentum",          # 动量策略
+    "mean_reversion",    # 均值回归策略
+    "breakout",          # 突破策略
+    "grid_trading",      # 网格交易策略
+    "trend_following",   # 趋势跟踪策略
+    "high_frequency",    # 高频交易策略
+    "scalping",          # 短线策略
+    "arbitrage",         # 套利策略
+    "pattern_recognition", # 形态识别策略
+]
+
+# 全局参数规则
+PARAMETER_RULES = {
+    # 动量策略参数
+    "momentum_period": {
+        "range": [5, 120],
+        "optimal": 14,
+        "step": 1,
+        "profit_logic": "dynamic", # 参数调整逻辑：根据市场状态动态调整
+        "description": "动量计算周期",
+        "market_adaption": {
+            "TRENDING_UP": [10, 30],
+            "TRENDING_DOWN": [10, 30],
+            "SIDEWAYS": [5, 15],
+            "VOLATILE": [3, 20],
+            "LOW_VOLATILITY": [20, 60]
+        },
+        "mutation_strength": 0.2, # 变异强度
+        "type": "int"
+    },
+    "momentum_threshold": {
+        "range": [0.01, 0.3],
+        "optimal": 0.05,
+        "step": 0.01,
+        "profit_logic": "direct", # 参数调整逻辑：收益越高，参数越接近最优
+        "description": "动量阈值",
+        "market_adaption": {
+            "TRENDING_UP": [0.03, 0.1],
+            "TRENDING_DOWN": [0.03, 0.1],
+            "SIDEWAYS": [0.01, 0.05],
+            "VOLATILE": [0.05, 0.15],
+            "LOW_VOLATILITY": [0.01, 0.03]
+        },
+        "mutation_strength": 0.1,
+        "type": "float"
     },
     
-    'mean_reversion': {
-        # 基础参数
-        'lookback_period': {'default': 30, 'range': (15, 60), 'type': 'int', 'description': '回望周期'},
-        'std_multiplier': {'default': 2.0, 'range': (1.5, 3.0), 'type': 'float', 'description': '标准差倍数'},
-        'quantity': {'default': 100, 'range': (50, 200), 'type': 'float', 'description': '交易数量'},
-        'reversion_threshold': {'default': 0.02, 'range': (0.01, 0.05), 'type': 'float', 'description': '回归阈值'},
-        'min_deviation': {'default': 0.01, 'range': (0.005, 0.03), 'type': 'float', 'description': '最小偏差'},
-        
-        # 布林带参数
-        'bb_period': {'default': 20, 'range': (10, 40), 'type': 'int', 'description': '布林带周期'},
-        'bb_std_dev': {'default': 2.0, 'range': (1.5, 3.0), 'type': 'float', 'description': '布林带标准差'},
-        'bb_squeeze_threshold': {'default': 0.1, 'range': (0.05, 0.2), 'type': 'float', 'description': '布林带收敛阈值'},
-        
-        # 均值回归指标
-        'z_score_threshold': {'default': 2.0, 'range': (1.5, 3.0), 'type': 'float', 'description': 'Z-score阈值'},
-        'correlation_threshold': {'default': 0.7, 'range': (0.5, 0.9), 'type': 'float', 'description': '相关性阈值'},
-        'mean_reversion_strength': {'default': 0.3, 'range': (0.1, 0.6), 'type': 'float', 'description': '回归强度'},
-        'volatility_adjustment': {'default': 1.0, 'range': (0.5, 2.0), 'type': 'float', 'description': '波动率调整系数'},
-        
-        # 风险管理参数
-        'stop_loss_pct': {'default': 1.5, 'range': (0.8, 3.0), 'type': 'float', 'description': '止损百分比'},
-        'take_profit_pct': {'default': 3.0, 'range': (1.5, 5.0), 'type': 'float', 'description': '止盈百分比'},
-        'max_positions': {'default': 3, 'range': (1, 5), 'type': 'int', 'description': '最大持仓数'},
-        'max_hold_period': {'default': 24, 'range': (6, 72), 'type': 'int', 'description': '最大持有时间(小时)'},
-        'risk_per_trade': {'default': 0.02, 'range': (0.01, 0.05), 'type': 'float', 'description': '单笔交易风险'}
+    # 均值回归策略参数
+    "mean_window": {
+        "range": [10, 200],
+        "optimal": 50,
+        "step": 5,
+        "profit_logic": "inverse", # 参数调整逻辑：收益越高，参数越远离当前值
+        "description": "均值计算窗口",
+        "market_adaption": {
+            "TRENDING_UP": [50, 100],
+            "TRENDING_DOWN": [50, 100],
+            "SIDEWAYS": [20, 50],
+            "VOLATILE": [30, 80],
+            "LOW_VOLATILITY": [80, 150]
+        },
+        "mutation_strength": 0.2,
+        "type": "int"
+    },
+    "std_dev_multiplier": {
+        "range": [1.0, 3.0],
+        "optimal": 2.0,
+        "step": 0.1,
+        "profit_logic": "direct",
+        "description": "标准差倍数",
+        "market_adaption": {
+            "TRENDING_UP": [1.5, 2.5],
+            "TRENDING_DOWN": [1.5, 2.5],
+            "SIDEWAYS": [1.8, 2.2],
+            "VOLATILE": [2.0, 3.0],
+            "LOW_VOLATILITY": [1.0, 2.0]
+        },
+        "mutation_strength": 0.15,
+        "type": "float"
     },
     
-    'grid_trading': {
-        # 网格基础参数
-        'grid_spacing': {'default': 1.0, 'range': (0.5, 3.0), 'type': 'float', 'description': '网格间距百分比'},
-        'grid_count': {'default': 10, 'range': (5, 20), 'type': 'int', 'description': '网格数量'},
-        'quantity': {'default': 1000, 'range': (500, 2000), 'type': 'float', 'description': '交易数量'},
-        'lookback_period': {'default': 100, 'range': (50, 200), 'type': 'int', 'description': '回望周期'},
-        'min_profit': {'default': 0.5, 'range': (0.2, 1.0), 'type': 'float', 'description': '最小利润百分比'},
-        
-        # 网格高级参数
-        'upper_price_limit': {'default': 110000, 'range': (90000, 150000), 'type': 'float', 'description': '上限价格'},
-        'lower_price_limit': {'default': 90000, 'range': (50000, 110000), 'type': 'float', 'description': '下限价格'},
-        'grid_density': {'default': 0.5, 'range': (0.2, 1.0), 'type': 'float', 'description': '网格密度'},
-        'rebalance_threshold': {'default': 5.0, 'range': (2.0, 10.0), 'type': 'float', 'description': '再平衡阈值'},
-        'profit_taking_ratio': {'default': 0.8, 'range': (0.5, 1.0), 'type': 'float', 'description': '获利回吐比例'},
-        'grid_spacing_type': {'default': 'arithmetic', 'range': ['arithmetic', 'geometric'], 'type': 'str', 'description': '网格间距类型'},
-        
-        # 动态调整参数
-        'volatility_adjustment': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '波动率调整'},
-        'trend_following_factor': {'default': 0.3, 'range': (0.1, 0.6), 'type': 'float', 'description': '趋势跟随因子'},
-        'grid_stop_loss': {'default': 8.0, 'range': (5.0, 15.0), 'type': 'float', 'description': '网格止损百分比'},
-        'max_grid_exposure': {'default': 10000, 'range': (5000, 20000), 'type': 'float', 'description': '最大网格敞口'},
-        'emergency_stop_loss': {'default': 10.0, 'range': (5.0, 20.0), 'type': 'float', 'description': '紧急止损百分比'},
-        'dynamic_adjustment': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '动态调整'}
+    # 突破策略参数
+    "breakout_period": {
+        "range": [5, 100],
+        "optimal": 20,
+        "step": 1,
+        "profit_logic": "dynamic",
+        "description": "突破计算周期",
+        "market_adaption": {
+            "TRENDING_UP": [15, 30],
+            "TRENDING_DOWN": [15, 30],
+            "SIDEWAYS": [5, 15],
+            "VOLATILE": [10, 25],
+            "BREAKOUT": [5, 20],
+            "REVERSAL": [10, 30]
+        },
+        "mutation_strength": 0.25,
+        "type": "int"
+    },
+    "breakout_threshold": {
+        "range": [0.005, 0.05],
+        "optimal": 0.01,
+        "step": 0.001,
+        "profit_logic": "direct",
+        "description": "突破阈值",
+        "market_adaption": {
+            "TRENDING_UP": [0.01, 0.02],
+            "TRENDING_DOWN": [0.01, 0.02],
+            "SIDEWAYS": [0.005, 0.01],
+            "VOLATILE": [0.02, 0.05],
+            "BREAKOUT": [0.01, 0.03],
+            "REVERSAL": [0.015, 0.035]
+        },
+        "mutation_strength": 0.2,
+        "type": "float"
     },
     
-    'breakout': {
-        # 突破基础参数
-        'lookback_period': {'default': 20, 'range': (10, 40), 'type': 'int', 'description': '回望周期'},
-        'breakout_threshold': {'default': 1.5, 'range': (0.8, 3.0), 'type': 'float', 'description': '突破阈值'},
-        'quantity': {'default': 50, 'range': (25, 100), 'type': 'float', 'description': '交易数量'},
-        'volume_threshold': {'default': 2.0, 'range': (1.2, 4.0), 'type': 'float', 'description': '成交量确认倍数'},
-        'confirmation_periods': {'default': 3, 'range': (1, 6), 'type': 'int', 'description': '确认周期数'},
-        
-        # 技术指标确认
-        'atr_period': {'default': 14, 'range': (10, 25), 'type': 'int', 'description': 'ATR周期'},
-        'atr_multiplier': {'default': 2.0, 'range': (1.5, 3.0), 'type': 'float', 'description': 'ATR倍数'},
-        'volume_ma_period': {'default': 20, 'range': (10, 30), 'type': 'int', 'description': '成交量移动平均周期'},
-        'price_ma_period': {'default': 50, 'range': (20, 100), 'type': 'int', 'description': '价格移动平均周期'},
-        'momentum_confirmation': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '动量确认'},
-        'volume_confirmation': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '成交量确认'},
-        
-        # 假突破过滤
-        'false_breakout_filter': {'default': 0.5, 'range': (0.2, 0.8), 'type': 'float', 'description': '假突破过滤强度'},
-        'consolidation_detection': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '整理期检测'},
-        'trend_strength_filter': {'default': 0.6, 'range': (0.3, 0.9), 'type': 'float', 'description': '趋势强度过滤'},
-        
-        # 风险控制
-        'stop_loss_atr_multiple': {'default': 2.0, 'range': (1.5, 3.0), 'type': 'float', 'description': '止损ATR倍数'},
-        'take_profit_atr_multiple': {'default': 4.0, 'range': (2.0, 6.0), 'type': 'float', 'description': '止盈ATR倍数'},
-        'max_holding_period': {'default': 48, 'range': (12, 96), 'type': 'int', 'description': '最大持有时间(小时)'}
+    # 网格交易策略参数
+    "grid_levels": {
+        "range": [3, 50],
+        "optimal": 10,
+        "step": 1,
+        "profit_logic": "moderate",
+        "description": "网格级别数量",
+        "market_adaption": {
+            "TRENDING_UP": [5, 10],
+            "TRENDING_DOWN": [5, 10],
+            "SIDEWAYS": [8, 20],
+            "VOLATILE": [10, 30],
+            "LOW_VOLATILITY": [5, 15],
+            "RANGING": [10, 40]
+        },
+        "mutation_strength": 0.3,
+        "type": "int"
+    },
+    "grid_spacing": {
+        "range": [0.002, 0.05],
+        "optimal": 0.01,
+        "step": 0.001,
+        "profit_logic": "direct",
+        "description": "网格间距",
+        "market_adaption": {
+            "TRENDING_UP": [0.01, 0.02],
+            "TRENDING_DOWN": [0.01, 0.02],
+            "SIDEWAYS": [0.005, 0.015],
+            "VOLATILE": [0.02, 0.05],
+            "LOW_VOLATILITY": [0.002, 0.01],
+            "RANGING": [0.008, 0.025]
+        },
+        "mutation_strength": 0.2,
+        "type": "float"
     },
     
-    'high_frequency': {
-        # 高频基础参数
-        'quantity': {'default': 100, 'range': (50, 200), 'type': 'float', 'description': '交易数量'},
-        'min_profit': {'default': 0.05, 'range': (0.01, 0.1), 'type': 'float', 'description': '最小利润百分比'},
-        'volatility_threshold': {'default': 0.001, 'range': (0.0005, 0.005), 'type': 'float', 'description': '波动率阈值'},
-        'lookback_period': {'default': 10, 'range': (5, 20), 'type': 'int', 'description': '回望周期'},
-        'signal_interval': {'default': 30, 'range': (10, 60), 'type': 'int', 'description': '信号间隔(秒)'},
-        
-        # 微观结构参数
-        'bid_ask_spread_threshold': {'default': 0.01, 'range': (0.005, 0.02), 'type': 'float', 'description': '买卖价差阈值'},
-        'order_book_depth_min': {'default': 1000, 'range': (500, 2000), 'type': 'float', 'description': '最小订单簿深度'},
-        'tick_size_multiple': {'default': 1.0, 'range': (0.5, 3.0), 'type': 'float', 'description': '最小变动单位倍数'},
-        'latency_threshold': {'default': 100, 'range': (50, 200), 'type': 'int', 'description': '延迟阈值(毫秒)'},
-        'market_impact_limit': {'default': 0.001, 'range': (0.0005, 0.005), 'type': 'float', 'description': '市场影响限制'},
-        'slippage_tolerance': {'default': 0.002, 'range': (0.001, 0.005), 'type': 'float', 'description': '滑点容忍度'},
-        
-        # 高频交易优化
-        'inventory_turnover_target': {'default': 10.0, 'range': (5.0, 20.0), 'type': 'float', 'description': '库存周转目标'},
-        'risk_limit_per_trade': {'default': 0.01, 'range': (0.005, 0.02), 'type': 'float', 'description': '单笔风险限制'},
-        'max_position_duration': {'default': 300, 'range': (60, 600), 'type': 'int', 'description': '最大持仓时间(秒)'},
-        'profit_target_multiplier': {'default': 1.5, 'range': (1.2, 2.0), 'type': 'float', 'description': '利润目标倍数'},
-        
-        # 算法交易参数
-        'execution_algorithm': {'default': 'twap', 'range': ['twap', 'vwap', 'pov'], 'type': 'str', 'description': '执行算法'},
-        'order_split_size': {'default': 100, 'range': (50, 200), 'type': 'float', 'description': '订单拆分大小'},
-        'adaptive_sizing': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '自适应仓位大小'},
-        'momentum_detection': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '动量检测'},
-        'mean_reversion_mode': {'default': False, 'range': [True, False], 'type': 'bool', 'description': '均值回归模式'},
-        'max_inventory_limit': {'default': 5000, 'range': (2000, 10000), 'type': 'float', 'description': '最大库存限制'}
+    # 趋势跟踪策略参数
+    "trend_period": {
+        "range": [10, 200],
+        "optimal": 50,
+        "step": 5,
+        "profit_logic": "dynamic",
+        "description": "趋势计算周期",
+        "market_adaption": {
+            "TRENDING_UP": [30, 80],
+            "TRENDING_DOWN": [30, 80],
+            "SIDEWAYS": [20, 50],
+            "VOLATILE": [40, 100],
+            "LOW_VOLATILITY": [50, 150],
+        },
+        "mutation_strength": 0.25,
+        "type": "int"
+    },
+    "trend_threshold": {
+        "range": [0.01, 0.1],
+        "optimal": 0.03,
+        "step": 0.005,
+        "profit_logic": "direct",
+        "description": "趋势确认阈值",
+        "market_adaption": {
+            "TRENDING_UP": [0.02, 0.05],
+            "TRENDING_DOWN": [0.02, 0.05],
+            "SIDEWAYS": [0.01, 0.03],
+            "VOLATILE": [0.04, 0.1],
+            "LOW_VOLATILITY": [0.01, 0.03],
+        },
+        "mutation_strength": 0.15,
+        "type": "float"
     },
     
-    'trend_following': {
-        # 趋势基础参数
-        'lookback_period': {'default': 50, 'range': (20, 100), 'type': 'int', 'description': '回望周期'},
-        'trend_threshold': {'default': 1.0, 'range': (0.5, 2.0), 'type': 'float', 'description': '趋势阈值'},
-        'quantity': {'default': 100, 'range': (50, 200), 'type': 'float', 'description': '交易数量'},
-        'trend_strength_min': {'default': 0.3, 'range': (0.2, 0.6), 'type': 'float', 'description': '最小趋势强度'},
-        'trend_duration_min': {'default': 30, 'range': (15, 60), 'type': 'int', 'description': '最小趋势持续时间(分钟)'},
-        
-        # 趋势识别参数
-        'ema_fast_period': {'default': 12, 'range': (8, 20), 'type': 'int', 'description': '快速EMA周期'},
-        'ema_slow_period': {'default': 26, 'range': (20, 50), 'type': 'int', 'description': '慢速EMA周期'},
-        'adx_period': {'default': 14, 'range': (10, 25), 'type': 'int', 'description': 'ADX周期'},
-        'adx_threshold': {'default': 25, 'range': (20, 35), 'type': 'int', 'description': 'ADX阈值'},
-        'slope_threshold': {'default': 0.001, 'range': (0.0005, 0.003), 'type': 'float', 'description': '斜率阈值'},
-        'trend_angle_min': {'default': 15, 'range': (10, 30), 'type': 'int', 'description': '最小趋势角度'},
-        
-        # 趋势确认指标
-        'macd_confirmation': {'default': True, 'range': [True, False], 'type': 'bool', 'description': 'MACD确认'},
-        'volume_confirmation': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '成交量确认'},
-        'rsi_filter': {'default': True, 'range': [True, False], 'type': 'bool', 'description': 'RSI过滤'},
-        'multi_timeframe': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '多时间框架确认'},
-        
-        # 进出场管理
-        'trailing_stop_pct': {'default': 3.0, 'range': (2.0, 5.0), 'type': 'float', 'description': '移动止损百分比'},
-        'profit_lock_pct': {'default': 2.0, 'range': (1.0, 4.0), 'type': 'float', 'description': '利润锁定百分比'},
-        'trend_reversal_detection': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '趋势反转检测'},
-        'position_scaling': {'default': True, 'range': [True, False], 'type': 'bool', 'description': '仓位缩放'},
-        'max_drawdown_exit': {'default': 5.0, 'range': (3.0, 8.0), 'type': 'float', 'description': '最大回撤退出百分比'},
-        'trend_strength_exit': {'default': 0.2, 'range': (0.1, 0.4), 'type': 'float', 'description': '趋势强度退出阈值'}
+    # 高频交易策略参数
+    "hf_window": {
+        "range": [2, 30],
+        "optimal": 5,
+        "step": 1,
+        "profit_logic": "direct",
+        "description": "高频交易窗口",
+        "market_adaption": {
+            "TRENDING_UP": [3, 8],
+            "TRENDING_DOWN": [3, 8],
+            "SIDEWAYS": [2, 5],
+            "VOLATILE": [3, 10],
+            "LOW_VOLATILITY": [5, 15]
+        },
+        "mutation_strength": 0.3,
+        "type": "int"
+    },
+    "hf_threshold": {
+        "range": [0.001, 0.01],
+        "optimal": 0.002,
+        "step": 0.0005,
+        "profit_logic": "direct",
+        "description": "高频交易阈值",
+        "market_adaption": {
+            "TRENDING_UP": [0.001, 0.003],
+            "TRENDING_DOWN": [0.001, 0.003],
+            "SIDEWAYS": [0.0015, 0.004],
+            "VOLATILE": [0.003, 0.01],
+            "LOW_VOLATILITY": [0.001, 0.002]
+        },
+        "mutation_strength": 0.25,
+        "type": "float"
+    },
+    
+    # 短线策略参数
+    "scalping_period": {
+        "range": [1, 15],
+        "optimal": 3,
+        "step": 1,
+        "profit_logic": "direct", 
+        "description": "短线交易周期",
+        "market_adaption": {
+            "TRENDING_UP": [2, 5],
+            "TRENDING_DOWN": [2, 5],
+            "SIDEWAYS": [1, 3],
+            "VOLATILE": [2, 8],
+            "LOW_VOLATILITY": [3, 10]
+        },
+        "mutation_strength": 0.3,
+        "type": "int"
+    },
+    "profit_target": {
+        "range": [0.001, 0.02],
+        "optimal": 0.005,
+        "step": 0.001,
+        "profit_logic": "direct",
+        "description": "利润目标",
+        "market_adaption": {
+            "TRENDING_UP": [0.003, 0.01],
+            "TRENDING_DOWN": [0.003, 0.01],
+            "SIDEWAYS": [0.001, 0.005],
+            "VOLATILE": [0.005, 0.02],
+            "LOW_VOLATILITY": [0.001, 0.003]
+        },
+        "mutation_strength": 0.2,
+        "type": "float"
+    },
+    
+    # 套利策略参数
+    "price_diff_threshold": {
+        "range": [0.001, 0.05],
+        "optimal": 0.01,
+        "step": 0.001,
+        "profit_logic": "direct",
+        "description": "价格差异阈值",
+        "market_adaption": {
+            "TRENDING_UP": [0.005, 0.02],
+            "TRENDING_DOWN": [0.005, 0.02],
+            "SIDEWAYS": [0.002, 0.01],
+            "VOLATILE": [0.01, 0.05],
+            "LOW_VOLATILITY": [0.001, 0.008]
+        },
+        "mutation_strength": 0.2,
+        "type": "float"
+    },
+    
+    # 风控参数
+    "max_position_size": {
+        "range": [0.01, 0.5],
+        "optimal": 0.1,
+        "step": 0.01,
+        "profit_logic": "risk_adjusted", # 根据风险调整收益
+        "description": "最大仓位比例",
+        "market_adaption": {
+            "TRENDING_UP": [0.05, 0.2],
+            "TRENDING_DOWN": [0.05, 0.15],
+            "SIDEWAYS": [0.03, 0.1],
+            "VOLATILE": [0.01, 0.08],
+            "LOW_VOLATILITY": [0.05, 0.3]
+        },
+        "mutation_strength": 0.1,
+        "type": "float"
+    },
+    "stop_loss": {
+        "range": [0.01, 0.1],
+        "optimal": 0.03,
+        "step": 0.005,
+        "profit_logic": "risk_adjusted",
+        "description": "止损比例",
+        "market_adaption": {
+            "TRENDING_UP": [0.02, 0.05],
+            "TRENDING_DOWN": [0.02, 0.05],
+            "SIDEWAYS": [0.01, 0.03],
+            "VOLATILE": [0.03, 0.1],
+            "LOW_VOLATILITY": [0.01, 0.03]
+        },
+        "mutation_strength": 0.15,
+        "type": "float"
+    },
+    "take_profit": {
+        "range": [0.01, 0.2],
+        "optimal": 0.05,
+        "step": 0.01,
+        "profit_logic": "risk_adjusted",
+        "description": "止盈比例",
+        "market_adaption": {
+            "TRENDING_UP": [0.03, 0.1],
+            "TRENDING_DOWN": [0.03, 0.1],
+            "SIDEWAYS": [0.01, 0.05],
+            "VOLATILE": [0.05, 0.2],
+            "LOW_VOLATILITY": [0.02, 0.08]
+        },
+        "mutation_strength": 0.2,
+        "type": "float"
     }
 }
 
-def get_strategy_default_parameters(strategy_type: str) -> dict:
-    """获取策略的默认参数"""
-    if strategy_type not in STRATEGY_PARAMETERS_CONFIG:
-        return {}
-    
-    defaults = {}
-    for param, config in STRATEGY_PARAMETERS_CONFIG[strategy_type].items():
-        defaults[param] = config['default']
-    return defaults
 
-def get_strategy_parameter_ranges(strategy_type: str) -> dict:
-    """获取策略参数的有效范围"""
-    if strategy_type not in STRATEGY_PARAMETERS_CONFIG:
-        return {}
+class StrategyParameterManager:
+    """增强版策略参数管理器"""
     
-    ranges = {}
-    for param, config in STRATEGY_PARAMETERS_CONFIG[strategy_type].items():
-        ranges[param] = config['range']
-    return ranges
-
-def validate_strategy_parameters(strategy_type: str, parameters: dict) -> tuple:
-    """验证策略参数是否在有效范围内"""
-    if strategy_type not in STRATEGY_PARAMETERS_CONFIG:
-        return False, f"未知策略类型: {strategy_type}"
+    def __init__(self):
+        self.parameter_rules = PARAMETER_RULES
+        self.strategy_types = STRATEGY_TYPES
+        self.market_states = MARKET_STATES
+        # 加载权重配置
+        self.scoring_weights = self._load_scoring_weights()
+        
+    def _load_scoring_weights(self) -> Dict:
+        """加载评分权重配置"""
+        default_weights = {
+            "total_return": 0.30,  # 总收益率
+            "win_rate": 0.25,      # 胜率
+            "sharpe_ratio": 0.20,  # 夏普比率
+            "max_drawdown": 0.15,  # 最大回撤
+            "profit_factor": 0.10  # 盈亏比
+        }
+        
+        try:
+            weights_file = "strategy_scoring_weights.json"
+            if os.path.exists(weights_file):
+                with open(weights_file, "r") as f:
+                    weights = json.load(f)
+                return weights
+            else:
+                return default_weights
+        except Exception:
+            return default_weights
     
-    config = STRATEGY_PARAMETERS_CONFIG[strategy_type]
-    errors = []
+    def save_scoring_weights(self, weights: Dict):
+        """保存评分权重配置"""
+        try:
+            with open("strategy_scoring_weights.json", "w") as f:
+                json.dump(weights, f, indent=2)
+        except Exception as e:
+            print(f"保存评分权重配置失败: {e}")
     
-    for param, value in parameters.items():
-        if param in config:
-            param_config = config[param]
-            param_range = param_config['range']
-            param_type = param_config['type']
+    def adapt_parameters_to_market(self, strategy_type: str, market_state: str) -> Dict:
+        """根据市场状态调整参数范围"""
+        adapted_params = {}
+        
+        for param_name, config in self.parameter_rules.items():
+            # 检查参数是否适用于当前策略类型
+            if not param_name.startswith(strategy_type.split("_")[0]):
+                # 风控参数适用于所有策略
+                if not param_name in ["max_position_size", "stop_loss", "take_profit"]:
+                    continue
             
-            # 类型检查
-            if param_type == 'int' and not isinstance(value, int):
-                errors.append(f"{param}: 期望整数类型，得到 {type(value)}")
-                continue
-            elif param_type == 'float' and not isinstance(value, (int, float)):
-                errors.append(f"{param}: 期望数值类型，得到 {type(value)}")
-                continue
-            elif param_type == 'bool' and not isinstance(value, bool):
-                errors.append(f"{param}: 期望布尔类型，得到 {type(value)}")
-                continue
-            elif param_type == 'str' and not isinstance(value, str):
-                errors.append(f"{param}: 期望字符串类型，得到 {type(value)}")
-                continue
+            # 获取市场适应性设置
+            market_adaption = config.get("market_adaption", {})
             
-            # 范围检查
-            if param_type in ['int', 'float'] and isinstance(param_range, tuple):
-                min_val, max_val = param_range
-                if value < min_val or value > max_val:
-                    errors.append(f"{param}: 值 {value} 超出范围 [{min_val}, {max_val}]")
-            elif param_type in ['str', 'bool'] and isinstance(param_range, list):
-                if value not in param_range:
-                    errors.append(f"{param}: 值 {value} 不在允许列表 {param_range} 中")
+            # 如果有针对当前市场状态的适应性范围，则使用
+            if market_state in market_adaption:
+                adapted_range = market_adaption[market_state]
+                adapted_params[param_name] = {
+                    "range": adapted_range,
+                    "step": config["step"],
+                    "type": config["type"]
+                }
+            else:
+                # 否则使用默认范围
+                adapted_params[param_name] = {
+                    "range": config["range"],
+                    "step": config["step"],
+                    "type": config["type"]
+                }
+        
+        return adapted_params
     
-    if errors:
-        return False, "; ".join(errors)
-    return True, "参数验证通过"
-
-def get_all_strategy_types() -> list:
-    """获取所有支持的策略类型"""
-    return list(STRATEGY_PARAMETERS_CONFIG.keys())
-
-def get_strategy_parameter_description(strategy_type: str, parameter: str) -> str:
-    """获取参数描述"""
-    if (strategy_type in STRATEGY_PARAMETERS_CONFIG and 
-        parameter in STRATEGY_PARAMETERS_CONFIG[strategy_type]):
-        return STRATEGY_PARAMETERS_CONFIG[strategy_type][parameter]['description']
-    return "无描述"
-
-# 🔧 为兼容现有代码提供的辅助函数
-def get_legacy_template_parameters(strategy_type: str) -> dict:
-    """为与现有quantitative_service.py模板兼容而提供的参数范围"""
-    if strategy_type not in STRATEGY_PARAMETERS_CONFIG:
-        return {}
+    def generate_parameter_mutations(self, base_params: Dict, mutation_strength: float = 1.0,
+                               market_state: str = "SIDEWAYS") -> Dict:
+        """
+        生成参数变异
+        :param base_params: 基础参数
+        :param mutation_strength: 变异强度，范围0-1
+        :param market_state: 市场状态
+        :return: 变异后的参数
+        """
+        mutated_params = {}
+        
+        for param_name, value in base_params.items():
+            if param_name not in self.parameter_rules:
+                mutated_params[param_name] = value
+                continue
+                
+            config = self.parameter_rules[param_name]
+            param_range = config["range"]
+            param_step = config["step"]
+            mutation_rate = config.get("mutation_strength", 0.2) * mutation_strength
+            
+            # 根据市场状态调整参数范围
+            market_adaption = config.get("market_adaption", {})
+            if market_state in market_adaption:
+                param_range = market_adaption[market_state]
+            
+            # 计算变异
+            if config["type"] == "int":
+                range_size = param_range[1] - param_range[0]
+                mutation_size = int(range_size * mutation_rate)
+                mutation = random.randint(-mutation_size, mutation_size)
+                new_value = int(value) + mutation
+                # 确保在范围内
+                new_value = max(param_range[0], min(new_value, param_range[1]))
+                mutated_params[param_name] = new_value
+            elif config["type"] == "float":
+                range_size = param_range[1] - param_range[0]
+                mutation_size = range_size * mutation_rate
+                mutation = random.uniform(-mutation_size, mutation_size)
+                new_value = float(value) + mutation
+                # 确保在范围内
+                new_value = max(param_range[0], min(new_value, param_range[1]))
+                # 四舍五入到指定精度
+                decimal_places = len(str(param_step).split(".")[-1]) if "." in str(param_step) else 0
+                mutated_params[param_name] = round(new_value, decimal_places)
+            else:
+                mutated_params[param_name] = value
+        
+        return mutated_params
     
-    template = {'param_ranges': {}}
-    for param, config in STRATEGY_PARAMETERS_CONFIG[strategy_type].items():
-        template['param_ranges'][param] = config['range']
-    return template 
+    def parameter_crossover(self, parent1_params: Dict, parent2_params: Dict,
+                     crossover_rate: float = 0.7) -> Dict:
+        """
+        参数交叉
+        :param parent1_params: 父代1参数
+        :param parent2_params: 父代2参数
+        :param crossover_rate: 交叉率
+        :return: 交叉后的参数
+        """
+        child_params = {}
+        
+        # 获取两个父代共有的参数
+        common_params = set(parent1_params.keys()).intersection(set(parent2_params.keys()))
+        
+        for param in common_params:
+            # 按照交叉率决定是否交换参数
+            if random.random() < crossover_rate:
+                # 50%概率选择父代1或父代2的参数
+                child_params[param] = parent1_params[param] if random.random() < 0.5 else parent2_params[param]
+            else:
+                # 不交换，随机选择一个父代的参数
+                source = random.choice([parent1_params, parent2_params])
+                child_params[param] = source[param]
+        
+        # 处理非共有参数
+        for param in set(parent1_params.keys()) - common_params:
+            child_params[param] = parent1_params[param]
+            
+        for param in set(parent2_params.keys()) - common_params:
+            child_params[param] = parent2_params[param]
+        
+        return child_params
+    
+    def calculate_strategy_score(self, stats: Dict, market_state: str = None) -> float:
+        """
+        计算策略评分 - 2.0增强版
+        根据市场状态动态调整评分权重
+        
+        :param stats: 策略统计数据
+        :param market_state: 市场状态
+        :return: 综合评分(0-100)
+        """
+        # 获取基础统计数据
+        total_return = float(stats.get('total_return', 0))
+        win_rate = float(stats.get('win_rate', 0))
+        sharpe_ratio = float(stats.get('sharpe_ratio', 1.0))
+        max_drawdown = abs(float(stats.get('max_drawdown', 0.05)))
+        profit_factor = float(stats.get('profit_factor', 1.5))
+        total_trades = int(stats.get('total_trades', 0))
+        
+        # 根据市场状态调整权重
+        weights = self.scoring_weights.copy()
+        
+        if market_state:
+            # 在不同市场状态下调整权重
+            if market_state == "TRENDING_UP" or market_state == "TRENDING_DOWN":
+                # 趋势市场更看重总收益和夏普比率
+                weights["total_return"] = weights["total_return"] * 1.2
+                weights["sharpe_ratio"] = weights["sharpe_ratio"] * 1.2
+                weights["win_rate"] = weights["win_rate"] * 0.8
+            elif market_state == "SIDEWAYS" or market_state == "RANGING":
+                # 震荡市场更看重胜率和盈亏比
+                weights["win_rate"] = weights["win_rate"] * 1.2
+                weights["profit_factor"] = weights["profit_factor"] * 1.2
+                weights["total_return"] = weights["total_return"] * 0.8
+            elif market_state == "VOLATILE":
+                # 高波动市场更看重最大回撤控制
+                weights["max_drawdown"] = weights["max_drawdown"] * 1.5
+                weights["sharpe_ratio"] = weights["sharpe_ratio"] * 1.2
+            
+            # 归一化权重
+            weight_sum = sum(weights.values())
+            for k in weights:
+                weights[k] = weights[k] / weight_sum
+        
+        # 各项指标评分计算
+        
+        # 收益率分数 (指数函数，高收益更高分)
+        return_score = min(100, max(0, 50 + 50 * np.tanh(total_return * 2)))
+        
+        # 胜率分数 (线性，胜率越高分数越高)
+        win_rate_score = win_rate * 100
+        
+        # 夏普比率分数 (指数函数，高夏普更高分)
+        sharpe_score = min(100, max(0, 50 * np.tanh(sharpe_ratio)))
+        
+        # 最大回撤分数 (反比例，回撤越小分数越高)
+        drawdown_score = max(0, 100 - max_drawdown * 500)
+        
+        # 盈亏比分数 (指数函数，高盈亏比更高分)
+        profit_factor_score = min(100, max(0, 50 * np.tanh((profit_factor - 1) * 2)))
+        
+        # 交易次数调整因子
+        trade_count_factor = 1.0
+        if total_trades < 10:
+            trade_count_factor = 0.7 + 0.03 * total_trades  # 交易次数少，降低评分
+        elif total_trades > 50:
+            trade_count_factor = min(1.2, 1.0 + 0.004 * (total_trades - 50))  # 交易次数多，提高评分
+        
+        # 计算加权总分
+        weighted_score = (
+            return_score * weights["total_return"] +
+            win_rate_score * weights["win_rate"] +
+            sharpe_score * weights["sharpe_ratio"] +
+            drawdown_score * weights["max_drawdown"] +
+            profit_factor_score * weights["profit_factor"]
+        )
+        
+        # 应用交易次数调整
+        final_score = weighted_score * trade_count_factor
+        
+        # 将分数限制在0-100范围内
+        return min(100, max(0, final_score))
+    
+    def get_evolution_direction(self, param_name: str, performance_change: float, 
+                              market_state: str = None) -> float:
+        """
+        确定参数进化方向
+        :param param_name: 参数名称
+        :param performance_change: 性能变化(正数表示改善，负数表示恶化)
+        :param market_state: 市场状态
+        :return: 进化方向系数(-1.0到1.0)
+        """
+        if param_name not in self.parameter_rules:
+            return 0.0
+            
+        config = self.parameter_rules[param_name]
+        logic = config.get("profit_logic", "direct")
+        
+        # 性能未改变，返回0
+        if abs(performance_change) < 0.0001:
+            return 0.0
+        
+        # 根据不同的参数调整逻辑确定方向    
+        if logic == "direct":
+            # 性能提升则沿同方向调整，恶化则反向
+            return 0.5 if performance_change > 0 else -0.5
+            
+        elif logic == "inverse":
+            # 与direct相反
+            return -0.5 if performance_change > 0 else 0.5
+            
+        elif logic == "dynamic":
+            # 根据市场状态动态决定
+            if not market_state or market_state in ["TRENDING_UP", "TRENDING_DOWN"]:
+                # 趋势市场中，性能提升则增加参数
+                return 0.7 if performance_change > 0 else -0.7
+            else:
+                # 其他市场中，性能提升则减小参数
+                return -0.5 if performance_change > 0 else 0.5
+                
+        elif logic == "risk_adjusted":
+            # 风险控制参数，考虑风险和收益的平衡
+            if market_state == "VOLATILE":
+                # 高波动市场，优先考虑风险控制
+                return -0.6 if performance_change > 0 else 0.4
+            else:
+                # 其他市场，平衡风险和收益
+                return 0.4 if performance_change > 0 else -0.4
+                
+        elif logic == "moderate":
+            # 缓和的调整
+            return 0.3 if performance_change > 0 else -0.3
+            
+        return 0.0
+    
+    def detect_market_state(self, price_data: List[float], volume_data: List[float] = None) -> str:
+        """
+        检测当前市场状态
+        :param price_data: 价格数据
+        :param volume_data: 成交量数据(可选)
+        :return: 市场状态
+        """
+        if len(price_data) < 20:
+            return "SIDEWAYS"  # 默认状态
+            
+        # 计算最近的价格变化
+        recent_prices = price_data[-20:]
+        price_changes = [recent_prices[i] / recent_prices[i-1] - 1 for i in range(1, len(recent_prices))]
+        
+        # 计算趋势指标
+        price_mean = np.mean(recent_prices)
+        price_std = np.std(recent_prices)
+        price_volatility = price_std / price_mean
+        
+        # 计算趋势强度
+        trend_strength = np.abs(recent_prices[-1] - recent_prices[0]) / (price_std * np.sqrt(len(recent_prices)))
+        
+        # 判断是否处于突破状态
+        is_breakout = False
+        if len(price_data) > 50:
+            long_term_std = np.std(price_data[-50:])
+            recent_move = abs(price_data[-1] - price_data[-5])
+            if recent_move > 2.5 * long_term_std:
+                is_breakout = True
+        
+        # 根据指标判断市场状态
+        if is_breakout:
+            return "BREAKOUT"
+        elif trend_strength > 2.0:
+            if price_data[-1] > price_data[-10]:
+                return "TRENDING_UP"
+            else:
+                return "TRENDING_DOWN"
+        elif price_volatility > 0.02:
+            return "VOLATILE"
+        elif price_volatility < 0.005:
+            return "LOW_VOLATILITY"
+        elif np.max(recent_prices) - np.min(recent_prices) < 0.03 * np.mean(recent_prices):
+            return "SIDEWAYS"
+        else:
+            return "RANGING"
+
+
+# 全局参数管理器实例
+parameter_manager = StrategyParameterManager()
+
+def get_parameter_rules():
+    """获取参数规则"""
+    return PARAMETER_RULES
+
+def get_strategy_types():
+    """获取支持的策略类型"""
+    return STRATEGY_TYPES
+
+def get_market_states():
+    """获取市场状态类型"""
+    return MARKET_STATES
+
+def calculate_score(stats, market_state=None):
+    """计算策略评分"""
+    return parameter_manager.calculate_strategy_score(stats, market_state)
+
+def get_parameter_manager():
+    """获取参数管理器实例"""
+    return parameter_manager
+
+
+if __name__ == "__main__":
+    # 测试功能
+    manager = StrategyParameterManager()
+    
+    # 测试市场状态检测
+    import random
+    test_prices = [100]
+    for i in range(100):
+        change = random.normalvariate(0.001, 0.01)
+        test_prices.append(test_prices[-1] * (1 + change))
+    
+    market = manager.detect_market_state(test_prices)
+    print(f"检测到的市场状态: {market}")
+    
+    # 测试评分计算
+    test_stats = {
+        'total_return': 0.35,
+        'win_rate': 0.65,
+        'sharpe_ratio': 2.1,
+        'max_drawdown': 0.12,
+        'profit_factor': 1.8,
+        'total_trades': 45
+    }
+    
+    score = manager.calculate_strategy_score(test_stats, market)
+    print(f"策略评分: {score:.2f}")
+    
+    # 测试参数调整
+    base_params = {
+        "trend_period": 50,
+        "trend_threshold": 0.03
+    }
+    
+    # 生成变异
+    mutated = manager.generate_parameter_mutations(base_params, 0.5, market)
+    print(f"基础参数: {base_params}")
+    print(f"变异参数: {mutated}") 

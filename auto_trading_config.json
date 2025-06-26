@@ -1,0 +1,54 @@
+{
+  "engine_name": "AutoTrader2.0",
+  "database_path": "quantitative.db",
+  "check_interval": 60,
+  "allocation_interval": 86400,
+  "market_analysis_interval": 3600,
+  "data_update_interval": 300,
+  "strategy_update_interval": 3600,
+  "max_active_strategies": 5,
+  "emergency_shutdown_balance": 100,
+  "reserve_balance": 50,
+  "enable_auto_recovery": true,
+  
+  "trading_hours": {
+    "enabled": false,
+    "start": "00:00",
+    "end": "23:59",
+    "timezone": "UTC"
+  },
+  
+  "exchanges": ["binance", "okex"],
+  "assets": ["BTC", "ETH", "BNB", "SOL", "DOT"],
+  "quote_currency": "USDT",
+  "market_reference_symbol": "BTC/USDT",
+  "market_reference_exchange": "binance",
+  
+  "enable_market_classifier": true,
+  "enable_resource_allocator": true,
+  
+  "dry_run": false,
+  "test_capital": 10000.0,
+  "default_available_capital": 1000.0,
+  
+  "log_level": "INFO",
+  
+  "advanced_settings": {
+    "auto_restart_on_crash": true,
+    "restart_interval": 300,
+    "max_restarts_per_day": 5,
+    "backup_interval": 86400,
+    "backup_dir": "backups",
+    "cleanup_logs_days": 7,
+    "performance_tracking": {
+      "enabled": true,
+      "interval": 3600,
+      "history_length": 30
+    },
+    "auto_terminate_conditions": {
+      "consecutive_losses": 10,
+      "drawdown_percent": 20,
+      "error_threshold": 50
+    }
+  }
+} 

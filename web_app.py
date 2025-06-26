@@ -628,7 +628,7 @@ def get_exchange_balances():
             except Exception as e:
                 print(f"获取 {exchange_id} 余额失败: {e}，使用空余额避免重复实现冲突")
                 # 🔧 修复重复代码段问题：移除回退机制，直接使用空余额确保数据一致性
-                balances[exchange_id] = exchange_balances
+                    balances[exchange_id] = exchange_balances
         except Exception as e:
             print(f"获取 {exchange_id} 余额过程中出现异常: {e}，使用空余额")
             balances[exchange_id] = {"USDT": 0, "USDT_available": 0, "USDT_locked": 0, "positions": {}}
