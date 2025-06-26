@@ -843,40 +843,69 @@
         
         // ✅ 初始化量化交易系统
         let app;
+        function debugLog(message) {
+            console.log(message);
+            // 同时在页面上显示调试信息
+            const container = document.getElementById('strategiesContainer');
+            if (container) {
+                const debugDiv = document.getElementById('debugInfo') || (() => {
+                    const div = document.createElement('div');
+                    div.id = 'debugInfo';
+                    div.className = 'alert alert-info';
+                    div.innerHTML = '<h6>🔧 调试信息:</h6><div id="debugMessages"></div>';
+                    container.appendChild(div);
+                    return div;
+                })();
+                const messages = document.getElementById('debugMessages');
+                messages.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+            }
+        }
+        
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 开始初始化量化交易系统...');
+            debugLog('🚀 DOM已加载，开始初始化量化交易系统...');
+            
+            // 检查QuantitativeSystem类是否存在
+            if (typeof QuantitativeSystem === 'undefined') {
+                debugLog('❌ QuantitativeSystem类未定义，quantitative.js可能没有正确加载');
+                return;
+            }
             
             try {
                 app = new QuantitativeSystem();
-                console.log('✅ 量化交易系统初始化成功！');
+                debugLog('✅ 量化交易系统实例创建成功');
                 
-                // 🔥 立即加载系统状态和数据
+                // 🔥 立即测试策略API
+                debugLog('🔄 开始测试策略API...');
+                fetch('/api/quantitative/strategies?limit=3')
+                    .then(response => {
+                        debugLog(`📡 策略API响应状态: ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        debugLog(`📊 策略API返回数据: ${JSON.stringify(data).substring(0, 200)}...`);
+                        if (data.status === 'success' && data.data) {
+                            debugLog(`✅ 成功获取${data.data.length}个策略，开始调用app.loadStrategies()`);
+                            app.loadStrategies();
+                        } else {
+                            debugLog('❌ 策略API返回数据格式不正确');
+                        }
+                    })
+                    .catch(error => {
+                        debugLog(`❌ 策略API调用失败: ${error.message}`);
+                    });
+                
+                // 加载其他数据
                 setTimeout(() => {
-                    console.log('🔄 开始加载系统数据...');
+                    debugLog('🔄 加载系统状态和其他数据...');
                     app.loadSystemStatus();
-                    app.loadStrategies();
                     app.loadAccountInfo();
                     app.loadPositions();
                     app.loadSignals();
-                    console.log('📊 所有数据加载请求已发送');
-                }, 100);
+                }, 500);
                 
             } catch (error) {
-                console.error('❌ 量化交易系统初始化失败:', error);
-                
-                // 显示错误信息给用户
-                const container = document.getElementById('strategiesContainer');
-                if (container) {
-                    container.innerHTML = `
-                        <div class="col-12">
-                            <div class="alert alert-danger">
-                                <h5>⚠️ 系统初始化失败</h5>
-                                <p>量化交易系统初始化时发生错误，请刷新页面重试。</p>
-                                <small>错误详情: ${error.message}</small>
-                            </div>
-                        </div>
-                    `;
-                }
+                debugLog(`❌ 量化交易系统初始化失败: ${error.message}`);
+                debugLog(`错误堆栈: ${error.stack}`);
             }
         });
     </script>
