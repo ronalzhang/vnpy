@@ -2338,9 +2338,4 @@ function updateSwitchLabel(switchId) {
     }
 }
 
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', function() {
-    app = new QuantitativeSystem();
-    
-    console.log('量化交易系统初始化完成');
-}); 
+// 🔥 初始化代码已移至HTML模板中，避免重复初始化 

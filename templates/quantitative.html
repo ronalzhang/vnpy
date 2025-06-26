@@ -841,5 +841,41 @@
         setInterval(updateCurrentTime, 1000);
     </script>
     <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
+    <script>
+        // 🔥 全局变量声明（必须在初始化之前）
+        let systemRunning = false;
+        let autoTradingEnabled = false;
+        let refreshTimer = null;
+        let evolutionLogTimer = null;
+        let managementConfig = {};
+        
+        // ✅ 初始化量化交易系统
+        let app;
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 开始初始化量化交易系统...');
+            
+            try {
+                app = new QuantitativeSystem();
+                console.log('✅ 量化交易系统初始化成功！');
+                console.log('📊 策略卡即将加载...');
+            } catch (error) {
+                console.error('❌ 量化交易系统初始化失败:', error);
+                
+                // 显示错误信息给用户
+                const container = document.getElementById('strategiesContainer');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-danger">
+                                <h5>⚠️ 系统初始化失败</h5>
+                                <p>量化交易系统初始化时发生错误，请刷新页面重试。</p>
+                                <small>错误详情: ${error.message}</small>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        });
+    </script>
 </body>
 </html> 
