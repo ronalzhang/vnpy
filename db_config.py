@@ -9,7 +9,7 @@
 import os
 import psycopg2
 import psycopg2.extras
-from typing import Union, Dict, Any, List, Tuple
+from typing import Union, Dict, Any, List, Tuple, Optional
 
 # 数据库配置
 DATABASE_CONFIG = {
@@ -27,10 +27,10 @@ DATABASE_CONFIG = {
 class DatabaseAdapter:
     """数据库适配器，专门用于PostgreSQL"""
     
-    def __init__(self, config: Dict = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or DATABASE_CONFIG
         self.db_type = 'postgresql'  # 仅支持PostgreSQL
-        self.connection = None
+        self.connection: Optional[psycopg2.extensions.connection] = None
         self.connect()
     
     def connect(self):
@@ -49,11 +49,17 @@ class DatabaseAdapter:
             print(f"✅ 已连接到PostgreSQL数据库: {pg_config['database']}")
         except Exception as e:
             print(f"❌ 数据库连接失败: {e}")
+            self.connection = None  # 确保失败时连接为None
             raise
     
     def execute_query(self, query: str, params: tuple = (), fetch_one: bool = False, 
                      fetch_all: bool = False) -> Union[Dict, List[Dict], None]:
         """执行PostgreSQL查询"""
+        if not self.connection:
+            print("❌ 数据库未连接，无法执行查询。")
+            raise ConnectionError("数据库未连接")
+
+        cursor = None
         try:
             cursor = self.connection.cursor()
             
@@ -72,13 +78,14 @@ class DatabaseAdapter:
                 results = cursor.fetchall()
                 return [dict(row) for row in results] if results else []
             else:
-                self.connection.commit()
+                # autocommit is True, no need for explicit commit
                 return None
         except Exception as e:
             print(f"❌ 查询执行失败: {e}")
             print(f"Query: {query}")
             print(f"Params: {params}")
-            self.connection.rollback()
+            if self.connection:
+                self.connection.rollback()
             raise
         finally:
             if cursor:
@@ -133,13 +140,20 @@ class DatabaseAdapter:
         for table in tables:
             schema_sql = self.get_schema_sql(table)
             if schema_sql:
-                self.execute_query(schema_sql)
-                print(f"✅ 表 {table} 初始化完成")
+                try:
+                    self.execute_query(schema_sql)
+                    print(f"✅ 表 {table} 初始化完成")
+                except Exception as e:
+                    print(f"⚠️ 初始化表 {table} 失败: {e}")
     
-    def record_balance_history(self, total_balance: float, available_balance: float = None,
-                             frozen_balance: float = 0.0, strategy_id: str = None, 
+    def record_balance_history(self, total_balance: float, available_balance: Optional[float] = None,
+                             frozen_balance: float = 0.0, strategy_id: Optional[str] = None, 
                              change_type: str = 'balance_update'):
         """记录余额历史"""
+        if not self.connection:
+            print("⚠️ 无法记录余额历史：数据库未连接。")
+            return
+
         try:
             # 创建余额历史表（如果不存在）
             create_table_sql = """
@@ -190,6 +204,10 @@ def get_db_adapter() -> DatabaseAdapter:
     if db_adapter is None:
         db_adapter = DatabaseAdapter()
     return db_adapter
+
+def get_db_config() -> Dict[str, Any]:
+    """获取原始的PostgreSQL连接配置字典"""
+    return DATABASE_CONFIG.get('postgresql', {})
 
 def switch_database(db_type: str):
     """切换数据库类型"""

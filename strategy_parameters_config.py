@@ -12,6 +12,10 @@ import os
 import random
 from datetime import datetime
 import numpy as np
+from decimal import Decimal, getcontext
+
+# 设置Decimal的精度
+getcontext().prec = 10
 
 
 # 市场状态定义
@@ -55,24 +59,24 @@ PARAMETER_RULES = {
             "VOLATILE": [3, 20],
             "LOW_VOLATILITY": [20, 60]
         },
-        "mutation_strength": 0.2, # 变异强度
+        "mutation_strength": Decimal("0.2"), # 变异强度
         "type": "int"
     },
     "momentum_threshold": {
-        "range": [0.01, 0.3],
-        "optimal": 0.05,
-        "step": 0.01,
+        "range": [Decimal("0.01"), Decimal("0.3")],
+        "optimal": Decimal("0.05"),
+        "step": Decimal("0.01"),
         "profit_logic": "direct", # 参数调整逻辑：收益越高，参数越接近最优
         "description": "动量阈值",
         "market_adaption": {
-            "TRENDING_UP": [0.03, 0.1],
-            "TRENDING_DOWN": [0.03, 0.1],
-            "SIDEWAYS": [0.01, 0.05],
-            "VOLATILE": [0.05, 0.15],
-            "LOW_VOLATILITY": [0.01, 0.03]
+            "TRENDING_UP": [Decimal("0.03"), Decimal("0.1")],
+            "TRENDING_DOWN": [Decimal("0.03"), Decimal("0.1")],
+            "SIDEWAYS": [Decimal("0.01"), Decimal("0.05")],
+            "VOLATILE": [Decimal("0.05"), Decimal("0.15")],
+            "LOW_VOLATILITY": [Decimal("0.01"), Decimal("0.03")]
         },
-        "mutation_strength": 0.1,
-        "type": "float"
+        "mutation_strength": Decimal("0.1"),
+        "type": "decimal"
     },
     
     # 均值回归策略参数
@@ -89,24 +93,24 @@ PARAMETER_RULES = {
             "VOLATILE": [30, 80],
             "LOW_VOLATILITY": [80, 150]
         },
-        "mutation_strength": 0.2,
+        "mutation_strength": Decimal("0.2"),
         "type": "int"
     },
     "std_dev_multiplier": {
-        "range": [1.0, 3.0],
-        "optimal": 2.0,
-        "step": 0.1,
+        "range": [Decimal("1.0"), Decimal("3.0")],
+        "optimal": Decimal("2.0"),
+        "step": Decimal("0.1"),
         "profit_logic": "direct",
         "description": "标准差倍数",
         "market_adaption": {
-            "TRENDING_UP": [1.5, 2.5],
-            "TRENDING_DOWN": [1.5, 2.5],
-            "SIDEWAYS": [1.8, 2.2],
-            "VOLATILE": [2.0, 3.0],
-            "LOW_VOLATILITY": [1.0, 2.0]
+            "TRENDING_UP": [Decimal("1.5"), Decimal("2.5")],
+            "TRENDING_DOWN": [Decimal("1.5"), Decimal("2.5")],
+            "SIDEWAYS": [Decimal("1.8"), Decimal("2.2")],
+            "VOLATILE": [Decimal("2.0"), Decimal("3.0")],
+            "LOW_VOLATILITY": [Decimal("1.0"), Decimal("2.0")]
         },
-        "mutation_strength": 0.15,
-        "type": "float"
+        "mutation_strength": Decimal("0.15"),
+        "type": "decimal"
     },
     
     # 突破策略参数
@@ -124,25 +128,25 @@ PARAMETER_RULES = {
             "BREAKOUT": [5, 20],
             "REVERSAL": [10, 30]
         },
-        "mutation_strength": 0.25,
+        "mutation_strength": Decimal("0.25"),
         "type": "int"
     },
     "breakout_threshold": {
-        "range": [0.005, 0.05],
-        "optimal": 0.01,
-        "step": 0.001,
+        "range": [Decimal("0.005"), Decimal("0.05")],
+        "optimal": Decimal("0.01"),
+        "step": Decimal("0.001"),
         "profit_logic": "direct",
         "description": "突破阈值",
         "market_adaption": {
-            "TRENDING_UP": [0.01, 0.02],
-            "TRENDING_DOWN": [0.01, 0.02],
-            "SIDEWAYS": [0.005, 0.01],
-            "VOLATILE": [0.02, 0.05],
-            "BREAKOUT": [0.01, 0.03],
-            "REVERSAL": [0.015, 0.035]
+            "TRENDING_UP": [Decimal("0.01"), Decimal("0.02")],
+            "TRENDING_DOWN": [Decimal("0.01"), Decimal("0.02")],
+            "SIDEWAYS": [Decimal("0.005"), Decimal("0.01")],
+            "VOLATILE": [Decimal("0.02"), Decimal("0.05")],
+            "BREAKOUT": [Decimal("0.01"), Decimal("0.03")],
+            "REVERSAL": [Decimal("0.015"), Decimal("0.035")]
         },
-        "mutation_strength": 0.2,
-        "type": "float"
+        "mutation_strength": Decimal("0.2"),
+        "type": "decimal"
     },
     
     # 网格交易策略参数
@@ -160,25 +164,25 @@ PARAMETER_RULES = {
             "LOW_VOLATILITY": [5, 15],
             "RANGING": [10, 40]
         },
-        "mutation_strength": 0.3,
+        "mutation_strength": Decimal("0.3"),
         "type": "int"
     },
     "grid_spacing": {
-        "range": [0.002, 0.05],
-        "optimal": 0.01,
-        "step": 0.001,
+        "range": [Decimal("0.002"), Decimal("0.05")],
+        "optimal": Decimal("0.01"),
+        "step": Decimal("0.001"),
         "profit_logic": "direct",
         "description": "网格间距",
         "market_adaption": {
-            "TRENDING_UP": [0.01, 0.02],
-            "TRENDING_DOWN": [0.01, 0.02],
-            "SIDEWAYS": [0.005, 0.015],
-            "VOLATILE": [0.02, 0.05],
-            "LOW_VOLATILITY": [0.002, 0.01],
-            "RANGING": [0.008, 0.025]
+            "TRENDING_UP": [Decimal("0.01"), Decimal("0.02")],
+            "TRENDING_DOWN": [Decimal("0.01"), Decimal("0.02")],
+            "SIDEWAYS": [Decimal("0.005"), Decimal("0.015")],
+            "VOLATILE": [Decimal("0.02"), Decimal("0.05")],
+            "LOW_VOLATILITY": [Decimal("0.002"), Decimal("0.01")],
+            "RANGING": [Decimal("0.008"), Decimal("0.025")]
         },
-        "mutation_strength": 0.2,
-        "type": "float"
+        "mutation_strength": Decimal("0.2"),
+        "type": "decimal"
     },
     
     # 趋势跟踪策略参数
@@ -195,24 +199,24 @@ PARAMETER_RULES = {
             "VOLATILE": [40, 100],
             "LOW_VOLATILITY": [50, 150],
         },
-        "mutation_strength": 0.25,
+        "mutation_strength": Decimal("0.25"),
         "type": "int"
     },
     "trend_threshold": {
-        "range": [0.01, 0.1],
-        "optimal": 0.03,
-        "step": 0.005,
+        "range": [Decimal("0.01"), Decimal("0.1")],
+        "optimal": Decimal("0.03"),
+        "step": Decimal("0.005"),
         "profit_logic": "direct",
         "description": "趋势确认阈值",
         "market_adaption": {
-            "TRENDING_UP": [0.02, 0.05],
-            "TRENDING_DOWN": [0.02, 0.05],
-            "SIDEWAYS": [0.01, 0.03],
-            "VOLATILE": [0.04, 0.1],
-            "LOW_VOLATILITY": [0.01, 0.03],
+            "TRENDING_UP": [Decimal("0.02"), Decimal("0.05")],
+            "TRENDING_DOWN": [Decimal("0.02"), Decimal("0.05")],
+            "SIDEWAYS": [Decimal("0.01"), Decimal("0.03")],
+            "VOLATILE": [Decimal("0.04"), Decimal("0.1")],
+            "LOW_VOLATILITY": [Decimal("0.01"), Decimal("0.03")],
         },
-        "mutation_strength": 0.15,
-        "type": "float"
+        "mutation_strength": Decimal("0.15"),
+        "type": "decimal"
     },
     
     # 高频交易策略参数
@@ -229,24 +233,24 @@ PARAMETER_RULES = {
             "VOLATILE": [3, 10],
             "LOW_VOLATILITY": [5, 15]
         },
-        "mutation_strength": 0.3,
+        "mutation_strength": Decimal("0.3"),
         "type": "int"
     },
     "hf_threshold": {
-        "range": [0.001, 0.01],
-        "optimal": 0.002,
-        "step": 0.0005,
+        "range": [Decimal("0.001"), Decimal("0.01")],
+        "optimal": Decimal("0.002"),
+        "step": Decimal("0.0005"),
         "profit_logic": "direct",
         "description": "高频交易阈值",
         "market_adaption": {
-            "TRENDING_UP": [0.001, 0.003],
-            "TRENDING_DOWN": [0.001, 0.003],
-            "SIDEWAYS": [0.0015, 0.004],
-            "VOLATILE": [0.003, 0.01],
-            "LOW_VOLATILITY": [0.001, 0.002]
+            "TRENDING_UP": [Decimal("0.001"), Decimal("0.003")],
+            "TRENDING_DOWN": [Decimal("0.001"), Decimal("0.003")],
+            "SIDEWAYS": [Decimal("0.0015"), Decimal("0.004")],
+            "VOLATILE": [Decimal("0.003"), Decimal("0.01")],
+            "LOW_VOLATILITY": [Decimal("0.001"), Decimal("0.002")]
         },
-        "mutation_strength": 0.25,
-        "type": "float"
+        "mutation_strength": Decimal("0.25"),
+        "type": "decimal"
     },
     
     # 短线策略参数
@@ -263,92 +267,92 @@ PARAMETER_RULES = {
             "VOLATILE": [2, 8],
             "LOW_VOLATILITY": [3, 10]
         },
-        "mutation_strength": 0.3,
+        "mutation_strength": Decimal("0.3"),
         "type": "int"
     },
     "profit_target": {
-        "range": [0.001, 0.02],
-        "optimal": 0.005,
-        "step": 0.001,
+        "range": [Decimal("0.001"), Decimal("0.02")],
+        "optimal": Decimal("0.005"),
+        "step": Decimal("0.001"),
         "profit_logic": "direct",
         "description": "利润目标",
         "market_adaption": {
-            "TRENDING_UP": [0.003, 0.01],
-            "TRENDING_DOWN": [0.003, 0.01],
-            "SIDEWAYS": [0.001, 0.005],
-            "VOLATILE": [0.005, 0.02],
-            "LOW_VOLATILITY": [0.001, 0.003]
+            "TRENDING_UP": [Decimal("0.003"), Decimal("0.01")],
+            "TRENDING_DOWN": [Decimal("0.003"), Decimal("0.01")],
+            "SIDEWAYS": [Decimal("0.001"), Decimal("0.005")],
+            "VOLATILE": [Decimal("0.005"), Decimal("0.02")],
+            "LOW_VOLATILITY": [Decimal("0.001"), Decimal("0.003")]
         },
-        "mutation_strength": 0.2,
-        "type": "float"
+        "mutation_strength": Decimal("0.2"),
+        "type": "decimal"
     },
     
     # 套利策略参数
     "price_diff_threshold": {
-        "range": [0.001, 0.05],
-        "optimal": 0.01,
-        "step": 0.001,
+        "range": [Decimal("0.001"), Decimal("0.05")],
+        "optimal": Decimal("0.01"),
+        "step": Decimal("0.001"),
         "profit_logic": "direct",
         "description": "价格差异阈值",
         "market_adaption": {
-            "TRENDING_UP": [0.005, 0.02],
-            "TRENDING_DOWN": [0.005, 0.02],
-            "SIDEWAYS": [0.002, 0.01],
-            "VOLATILE": [0.01, 0.05],
-            "LOW_VOLATILITY": [0.001, 0.008]
+            "TRENDING_UP": [Decimal("0.005"), Decimal("0.02")],
+            "TRENDING_DOWN": [Decimal("0.005"), Decimal("0.02")],
+            "SIDEWAYS": [Decimal("0.002"), Decimal("0.01")],
+            "VOLATILE": [Decimal("0.01"), Decimal("0.05")],
+            "LOW_VOLATILITY": [Decimal("0.001"), Decimal("0.008")]
         },
-        "mutation_strength": 0.2,
-        "type": "float"
+        "mutation_strength": Decimal("0.2"),
+        "type": "decimal"
     },
     
     # 风控参数
     "max_position_size": {
-        "range": [0.01, 0.5],
-        "optimal": 0.1,
-        "step": 0.01,
+        "range": [Decimal("0.01"), Decimal("0.5")],
+        "optimal": Decimal("0.1"),
+        "step": Decimal("0.01"),
         "profit_logic": "risk_adjusted", # 根据风险调整收益
         "description": "最大仓位比例",
         "market_adaption": {
-            "TRENDING_UP": [0.05, 0.2],
-            "TRENDING_DOWN": [0.05, 0.15],
-            "SIDEWAYS": [0.03, 0.1],
-            "VOLATILE": [0.01, 0.08],
-            "LOW_VOLATILITY": [0.05, 0.3]
+            "TRENDING_UP": [Decimal("0.05"), Decimal("0.2")],
+            "TRENDING_DOWN": [Decimal("0.05"), Decimal("0.15")],
+            "SIDEWAYS": [Decimal("0.03"), Decimal("0.1")],
+            "VOLATILE": [Decimal("0.01"), Decimal("0.08")],
+            "LOW_VOLATILITY": [Decimal("0.05"), Decimal("0.3")]
         },
-        "mutation_strength": 0.1,
-        "type": "float"
+        "mutation_strength": Decimal("0.1"),
+        "type": "decimal"
     },
     "stop_loss": {
-        "range": [0.01, 0.1],
-        "optimal": 0.03,
-        "step": 0.005,
+        "range": [Decimal("0.01"), Decimal("0.1")],
+        "optimal": Decimal("0.03"),
+        "step": Decimal("0.005"),
         "profit_logic": "risk_adjusted",
         "description": "止损比例",
         "market_adaption": {
-            "TRENDING_UP": [0.02, 0.05],
-            "TRENDING_DOWN": [0.02, 0.05],
-            "SIDEWAYS": [0.01, 0.03],
-            "VOLATILE": [0.03, 0.1],
-            "LOW_VOLATILITY": [0.01, 0.03]
+            "TRENDING_UP": [Decimal("0.02"), Decimal("0.05")],
+            "TRENDING_DOWN": [Decimal("0.02"), Decimal("0.05")],
+            "SIDEWAYS": [Decimal("0.01"), Decimal("0.03")],
+            "VOLATILE": [Decimal("0.03"), Decimal("0.1")],
+            "LOW_VOLATILITY": [Decimal("0.01"), Decimal("0.03")]
         },
-        "mutation_strength": 0.15,
-        "type": "float"
+        "mutation_strength": Decimal("0.15"),
+        "type": "decimal"
     },
     "take_profit": {
-        "range": [0.01, 0.2],
-        "optimal": 0.05,
-        "step": 0.01,
+        "range": [Decimal("0.01"), Decimal("0.2")],
+        "optimal": Decimal("0.05"),
+        "step": Decimal("0.01"),
         "profit_logic": "risk_adjusted",
         "description": "止盈比例",
         "market_adaption": {
-            "TRENDING_UP": [0.03, 0.1],
-            "TRENDING_DOWN": [0.03, 0.1],
-            "SIDEWAYS": [0.01, 0.05],
-            "VOLATILE": [0.05, 0.2],
-            "LOW_VOLATILITY": [0.02, 0.08]
+            "TRENDING_UP": [Decimal("0.03"), Decimal("0.1")],
+            "TRENDING_DOWN": [Decimal("0.03"), Decimal("0.1")],
+            "SIDEWAYS": [Decimal("0.01"), Decimal("0.05")],
+            "VOLATILE": [Decimal("0.05"), Decimal("0.2")],
+            "LOW_VOLATILITY": [Decimal("0.02"), Decimal("0.08")]
         },
-        "mutation_strength": 0.2,
-        "type": "float"
+        "mutation_strength": Decimal("0.2"),
+        "type": "decimal"
     }
 }
 
@@ -366,18 +370,19 @@ class StrategyParameterManager:
     def _load_scoring_weights(self) -> Dict:
         """加载评分权重配置"""
         default_weights = {
-            "total_return": 0.30,  # 总收益率
-            "win_rate": 0.25,      # 胜率
-            "sharpe_ratio": 0.20,  # 夏普比率
-            "max_drawdown": 0.15,  # 最大回撤
-            "profit_factor": 0.10  # 盈亏比
+            "total_return": Decimal("0.30"),  # 总收益率
+            "win_rate": Decimal("0.25"),      # 胜率
+            "sharpe_ratio": Decimal("0.20"),  # 夏普比率
+            "max_drawdown": Decimal("0.15"),  # 最大回撤
+            "profit_factor": Decimal("0.10")  # 盈亏比
         }
         
         try:
             weights_file = "strategy_scoring_weights.json"
             if os.path.exists(weights_file):
                 with open(weights_file, "r") as f:
-                    weights = json.load(f)
+                    weights_str = json.load(f)
+                    weights = {k: Decimal(v) for k, v in weights_str.items()}
                 return weights
             else:
                 return default_weights
@@ -388,7 +393,8 @@ class StrategyParameterManager:
         """保存评分权重配置"""
         try:
             with open("strategy_scoring_weights.json", "w") as f:
-                json.dump(weights, f, indent=2)
+                weights_str = {k: str(v) for k, v in weights.items()}
+                json.dump(weights_str, f, indent=2)
         except Exception as e:
             print(f"保存评分权重配置失败: {e}")
     
@@ -410,7 +416,7 @@ class StrategyParameterManager:
             if market_state in market_adaption:
                 adapted_range = market_adaption[market_state]
                 adapted_params[param_name] = {
-                    "range": adapted_range,
+                    "range": [Decimal(str(v)) for v in adapted_range] if isinstance(config["type"], str) and config["type"] == "decimal" else adapted_range,
                     "step": config["step"],
                     "type": config["type"]
                 }
@@ -459,16 +465,26 @@ class StrategyParameterManager:
                 # 确保在范围内
                 new_value = max(param_range[0], min(new_value, param_range[1]))
                 mutated_params[param_name] = new_value
-            elif config["type"] == "float":
-                range_size = param_range[1] - param_range[0]
+            elif config["type"] == "decimal":
+                param_range_dec = [Decimal(str(v)) for v in param_range]
+                range_size = param_range_dec[1] - param_range_dec[0]
                 mutation_size = range_size * mutation_rate
-                mutation = random.uniform(-mutation_size, mutation_size)
-                new_value = float(value) + mutation
+                
+                # 生成一个Decimal类型的随机数
+                random_decimal = Decimal(str(random.uniform(-1, 1)))
+                mutation = mutation_size * random_decimal
+
+                new_value = Decimal(str(value)) + mutation
                 # 确保在范围内
-                new_value = max(param_range[0], min(new_value, param_range[1]))
+                new_value = max(param_range_dec[0], min(new_value, param_range_dec[1]))
+                
                 # 四舍五入到指定精度
-                decimal_places = len(str(param_step).split(".")[-1]) if "." in str(param_step) else 0
-                mutated_params[param_name] = round(new_value, decimal_places)
+                step_str = str(config["step"])
+                if "." in step_str:
+                    decimal_places = len(step_str.split('.')[-1])
+                    mutated_params[param_name] = new_value.quantize(Decimal(step_str))
+                else:
+                    mutated_params[param_name] = new_value.quantize(Decimal('1'))
             else:
                 mutated_params[param_name] = value
         
@@ -507,7 +523,7 @@ class StrategyParameterManager:
         
         return child_params
     
-    def calculate_strategy_score(self, stats: Dict, market_state: str = None) -> float:
+    def calculate_strategy_score(self, stats: Dict, market_state: Optional[str] = None) -> Decimal:
         """
         计算策略评分 - 2.0增强版
         根据市场状态动态调整评分权重
@@ -516,12 +532,12 @@ class StrategyParameterManager:
         :param market_state: 市场状态
         :return: 综合评分(0-100)
         """
-        # 获取基础统计数据
-        total_return = float(stats.get('total_return', 0))
-        win_rate = float(stats.get('win_rate', 0))
-        sharpe_ratio = float(stats.get('sharpe_ratio', 1.0))
-        max_drawdown = abs(float(stats.get('max_drawdown', 0.05)))
-        profit_factor = float(stats.get('profit_factor', 1.5))
+        # 获取基础统计数据并转换为Decimal
+        total_return = Decimal(str(stats.get('total_return', '0')))
+        win_rate = Decimal(str(stats.get('win_rate', '0')))
+        sharpe_ratio = Decimal(str(stats.get('sharpe_ratio', '1.0')))
+        max_drawdown = abs(Decimal(str(stats.get('max_drawdown', '0.05'))))
+        profit_factor = Decimal(str(stats.get('profit_factor', '1.5')))
         total_trades = int(stats.get('total_trades', 0))
         
         # 根据市场状态调整权重
@@ -531,47 +547,51 @@ class StrategyParameterManager:
             # 在不同市场状态下调整权重
             if market_state == "TRENDING_UP" or market_state == "TRENDING_DOWN":
                 # 趋势市场更看重总收益和夏普比率
-                weights["total_return"] = weights["total_return"] * 1.2
-                weights["sharpe_ratio"] = weights["sharpe_ratio"] * 1.2
-                weights["win_rate"] = weights["win_rate"] * 0.8
+                weights["total_return"] *= Decimal("1.2")
+                weights["sharpe_ratio"] *= Decimal("1.2")
+                weights["win_rate"] *= Decimal("0.8")
             elif market_state == "SIDEWAYS" or market_state == "RANGING":
                 # 震荡市场更看重胜率和盈亏比
-                weights["win_rate"] = weights["win_rate"] * 1.2
-                weights["profit_factor"] = weights["profit_factor"] * 1.2
-                weights["total_return"] = weights["total_return"] * 0.8
+                weights["win_rate"] *= Decimal("1.2")
+                weights["profit_factor"] *= Decimal("1.2")
+                weights["total_return"] *= Decimal("0.8")
             elif market_state == "VOLATILE":
                 # 高波动市场更看重最大回撤控制
-                weights["max_drawdown"] = weights["max_drawdown"] * 1.5
-                weights["sharpe_ratio"] = weights["sharpe_ratio"] * 1.2
+                weights["max_drawdown"] *= Decimal("1.5")
+                weights["sharpe_ratio"] *= Decimal("1.2")
             
             # 归一化权重
             weight_sum = sum(weights.values())
-            for k in weights:
-                weights[k] = weights[k] / weight_sum
+            if weight_sum > 0:
+                for k in weights:
+                    weights[k] = weights[k] / weight_sum
         
         # 各项指标评分计算
         
-        # 收益率分数 (指数函数，高收益更高分)
-        return_score = min(100, max(0, 50 + 50 * np.tanh(total_return * 2)))
-        
+        # 收益率分数 (指数函数，高收益更高分) - np.tanh需要float
+        return_score = Decimal("50") + Decimal("50") * Decimal(str(np.tanh(float(total_return) * 2)))
+        return_score = min(Decimal("100"), max(Decimal("0"), return_score))
+
         # 胜率分数 (线性，胜率越高分数越高)
-        win_rate_score = win_rate * 100
+        win_rate_score = win_rate * Decimal("100")
         
-        # 夏普比率分数 (指数函数，高夏普更高分)
-        sharpe_score = min(100, max(0, 50 * np.tanh(sharpe_ratio)))
+        # 夏普比率分数 (指数函数，高夏普更高分) - np.tanh需要float
+        sharpe_score = Decimal("50") * Decimal(str(np.tanh(float(sharpe_ratio))))
+        sharpe_score = min(Decimal("100"), max(Decimal("0"), sharpe_score))
         
         # 最大回撤分数 (反比例，回撤越小分数越高)
-        drawdown_score = max(0, 100 - max_drawdown * 500)
+        drawdown_score = max(Decimal("0"), Decimal("100") - max_drawdown * Decimal("500"))
         
-        # 盈亏比分数 (指数函数，高盈亏比更高分)
-        profit_factor_score = min(100, max(0, 50 * np.tanh((profit_factor - 1) * 2)))
+        # 盈亏比分数 (指数函数，高盈亏比更高分) - np.tanh需要float
+        profit_factor_score = Decimal("50") * Decimal(str(np.tanh(float(profit_factor - 1) * 2)))
+        profit_factor_score = min(Decimal("100"), max(Decimal("0"), profit_factor_score))
         
         # 交易次数调整因子
-        trade_count_factor = 1.0
+        trade_count_factor = Decimal("1.0")
         if total_trades < 10:
-            trade_count_factor = 0.7 + 0.03 * total_trades  # 交易次数少，降低评分
+            trade_count_factor = Decimal("0.7") + Decimal("0.03") * total_trades
         elif total_trades > 50:
-            trade_count_factor = min(1.2, 1.0 + 0.004 * (total_trades - 50))  # 交易次数多，提高评分
+            trade_count_factor = min(Decimal("1.2"), Decimal("1.0") + Decimal("0.004") * (total_trades - 50))
         
         # 计算加权总分
         weighted_score = (
@@ -586,10 +606,10 @@ class StrategyParameterManager:
         final_score = weighted_score * trade_count_factor
         
         # 将分数限制在0-100范围内
-        return min(100, max(0, final_score))
+        return min(Decimal("100"), max(Decimal("0"), final_score))
     
-    def get_evolution_direction(self, param_name: str, performance_change: float, 
-                              market_state: str = None) -> float:
+    def get_evolution_direction(self, param_name: str, performance_change: Decimal, 
+                              market_state: Optional[str] = None) -> Decimal:
         """
         确定参数进化方向
         :param param_name: 参数名称
@@ -598,49 +618,49 @@ class StrategyParameterManager:
         :return: 进化方向系数(-1.0到1.0)
         """
         if param_name not in self.parameter_rules:
-            return 0.0
+            return Decimal("0.0")
             
         config = self.parameter_rules[param_name]
         logic = config.get("profit_logic", "direct")
         
         # 性能未改变，返回0
-        if abs(performance_change) < 0.0001:
-            return 0.0
+        if abs(performance_change) < Decimal("0.0001"):
+            return Decimal("0.0")
         
         # 根据不同的参数调整逻辑确定方向    
         if logic == "direct":
             # 性能提升则沿同方向调整，恶化则反向
-            return 0.5 if performance_change > 0 else -0.5
+            return Decimal("0.5") if performance_change > 0 else Decimal("-0.5")
             
         elif logic == "inverse":
             # 与direct相反
-            return -0.5 if performance_change > 0 else 0.5
+            return Decimal("-0.5") if performance_change > 0 else Decimal("0.5")
             
         elif logic == "dynamic":
             # 根据市场状态动态决定
             if not market_state or market_state in ["TRENDING_UP", "TRENDING_DOWN"]:
                 # 趋势市场中，性能提升则增加参数
-                return 0.7 if performance_change > 0 else -0.7
+                return Decimal("0.7") if performance_change > 0 else Decimal("-0.7")
             else:
                 # 其他市场中，性能提升则减小参数
-                return -0.5 if performance_change > 0 else 0.5
+                return Decimal("-0.5") if performance_change > 0 else Decimal("0.5")
                 
         elif logic == "risk_adjusted":
             # 风险控制参数，考虑风险和收益的平衡
             if market_state == "VOLATILE":
                 # 高波动市场，优先考虑风险控制
-                return -0.6 if performance_change > 0 else 0.4
+                return Decimal("-0.6") if performance_change > 0 else Decimal("0.4")
             else:
                 # 其他市场，平衡风险和收益
-                return 0.4 if performance_change > 0 else -0.4
+                return Decimal("0.4") if performance_change > 0 else Decimal("-0.4")
                 
         elif logic == "moderate":
             # 缓和的调整
-            return 0.3 if performance_change > 0 else -0.3
+            return Decimal("0.3") if performance_change > 0 else Decimal("-0.3")
             
-        return 0.0
+        return Decimal("0.0")
     
-    def detect_market_state(self, price_data: List[float], volume_data: List[float] = None) -> str:
+    def detect_market_state(self, price_data: List[float], volume_data: Optional[List[float]] = None) -> str:
         """
         检测当前市场状态
         :param price_data: 价格数据
@@ -703,7 +723,7 @@ def get_market_states():
     """获取市场状态类型"""
     return MARKET_STATES
 
-def calculate_score(stats, market_state=None):
+def calculate_score(stats, market_state: Optional[str] = None):
     """计算策略评分"""
     return parameter_manager.calculate_strategy_score(stats, market_state)
 
@@ -749,13 +769,135 @@ def get_all_strategy_types():
     return STRATEGY_TYPES
 
 
+def get_strategy_default_parameters(strategy_type):
+    """
+    🔧 修复：获取策略的默认参数配置
+    根据策略类型返回对应的默认参数
+    """
+    # 定义各种策略类型的默认参数
+    default_params = {
+        'momentum': {
+            # 基础参数
+            'lookback_period': 20, 'threshold': 0.02, 'quantity': 100,
+            'momentum_threshold': 0.01, 'volume_threshold': 2.0,
+            # 技术指标参数 - RSI
+            'rsi_period': 14, 'rsi_oversold': 30, 'rsi_overbought': 70,
+            # MACD指标参数
+            'macd_fast_period': 12, 'macd_slow_period': 26, 'macd_signal_period': 9,
+            # 价格动量参数
+            'price_momentum_period': 10, 'volume_momentum_period': 20,
+            # 风险控制参数
+            'stop_loss_pct': 2.0, 'take_profit_pct': 4.0, 'max_drawdown_pct': 5.0,
+            'position_sizing': 0.1, 'max_position_risk': 0.05,
+            # 时间管理参数
+            'min_hold_time': 300, 'max_hold_time': 3600,
+            'trade_start_hour': 0, 'trade_end_hour': 24
+        },
+        'mean_reversion': {
+            # 基础参数
+            'lookback_period': 30, 'std_multiplier': 2.0, 'quantity': 100,
+            'reversion_threshold': 0.02, 'min_deviation': 0.01,
+            # 布林带参数
+            'bb_period': 20, 'bb_std_dev': 2.0, 'bb_squeeze_threshold': 0.1,
+            # 均值回归指标
+            'z_score_threshold': 2.0, 'correlation_threshold': 0.7,
+            'volatility_threshold': 0.02, 'mean_lookback': 50,
+            # Bollinger Bands扩展参数
+            'bb_upper_threshold': 0.9, 'bb_lower_threshold': 0.1,
+            # 风险控制
+            'stop_loss_pct': 1.5, 'take_profit_pct': 3.0, 'max_positions': 3,
+            'min_profit_target': 0.5, 'position_scaling': 0.8,
+            # 时间控制
+            'entry_cooldown': 600, 'max_trade_duration': 7200,
+            'avoid_news_hours': True, 'weekend_trading': False
+        },
+        'grid_trading': {
+            # 网格基础参数
+            'grid_spacing': 1.0, 'grid_count': 10, 'quantity': 1000,
+            'lookback_period': 100, 'min_profit': 0.5,
+            # 网格高级参数
+            'upper_price_limit': 110000, 'lower_price_limit': 90000,
+            'grid_density': 0.5, 'rebalance_threshold': 5.0,
+            'profit_taking_ratio': 0.8, 'grid_spacing_type': 'arithmetic',
+            # 动态调整参数
+            'volatility_adjustment': True, 'trend_filter_enabled': True,
+            'volume_weighted': True, 'dynamic_spacing': True,
+            # 网格优化参数
+            'grid_adaptation_period': 24, 'price_range_buffer': 0.1,
+            # 风险管理
+            'max_grid_exposure': 10000, 'emergency_stop_loss': 10.0,
+            'grid_pause_conditions': True, 'liquidity_threshold': 1000000,
+            'single_grid_risk': 0.02
+        },
+        'breakout': {
+            # 突破基础参数
+            'lookback_period': 20, 'breakout_threshold': 1.5, 'quantity': 50,
+            'volume_threshold': 2.0, 'confirmation_periods': 3,
+            # 技术指标确认
+            'atr_period': 14, 'atr_multiplier': 2.0,
+            'volume_ma_period': 20, 'price_ma_period': 50,
+            'momentum_confirmation': True, 'volume_confirmation': True,
+            # 假突破过滤
+            'false_breakout_filter': True, 'pullback_tolerance': 0.3,
+            'breakout_strength_min': 1.2, 'minimum_breakout_volume': 1.5,
+            # 突破确认参数
+            'breakout_confirmation_candles': 2, 'resistance_support_buffer': 0.1,
+            # 风险控制
+            'stop_loss_atr_multiple': 2.0, 'take_profit_atr_multiple': 4.0,
+            'trailing_stop_enabled': True, 'max_holding_period': 14400,
+            'position_risk_limit': 0.03
+        },
+        'high_frequency': {
+            # 高频基础参数
+            'quantity': 100, 'min_profit': 0.05, 'volatility_threshold': 0.001,
+            'lookback_period': 10, 'signal_interval': 30,
+            # 微观结构参数
+            'bid_ask_spread_threshold': 0.01, 'order_book_depth_min': 1000,
+            'tick_size_multiple': 1.0, 'latency_threshold': 100,
+            'market_impact_limit': 0.001, 'slippage_tolerance': 0.002,
+            # 高频交易优化
+            'order_book_levels': 5, 'imbalance_threshold': 0.3,
+            'tick_rule_filter': True, 'momentum_timeframe': 60,
+            # 风险和执行
+            'max_order_size': 1000, 'inventory_limit': 5000,
+            'pnl_stop_loss': 100, 'correlation_hedge': True,
+            'max_drawdown_hf': 2.0, 'daily_loss_limit': 500,
+            # 时间控制
+            'trading_session_length': 3600, 'cooldown_period': 60,
+            'avoid_rollover': True, 'market_hours_only': True
+        },
+        'trend_following': {
+            # 趋势基础参数
+            'lookback_period': 50, 'trend_threshold': 1.0, 'quantity': 100,
+            'trend_strength_min': 0.3, 'trend_duration_min': 30,
+            # 趋势识别参数
+            'ema_fast_period': 12, 'ema_slow_period': 26,
+            'adx_period': 14, 'adx_threshold': 25,
+            'slope_threshold': 0.001, 'trend_angle_min': 15,
+            # 趋势确认指标
+            'macd_confirmation': True, 'volume_confirmation': True,
+            'momentum_confirmation': True, 'multi_timeframe': True,
+            'ichimoku_enabled': True, 'parabolic_sar_enabled': True,
+            # 趋势过滤参数
+            'noise_filter_enabled': True, 'trend_quality_min': 0.7,
+            # 风险和退出
+            'trailing_stop_pct': 3.0, 'trend_reversal_exit': True,
+            'profit_lock_pct': 2.0, 'max_adverse_excursion': 4.0,
+            'trend_exhaustion_exit': True, 'position_pyramid': False
+        }
+    }
+    
+    # 返回对应策略类型的参数，如果不存在则返回动量策略的参数作为默认值
+    return default_params.get(strategy_type, default_params.get('momentum', {}))
+
+
 if __name__ == "__main__":
     # 测试功能
     manager = StrategyParameterManager()
     
     # 测试市场状态检测
     import random
-    test_prices = [100]
+    test_prices = [100.0]
     for i in range(100):
         change = random.normalvariate(0.001, 0.01)
         test_prices.append(test_prices[-1] * (1 + change))

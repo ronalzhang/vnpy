@@ -12,7 +12,7 @@ import logging
 import psycopg2
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import threading
 import traceback
 from db_config import get_db_config
@@ -36,18 +36,18 @@ class AdvancedStrategyManager:
             # 进化和淘汰配置
             'evolution_interval_minutes': 15,      # 进化检查间隔
             'elimination_cycle_hours': 24,         # 淘汰周期
-            'score_improvement_threshold': 5.0,    # 评分提升门槛
+            'score_improvement_threshold': Decimal('5.0'),    # 评分提升门槛
             
             # 质量标准
-            'real_trading_score_threshold': 65.0,  # 真实交易门槛
-            'elimination_score_threshold': 30.0,   # 淘汰门槛
+            'real_trading_score_threshold': Decimal('65.0'),  # 真实交易门槛
+            'elimination_score_threshold': Decimal('30.0'),   # 淘汰门槛
             'min_trades_for_evaluation': 10,       # 最少交易次数
-            'min_win_rate': 0.6,                   # 最低胜率
+            'min_win_rate': Decimal('0.6'),                   # 最低胜率
             
             # 风险控制
-            'max_position_size': 200.0,            # 最大仓位
-            'stop_loss_percent': 5.0,              # 止损百分比
-            'take_profit_percent': 4.0,            # 止盈百分比
+            'max_position_size': Decimal('200.0'),            # 最大仓位
+            'stop_loss_percent': Decimal('5.0'),              # 止损百分比
+            'take_profit_percent': Decimal('4.0'),            # 止盈百分比
             
             # 自动管理
             'auto_management_enabled': True,        # 启用全自动管理
@@ -100,9 +100,12 @@ class AdvancedStrategyManager:
                         if isinstance(self.config[key], bool):
                             self.config[key] = value.lower() == 'true'
                         elif isinstance(self.config[key], int):
-                            self.config[key] = int(float(value))
+                            self.config[key] = int(value)
+                        elif isinstance(self.config[key], Decimal):
+                            self.config[key] = Decimal(value)
                         elif isinstance(self.config[key], float):
-                            self.config[key] = float(value)
+                            # For backward compatibility if float is still stored
+                            self.config[key] = Decimal(str(value))
                         else:
                             self.config[key] = value
                             
@@ -213,7 +216,8 @@ class AdvancedStrategyManager:
                 SELECT COALESCE(AVG(final_score), 0) FROM strategies 
                 WHERE id LIKE 'STRAT_%' AND final_score > 0
             """)
-            avg_score = float(cursor.fetchone()[0])
+            avg_score_raw = cursor.fetchone()[0]
+            avg_score = Decimal(str(avg_score_raw)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
             cursor.close()
             conn.close()
@@ -223,7 +227,7 @@ class AdvancedStrategyManager:
                 'active_strategies': active_count,
                 'real_trading_strategies': real_trading_count,
                 'validation_strategies': validation_count,
-                'average_score': round(avg_score, 2),
+                'average_score': avg_score,
                 'config': self.config
             }
             
@@ -494,7 +498,7 @@ class AdvancedStrategyManager:
                 if self.config['auto_optimization_enabled']:
                     optimized = self._run_strategy_optimization()
                     self.logger.info(f"🔧 已优化 {optimized} 个策略")
-                
+            
                 # 4. 选择顶级策略
                 top_strategies = self.select_top_strategies_for_trading()
                 
@@ -590,7 +594,7 @@ class AdvancedStrategyManager:
                 self.logger.info(f"🔄 策略轮换: 禁用{disabled_count}个, 启用{enabled_count}个")
             
             return disabled_count + enabled_count
-            
+                
         except Exception as e:
             self.logger.error(f"❌ 策略轮换失败: {e}")
             return 0
@@ -647,7 +651,7 @@ class AdvancedStrategyManager:
             conn.close()
             
             return strategies
-            
+                
         except Exception as e:
             self.logger.error(f"❌ 获取显示策略失败: {e}")
             return []
@@ -655,7 +659,7 @@ class AdvancedStrategyManager:
 
 # 全局实例
 strategy_manager = AdvancedStrategyManager()
-
+    
 def start_strategy_management():
     """启动策略管理线程"""
     if not strategy_manager.running:
@@ -674,7 +678,7 @@ def stop_strategy_management():
 if __name__ == "__main__":
     # 测试运行
     print("🚀 测试高级策略管理器...")
-    
+        
     # 获取统计信息
     stats = strategy_manager.get_strategy_statistics()
     print(f"📊 策略统计: {stats}")
