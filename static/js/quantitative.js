@@ -113,30 +113,51 @@ class QuantitativeSystem {
         const systemStatusEl = document.getElementById('systemStatus');
         const systemToggle = document.getElementById('systemToggle');
         
-        // 更新顶部导航栏的状态指示器
-        const statusIndicator = document.getElementById('system-status-indicator');
-        const statusText = document.getElementById('system-status-text');
+        // 检查状态值
+        const isRunning = window.systemRunning || this.systemStatus?.running || false;
         
-        if (systemRunning) {
-            // 系统控制台状态 - 运行中金色闪动
-            systemStatusEl.innerHTML = '<span class="status-indicator status-running"></span>在线';
-            systemToggle.classList.add('active');
-            
-            // 导航栏状态 - 运行中金色闪动
-            if (statusIndicator) {
-                statusIndicator.className = 'status-indicator status-running';
-                statusText.textContent = '运行中';
+        console.log('🔄 更新系统状态显示:', {
+            systemRunning: window.systemRunning,
+            实例状态: this.systemStatus?.running,
+            最终状态: isRunning,
+            statusElement: !!systemStatusEl,
+            toggleElement: !!systemToggle
+        });
+        
+        if (isRunning) {
+            // 系统控制台状态 - 运行中
+            if (systemStatusEl) {
+                systemStatusEl.innerHTML = '<span class="status-indicator status-running"></span>在线';
             }
+            if (systemToggle) {
+                systemToggle.classList.add('active');
+            }
+            
+            // 更新顶部导航栏状态
+            const statusElements = document.querySelectorAll('[data-status-text]');
+            statusElements.forEach(el => {
+                el.textContent = '在线';
+                el.className = 'text-success';
+            });
+            
+            console.log('✅ 系统状态已更新为在线');
         } else {
-            // 系统控制台状态 - 离线黑色
-            systemStatusEl.innerHTML = '<span class="status-indicator status-offline"></span>离线';
-            systemToggle.classList.remove('active');
-            
-            // 导航栏状态 - 离线黑色
-            if (statusIndicator) {
-                statusIndicator.className = 'status-indicator status-offline';
-                statusText.textContent = '离线';
+            // 系统控制台状态 - 离线
+            if (systemStatusEl) {
+                systemStatusEl.innerHTML = '<span class="status-indicator status-offline"></span>离线';
             }
+            if (systemToggle) {
+                systemToggle.classList.remove('active');
+            }
+            
+            // 更新顶部导航栏状态
+            const statusElements = document.querySelectorAll('[data-status-text]');
+            statusElements.forEach(el => {
+                el.textContent = '离线';
+                el.className = 'text-muted';
+            });
+            
+            console.log('⚠️ 系统状态已更新为离线');
         }
     }
 
@@ -144,10 +165,23 @@ class QuantitativeSystem {
     updateAutoTradingStatus() {
         const autoTradingToggle = document.getElementById('autoTradingToggle');
         
-        if (autoTradingEnabled) {
-            autoTradingToggle.classList.add('active');
-        } else {
-            autoTradingToggle.classList.remove('active');
+        const isAutoTradingEnabled = window.autoTradingEnabled || this.systemStatus?.auto_trading_enabled || false;
+        
+        console.log('🔄 更新自动交易状态:', {
+            autoTradingEnabled: window.autoTradingEnabled,
+            实例状态: this.systemStatus?.auto_trading_enabled,
+            最终状态: isAutoTradingEnabled,
+            toggleElement: !!autoTradingToggle
+        });
+        
+        if (autoTradingToggle) {
+            if (isAutoTradingEnabled) {
+                autoTradingToggle.classList.add('active');
+                console.log('✅ 自动交易状态已启用');
+            } else {
+                autoTradingToggle.classList.remove('active');
+                console.log('⚠️ 自动交易状态已禁用');
+            }
         }
     }
 
@@ -251,19 +285,19 @@ class QuantitativeSystem {
             const data = await response.json();
             console.log('策略API响应:', data);
             
-            // 处理双层data嵌套：{data: {data: [...]}}
-            if (data.data && data.data.data && Array.isArray(data.data.data)) {
-                this.strategies = data.data.data;
+            // 检查API返回状态
+            if (data.status === 'success' && data.data && Array.isArray(data.data)) {
+                this.strategies = data.data;
                 console.log(`✅ 成功加载 ${this.strategies.length} 个策略`);
                 this.renderStrategies();
             } else if (data.data && Array.isArray(data.data)) {
-                // 兼容单层data结构
+                // 兼容旧版本API结构
                 this.strategies = data.data;
                 console.log(`✅ 成功加载 ${this.strategies.length} 个策略`);
                 this.renderStrategies();
             } else {
                 console.error('❌ 无效的策略数据结构:', data);
-                console.log('尝试渲染空策略状态');
+                console.log('API状态:', data.status, '数据类型:', typeof data.data, '是否数组:', Array.isArray(data.data));
                 this.renderEmptyStrategies();
             }
         } catch (error) {
@@ -1601,27 +1635,49 @@ class QuantitativeSystem {
     // 加载系统状态
     async loadSystemStatus() {
         try {
+            console.log('🔄 开始加载系统状态...');
             const response = await fetch('/api/quantitative/system-status');
             const data = await response.json();
             
+            console.log('📊 系统状态API响应:', data);
+            
             if (data.success) {
                 // 更新全局状态变量
-                systemRunning = data.running || false;
-                autoTradingEnabled = data.auto_trading_enabled || false;
+                window.systemRunning = data.running || false;
+                window.autoTradingEnabled = data.auto_trading_enabled || false;
+                
+                // 保存到实例变量
+                this.systemStatus = {
+                    running: data.running || false,
+                    auto_trading_enabled: data.auto_trading_enabled || false,
+                    total_strategies: data.total_strategies || 0,
+                    running_strategies: data.running_strategies || 0
+                };
                 
                 // 更新界面显示
                 this.updateSystemStatus();
                 this.updateAutoTradingStatus();
                 
-                console.log('系统状态加载成功:', {
-                    running: systemRunning,
-                    autoTrading: autoTradingEnabled
+                console.log('✅ 系统状态加载成功:', {
+                    running: window.systemRunning,
+                    autoTrading: window.autoTradingEnabled,
+                    全局变量检查: typeof systemRunning !== 'undefined' ? systemRunning : '未定义'
                 });
             } else {
-                console.error('获取系统状态失败:', data.message);
+                console.error('❌ 获取系统状态失败:', data.message);
+                // 默认设置为离线状态
+                window.systemRunning = false;
+                window.autoTradingEnabled = false;
+                this.updateSystemStatus();
+                this.updateAutoTradingStatus();
             }
         } catch (error) {
-            console.error('加载系统状态失败:', error);
+            console.error('❌ 加载系统状态失败:', error);
+            // 网络错误时设置为离线状态
+            window.systemRunning = false;
+            window.autoTradingEnabled = false;
+            this.updateSystemStatus();
+            this.updateAutoTradingStatus();
         }
     }
 
