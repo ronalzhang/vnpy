@@ -1980,8 +1980,20 @@ class QuantitativeService:
         }
         
         # 设置默认的真实交易门槛和进化频率（配置化参数，支持动态更新）
-        self.real_trading_threshold = 65.0  # 真实交易分数阈值
-        self.evolution_interval = 10  # 进化频率（分钟）
+        self.real_trading_threshold = 50.0  # 🔧 降低真实交易分数阈值，提升策略利用率
+        self.evolution_interval = 30  # 🔧 调整进化频率为30分钟，平衡效率和稳定性
+        
+        # 🚀 新增全自动策略管理配置
+        self.auto_strategy_management = {
+            'enabled': True,  # 启用全自动策略管理
+            'min_active_strategies': 2,  # 最少保持2个活跃策略
+            'max_active_strategies': 5,  # 最多同时运行5个策略
+            'auto_enable_threshold': 45.0,  # 45分以上自动启用
+            'auto_select_interval': 600,  # 每10分钟自动选择一次
+            'strategy_rotation_enabled': True,  # 启用策略轮换
+            'rotation_interval': 3600,  # 每小时轮换一次
+            'performance_review_interval': 1800  # 每30分钟检查表现
+        }
         
         # 加载配置和初始化
         self.load_config()
@@ -2266,7 +2278,210 @@ class QuantitativeService:
         self.auto_evolution_thread = threading.Thread(target=evolution_loop, daemon=True)
         self.auto_evolution_thread.start()
         print("🧬 自动进化线程已启动")
+        
+        # 🚀 启动全自动策略管理线程
+        if self.auto_strategy_management['enabled']:
+            self._start_auto_strategy_management()
     
+    def _start_auto_strategy_management(self):
+        """启动全自动策略管理线程"""
+        if hasattr(self, 'auto_strategy_thread') and self.auto_strategy_thread and self.auto_strategy_thread.is_alive():
+            return
+            
+        def strategy_management_loop():
+            """策略自动管理主循环"""
+            import time
+            last_selection_time = 0
+            last_rotation_time = 0
+            last_review_time = 0
+            
+            while self.running and self.auto_strategy_management['enabled']:
+                try:
+                    current_time = time.time()
+                    
+                    # 🔍 每10分钟自动选择策略
+                    if current_time - last_selection_time >= self.auto_strategy_management['auto_select_interval']:
+                        print("🎯 执行自动策略选择...")
+                        self._auto_select_strategies()
+                        last_selection_time = current_time
+                    
+                    # 🔄 每小时策略轮换
+                    if (self.auto_strategy_management['strategy_rotation_enabled'] and 
+                        current_time - last_rotation_time >= self.auto_strategy_management['rotation_interval']):
+                        print("🔄 执行策略轮换...")
+                        self._auto_rotate_strategies()
+                        last_rotation_time = current_time
+                    
+                    # 📊 每30分钟性能评估
+                    if current_time - last_review_time >= self.auto_strategy_management['performance_review_interval']:
+                        print("📊 执行策略性能评估...")
+                        self._auto_review_strategy_performance()
+                        last_review_time = current_time
+                    
+                    # 检查间隔：每60秒检查一次
+                    time.sleep(60)
+                    
+                except Exception as e:
+                    print(f"❌ 自动策略管理失败: {e}")
+                    time.sleep(300)  # 出错后5分钟重试
+        
+        self.auto_strategy_thread = threading.Thread(target=strategy_management_loop, daemon=True)
+        self.auto_strategy_thread.start()
+        print("🚀 全自动策略管理线程已启动")
+
+    def _auto_select_strategies(self):
+        """自动选择策略进行真实交易"""
+        try:
+            strategies_response = self.get_strategies()
+            if not strategies_response.get('success', False):
+                print("⚠️ 获取策略列表失败")
+                return
+            
+            strategies = strategies_response.get('data', [])
+            
+            # 筛选合格策略（降低门槛）
+            qualified_strategies = []
+            for strategy in strategies:
+                score = strategy.get('final_score', 0)
+                if score >= self.auto_strategy_management['auto_enable_threshold']:
+                    qualified_strategies.append({
+                        'id': strategy['id'],
+                        'name': strategy['name'],
+                        'score': score,
+                        'enabled': strategy.get('enabled', False),
+                        'win_rate': strategy.get('win_rate', 0),
+                        'total_return': strategy.get('total_return', 0)
+                    })
+            
+            if not qualified_strategies:
+                print("⚠️ 暂无合格策略，降低要求重新筛选...")
+                # 降低要求：选择评分最高的前3个策略
+                all_scores = [(s['id'], s.get('final_score', 0), s['name']) for s in strategies]
+                all_scores.sort(key=lambda x: x[1], reverse=True)
+                for sid, score, name in all_scores[:3]:
+                    strategy = next(s for s in strategies if s['id'] == sid)
+                    qualified_strategies.append({
+                        'id': sid,
+                        'name': name,
+                        'score': score,
+                        'enabled': strategy.get('enabled', False),
+                        'win_rate': strategy.get('win_rate', 0),
+                        'total_return': strategy.get('total_return', 0)
+                    })
+            
+            # 按综合评分排序
+            qualified_strategies.sort(key=lambda x: x['score'] * 0.7 + x['win_rate'] * 30, reverse=True)
+            
+            # 确保活跃策略数量在合理范围内
+            currently_enabled = sum(1 for s in qualified_strategies if s['enabled'])
+            min_active = self.auto_strategy_management['min_active_strategies']
+            max_active = self.auto_strategy_management['max_active_strategies']
+            
+            if currently_enabled < min_active:
+                # 启用更多策略
+                to_enable = min_active - currently_enabled
+                for strategy in qualified_strategies[:to_enable]:
+                    if not strategy['enabled']:
+                        self._enable_strategy_auto(strategy['id'])
+                        print(f"✅ 自动启用策略: {strategy['name']} (评分: {strategy['score']:.1f})")
+                        
+            elif currently_enabled > max_active:
+                # 禁用表现差的策略
+                enabled_strategies = [s for s in qualified_strategies if s['enabled']]
+                enabled_strategies.sort(key=lambda x: x['score'])
+                to_disable = currently_enabled - max_active
+                for strategy in enabled_strategies[:to_disable]:
+                    self._disable_strategy_auto(strategy['id'])
+                    print(f"❌ 自动禁用策略: {strategy['name']} (评分: {strategy['score']:.1f})")
+            
+            # 启用自动交易模式
+            if not self.auto_trading_enabled:
+                self.auto_trading_enabled = True
+                self.update_system_status(auto_trading_enabled=True)
+                print("🚀 自动启用自动交易模式")
+                
+        except Exception as e:
+            print(f"❌ 自动策略选择失败: {e}")
+
+    def _auto_rotate_strategies(self):
+        """自动轮换策略"""
+        try:
+            strategies_response = self.get_strategies()
+            if not strategies_response.get('success', False):
+                return
+            
+            strategies = strategies_response.get('data', [])
+            enabled_strategies = [s for s in strategies if s.get('enabled', False)]
+            
+            if len(enabled_strategies) < 2:
+                print("📝 启用策略不足，跳过轮换")
+                return
+            
+            # 找到表现最差的启用策略
+            worst_strategy = min(enabled_strategies, key=lambda x: x.get('final_score', 0))
+            
+            # 找到最好的未启用策略
+            disabled_strategies = [s for s in strategies if not s.get('enabled', False)]
+            if not disabled_strategies:
+                print("📝 无可用的备选策略")
+                return
+                
+            best_disabled = max(disabled_strategies, key=lambda x: x.get('final_score', 0))
+            
+            # 如果备选策略明显更好，则轮换
+            if best_disabled['final_score'] > worst_strategy['final_score'] + 10:  # 至少高10分
+                self._disable_strategy_auto(worst_strategy['id'])
+                self._enable_strategy_auto(best_disabled['id'])
+                print(f"🔄 策略轮换: {worst_strategy['name']}({worst_strategy['final_score']:.1f}) → {best_disabled['name']}({best_disabled['final_score']:.1f})")
+                
+        except Exception as e:
+            print(f"❌ 策略轮换失败: {e}")
+
+    def _auto_review_strategy_performance(self):
+        """自动评估策略性能"""
+        try:
+            strategies_response = self.get_strategies()
+            if not strategies_response.get('success', False):
+                return
+            
+            strategies = strategies_response.get('data', [])
+            enabled_strategies = [s for s in strategies if s.get('enabled', False)]
+            
+            for strategy in enabled_strategies:
+                sid = strategy['id']
+                score = strategy.get('final_score', 0)
+                win_rate = strategy.get('win_rate', 0)
+                
+                # 如果策略表现太差，自动禁用
+                if score < 30 or win_rate < 0.3:
+                    self._disable_strategy_auto(sid)
+                    print(f"⚠️ 自动禁用低表现策略: {strategy['name']} (评分: {score:.1f}, 胜率: {win_rate*100:.1f}%)")
+                
+                # 如果策略表现很好，提升其资金配置
+                elif score > 80 and win_rate > 0.8:
+                    print(f"⭐ 发现优秀策略: {strategy['name']} (评分: {score:.1f}, 胜率: {win_rate*100:.1f}%)")
+                    
+        except Exception as e:
+            print(f"❌ 策略性能评估失败: {e}")
+
+    def _enable_strategy_auto(self, strategy_id):
+        """自动启用策略"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE strategies SET enabled = 1 WHERE id = %s", (strategy_id,))
+            self.conn.commit()
+        except Exception as e:
+            print(f"❌ 自动启用策略失败: {e}")
+
+    def _disable_strategy_auto(self, strategy_id):
+        """自动禁用策略"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE strategies SET enabled = 0 WHERE id = %s", (strategy_id,))
+            self.conn.commit()
+        except Exception as e:
+            print(f"❌ 自动禁用策略失败: {e}")
+
     def manual_evolution(self):
         """手动触发进化"""
         if not self.evolution_engine:

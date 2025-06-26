@@ -245,7 +245,7 @@ def _get_strategy_trade_mode(score, enabled):
     """根据策略分数和启用状态确定交易模式"""
     if not enabled:
         return '已停止'
-    elif score >= 65.0:
+    elif score >= 50.0:  # 🔧 降低真实交易门槛从65分到50分
         return '真实交易'
     else:
         return '验证交易'
@@ -2894,8 +2894,7 @@ def select_top_strategies():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 🔥 提高真实交易标准：至少10次交易，65%+胜率，盈利≥10U
-        # 🔥 修复参数绑定问题：使用字符串格式化替代%s参数绑定避免"tuple index out of range"错误
+        # 🔧 降低真实交易标准：至少5次交易，55%+胜率，盈利≥5U，提升策略利用率
         query = f'''
             SELECT s.id, s.name, s.final_score,
                    COUNT(t.id) as actual_trades,
@@ -2905,9 +2904,9 @@ def select_top_strategies():
             LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = true
             WHERE s.enabled = 1
             GROUP BY s.id, s.name, s.final_score
-            HAVING COUNT(t.id) >= 10 
-                AND COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 65
-                AND COALESCE(SUM(t.expected_return), 0) >= 10.0
+            HAVING COUNT(t.id) >= 5 
+                AND COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) * 100.0 / COUNT(t.id) >= 55
+                AND COALESCE(SUM(t.expected_return), 0) >= 5.0
             ORDER BY SUM(t.expected_return) DESC, s.final_score DESC
             LIMIT {max_strategies}
         '''
