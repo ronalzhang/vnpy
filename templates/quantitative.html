@@ -812,17 +812,64 @@
     </div>
 
     <script>
-        // 🚨 紧急测试：最基础的JavaScript执行测试
-        console.log('🔧 测试1: 基础JavaScript执行');
-        alert('🔧 测试2: alert弹窗测试');
-        
-        try {
-            document.getElementById('jsTestStatus').innerHTML = '✅ 基础JavaScript可以执行！';
-            document.getElementById('jsTestStatus').className = 'alert alert-success';
-            console.log('🔧 测试3: DOM操作成功');
-        } catch (error) {
-            console.error('🔧 测试3失败: DOM操作失败', error);
-        }
+        // 🔧 逐步测试QuantitativeSystem问题
+        setTimeout(() => {
+            const testEl = document.getElementById('jsTestStatus');
+            if (testEl) {
+                testEl.innerHTML = '✅ 基础JS正常！正在检查quantitative.js...';
+                testEl.className = 'alert alert-info';
+                
+                // 测试文件加载
+                setTimeout(() => {
+                    if (typeof QuantitativeSystem === 'undefined') {
+                        testEl.innerHTML = '❌ QuantitativeSystem类未定义！quantitative.js文件加载失败';
+                        testEl.className = 'alert alert-danger';
+                        
+                        // 尝试手动加载文件进行调试
+                        const script = document.createElement('script');
+                        script.src = '/static/js/quantitative.js';
+                        script.onload = () => {
+                            testEl.innerHTML = '🔄 quantitative.js手动加载完成，重新检查...';
+                            setTimeout(() => {
+                                if (typeof QuantitativeSystem !== 'undefined') {
+                                    testEl.innerHTML = '✅ 手动加载成功！创建实例...';
+                                    try {
+                                        window.app = new QuantitativeSystem();
+                                        testEl.innerHTML = '🎉 成功！开始加载策略数据...';
+                                        testEl.className = 'alert alert-success';
+                                        window.app.loadStrategies();
+                                    } catch (error) {
+                                        testEl.innerHTML = `❌ 创建实例失败: ${error.message}`;
+                                        testEl.className = 'alert alert-danger';
+                                    }
+                                } else {
+                                    testEl.innerHTML = '❌ 手动加载也失败，quantitative.js有语法错误';
+                                    testEl.className = 'alert alert-danger';
+                                }
+                            }, 1000);
+                        };
+                        script.onerror = () => {
+                            testEl.innerHTML = '❌ quantitative.js文件无法加载，路径或权限问题';
+                            testEl.className = 'alert alert-danger';
+                        };
+                        document.head.appendChild(script);
+                    } else {
+                        testEl.innerHTML = '✅ QuantitativeSystem类存在！创建实例...';
+                        testEl.className = 'alert alert-success';
+                        setTimeout(() => {
+                            try {
+                                window.app = new QuantitativeSystem();
+                                testEl.innerHTML = '🎉 实例创建成功！开始加载策略数据...';
+                                window.app.loadStrategies();
+                            } catch (error) {
+                                testEl.innerHTML = `❌ 创建实例失败: ${error.message}`;
+                                testEl.className = 'alert alert-danger';
+                            }
+                        }, 1000);
+                    }
+                }, 1000);
+            }
+        }, 500);
     </script>
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
     <script>
