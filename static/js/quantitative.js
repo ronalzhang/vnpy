@@ -220,16 +220,35 @@ class GlobalStatusManager {
             const response = await fetch('/api/system/status');
             const data = await response.json();
             
-            if (data.overall_status === 'online') {
-                this.updateStatus('system', 'online', '运行正常');
-            } else if (data.overall_status === 'degraded') {
-                this.updateStatus('system', 'warning', '部分异常');
+            console.log('🔍 系统状态检查结果:', data);
+            
+            if (data.success && data.data) {
+                const status = data.data.overall_status;
+                if (status === 'online') {
+                    this.updateStatus('system', 'online', '系统在线');
+                } else if (status === 'degraded') {
+                    this.updateStatus('system', 'warning', '部分异常');
+                } else {
+                    this.updateStatus('system', 'offline', '系统离线');
+                }
+                
+                // 检查交易所API状态
+                const exchangeStatus = data.data.services?.exchange_api;
+                if (exchangeStatus === 'online') {
+                    this.updateStatus('exchange', 'online', 'API正常');
+                } else if (exchangeStatus === 'degraded') {
+                    this.updateStatus('exchange', 'warning', 'API异常');
+                } else {
+                    this.updateStatus('exchange', 'offline', 'API离线');
+                }
             } else {
-                this.updateStatus('system', 'offline', '系统离线');
+                this.updateStatus('system', 'offline', '检查失败');
+                this.updateStatus('exchange', 'offline', '检查失败');
             }
         } catch (error) {
             console.error('系统状态检查失败:', error);
             this.updateStatus('system', 'offline', '检查失败');
+            this.updateStatus('exchange', 'offline', '检查失败');
         }
     }
     
