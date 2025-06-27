@@ -24,6 +24,266 @@ let managementConfig = {
     minScore: 50
 };
 
+// 🔥 全局状态管理器
+class GlobalStatusManager {
+    constructor() {
+        this.status = {
+            system: 'checking',
+            websocket: 'connecting',
+            exchange: 'checking',
+            evolution: 'running'
+        };
+        this.indicators = {
+            system: document.getElementById('globalStatusIndicator'),
+            websocket: document.getElementById('websocketStatusIndicator'),
+            exchange: document.getElementById('exchangeStatusIndicator'),
+            evolution: document.getElementById('evolutionStatusIndicator')
+        };
+        this.statusTexts = {
+            system: document.getElementById('globalSystemStatus'),
+            websocket: document.getElementById('websocketStatus'),
+            exchange: document.getElementById('exchangeStatus'),
+            evolution: document.getElementById('evolutionStatus')
+        };
+        
+        this.initializeWebSocket();
+        this.startStatusPolling();
+    }
+    
+    updateStatus(type, status, text) {
+        this.status[type] = status;
+        
+        if (this.indicators[type] && this.statusTexts[type]) {
+            const indicator = this.indicators[type].querySelector('.status-dot');
+            const statusText = this.statusTexts[type];
+            
+            // 更新指示器颜色
+            indicator.className = 'status-dot';
+            switch(status) {
+                case 'online':
+                case 'connected':
+                case 'running':
+                    indicator.classList.add('bg-success');
+                    break;
+                case 'offline':
+                case 'disconnected':
+                case 'stopped':
+                    indicator.classList.add('bg-danger');
+                    break;
+                case 'warning':
+                case 'degraded':
+                    indicator.classList.add('bg-warning');
+                    break;
+                case 'checking':
+                case 'connecting':
+                    indicator.classList.add('bg-info');
+                    break;
+                default:
+                    indicator.classList.add('bg-secondary');
+            }
+            
+            // 更新状态文本
+            statusText.textContent = text;
+        }
+    }
+    
+    initializeWebSocket() {
+        try {
+            // 尝试连接实时监控WebSocket
+            this.websocket = new WebSocket('ws://47.236.39.134:8765');
+            
+            this.websocket.onopen = () => {
+                console.log('✅ WebSocket连接成功');
+                this.updateStatus('websocket', 'connected', '已连接');
+            };
+            
+            this.websocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleWebSocketMessage(data);
+                } catch (error) {
+                    console.error('WebSocket消息解析错误:', error);
+                }
+            };
+            
+            this.websocket.onclose = () => {
+                console.log('🔌 WebSocket连接断开，尝试重连...');
+                this.updateStatus('websocket', 'disconnected', '连接断开');
+                setTimeout(() => this.initializeWebSocket(), 5000);
+            };
+            
+            this.websocket.onerror = (error) => {
+                console.error('WebSocket连接错误:', error);
+                this.updateStatus('websocket', 'disconnected', '连接失败');
+            };
+            
+        } catch (error) {
+            console.error('WebSocket初始化失败:', error);
+            this.updateStatus('websocket', 'disconnected', '不可用');
+        }
+    }
+    
+    handleWebSocketMessage(data) {
+        // 处理实时数据更新
+        if (data.type === 'strategy_update') {
+            window.app?.updateStrategyData(data.data);
+        } else if (data.type === 'system_status') {
+            this.updateStatus('system', data.status, data.message);
+        } else if (data.type === 'evolution_progress') {
+            this.updateStatus('evolution', 'running', `第${data.generation}代第${data.individual}个`);
+        }
+    }
+    
+    async startStatusPolling() {
+        // 每30秒检查一次系统状态
+        setInterval(async () => {
+            await this.checkSystemStatus();
+            await this.checkExchangeStatus();
+        }, 30000);
+        
+        // 立即执行一次
+        await this.checkSystemStatus();
+        await this.checkExchangeStatus();
+    }
+    
+    async checkSystemStatus() {
+        try {
+            const response = await fetch('/api/system/status');
+            const data = await response.json();
+            
+            if (data.overall_status === 'online') {
+                this.updateStatus('system', 'online', '运行正常');
+            } else if (data.overall_status === 'degraded') {
+                this.updateStatus('system', 'warning', '部分异常');
+            } else {
+                this.updateStatus('system', 'offline', '系统离线');
+            }
+        } catch (error) {
+            console.error('系统状态检查失败:', error);
+            this.updateStatus('system', 'offline', '检查失败');
+        }
+    }
+    
+    async checkExchangeStatus() {
+        try {
+            const response = await fetch('/api/quantitative/exchange-status');
+            const data = await response.json();
+            
+            if (data.success && data.status) {
+                const connectedExchanges = Object.values(data.status).filter(s => s.connected).length;
+                const totalExchanges = Object.keys(data.status).length;
+                
+                if (connectedExchanges === totalExchanges) {
+                    this.updateStatus('exchange', 'online', `${connectedExchanges}/${totalExchanges} 正常`);
+                } else if (connectedExchanges > 0) {
+                    this.updateStatus('exchange', 'warning', `${connectedExchanges}/${totalExchanges} 连接`);
+                } else {
+                    this.updateStatus('exchange', 'offline', '全部离线');
+                }
+            }
+        } catch (error) {
+            console.error('交易所状态检查失败:', error);
+            this.updateStatus('exchange', 'offline', '检查失败');
+        }
+    }
+}
+
+// 🔥 增强的进化日志渲染
+class EnhancedEvolutionRenderer {
+    constructor() {
+        this.logCount = 0;
+        this.maxDisplayLogs = 50;
+    }
+    
+    renderEvolutionLog(logs) {
+        const ticker = document.getElementById('evolutionTicker');
+        const logCountElement = document.getElementById('evolutionLogCount');
+        
+        if (!ticker) return;
+
+        // 更新日志计数
+        this.logCount = logs.length;
+        if (logCountElement) {
+            logCountElement.textContent = `${this.logCount} 条记录`;
+        }
+
+        // 🔧 优化排序和显示
+        const sortedLogs = [...logs].sort((a, b) => {
+            const timeA = new Date(a.timestamp || '1970-01-01').getTime();
+            const timeB = new Date(b.timestamp || '1970-01-01').getTime();
+            return timeB - timeA; // 最新在前
+        });
+        
+        const recentLogs = sortedLogs.slice(0, this.maxDisplayLogs);
+        
+        // 生成增强的HTML内容
+        const tickerContent = recentLogs.map(log => {
+            const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            let actionClass = 'created';
+            let actionText = '新增';
+            let actionIcon = '🆕';
+            
+            switch(log.action) {
+                case 'created':
+                    actionClass = 'created';
+                    actionText = '新增';
+                    actionIcon = '🆕';
+                    break;
+                case 'eliminated':
+                    actionClass = 'eliminated';
+                    actionText = '淘汰';
+                    actionIcon = '❌';
+                    break;
+                case 'optimized':
+                    actionClass = 'optimized';
+                    actionText = '优化';
+                    actionIcon = '⚡';
+                    break;
+                case 'validated':
+                    actionClass = 'validated';
+                    actionText = '验证';
+                    actionIcon = '✅';
+                    break;
+                default:
+                    actionIcon = '📊';
+            }
+
+            return `
+                <div class="ticker-item">
+                    <span class="time">${time}</span>
+                    <span class="action ${actionClass}">${actionIcon} ${actionText}</span>
+                    <span class="message">${log.message || log.details || '策略进化中...'}</span>
+                    ${log.strategy_id ? `<span class="strategy-id" data-id="${log.strategy_id}">ID: ${log.strategy_id.substring(0, 8)}</span>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        // 平滑更新内容
+        ticker.style.opacity = '0.7';
+        setTimeout(() => {
+            ticker.innerHTML = tickerContent || '<div class="ticker-item"><span class="text-muted">暂无进化日志...</span></div>';
+            ticker.style.opacity = '1';
+        }, 200);
+
+        // 添加点击事件监听器
+        ticker.querySelectorAll('.strategy-id').forEach(element => {
+            element.addEventListener('click', (e) => {
+                const strategyId = e.target.dataset.id;
+                if (strategyId && window.app) {
+                    window.app.viewStrategyDetails(strategyId);
+                }
+            });
+        });
+
+        console.log(`✅ 进化日志已更新: ${recentLogs.length}条最新日志`);
+    }
+}
+
 // 系统状态管理类
 class QuantitativeSystem {
     constructor() {
@@ -34,6 +294,10 @@ class QuantitativeSystem {
         this.systemStatus = 'offline';
         this.accountInfo = {};
         this.exchangeStatus = {};
+        
+        // 🔥 新增：全局状态管理和增强功能
+        this.globalStatusManager = new GlobalStatusManager();
+        this.evolutionRenderer = new EnhancedEvolutionRenderer();
         
         this.bindEvents();
         this.initChart();
@@ -2111,86 +2375,33 @@ class QuantitativeSystem {
         }
     }
 
-    // 渲染进化日志 - CNN滚动新闻样式（显示最新20条）
+    // 渲染进化日志 - 使用增强渲染器
     renderEvolutionLog(logs) {
-        const ticker = document.getElementById('evolutionTicker');
-        if (!ticker) return;
-
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
-
-        // 🔧 修复排序：确保最新日志在前面并取前30条
-        const sortedLogs = [...this.allEvolutionLogs].sort((a, b) => {
-            const timeA = new Date(a.timestamp || '1970-01-01').getTime();
-            const timeB = new Date(b.timestamp || '1970-01-01').getTime();
-            return timeB - timeA; // 降序排列，最新在前
-        });
         
-        const recentLogs = sortedLogs.slice(0, 30);  // 🔥 修复：增加显示日志数量到30条
-        
-        const tickerContent = recentLogs.map(log => {
-            const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-
-            let actionClass = 'created';
-            let actionText = '新增';
-            
-            switch(log.action) {
-                case 'created':
-                    actionClass = 'created';
-                    actionText = '新增';
-                    break;
-                case 'eliminated':
-                    actionClass = 'eliminated';
-                    actionText = '淘汰';
-                    break;
-                case 'optimized':
-                    actionClass = 'optimized';
-                    actionText = '优化';
-                    break;
-                case 'updated':
-                    actionClass = 'optimized';
-                    actionText = '更新';
-                    break;
-                case 'promoted':
-                    actionClass = 'created';
-                    actionText = '晋级';
-                    break;
-                case 'protected':
-                    actionClass = 'optimized';
-                    actionText = '保护';
-                    break;
-                case 'evolved':
-                    actionClass = 'optimized';
-                    actionText = '进化';
-                    break;
-                default:
-                    actionClass = 'created';
-                    actionText = '变更';
+        // 🔥 使用新的增强渲染器
+        if (this.evolutionRenderer) {
+            this.evolutionRenderer.renderEvolutionLog(logs);
+        } else {
+            // 降级处理
+            const ticker = document.getElementById('evolutionTicker');
+            if (ticker) {
+                ticker.innerHTML = '<div class="ticker-item"><span class="text-muted">加载中...</span></div>';
             }
-
-            return `
-                <span class="log-item">
-                    <span class="log-time">${time}</span>
-                    <span class="log-action ${actionClass}">${actionText}</span>
-                    <span class="log-details">${log.details}</span>
-                </span>
-            `;
-        }).join('');
-
-        // 🔧 修复滚动效果：确保有足够内容且不会重置
-        let finalContent = tickerContent;
-        if (tickerContent.length < 500) {
-            // 重复内容确保滚动连续性
-            finalContent = Array(3).fill(tickerContent).join('');
         }
-
-        ticker.innerHTML = finalContent;
-        
-        console.log(`✅ 进化日志已更新: ${recentLogs.length}条最新日志`);
+    }
+    
+    // 🔥 新增：更新策略数据方法（供WebSocket调用）
+    updateStrategyData(data) {
+        if (data && data.strategy_id) {
+            // 更新对应策略的数据
+            const strategyIndex = this.strategies.findIndex(s => s.id === data.strategy_id);
+            if (strategyIndex !== -1) {
+                this.strategies[strategyIndex] = { ...this.strategies[strategyIndex], ...data };
+                this.renderStrategies(); // 重新渲染策略列表
+            }
+        }
     }
 }
 

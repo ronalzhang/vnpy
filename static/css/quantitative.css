@@ -967,5 +967,302 @@
     }
 }
 
+/* 🎨 全局状态指示器样式 */
+.status-indicator {
+    position: relative;
+    display: inline-block;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    position: relative;
+    animation: pulse 2s infinite;
+}
+
+.status-dot.bg-success {
+    background-color: #28a745 !important;
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+}
+
+.status-dot.bg-danger {
+    background-color: #dc3545 !important;
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+}
+
+.status-dot.bg-warning {
+    background-color: #ffc107 !important;
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+}
+
+.status-dot.bg-info {
+    background-color: #17a2b8 !important;
+    box-shadow: 0 0 10px rgba(23, 162, 184, 0.5);
+}
+
+.status-dot.bg-primary {
+    background-color: #007bff !important;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+}
+
+.status-dot.bg-secondary {
+    background-color: #6c757d !important;
+    animation: none;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* 🎨 增强进化日志滚动效果 */
+.evolution-ticker-container {
+    position: relative;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.evolution-ticker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 15px;
+    animation: scroll-up 60s linear infinite;
+    min-height: 120px;
+}
+
+.ticker-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    min-height: 40px;
+}
+
+.ticker-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.ticker-item .time {
+    color: #6c757d;
+    font-size: 12px;
+    margin-right: 10px;
+    min-width: 60px;
+}
+
+.ticker-item .action {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-right: 8px;
+    min-width: 50px;
+    text-align: center;
+}
+
+.ticker-item .action.created {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.ticker-item .action.eliminated {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.ticker-item .action.optimized {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.ticker-item .action.validated {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+@keyframes scroll-up {
+    0% {
+        transform: translateY(100%);
+    }
+    100% {
+        transform: translateY(-100%);
+    }
+}
+
+/* 🎨 策略卡片增强样式 */
+.strategy-card {
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.strategy-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: #007bff;
+}
+
+.strategy-card .card-header {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    border-bottom: none;
+    padding: 12px 15px;
+}
+
+.strategy-card .score-badge {
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.strategy-card .metric-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #f8f9fa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.strategy-card .metric-item:last-child {
+    border-bottom: none;
+}
+
+.strategy-card .metric-label {
+    color: #6c757d;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.strategy-card .metric-value {
+    font-weight: 600;
+    color: #495057;
+}
+
+.strategy-card .profit-positive {
+    color: #28a745 !important;
+}
+
+.strategy-card .profit-negative {
+    color: #dc3545 !important;
+}
+
+.strategy-card .profit-neutral {
+    color: #6c757d !important;
+}
+
+/* 🎨 按钮组优化 */
+.btn-group-enhanced .btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    margin: 0 2px;
+    transition: all 0.2s ease;
+}
+
+.btn-group-enhanced .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 🎨 加载状态指示器 */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 🎨 响应式优化 */
+@media (max-width: 768px) {
+    .strategy-card {
+        margin-bottom: 15px;
+    }
+    
+    .status-indicator {
+        margin-bottom: 10px;
+    }
+    
+    .evolution-ticker-container {
+        height: 80px;
+    }
+    
+    .ticker-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .ticker-item .time {
+        margin-bottom: 5px;
+    }
+}
+
+/* 🎨 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .strategy-card {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .ticker-item {
+        background: rgba(45, 55, 72, 0.8);
+        color: #e2e8f0;
+    }
+    
+    .evolution-ticker-container {
+        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+    }
+}
+
+/* 🎨 自定义滚动条 */
+.evolution-ticker::-webkit-scrollbar {
+    width: 6px;
+}
+
+.evolution-ticker::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.evolution-ticker::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.evolution-ticker::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
 
 
