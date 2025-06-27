@@ -8350,7 +8350,7 @@ class EvolutionaryStrategyEngine:
         """🔧 计算策略的真实交易数量"""
         try:
             conn = self.quantitative_service.db_manager.conn
-                cursor = conn.cursor()
+            cursor = conn.cursor()
                 cursor.execute("""
                     SELECT COUNT(*) 
                     FROM trading_signals 
