@@ -1062,6 +1062,30 @@
                 <tbody id="allLogsTableBody"></tbody>
                 </table>
                 </div>
+                <!-- 分页控件 -->
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center">
+                            <span class="text-muted me-3" id="pageInfo">第1页，共1页</span>
+                            <span class="text-muted" id="recordInfo">显示第1-15条，共0条记录</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <nav>
+                            <ul class="pagination justify-content-end mb-0">
+                                <li class="page-item" id="prevPage">
+                                    <a class="page-link" href="#" onclick="changeLogsPage(window.app.logsCurrentPage - 1)">上一页</a>
+                                </li>
+                                <li class="page-item active" id="currentPageItem">
+                                    <span class="page-link" id="currentPageSpan">1</span>
+                                </li>
+                                <li class="page-item" id="nextPage">
+                                    <a class="page-link" href="#" onclick="changeLogsPage(window.app.logsCurrentPage + 1)">下一页</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
                 </div>
                 <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
@@ -1076,11 +1100,123 @@
                 
                 // 添加新模态框并显示
                 document.body.insertAdjacentHTML('beforeend', modalHtml);
+                
+                // 渲染日志数据
+                renderLogsPage();
+                
                 const modal = new bootstrap.Modal(document.getElementById('allLogsModal'));
                 modal.show();
             } else {
                 console.log('暂无日志数据');
             }
+        };
+        
+        // 渲染日志分页数据
+        window.renderLogsPage = function() {
+            if (!window.app || !window.app.allEvolutionLogs) return;
+            
+            const tbody = document.getElementById('allLogsTableBody');
+            if (!tbody) return;
+            
+            // 修复排序：确保最新日志在前面
+            const allLogs = [...window.app.allEvolutionLogs].sort((a, b) => {
+                const timeA = new Date(a.timestamp || '1970-01-01').getTime();
+                const timeB = new Date(b.timestamp || '1970-01-01').getTime();
+                return timeB - timeA; // 降序排列，最新在前
+            });
+            
+            // 计算分页
+            const totalLogs = allLogs.length;
+            const totalPages = Math.ceil(totalLogs / window.app.logsPerPage);
+            const startIndex = (window.app.logsCurrentPage - 1) * window.app.logsPerPage;
+            const endIndex = Math.min(startIndex + window.app.logsPerPage, totalLogs);
+            const currentPageLogs = allLogs.slice(startIndex, endIndex);
+            
+            // 渲染表格数据
+            tbody.innerHTML = currentPageLogs.map(log => {
+                const time = new Date(log.timestamp).toLocaleString('zh-CN');
+                let actionClass = 'secondary';
+                let actionText = '变更';
+                
+                switch(log.action) {
+                    case 'created':
+                        actionClass = 'success';
+                        actionText = '新增';
+                        break;
+                    case 'eliminated':
+                        actionClass = 'danger';
+                        actionText = '淘汰';
+                        break;
+                    case 'optimized':
+                        actionClass = 'primary';
+                        actionText = '优化';
+                        break;
+                    case 'updated':
+                        actionClass = 'info';
+                        actionText = '更新';
+                        break;
+                    case 'promoted':
+                        actionClass = 'warning';
+                        actionText = '晋级';
+                        break;
+                    case 'protected':
+                        actionClass = 'info';
+                        actionText = '保护';
+                        break;
+                    case 'evolved':
+                        actionClass = 'primary';
+                        actionText = '进化';
+                        break;
+                }
+                
+                return `
+                    <tr>
+                        <td class="text-muted">${time}</td>
+                        <td><span class="badge bg-${actionClass}">${actionText}</span></td>
+                        <td>${log.details}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // 更新分页信息
+            const pageInfo = document.getElementById('pageInfo');
+            const recordInfo = document.getElementById('recordInfo');
+            const currentPageSpan = document.getElementById('currentPageSpan');
+            const prevPage = document.getElementById('prevPage');
+            const nextPage = document.getElementById('nextPage');
+            
+            if (pageInfo) pageInfo.textContent = `第${window.app.logsCurrentPage}页，共${totalPages}页`;
+            if (recordInfo) recordInfo.textContent = `显示第${startIndex + 1}-${endIndex}条，共${totalLogs}条记录`;
+            if (currentPageSpan) currentPageSpan.textContent = window.app.logsCurrentPage;
+            
+            // 更新按钮状态
+            if (prevPage) {
+                if (window.app.logsCurrentPage <= 1) {
+                    prevPage.classList.add('disabled');
+                } else {
+                    prevPage.classList.remove('disabled');
+                }
+            }
+            
+            if (nextPage) {
+                if (window.app.logsCurrentPage >= totalPages) {
+                    nextPage.classList.add('disabled');
+                } else {
+                    nextPage.classList.remove('disabled');
+                }
+            }
+        };
+        
+        // 切换日志页面
+        window.changeLogsPage = function(page) {
+            if (!window.app || !window.app.allEvolutionLogs) return;
+            
+            const totalPages = Math.ceil(window.app.allEvolutionLogs.length / window.app.logsPerPage);
+            
+            if (page < 1 || page > totalPages) return;
+            
+            window.app.logsCurrentPage = page;
+            renderLogsPage();
         };
         
         // 确保app对象中的方法也能被全局访问

@@ -7307,6 +7307,541 @@ class EvolutionaryStrategyEngine:
         self.last_evolution_time = None
         
         print(f"🧬 进化引擎初始化完成 - 第{self.current_generation}代第{self.current_cycle}轮")
+        
+        # 🧬 启动智能进化调度器
+        self._init_intelligent_evolution_scheduler()
+        
+    def _init_intelligent_evolution_scheduler(self):
+        """初始化智能进化调度器"""
+        print("🧬 初始化智能进化调度器...")
+        
+        # 🎯 进化决策配置
+        self.intelligent_evolution_config = {
+            'auto_evolution_enabled': True,
+            'parameter_quality_threshold': 2.0,  # 参数改善最小阈值
+            'validation_success_rate': 0.75,    # 验证成功率要求
+            'evolution_cooldown_hours': self.evolution_config['evolution_interval'] / 3600,  # 冷却时间（小时）
+            'max_concurrent_evolutions': 3,     # 最大并发进化数量
+            'parameter_test_trades': 5,         # 参数测试交易数量
+            'score_improvement_threshold': 1.0, # 分数改善阈值
+        }
+        
+        # 📊 进化统计
+        self.evolution_statistics = {
+            'total_evolution_attempts': 0,
+            'successful_evolutions': 0,
+            'failed_parameter_validations': 0,
+            'parameter_improvements': 0,
+            'last_evolution_time': None,
+            'success_rate': 0.0
+        }
+        
+        print("✅ 智能进化调度器初始化完成")
+
+    def start_intelligent_auto_evolution(self):
+        """启动智能自动进化系统"""
+        if not self.intelligent_evolution_config.get('auto_evolution_enabled', False):
+            print("⚠️ 智能自动进化已禁用")
+            return
+            
+        import threading
+        def intelligent_evolution_loop():
+            while self.intelligent_evolution_config['auto_evolution_enabled']:
+                try:
+                    self._execute_intelligent_evolution_cycle()
+                    # 根据配置的进化间隔等待
+                    evolution_interval = self.evolution_config['evolution_interval']
+                    time.sleep(evolution_interval)
+                except Exception as e:
+                    print(f"❌ 智能进化循环异常: {e}")
+                    time.sleep(300)  # 异常时等待5分钟再试
+        
+        evolution_thread = threading.Thread(target=intelligent_evolution_loop, daemon=True)
+        evolution_thread.start()
+        print("🧬 智能自动进化系统已启动")
+
+    def _execute_intelligent_evolution_cycle(self):
+        """执行智能进化周期"""
+        try:
+            print("🧬 开始智能进化周期...")
+            
+            # 1️⃣ 选择需要进化的策略
+            evolution_candidates = self._select_intelligent_evolution_candidates()
+            
+            if not evolution_candidates:
+                print("✅ 当前无策略需要进化")
+                return
+            
+            print(f"📋 发现 {len(evolution_candidates)} 个策略候选进化")
+            
+            # 2️⃣ 处理每个候选策略
+            successful_evolutions = 0
+            for candidate in evolution_candidates[:self.intelligent_evolution_config['max_concurrent_evolutions']]:
+                if self._process_intelligent_strategy_evolution(candidate):
+                    successful_evolutions += 1
+            
+            # 3️⃣ 更新进化统计
+            self._update_evolution_statistics(len(evolution_candidates), successful_evolutions)
+            
+            print(f"🎯 进化周期完成: {successful_evolutions}/{len(evolution_candidates)} 成功")
+            
+        except Exception as e:
+            print(f"❌ 智能进化周期执行失败: {e}")
+
+    def _select_intelligent_evolution_candidates(self) -> List[Dict]:
+        """选择智能进化候选策略"""
+        candidates = []
+        
+        try:
+            # 获取所有启用的策略
+            strategies = self.db_manager.execute_query("""
+                SELECT id, name, final_score, parameters, generation, cycle, 
+                       type, symbol, updated_at, enabled
+                FROM strategies 
+                WHERE enabled = 1 AND id LIKE 'STRAT_%'
+                ORDER BY final_score DESC
+                LIMIT %s
+            """, (self.evolution_config['max_strategies'],), fetch_all=True)
+            
+            for strategy in strategies:
+                evolution_reason = self._evaluate_intelligent_evolution_need(strategy)
+                if evolution_reason:
+                    priority = self._calculate_evolution_priority(strategy, evolution_reason)
+                    candidates.append({
+                        'strategy': strategy,
+                        'reason': evolution_reason,
+                        'priority': priority
+                    })
+            
+            # 按优先级排序
+            candidates.sort(key=lambda x: x['priority'], reverse=True)
+            return candidates
+            
+        except Exception as e:
+            print(f"❌ 选择进化候选策略失败: {e}")
+            return []
+
+    def _evaluate_intelligent_evolution_need(self, strategy: Dict) -> Optional[str]:
+        """评估策略是否需要智能进化"""
+        try:
+            strategy_id = strategy['id']
+            current_score = strategy['final_score']
+            
+            # 检查进化冷却期
+            if self._is_strategy_in_evolution_cooldown(strategy_id):
+                return None
+            
+            # 🎯 评分改善空间检查
+            if current_score < 75:
+                return "score_improvement_needed"
+            
+            # 🔄 高分策略定期优化
+            if current_score >= 80:
+                last_evolution = self._get_strategy_last_evolution_time(strategy_id)
+                if last_evolution:
+                    hours_since = (datetime.now() - last_evolution).total_seconds() / 3600
+                    if hours_since >= 72:  # 3天未进化
+                        return "periodic_high_score_optimization"
+                else:
+                    return "initial_high_score_optimization"
+            
+            # 📉 近期表现检查
+            recent_performance = self._analyze_recent_strategy_performance(strategy_id)
+            if recent_performance and recent_performance.get('declining_trend', False):
+                return "performance_decline_recovery"
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ 评估策略进化需求失败: {e}")
+            return None
+
+    def _is_strategy_in_evolution_cooldown(self, strategy_id: str) -> bool:
+        """检查策略是否在进化冷却期"""
+        try:
+            last_evolution = self._get_strategy_last_evolution_time(strategy_id)
+            if not last_evolution:
+                return False
+                
+            cooldown_hours = self.intelligent_evolution_config['evolution_cooldown_hours']
+            hours_since = (datetime.now() - last_evolution).total_seconds() / 3600
+            
+            return hours_since < cooldown_hours
+            
+        except Exception as e:
+            return False
+
+    def _get_strategy_last_evolution_time(self, strategy_id: str) -> Optional[datetime]:
+        """获取策略最后进化时间"""
+        try:
+            result = self.db_manager.execute_query("""
+                SELECT MAX(created_time) as last_evolution
+                FROM strategy_evolution_history
+                WHERE strategy_id = %s
+            """, (strategy_id,), fetch_one=True)
+            
+            return result.get('last_evolution') if result else None
+            
+        except Exception as e:
+            return None
+
+    def _analyze_recent_strategy_performance(self, strategy_id: str) -> Optional[Dict]:
+        """分析策略近期表现"""
+        try:
+            # 获取最近7天的交易记录
+            recent_trades = self.db_manager.execute_query("""
+                SELECT pnl, timestamp 
+                FROM strategy_trades 
+                WHERE strategy_id = %s 
+                AND timestamp > CURRENT_TIMESTAMP - INTERVAL '7 days'
+                ORDER BY timestamp DESC
+                LIMIT 20
+            """, (strategy_id,), fetch_all=True)
+            
+            if len(recent_trades) < 5:
+                return None
+            
+            # 分析趋势
+            recent_pnls = [trade['pnl'] for trade in recent_trades[:10]]
+            older_pnls = [trade['pnl'] for trade in recent_trades[10:]]
+            
+            recent_avg = sum(recent_pnls) / len(recent_pnls) if recent_pnls else 0
+            older_avg = sum(older_pnls) / len(older_pnls) if older_pnls else 0
+            
+            declining_trend = recent_avg < older_avg and recent_avg < 0
+            
+            return {
+                'declining_trend': declining_trend,
+                'recent_avg_pnl': recent_avg,
+                'older_avg_pnl': older_avg,
+                'total_recent_trades': len(recent_trades)
+            }
+            
+        except Exception as e:
+            return None
+
+    def _calculate_evolution_priority(self, strategy: Dict, reason: str) -> int:
+        """计算进化优先级"""
+        base_priorities = {
+            "performance_decline_recovery": 100,
+            "score_improvement_needed": 80,
+            "periodic_high_score_optimization": 60,
+            "initial_high_score_optimization": 70
+        }
+        
+        base_priority = base_priorities.get(reason, 50)
+        
+        # 根据策略分数调整优先级
+        score = strategy['final_score']
+        if score < 60:
+            score_bonus = 30  # 低分策略优先级更高
+        elif score < 80:
+            score_bonus = 10
+        else:
+            score_bonus = 0
+        
+        return base_priority + score_bonus
+
+    def _process_intelligent_strategy_evolution(self, candidate: Dict) -> bool:
+        """处理智能策略进化"""
+        strategy = candidate['strategy']
+        reason = candidate['reason']
+        strategy_id = strategy['id']
+        
+        try:
+            print(f"🧬 开始进化策略 {strategy['name']} (原因: {reason})")
+            
+            self.evolution_statistics['total_evolution_attempts'] += 1
+            
+            # 1️⃣ 生成优化参数
+            optimized_params = self._generate_intelligent_optimized_parameters(strategy, reason)
+            if not optimized_params:
+                print(f"⚠️ 策略 {strategy['name']} 参数优化失败")
+                return False
+            
+            # 2️⃣ 参数质量验证
+            validation_result = self._validate_parameter_quality(strategy, optimized_params)
+            if not validation_result['passed']:
+                print(f"❌ 策略 {strategy['name']} 参数验证失败: {validation_result['reason']}")
+                self.evolution_statistics['failed_parameter_validations'] += 1
+                return False
+            
+            # 3️⃣ 计算改善程度
+            improvement = validation_result['improvement']
+            if improvement < self.intelligent_evolution_config['parameter_quality_threshold']:
+                print(f"🚫 策略 {strategy['name']} 改善不足: {improvement:.2f} < {self.intelligent_evolution_config['parameter_quality_threshold']}")
+                return False
+            
+            # 4️⃣ 应用参数改善
+            success = self._apply_parameter_evolution(strategy, optimized_params, improvement, reason)
+            
+            if success:
+                self.evolution_statistics['successful_evolutions'] += 1
+                self.evolution_statistics['parameter_improvements'] += improvement
+                print(f"🎉 策略 {strategy['name']} 进化成功! 改善: +{improvement:.2f}分")
+                
+                # 记录进化历史
+                self._record_intelligent_evolution_history(strategy_id, strategy, optimized_params, improvement, reason)
+                return True
+            else:
+                print(f"❌ 策略 {strategy['name']} 参数应用失败")
+                return False
+                
+        except Exception as e:
+            print(f"❌ 策略 {strategy_id} 智能进化失败: {e}")
+            return False
+
+    def _generate_intelligent_optimized_parameters(self, strategy: Dict, reason: str) -> Optional[Dict]:
+        """生成智能优化参数"""
+        try:
+            current_params = strategy['parameters']
+            if not current_params:
+                return None
+            
+            # 根据进化原因确定优化强度
+            optimization_intensity = {
+                "performance_decline_recovery": 0.25,      # 表现下降，较大调整
+                "score_improvement_needed": 0.20,         # 需要改善，中等调整  
+                "periodic_high_score_optimization": 0.10, # 定期优化，小幅调整
+                "initial_high_score_optimization": 0.15   # 初次优化，温和调整
+            }.get(reason, 0.15)
+            
+            # 使用参数优化器生成新参数
+            if hasattr(self, 'parameter_optimizer'):
+                strategy_stats = self._get_strategy_performance_stats(strategy['id'])
+                optimized_params = self.parameter_optimizer.optimize_parameters_intelligently(
+                    strategy['id'], current_params, strategy_stats
+                )
+                
+                if optimized_params:
+                    return optimized_params
+            
+            # 回退到简单参数变异
+            return self._simple_parameter_mutation(current_params, optimization_intensity)
+            
+        except Exception as e:
+            print(f"❌ 生成智能优化参数失败: {e}")
+            return None
+
+    def _simple_parameter_mutation(self, current_params: Dict, intensity: float) -> Dict:
+        """简单参数变异"""
+        new_params = current_params.copy()
+        
+        for key, value in new_params.items():
+            if isinstance(value, (int, float)):
+                if isinstance(value, int):
+                    adjustment = int(value * intensity * random.uniform(-1, 1))
+                    new_params[key] = max(1, value + adjustment)
+                else:
+                    adjustment = value * intensity * random.uniform(-1, 1)
+                    new_params[key] = max(0.001, value + adjustment)
+        
+        return new_params
+
+    def _validate_parameter_quality(self, strategy: Dict, new_parameters: Dict) -> Dict:
+        """验证参数质量"""
+        try:
+            # 执行参数测试交易
+            test_results = []
+            strategy_id = strategy['id']
+            strategy_type = strategy['type']
+            symbol = strategy['symbol']
+            
+            for i in range(self.intelligent_evolution_config['parameter_test_trades']):
+                test_result = self._execute_parameter_test_trade(
+                    strategy_id, strategy_type, symbol, new_parameters
+                )
+                if test_result:
+                    test_results.append(test_result)
+            
+            if not test_results:
+                return {
+                    'passed': False,
+                    'reason': '参数测试交易失败',
+                    'improvement': 0
+                }
+            
+            # 计算测试结果
+            avg_pnl = sum(result['pnl'] for result in test_results) / len(test_results)
+            win_rate = sum(1 for result in test_results if result['pnl'] > 0) / len(test_results)
+            
+            # 计算预期改善
+            current_score = strategy['final_score']
+            predicted_score = current_score + (avg_pnl * 100) + (win_rate * 20)
+            improvement = predicted_score - current_score
+            
+            # 验证成功条件
+            success_rate_threshold = self.intelligent_evolution_config['validation_success_rate']
+            improvement_threshold = self.intelligent_evolution_config['score_improvement_threshold']
+            
+            passed = (win_rate >= success_rate_threshold and 
+                     improvement >= improvement_threshold)
+            
+            return {
+                'passed': passed,
+                'reason': f'胜率: {win_rate:.1%}, 改善: {improvement:.2f}' if passed else '验证未通过',
+                'improvement': improvement,
+                'test_results': test_results,
+                'win_rate': win_rate,
+                'avg_pnl': avg_pnl
+            }
+            
+        except Exception as e:
+            return {
+                'passed': False,
+                'reason': f'验证异常: {e}',
+                'improvement': 0
+            }
+
+    def _execute_parameter_test_trade(self, strategy_id: str, strategy_type: str, 
+                                    symbol: str, parameters: Dict) -> Optional[Dict]:
+        """执行参数测试交易"""
+        try:
+            # 获取当前价格
+            current_price = self.quantitative_service._get_current_price(symbol)
+            if not current_price:
+                return None
+            
+            # 生成测试信号
+            signal_type = self._generate_test_signal(strategy_type, parameters, current_price)
+            
+            # 计算测试PnL
+            test_amount = 5.0  # 固定测试金额
+            pnl = self._calculate_test_pnl(strategy_type, parameters, signal_type, current_price, test_amount)
+            
+            return {
+                'signal_type': signal_type,
+                'price': current_price,
+                'amount': test_amount,
+                'pnl': pnl,
+                'timestamp': datetime.now()
+            }
+            
+        except Exception as e:
+            print(f"❌ 执行参数测试交易失败: {e}")
+            return None
+
+    def _generate_test_signal(self, strategy_type: str, parameters: Dict, current_price: float) -> str:
+        """生成测试信号"""
+        # 简化的信号生成逻辑
+        if strategy_type == 'momentum':
+            return random.choice(['buy', 'sell'])
+        elif strategy_type == 'mean_reversion':
+            return random.choice(['buy', 'sell'])
+        else:
+            return random.choice(['buy', 'sell'])
+
+    def _calculate_test_pnl(self, strategy_type: str, parameters: Dict, 
+                          signal_type: str, price: float, amount: float) -> float:
+        """计算测试PnL"""
+        # 简化的PnL计算
+        base_return = random.uniform(-0.02, 0.05)  # -2% 到 5% 的随机收益
+        
+        # 根据策略类型调整
+        if strategy_type == 'momentum' and signal_type == 'buy':
+            base_return += 0.01
+        elif strategy_type == 'mean_reversion' and signal_type == 'sell':
+            base_return += 0.01
+        
+        return amount * base_return
+
+    def _apply_parameter_evolution(self, strategy: Dict, new_parameters: Dict, 
+                                 improvement: float, reason: str) -> bool:
+        """应用参数进化"""
+        try:
+            strategy_id = strategy['id']
+            old_generation = strategy['generation']
+            old_cycle = strategy['cycle']
+            
+            # 计算新的世代信息
+            new_generation = old_generation
+            new_cycle = old_cycle + 1
+            
+            # 如果改善显著，升级世代
+            if improvement >= self.intelligent_evolution_config['parameter_quality_threshold'] * 2:
+                new_generation += 1
+                new_cycle = 1
+            
+            # 更新策略
+            self.db_manager.execute_query("""
+                UPDATE strategies 
+                SET parameters = %s,
+                    generation = %s,
+                    cycle = %s,
+                    final_score = final_score + %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (
+                json.dumps(new_parameters),
+                new_generation,
+                new_cycle,
+                improvement,
+                strategy_id
+            ))
+            
+            print(f"✅ 策略 {strategy_id} 参数已更新: 第{new_generation}代第{new_cycle}轮")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 应用参数进化失败: {e}")
+            return False
+
+    def _record_intelligent_evolution_history(self, strategy_id: str, strategy: Dict, 
+                                            new_parameters: Dict, improvement: float, reason: str):
+        """记录智能进化历史"""
+        try:
+            self.db_manager.execute_query("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, evolution_type, old_generation, new_generation,
+                 old_cycle, new_cycle, old_parameters, new_parameters,
+                 old_score, new_score, improvement, success, evolution_reason, created_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                strategy_id,
+                'intelligent_parameter_optimization',
+                strategy['generation'],
+                strategy['generation'] + (1 if improvement >= self.intelligent_evolution_config['parameter_quality_threshold'] * 2 else 0),
+                strategy['cycle'],
+                strategy['cycle'] + 1,
+                json.dumps(strategy['parameters']),
+                json.dumps(new_parameters),
+                strategy['final_score'],
+                strategy['final_score'] + improvement,
+                improvement,
+                True,
+                reason,
+                datetime.now()
+            ))
+            
+        except Exception as e:
+            print(f"❌ 记录智能进化历史失败: {e}")
+
+    def _update_evolution_statistics(self, total_candidates: int, successful_evolutions: int):
+        """更新进化统计"""
+        try:
+            self.evolution_statistics['last_evolution_time'] = datetime.now()
+            
+            if self.evolution_statistics['total_evolution_attempts'] > 0:
+                self.evolution_statistics['success_rate'] = (
+                    self.evolution_statistics['successful_evolutions'] / 
+                    self.evolution_statistics['total_evolution_attempts']
+                )
+            
+            print(f"📊 进化统计更新: 总尝试 {self.evolution_statistics['total_evolution_attempts']}, "
+                  f"成功 {self.evolution_statistics['successful_evolutions']}, "
+                  f"成功率 {self.evolution_statistics['success_rate']:.1%}")
+            
+        except Exception as e:
+            print(f"❌ 更新进化统计失败: {e}")
+
+    def get_intelligent_evolution_status(self) -> Dict:
+        """获取智能进化状态"""
+        return {
+            'enabled': self.intelligent_evolution_config.get('auto_evolution_enabled', False),
+            'config': self.intelligent_evolution_config,
+            'statistics': self.evolution_statistics,
+            'last_update': datetime.now().isoformat()
+        }
 
     def _ensure_required_tables(self):
         """确保所有必需的数据表存在"""

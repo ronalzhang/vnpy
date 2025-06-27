@@ -3006,6 +3006,112 @@ def toggle_evolution():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
+# 🧬 智能进化系统专用API端点
+@app.route('/api/evolution-status', methods=['GET'])
+def get_intelligent_evolution_status():
+    """获取智能进化系统状态"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"enabled": False, "message": "量化模块未启用"})
+    
+    try:
+        if quantitative_service and hasattr(quantitative_service, 'evolution_engine'):
+            status = quantitative_service.evolution_engine.get_intelligent_evolution_status()
+            return jsonify(status)
+        else:
+            return jsonify({"enabled": False, "message": "进化引擎未初始化"})
+    except Exception as e:
+        return jsonify({"enabled": False, "message": str(e)})
+
+@app.route('/api/start-intelligent-evolution', methods=['POST'])
+def start_intelligent_evolution_api():
+    """启动智能进化系统"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"success": False, "message": "量化模块未启用"})
+    
+    try:
+        data = request.get_json() or {}
+        enabled = data.get('enabled', True)
+        
+        if quantitative_service and hasattr(quantitative_service, 'evolution_engine'):
+            if enabled:
+                quantitative_service.evolution_engine.start_intelligent_auto_evolution()
+                return jsonify({"success": True, "message": "智能进化系统已启动"})
+            else:
+                # 停止智能进化
+                quantitative_service.evolution_engine.intelligent_evolution_config['auto_evolution_enabled'] = False
+                return jsonify({"success": True, "message": "智能进化系统已停止"})
+        else:
+            return jsonify({"success": False, "message": "进化引擎未初始化"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+@app.route('/api/recent-evolutions', methods=['GET'])
+def get_recent_evolutions():
+    """获取最近的进化记录"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify([])
+    
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        if quantitative_service and hasattr(quantitative_service, 'db_manager'):
+            evolutions = quantitative_service.db_manager.execute_query("""
+                SELECT strategy_id, evolution_type, old_score, new_score, 
+                       improvement, success, evolution_reason, notes, created_time
+                FROM strategy_evolution_history
+                ORDER BY created_time DESC
+                LIMIT %s
+            """, (limit,), fetch_all=True)
+            
+            # 转换为JSON格式
+            result = []
+            for evo in evolutions:
+                result.append({
+                    'strategy_id': evo['strategy_id'],
+                    'evolution_type': evo['evolution_type'],
+                    'old_score': float(evo['old_score']) if evo['old_score'] else 0,
+                    'new_score': float(evo['new_score']) if evo['new_score'] else 0,
+                    'improvement': float(evo['improvement']) if evo['improvement'] else 0,
+                    'success': evo['success'],
+                    'evolution_reason': evo['evolution_reason'],
+                    'notes': evo['notes'],
+                    'created_time': evo['created_time'].strftime('%m-%d %H:%M') if evo['created_time'] else ''
+                })
+            
+            return jsonify(result)
+        else:
+            return jsonify([])
+    except Exception as e:
+        print(f"获取进化记录失败: {e}")
+        return jsonify([])
+
+@app.route('/api/system-status', methods=['GET'])
+def get_system_status_simple():
+    """获取系统简要状态"""
+    if not QUANTITATIVE_ENABLED:
+        return jsonify({"active_strategies": 0, "average_score": 0})
+    
+    try:
+        if quantitative_service and hasattr(quantitative_service, 'db_manager'):
+            stats = quantitative_service.db_manager.execute_query("""
+                SELECT 
+                    COUNT(CASE WHEN enabled = 1 THEN 1 END) as active_strategies,
+                    AVG(final_score) as average_score
+                FROM strategies
+            """, fetch_one=True)
+            
+            if stats:
+                return jsonify({
+                    "active_strategies": stats['active_strategies'] or 0,
+                    "average_score": float(stats['average_score']) if stats['average_score'] else 0
+                })
+            else:
+                return jsonify({"active_strategies": 0, "average_score": 0})
+        else:
+            return jsonify({"active_strategies": 0, "average_score": 0})
+    except Exception as e:
+        return jsonify({"active_strategies": 0, "average_score": 0})
+
 @app.route('/api/quantitative/strategies/create', methods=['POST'])
 def create_strategy():
     """创建新策略"""
