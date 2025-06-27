@@ -27,6 +27,7 @@ class RealTimeMonitor:
             'alerts': []
         }
         self.running = False
+        self.loop = None  # 存储事件循环引用
         
     def _setup_logger(self):
         """设置日志"""
@@ -183,8 +184,12 @@ class RealTimeMonitor:
                 # 更新监控数据
                 self.monitoring_data['strategies'] = strategy_data
                 
-                # 异步广播更新
-                asyncio.create_task(self.broadcast_update('strategy_update', strategy_data))
+                # 异步广播更新 - 修复事件循环问题
+                if hasattr(self, 'loop') and self.loop and self.loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        self.broadcast_update('strategy_update', strategy_data), 
+                        self.loop
+                    )
                 
                 conn.close()
                 
@@ -229,8 +234,12 @@ class RealTimeMonitor:
                 
                 self.monitoring_data['system_metrics'] = system_metrics
                 
-                # 异步广播更新
-                asyncio.create_task(self.broadcast_update('system_metrics', system_metrics))
+                # 异步广播更新 - 修复事件循环问题  
+                if hasattr(self, 'loop') and self.loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        self.broadcast_update('system_metrics', system_metrics), 
+                        self.loop
+                    )
                 
             except Exception as e:
                 self.logger.error(f"系统监控错误: {e}")
