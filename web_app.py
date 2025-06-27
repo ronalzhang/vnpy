@@ -3199,21 +3199,48 @@ def toggle_auto_strategy_management():
 def get_auto_strategy_management_status():
     """获取全自动策略管理状态"""
     try:
-        # 通过HTTP请求后端服务
-        import requests
-        response = requests.get('http://localhost:8000/auto-management-status', timeout=10)
+        # 从数据库获取策略管理状态而不是连接不存在的8000端口服务
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        if response.status_code == 200:
-            result = response.json()
-            return jsonify({
-                "success": True,
-                "data": result
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "message": "后端服务响应异常"
-            }), 500
+        # 获取活跃策略数量
+        cursor.execute("""
+            SELECT COUNT(*) FROM strategies WHERE enabled = 1
+        """)
+        active_strategies = cursor.fetchone()[0] if cursor.fetchone() else 0
+        
+        # 获取总策略数量
+        cursor.execute("""
+            SELECT COUNT(*) FROM strategies
+        """)
+        total_strategies = cursor.fetchone()[0] if cursor.fetchone() else 0
+        
+        # 获取真实交易策略数量
+        cursor.execute("""
+            SELECT COUNT(*) FROM strategies WHERE enabled = 1 AND final_score >= 65
+        """)
+        real_trading_count = cursor.fetchone()[0] if cursor.fetchone() else 0
+        
+        # 获取验证交易策略数量  
+        cursor.execute("""
+            SELECT COUNT(*) FROM strategies WHERE enabled = 1 AND final_score >= 45 AND final_score < 65
+        """)
+        validation_count = cursor.fetchone()[0] if cursor.fetchone() else 0
+        
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "enabled": True,
+                "current_active_strategies": active_strategies,
+                "total_strategies": total_strategies,
+                "real_trading_strategies": real_trading_count,
+                "validation_strategies": validation_count,
+                "last_check": datetime.now().isoformat(),
+                "next_check": (datetime.now() + timedelta(minutes=10)).isoformat()
+            }
+        })
             
     except Exception as e:
         print(f"获取全自动策略管理状态失败: {e}")
@@ -3223,9 +3250,11 @@ def get_auto_strategy_management_status():
             "data": {
                 "enabled": False,
                 "current_active_strategies": 0,
-                "total_strategies": 0
+                "total_strategies": 0,
+                "real_trading_strategies": 0,
+                "validation_strategies": 0
             }
-        }), 500
+        }), 200  # 改为200状态码，避免前端报错
 
 @app.route('/api/quantitative/auto-trading', methods=['GET', 'POST'])
 def manage_auto_trading():
@@ -4153,6 +4182,103 @@ def get_performance_history():
             'message': f'获取失败: {str(e)}',
             'data': []
         })
+
+@app.route('/api/system/status', methods=['GET'])
+def get_unified_system_status():
+    """统一系统状态检测 - 检查所有核心服务"""
+    try:
+        status = {
+            'overall_status': 'online',
+            'timestamp': datetime.now().isoformat(),
+            'services': {},
+            'details': {}
+        }
+        
+        # 1. 数据库连接检测
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            conn.close()
+            status['services']['database'] = 'online'
+        except Exception as e:
+            status['services']['database'] = 'offline'
+            status['details']['database_error'] = str(e)
+            status['overall_status'] = 'degraded'
+        
+        # 2. 交易所API检测
+        try:
+            import ccxt
+            exchange = ccxt.binance({
+                'apiKey': os.getenv('BINANCE_API_KEY'),
+                'secret': os.getenv('BINANCE_SECRET_KEY'),
+                'sandbox': False,
+                'enableRateLimit': True,
+            })
+            ticker = exchange.fetch_ticker('BTC/USDT')
+            if ticker and ticker.get('last'):
+                status['services']['exchange_api'] = 'online'
+                status['details']['btc_price'] = ticker['last']
+            else:
+                status['services']['exchange_api'] = 'degraded'
+        except Exception as e:
+            status['services']['exchange_api'] = 'offline'
+            status['details']['exchange_error'] = str(e)
+            status['overall_status'] = 'degraded'
+        
+        # 3. PM2进程检测
+        try:
+            import subprocess
+            result = subprocess.run(['pm2', 'jlist'], capture_output=True, text=True)
+            if result.returncode == 0:
+                import json
+                processes = json.loads(result.stdout)
+                running_processes = [p for p in processes if p.get('pm2_env', {}).get('status') == 'online']
+                status['services']['pm2_processes'] = f"{len(running_processes)}/3 online"
+                status['details']['pm2_processes'] = [p.get('name') for p in running_processes]
+            else:
+                status['services']['pm2_processes'] = 'unknown'
+        except Exception as e:
+            status['services']['pm2_processes'] = 'offline'
+            status['details']['pm2_error'] = str(e)
+        
+        # 4. 策略引擎检测
+        try:
+            if hasattr(app, 'quant_service') and app.quant_service:
+                if hasattr(app.quant_service, 'is_system_enabled') and app.quant_service.is_system_enabled:
+                    status['services']['strategy_engine'] = 'online'
+                else:
+                    status['services']['strategy_engine'] = 'offline'
+            else:
+                status['services']['strategy_engine'] = 'offline'
+        except Exception as e:
+            status['services']['strategy_engine'] = 'offline'
+            status['details']['strategy_error'] = str(e)
+        
+        # 5. 计算总体状态
+        offline_services = [k for k, v in status['services'].items() if v == 'offline']
+        if len(offline_services) > 1:
+            status['overall_status'] = 'offline'
+        elif offline_services:
+            status['overall_status'] = 'degraded'
+        
+        return jsonify({
+            'success': True,
+            'data': status
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'系统状态检测失败: {str(e)}',
+            'data': {
+                'overall_status': 'offline',
+                'timestamp': datetime.now().isoformat(),
+                'services': {},
+                'details': {'critical_error': str(e)}
+            }
+        }), 500
 
 if __name__ == '__main__':
     main() 

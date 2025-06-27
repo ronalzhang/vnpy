@@ -1642,26 +1642,32 @@ class QuantitativeSystem {
         });
     }
 
-    // 加载系统状态
+    // 加载系统状态 - 使用统一状态端点
     async loadSystemStatus() {
         try {
             console.log('🔄 开始加载系统状态...');
-            const response = await fetch('/api/quantitative/system-status');
+            const response = await fetch('/api/system/status');
             const data = await response.json();
             
             console.log('📊 系统状态API响应:', data);
             
-            if (data.success) {
+            if (data.success && data.data) {
+                // 根据统一状态端点更新状态
+                const isOnline = data.data.overall_status === 'online';
+                const isDegraded = data.data.overall_status === 'degraded';
+                
                 // 更新全局状态变量
-                window.systemRunning = data.running || false;
-                window.autoTradingEnabled = data.auto_trading_enabled || false;
+                window.systemRunning = isOnline || isDegraded;
+                window.autoTradingEnabled = data.data.services?.strategy_engine === 'online';
                 
                 // 保存到实例变量
                 this.systemStatus = {
-                    running: data.running || false,
-                    auto_trading_enabled: data.auto_trading_enabled || false,
-                    total_strategies: data.total_strategies || 0,
-                    running_strategies: data.running_strategies || 0
+                    running: isOnline || isDegraded,
+                    auto_trading_enabled: data.data.services?.strategy_engine === 'online',
+                    overall_status: data.data.overall_status,
+                    services: data.data.services,
+                    details: data.data.details,
+                    timestamp: data.data.timestamp
                 };
                 
                 // 更新界面显示
@@ -1669,15 +1675,17 @@ class QuantitativeSystem {
                 this.updateAutoTradingStatus();
                 
                 console.log('✅ 系统状态加载成功:', {
+                    overall_status: data.data.overall_status,
                     running: window.systemRunning,
                     autoTrading: window.autoTradingEnabled,
-                    全局变量检查: typeof systemRunning !== 'undefined' ? systemRunning : '未定义'
+                    services: data.data.services
                 });
             } else {
-                console.error('❌ 获取系统状态失败:', data.message);
+                console.error('❌ 获取系统状态失败:', data.error);
                 // 默认设置为离线状态
                 window.systemRunning = false;
                 window.autoTradingEnabled = false;
+                this.systemStatus = { running: false, auto_trading_enabled: false, overall_status: 'offline' };
                 this.updateSystemStatus();
                 this.updateAutoTradingStatus();
             }
@@ -1686,6 +1694,7 @@ class QuantitativeSystem {
             // 网络错误时设置为离线状态
             window.systemRunning = false;
             window.autoTradingEnabled = false;
+            this.systemStatus = { running: false, auto_trading_enabled: false, overall_status: 'offline' };
             this.updateSystemStatus();
             this.updateAutoTradingStatus();
         }
