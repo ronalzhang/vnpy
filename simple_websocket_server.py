@@ -32,7 +32,7 @@ def get_db_connection():
         logger.error(f"数据库连接失败: {e}")
         return None
 
-async def register_client(websocket, path):
+async def register_client(websocket):
     """注册新的WebSocket客户端"""
     global connected_clients
     connected_clients.add(websocket)
