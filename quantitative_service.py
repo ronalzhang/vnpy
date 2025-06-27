@@ -8351,13 +8351,13 @@ class EvolutionaryStrategyEngine:
         try:
             conn = self.quantitative_service.db_manager.conn
             cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT COUNT(*) 
-                    FROM trading_signals 
-                    WHERE strategy_id = %s AND executed = 1
-                """, (strategy_id,))
-                result = cursor.fetchone()
-                return result[0] if result else 0
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM trading_signals 
+                WHERE strategy_id = %s AND executed = 1
+            """, (strategy_id,))
+            result = cursor.fetchone()
+            return result[0] if result else 0
         except Exception as e:
             print(f"❌ 统计策略交易失败: {e}")
             return 0
