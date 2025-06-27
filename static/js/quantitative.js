@@ -88,6 +88,15 @@ class GlobalStatusManager {
     }
     
     initializeWebSocket() {
+        // 🔧 暂时禁用WebSocket连接，避免频繁错误日志
+        // 等WebSocket服务启动后再启用
+        this.updateStatus('websocket', 'disconnected', '服务未启动');
+        console.log('💡 WebSocket服务暂未启动，已禁用连接尝试');
+        
+        // 可以通过调用 this.enableWebSocket() 来启用WebSocket
+        return;
+        
+        /* 原WebSocket连接代码 - 暂时注释
         try {
             // 尝试连接实时监控WebSocket
             this.websocket = new WebSocket('ws://47.236.39.134:8765');
@@ -95,6 +104,7 @@ class GlobalStatusManager {
             this.websocket.onopen = () => {
                 console.log('✅ WebSocket连接成功');
                 this.updateStatus('websocket', 'connected', '已连接');
+                this.reconnectAttempts = 0; // 重置重连计数
             };
             
             this.websocket.onmessage = (event) => {
@@ -107,9 +117,18 @@ class GlobalStatusManager {
             };
             
             this.websocket.onclose = () => {
-                console.log('🔌 WebSocket连接断开，尝试重连...');
+                console.log('🔌 WebSocket连接断开');
                 this.updateStatus('websocket', 'disconnected', '连接断开');
-                setTimeout(() => this.initializeWebSocket(), 5000);
+                
+                // 限制重连次数，避免无限重连
+                if (this.reconnectAttempts < 3) {
+                    this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+                    console.log(`尝试第${this.reconnectAttempts}次重连...`);
+                    setTimeout(() => this.initializeWebSocket(), 10000); // 10秒后重连
+                } else {
+                    console.log('WebSocket重连次数已达上限，停止重连');
+                    this.updateStatus('websocket', 'disconnected', '服务不可用');
+                }
             };
             
             this.websocket.onerror = (error) => {
@@ -119,6 +138,59 @@ class GlobalStatusManager {
             
         } catch (error) {
             console.error('WebSocket初始化失败:', error);
+            this.updateStatus('websocket', 'disconnected', '不可用');
+        }
+        */
+    }
+    
+    // 🔥 新增：手动启用WebSocket的方法
+    enableWebSocket() {
+        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+            console.log('WebSocket已连接');
+            return;
+        }
+        
+        this.reconnectAttempts = 0;
+        try {
+            console.log('🔄 启用WebSocket连接...');
+            this.websocket = new WebSocket('ws://47.236.39.134:8765');
+            
+            this.websocket.onopen = () => {
+                console.log('✅ WebSocket连接成功');
+                this.updateStatus('websocket', 'connected', '已连接');
+                this.reconnectAttempts = 0;
+            };
+            
+            this.websocket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleWebSocketMessage(data);
+                } catch (error) {
+                    console.error('WebSocket消息解析错误:', error);
+                }
+            };
+            
+            this.websocket.onclose = () => {
+                console.log('🔌 WebSocket连接断开');
+                this.updateStatus('websocket', 'disconnected', '连接断开');
+                
+                if (this.reconnectAttempts < 3) {
+                    this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+                    console.log(`尝试第${this.reconnectAttempts}次重连...`);
+                    setTimeout(() => this.enableWebSocket(), 10000);
+                } else {
+                    console.log('WebSocket重连次数已达上限');
+                    this.updateStatus('websocket', 'disconnected', '服务不可用');
+                }
+            };
+            
+            this.websocket.onerror = (error) => {
+                console.error('WebSocket连接错误:', error);
+                this.updateStatus('websocket', 'disconnected', '连接失败');
+            };
+            
+        } catch (error) {
+            console.error('WebSocket启用失败:', error);
             this.updateStatus('websocket', 'disconnected', '不可用');
         }
     }
