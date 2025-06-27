@@ -616,44 +616,84 @@ class AdvancedStrategyManager:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
+            # 首先检查表结构
             cursor.execute("""
-                SELECT id, name, symbol, type, enabled, final_score, 
-                       total_trades, win_rate, total_return, generation, cycle,
-                       created_at, updated_at
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'strategies' 
+                ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+            self.logger.info(f"📋 strategies表字段: {columns}")
+            
+            # 安全查询，只选择存在的字段
+            base_fields = ['id', 'name', 'symbol', 'type', 'enabled', 'final_score', 'total_trades', 'win_rate', 'total_return']
+            optional_fields = ['generation', 'cycle', 'created_at', 'updated_at']
+            
+            # 构建查询字段列表
+            select_fields = []
+            for field in base_fields:
+                if field in columns:
+                    select_fields.append(field)
+                else:
+                    select_fields.append(f"NULL as {field}")
+            
+            for field in optional_fields:
+                if field in columns:
+                    select_fields.append(field)
+                else:
+                    if field in ['generation', 'cycle']:
+                        select_fields.append(f"1 as {field}")
+                    else:
+                        select_fields.append(f"NULL as {field}")
+            
+            query = f"""
+                SELECT {', '.join(select_fields)}
                 FROM strategies 
-                WHERE id LIKE 'STRAT_%' 
+                WHERE final_score IS NOT NULL
                 ORDER BY final_score DESC, total_trades DESC
                 LIMIT %s
-            """, (display_limit,))
+            """
+            
+            self.logger.info(f"🔍 执行查询: {query}")
+            cursor.execute(query, (display_limit,))
             
             strategies = []
             rows = cursor.fetchall()
+            self.logger.info(f"📊 查询到 {len(rows)} 个策略")
             
-            for row in rows:
-                strategy = {
-                    'id': row[0],
-                    'name': row[1],
-                    'symbol': row[2],
-                    'type': row[3],
-                    'enabled': row[4],
-                    'final_score': float(row[5]) if row[5] else 0,
-                    'total_trades': int(row[6]) if row[6] else 0,
-                    'win_rate': float(row[7]) if row[7] else 0,
-                    'total_return': float(row[8]) if row[8] else 0,
-                    'generation': int(row[9]) if row[9] else 1,
-                    'cycle': int(row[10]) if row[10] else 1,
-                    'created_at': row[11].isoformat() if row[11] else None,
-                    'updated_at': row[12].isoformat() if row[12] else None
-                }
-                strategies.append(strategy)
+            for i, row in enumerate(rows):
+                try:
+                    strategy = {
+                        'id': row[0] if row[0] else f"STRAT_{i}",
+                        'name': row[1] if row[1] else f"策略_{i}",
+                        'symbol': row[2] if row[2] else 'BTC/USDT',
+                        'type': row[3] if row[3] else 'momentum',
+                        'enabled': bool(row[4]) if row[4] is not None else False,
+                        'final_score': float(row[5]) if row[5] is not None else 0.0,
+                        'total_trades': int(row[6]) if row[6] is not None else 0,
+                        'win_rate': float(row[7]) if row[7] is not None else 0.0,
+                        'total_return': float(row[8]) if row[8] is not None else 0.0,
+                        'generation': int(row[9]) if len(row) > 9 and row[9] is not None else 1,
+                        'cycle': int(row[10]) if len(row) > 10 and row[10] is not None else 1,
+                        'created_at': row[11].isoformat() if len(row) > 11 and row[11] else None,
+                        'updated_at': row[12].isoformat() if len(row) > 12 and row[12] else None
+                    }
+                    strategies.append(strategy)
+                except Exception as row_error:
+                    self.logger.error(f"❌ 处理策略行 {i} 失败: {row_error}, 行数据: {row}")
+                    continue
             
             cursor.close()
             conn.close()
             
+            self.logger.info(f"✅ 成功获取 {len(strategies)} 个显示策略")
             return strategies
                 
         except Exception as e:
             self.logger.error(f"❌ 获取显示策略失败: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
 
