@@ -1941,7 +1941,7 @@ class QuantitativeSystem {
             const response = await fetch('/api/quantitative/auto-strategy-management/status');
             const data = await response.json();
             
-            if (data.success) {
+            if (data.success && data.data) {
                 const status = data.data;
                 
                 // 更新开关状态
@@ -1954,17 +1954,19 @@ class QuantitativeSystem {
                 const statusElement = document.getElementById('autoManagementStatus');
                 const configElement = document.getElementById('autoManagementConfig');
                 
-                if (status.enabled) {
-                    statusElement.textContent = '启用';
-                    statusElement.className = 'text-success';
-                    configElement.style.display = 'block';
-                } else {
-                    statusElement.textContent = '禁用';
-                    statusElement.className = 'text-muted';
-                    configElement.style.display = 'none';
+                if (statusElement) {
+                    if (status.enabled) {
+                        statusElement.textContent = '启用';
+                        statusElement.className = 'text-success';
+                        if (configElement) configElement.style.display = 'block';
+                    } else {
+                        statusElement.textContent = '禁用';
+                        statusElement.className = 'text-muted';
+                        if (configElement) configElement.style.display = 'none';
+                    }
                 }
                 
-                // 更新状态统计
+                // 更新状态统计（增加null检查）
                 this.safeSetText('currentActiveStrategies', status.current_active_strategies || 0);
                 this.safeSetText('realTradingStrategiesCount', status.real_trading_strategies || 0);
                 this.safeSetText('validationStrategiesCount', status.validation_strategies || 0);
@@ -1996,7 +1998,20 @@ class QuantitativeSystem {
                 console.warn('获取全自动策略管理状态失败:', data.message);
             }
         } catch (error) {
-            console.error('加载全自动策略管理状态失败:', error);
+            console.error('❌ 获取全自动策略管理状态失败:', error.message || error);
+            
+            // 设置默认值以防止界面错误
+            this.safeSetText('currentActiveStrategies', '0');
+            this.safeSetText('realTradingStrategiesCount', '0');
+            this.safeSetText('validationStrategiesCount', '0');
+            this.safeSetText('totalStrategiesCount', '0');
+            
+            // 显示用户友好的错误信息
+            const statusElement = document.getElementById('autoManagementStatus');
+            if (statusElement) {
+                statusElement.textContent = '连接失败';
+                statusElement.className = 'text-danger';
+            }
         }
     }
 

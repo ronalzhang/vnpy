@@ -3207,25 +3207,29 @@ def get_auto_strategy_management_status():
         cursor.execute("""
             SELECT COUNT(*) FROM strategies WHERE enabled = 1
         """)
-        active_strategies = cursor.fetchone()[0] if cursor.fetchone() else 0
+        result = cursor.fetchone()
+        active_strategies = result[0] if result else 0
         
         # 获取总策略数量
         cursor.execute("""
             SELECT COUNT(*) FROM strategies
         """)
-        total_strategies = cursor.fetchone()[0] if cursor.fetchone() else 0
+        result = cursor.fetchone()
+        total_strategies = result[0] if result else 0
         
         # 获取真实交易策略数量
         cursor.execute("""
             SELECT COUNT(*) FROM strategies WHERE enabled = 1 AND final_score >= 65
         """)
-        real_trading_count = cursor.fetchone()[0] if cursor.fetchone() else 0
+        result = cursor.fetchone()
+        real_trading_count = result[0] if result else 0
         
         # 获取验证交易策略数量  
         cursor.execute("""
             SELECT COUNT(*) FROM strategies WHERE enabled = 1 AND final_score >= 45 AND final_score < 65
         """)
-        validation_count = cursor.fetchone()[0] if cursor.fetchone() else 0
+        result = cursor.fetchone()
+        validation_count = result[0] if result else 0
         
         conn.close()
         
