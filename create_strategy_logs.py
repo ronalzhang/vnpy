@@ -73,16 +73,16 @@ def create_strategy_trade_logs():
                 else:
                     pnl = 0
                 
-                # 插入交易记录
+                # 插入交易记录 (使用正确的字段名)
                 cursor.execute("""
                     INSERT INTO strategy_trades 
-                    (strategy_id, timestamp, signal_type, price, quantity, confidence, 
-                     execution_status, pnl, trade_type, notes)
+                    (strategy_id, symbol, side, amount, price, timestamp, 
+                     status, pnl, trade_type, notes)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
-                    strategy_id, timestamp, signal_type, price, quantity, 
-                    confidence, status, pnl, 'validation', 
-                    f'模拟交易 - {strategy_name}'
+                    strategy_id, symbol, signal_type, quantity, price, timestamp,
+                    status, pnl, 'validation', 
+                    f'模拟交易 - {strategy_name} - 置信度:{confidence}%'
                 ))
             
             # 为每个策略创建2-3条优化记录
