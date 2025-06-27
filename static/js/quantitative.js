@@ -88,12 +88,9 @@ class GlobalStatusManager {
     }
     
     initializeWebSocket() {
-        // 🔧 暂时禁用WebSocket连接，避免频繁错误日志
-        // 等WebSocket服务启动后再启用
-        this.updateStatus('websocket', 'disconnected', '服务未启动');
-        console.log('💡 WebSocket服务暂未启动，已禁用连接尝试');
-        
-        // 可以通过调用 this.enableWebSocket() 来启用WebSocket
+        // ✅ WebSocket服务已启动，开始连接
+        console.log('🔄 开始连接WebSocket服务...');
+        this.enableWebSocket();
         return;
         
         /* 原WebSocket连接代码 - 暂时注释
