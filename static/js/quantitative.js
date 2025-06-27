@@ -927,10 +927,15 @@ class QuantitativeSystem {
             
         } catch (error) {
             console.error('加载交易日志失败:', error);
-            const colSpan = this.displayMode === 'trade_cycles' ? '9' : '7';
-            document.getElementById('tradeLogsTable').innerHTML = 
-                `<tr><td colspan="${colSpan}" class="text-center text-danger">加载失败</td></tr>`;
-            document.getElementById('tradeLogPaginationContainer').innerHTML = '';
+            const tbody = document.getElementById('tradeLogsTable');
+            if (tbody) {
+                const colSpan = this.displayMode === 'trade_cycles' ? '9' : '7';
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-danger">加载失败</td></tr>`;
+            }
+            const container = document.getElementById('tradeLogPaginationContainer');
+            if (container) {
+                container.innerHTML = '';
+            }
         }
     }
 
@@ -1205,9 +1210,14 @@ class QuantitativeSystem {
             
         } catch (error) {
             console.error('加载优化记录失败:', error);
-            document.getElementById('optimizationLogsTable').innerHTML = 
-                '<tr><td colspan="6" class="text-center text-danger">加载失败</td></tr>';
-            document.getElementById('logPaginationContainer').innerHTML = '';
+            const tbody = document.getElementById('optimizationLogsTable');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">加载失败</td></tr>';
+            }
+            const container = document.getElementById('logPaginationContainer');
+            if (container) {
+                container.innerHTML = '';
+            }
         }
     }
 
