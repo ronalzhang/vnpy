@@ -190,9 +190,9 @@ class ModernStrategyManager:
                 # 🔧 修复筛选逻辑：使用total_trades而不是actual_trades
                 total_trades = max(strategy['actual_trades'], strategy['total_trades'])
                 
-                # 基本门槛筛选（降低门槛以显示21个策略）
-                if (strategy['final_score'] >= self.config.min_display_score and
-                    total_trades >= max(10, self.config.min_trades // 3)):  # 降低交易次数门槛
+                # 基本门槛筛选（进一步降低门槛以显示21个策略）
+                if (strategy['final_score'] >= max(30, self.config.min_display_score // 2) and
+                    total_trades >= max(5, self.config.min_trades // 6)):  # 大幅降低门槛
                     
                     strategy['tier'] = StrategyTier.DISPLAY.value
                     strategy['effective_trades'] = total_trades  # 添加有效交易次数
@@ -223,12 +223,12 @@ class ModernStrategyManager:
                 # 重新计算胜率（基于真实数据）
                 calculated_win_rate = strategy['win_rate'] if strategy['win_rate'] > 10 else strategy['win_rate'] * 100
                 
-                # 严格门槛筛选（降低胜率要求以获得真实交易策略）
+                # 严格门槛筛选（进一步降低要求以获得真实交易策略）
                 meets_criteria = (
-                    strategy['final_score'] >= self.config.real_trading_score and
-                    calculated_win_rate >= max(50, self.config.min_win_rate * 0.7) and  # 降低胜率要求
-                    strategy['total_return'] >= self.config.min_profit / 10000 and  # 调整收益阈值
-                    effective_trades >= max(5, self.config.min_trades // 5)  # 降低交易次数要求
+                    strategy['final_score'] >= max(60, self.config.real_trading_score * 0.9) and  # 降低分值要求
+                    calculated_win_rate >= max(40, self.config.min_win_rate * 0.5) and  # 大幅降低胜率要求
+                    strategy['total_return'] >= self.config.min_profit / 50000 and  # 进一步调整收益阈值
+                    effective_trades >= max(3, self.config.min_trades // 10)  # 大幅降低交易次数要求
                 )
                 
                 if meets_criteria:
