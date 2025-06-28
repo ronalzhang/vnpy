@@ -2114,23 +2114,23 @@ class QuantitativeSystem {
             return Number.isInteger(value) ? value.toString() : value.toFixed(2);
         };
         
-        // 更新当前状态数值，确保整数不显示小数点
+        // 🔥 修复：更新当前状态数值，确保整数不显示小数点
         const updateElement = (id, value, isInteger = false) => {
             const element = document.getElementById(id);
             if (element) {
-                if (isInteger && Number.isInteger(value)) {
-                    element.textContent = value.toString(); // 整数不显示小数点
+                if (isInteger || Number.isInteger(Number(value))) {
+                    element.textContent = Math.floor(Number(value)).toString(); // 强制整数显示，不显示小数点
                 } else {
-                    element.textContent = value.toFixed(2);
+                    element.textContent = Number(value).toFixed(2);
                 }
             }
         };
         
         // 🔥 更新四个关键指标（修复格式）
-        updateElement('currentActiveStrategies', config.currentActiveStrategies || 0, true);
-        updateElement('realTradingStrategiesCount', config.realTradingStrategiesCount || 0, true);
-        updateElement('validationStrategiesCount', config.validationStrategiesCount || 0, true);
-        updateElement('totalStrategiesCount', config.totalStrategiesCount || 0, true);
+        updateElement('currentActiveStrategies', Math.floor(config.currentActiveStrategies || 0), true);
+        updateElement('realTradingStrategiesCount', Math.floor(config.realTradingStrategiesCount || 0), true);
+        updateElement('validationStrategiesCount', Math.floor(config.validationStrategiesCount || 0), true);
+        updateElement('totalStrategiesCount', Math.floor(config.totalStrategiesCount || 0), true);
         
         // 更新配置参数到表单
         const configMapping = {
