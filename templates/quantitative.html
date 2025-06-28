@@ -845,134 +845,7 @@
     </script>
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
     <script>
-        // 更新当前时间
-        function updateCurrentTime() {
-            const now = new Date();
-            const timeString = now.toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
-            const timeElement = document.getElementById('current-time');
-            if (timeElement) {
-                timeElement.textContent = timeString;
-            }
-        }
-
-        // 页面加载时立即更新时间
-        updateCurrentTime();
-        
-        // 每秒更新时间
-        setInterval(updateCurrentTime, 1000);
-    </script>
-    <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
-    <script>
-        // 🔥 全局变量声明（必须在初始化之前，但避免重复声明）
-        // systemRunning、autoTradingEnabled、refreshTimer 已在 quantitative.js 中声明
-        let evolutionLogTimer = null;
-        let managementConfig = {};
-        
-        // ✅ 确保app是全局变量
-        window.app = null;
-        var app = null; // 用于onclick事件的直接全局变量
-        
-        // 🔥 统一的应用初始化函数
-        function initializeApp() {
-            console.log('🚀 开始初始化量化交易系统...');
-            
-            // 检查QuantitativeSystem类是否存在
-            if (typeof QuantitativeSystem === 'undefined') {
-                console.error('❌ QuantitativeSystem类未定义，quantitative.js可能没有正确加载');
-                return false;
-            }
-            
-            try {
-                // 🔥 创建全局app实例
-                const quantSystem = new QuantitativeSystem();
-                window.app = quantSystem;
-                // 🔥 同时设置为直接全局变量，兼容onclick事件
-                window.app = quantSystem;
-                app = quantSystem;
-                console.log('✅ 量化交易系统实例创建成功');
-                
-                // 立即加载数据
-                window.app.loadSystemStatus();
-                window.app.loadStrategies();
-                window.app.loadAccountInfo();
-                window.app.loadPositions();
-                window.app.loadSignals();
-                
-                // 绑定策略管理配置按钮事件
-                bindManagementConfigEvents();
-                
-                return true;
-            } catch (error) {
-                console.error(`❌ 量化交易系统初始化失败: ${error.message}`, error);
-                return false;
-            }
-        }
-        
-        // 🔥 绑定策略管理配置按钮事件
-        function bindManagementConfigEvents() {
-            // 策略管理配置按钮
-            const managementBtn = document.querySelector('button[onclick="showStrategyManagement()"]');
-            if (managementBtn) {
-                managementBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    showStrategyManagement();
-                });
-            }
-            
-            // 保存配置按钮
-            const saveBtn = document.getElementById('saveManagementConfig');
-            if (saveBtn) {
-                saveBtn.addEventListener('click', function() {
-                    if (window.app) {
-                        window.app.saveManagementConfig();
-                    }
-                });
-            }
-            
-            // 重置配置按钮
-            const resetBtn = document.getElementById('resetManagementConfig');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', function() {
-                    if (window.app) {
-                        window.app.resetManagementConfig();
-                    }
-                });
-            }
-        }
-        
-        // DOM加载完成后初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            // 延迟一点确保quantitative.js完全加载
-            setTimeout(() => {
-                const success = initializeApp();
-                
-                // 在页面上显示初始化状态
-                const testEl = document.getElementById('jsTestStatus');
-                if (testEl) {
-                    if (success) {
-                        testEl.innerHTML = '🎉 应用初始化成功！系统正常运行';
-                        testEl.className = 'alert alert-success';
-                        // 3秒后隐藏测试信息
-                        setTimeout(() => {
-                            testEl.style.display = 'none';
-                        }, 3000);
-                    } else {
-                        testEl.innerHTML = '❌ 应用初始化失败，请刷新页面重试';
-                        testEl.className = 'alert alert-danger';
-                    }
-                }
-            }, 1000);
-        });
-        
-        // 🔥 全局函数定义 - 确保所有onclick事件都能正确工作
+        // 🔥 立即定义全局函数 - 确保所有onclick事件都能正确工作
         window.toggleSystem = function() {
             if (window.app) {
                 window.app.toggleSystem();
@@ -1004,6 +877,33 @@
                 modal.show();
             } else {
                 console.error('❌ app对象未初始化');
+            }
+        };
+        
+        // 🔥 全局函数：策略日志查看
+        window.showStrategyLogs = function(strategyId) {
+            if (window.app && window.app.showStrategyLogs) {
+                window.app.showStrategyLogs(strategyId);
+            } else {
+                console.error('❌ app对象或showStrategyLogs方法未初始化');
+            }
+        };
+        
+        // 🔥 全局函数：策略配置
+        window.showStrategyConfig = function(strategyId) {
+            if (window.app && window.app.showStrategyConfig) {
+                window.app.showStrategyConfig(strategyId);
+            } else {
+                console.error('❌ app对象或showStrategyConfig方法未初始化');
+            }
+        };
+        
+        // 🔥 全局函数：余额图表切换
+        window.toggleBalanceChart = function(period) {
+            if (window.app && window.app.toggleBalanceChart) {
+                window.app.toggleBalanceChart(period);
+            } else {
+                console.error('❌ app对象或toggleBalanceChart方法未初始化');
             }
         };
         
@@ -1190,36 +1090,136 @@
             window.app.logsCurrentPage = page;
             renderLogsPage();
         };
-        
-        // 🔥 全局函数：策略日志查看
-        window.showStrategyLogs = function(strategyId) {
-            if (window.app && window.app.showStrategyLogs) {
-                window.app.showStrategyLogs(strategyId);
-            } else {
-                console.error('❌ app对象或showStrategyLogs方法未初始化');
+
+        // 更新当前时间
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = timeString;
             }
-        };
+        }
+
+        // 页面加载时立即更新时间
+        updateCurrentTime();
         
-        // 🔥 全局函数：策略配置
-        window.showStrategyConfig = function(strategyId) {
-            if (window.app && window.app.showStrategyConfig) {
-                window.app.showStrategyConfig(strategyId);
-            } else {
-                console.error('❌ app对象或showStrategyConfig方法未初始化');
+        // 每秒更新时间
+        setInterval(updateCurrentTime, 1000);
+    </script>
+    <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
+    <script>
+        // 🔥 全局变量声明（必须在初始化之前，但避免重复声明）
+        // systemRunning、autoTradingEnabled、refreshTimer 已在 quantitative.js 中声明
+        let evolutionLogTimer = null;
+        let managementConfig = {};
+        
+        // ✅ 确保app是全局变量
+        window.app = null;
+        var app = null; // 用于onclick事件的直接全局变量
+        
+        // 🔥 统一的应用初始化函数
+        function initializeApp() {
+            console.log('🚀 开始初始化量化交易系统...');
+            
+            // 检查QuantitativeSystem类是否存在
+            if (typeof QuantitativeSystem === 'undefined') {
+                console.error('❌ QuantitativeSystem类未定义，quantitative.js可能没有正确加载');
+                return false;
             }
-        };
-        
-        // 🔥 全局函数：余额图表切换
-        window.toggleBalanceChart = function(period) {
-            if (window.app && window.app.toggleBalanceChart) {
-                window.app.toggleBalanceChart(period);
-            } else {
-                console.error('❌ app对象或toggleBalanceChart方法未初始化');
+            
+            try {
+                // 🔥 创建全局app实例
+                const quantSystem = new QuantitativeSystem();
+                window.app = quantSystem;
+                // 🔥 同时设置为直接全局变量，兼容onclick事件
+                window.app = quantSystem;
+                app = quantSystem;
+                console.log('✅ 量化交易系统实例创建成功');
+                
+                // 立即加载数据
+                window.app.loadSystemStatus();
+                window.app.loadStrategies();
+                window.app.loadAccountInfo();
+                window.app.loadPositions();
+                window.app.loadSignals();
+                
+                // 绑定策略管理配置按钮事件
+                bindManagementConfigEvents();
+                
+                return true;
+            } catch (error) {
+                console.error(`❌ 量化交易系统初始化失败: ${error.message}`, error);
+                return false;
             }
-        };
+        }
         
-        // 确保app对象中的方法也能被全局访问
-        window.app = window.app || {};
+        // 🔥 绑定策略管理配置按钮事件
+        function bindManagementConfigEvents() {
+            // 策略管理配置按钮
+            const managementBtn = document.querySelector('button[onclick="showStrategyManagement()"]');
+            if (managementBtn) {
+                managementBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showStrategyManagement();
+                });
+            }
+            
+            // 保存配置按钮
+            const saveBtn = document.getElementById('saveManagementConfig');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', function() {
+                    if (window.app) {
+                        window.app.saveManagementConfig();
+                    }
+                });
+            }
+            
+            // 重置配置按钮
+            const resetBtn = document.getElementById('resetManagementConfig');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function() {
+                    if (window.app) {
+                        window.app.resetManagementConfig();
+                    }
+                });
+            }
+        }
+        
+        // DOM加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟一点确保quantitative.js完全加载
+            setTimeout(() => {
+                const success = initializeApp();
+                
+                // 在页面上显示初始化状态
+                const testEl = document.getElementById('jsTestStatus');
+                if (testEl) {
+                    if (success) {
+                        testEl.innerHTML = '🎉 应用初始化成功！系统正常运行';
+                        testEl.className = 'alert alert-success';
+                        // 3秒后隐藏测试信息
+                        setTimeout(() => {
+                            testEl.style.display = 'none';
+                        }, 3000);
+                    } else {
+                        testEl.innerHTML = '❌ 应用初始化失败，请刷新页面重试';
+                        testEl.className = 'alert alert-danger';
+                    }
+                }
+            }, 1000);
+        });
+        
+        // 应用初始化完成后的清理工作
+        console.log('✅ 全局函数已定义完成');
         
     </script>
     <!-- 实时监控脚本 - 暂时禁用，待WebSocket服务启动后再启用 -->
