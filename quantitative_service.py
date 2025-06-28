@@ -2558,13 +2558,32 @@ class QuantitativeService:
             print(f"❌ 自动启用策略失败: {e}")
 
     def _disable_strategy_auto(self, strategy_id):
-        """自动禁用策略"""
+        """自动禁用策略 - 已修复：保护前端显示策略"""
         try:
+            # 🔧 检查是否是前端显示的策略（前21个）
             cursor = self.conn.cursor()
-            cursor.execute("UPDATE strategies SET enabled = 0 WHERE id = %s", (strategy_id,))
+            cursor.execute("""
+                SELECT 1 FROM strategies 
+                WHERE id = %s AND id IN (
+                    SELECT id FROM strategies 
+                    WHERE id LIKE 'STRAT_%' AND final_score IS NOT NULL
+                    ORDER BY final_score DESC LIMIT 21
+                )
+            """, (strategy_id,))
+            
+            is_frontend_strategy = cursor.fetchone()
+            
+            if is_frontend_strategy:
+                print(f"🛡️ 策略{strategy_id[-4:]}属于前端显示策略，跳过自动禁用")
+                # 只更新notes表示尝试过禁用，但实际保持启用
+                cursor.execute("UPDATE strategies SET notes = 'auto_disable_protected' WHERE id = %s", (strategy_id,))
+            else:
+                print(f"⚠️ 非前端策略{strategy_id[-4:]}被自动禁用")
+                cursor.execute("UPDATE strategies SET enabled = 0, notes = 'auto_disabled_non_frontend' WHERE id = %s", (strategy_id,))
+            
             self.conn.commit()
         except Exception as e:
-            print(f"❌ 自动禁用策略失败: {e}")
+            print(f"❌ 策略禁用保护检查失败: {e}")
 
     def manual_evolution(self):
         """手动触发进化"""
@@ -9764,13 +9783,34 @@ class EvolutionaryStrategyEngine:
             if validation_passed:
                 print(f"✅ 策略{strategy_id[-4:]}初始化验证成功，已加入进化池")
             else:
-                print(f"❌ 策略{strategy_id[-4:]}初始化验证失败，将被移除")
-                # 验证失败的策略不参与进化
-                self.quantitative_service.db_manager.execute_query(
-                    "UPDATE strategies SET enabled = 0, notes = 'validation_failed' WHERE id = %s",
-                    (strategy_id,)
-                )
-                return False
+                print(f"❌ 策略{strategy_id[-4:]}初始化验证失败，但保持启用状态进行持续优化")
+                # 🔧 修复：不再自动停用验证失败的策略，特别是前端显示的优质策略
+                
+                # 检查是否是前端显示的策略（前21个）
+                top21_check = self.quantitative_service.db_manager.execute_query("""
+                    SELECT 1 FROM strategies 
+                    WHERE id = %s AND id IN (
+                        SELECT id FROM strategies 
+                        WHERE id LIKE 'STRAT_%' AND final_score IS NOT NULL
+                        ORDER BY final_score DESC LIMIT 21
+                    )
+                """, (strategy_id,), fetch_one=True)
+                
+                if top21_check:
+                    print(f"🛡️ 策略{strategy_id[-4:]}属于前端显示策略，继续参与进化")
+                    # 只更新notes，不停用策略
+                    self.quantitative_service.db_manager.execute_query(
+                        "UPDATE strategies SET notes = 'validation_pending_optimization' WHERE id = %s",
+                        (strategy_id,)
+                    )
+                    return True  # 允许继续进化
+                else:
+                    # 非前端策略才考虑停用
+                    self.quantitative_service.db_manager.execute_query(
+                        "UPDATE strategies SET notes = 'validation_failed_non_frontend' WHERE id = %s",
+                        (strategy_id,)
+                    )
+                    return False
             
             return True
             
