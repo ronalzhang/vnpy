@@ -4374,9 +4374,9 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
                 SELECT timestamp, symbol, signal_type, price, quantity, 
                        pnl, executed, confidence, 'real_trading' as log_type
                 FROM trading_signals 
-                WHERE strategy_id = ? AND executed = true
+                WHERE strategy_id = %s AND executed = true
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT %s
             """, (strategy_id, limit))
             
         elif log_type == 'validation':
@@ -4385,9 +4385,9 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
                 SELECT timestamp, symbol, signal_type, price, quantity, 
                        pnl, executed, confidence, 'validation' as log_type
                 FROM trading_signals 
-                WHERE strategy_id = ? AND is_validation = true
+                WHERE strategy_id = %s AND is_validation = true
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT %s
             """, (strategy_id, limit))
             
         elif log_type == 'evolution':
@@ -4397,9 +4397,9 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
                        old_parameters, new_parameters, trigger_reason,
                        target_success_rate, 'evolution' as log_type
                 FROM strategy_optimization_logs 
-                WHERE strategy_id = ?
+                WHERE strategy_id = %s
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT %s
             """, (strategy_id, limit))
             
         else:
@@ -4407,11 +4407,11 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
             cursor.execute("""
                 SELECT timestamp, symbol, signal_type, price, quantity, 
                        pnl, executed, confidence, 
-                       CASE WHEN is_validation = 1 THEN 'validation' ELSE 'real_trading' END as log_type
+                       CASE WHEN is_validation = true THEN 'validation' ELSE 'real_trading' END as log_type
                 FROM trading_signals 
-                WHERE strategy_id = ?
+                WHERE strategy_id = %s
                 ORDER BY timestamp DESC
-                LIMIT ?
+                LIMIT %s
             """, (strategy_id, limit))
         
         rows = cursor.fetchall()
