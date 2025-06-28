@@ -4301,14 +4301,12 @@ def get_strategy_logs_by_category(strategy_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 检查unified_strategy_logs表是否存在
+        # 检查unified_strategy_logs表是否存在 (SQLite语法)
         cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'unified_strategy_logs'
-            )
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='unified_strategy_logs'
         """)
-        has_unified_table = cursor.fetchone()[0]
+        has_unified_table = cursor.fetchone() is not None
         
         if has_unified_table:
             # 使用新的增强日志系统
@@ -4370,9 +4368,9 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
                 SELECT timestamp, symbol, signal_type, price, quantity, 
                        pnl, executed, confidence, 'real_trading' as log_type
                 FROM trading_signals 
-                WHERE strategy_id = %s AND executed = true
+                WHERE strategy_id = ? AND executed = true
                 ORDER BY timestamp DESC
-                LIMIT %s
+                LIMIT ?
             """, (strategy_id, limit))
             
         elif log_type == 'validation':
@@ -4381,9 +4379,9 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
                 SELECT timestamp, symbol, signal_type, price, quantity, 
                        pnl, executed, confidence, 'validation' as log_type
                 FROM trading_signals 
-                WHERE strategy_id = %s AND is_validation = true
+                WHERE strategy_id = ? AND is_validation = true
                 ORDER BY timestamp DESC
-                LIMIT %s
+                LIMIT ?
             """, (strategy_id, limit))
             
         elif log_type == 'evolution':
@@ -4393,9 +4391,9 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
                        old_parameters, new_parameters, trigger_reason,
                        target_success_rate, 'evolution' as log_type
                 FROM strategy_optimization_logs 
-                WHERE strategy_id = %s
+                WHERE strategy_id = ?
                 ORDER BY timestamp DESC
-                LIMIT %s
+                LIMIT ?
             """, (strategy_id, limit))
             
         else:
@@ -4403,11 +4401,11 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
             cursor.execute("""
                 SELECT timestamp, symbol, signal_type, price, quantity, 
                        pnl, executed, confidence, 
-                       CASE WHEN is_validation = true THEN 'validation' ELSE 'real_trading' END as log_type
+                       CASE WHEN is_validation = 1 THEN 'validation' ELSE 'real_trading' END as log_type
                 FROM trading_signals 
-                WHERE strategy_id = %s
+                WHERE strategy_id = ?
                 ORDER BY timestamp DESC
-                LIMIT %s
+                LIMIT ?
             """, (strategy_id, limit))
         
         rows = cursor.fetchall()

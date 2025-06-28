@@ -2000,24 +2000,30 @@ class QuantitativeSystem {
             let colorClass = 'text-muted';
             
             switch(log.action) {
-                case 'strategy_created':
+                case 'created':
                     actionText = '创建策略';
                     colorClass = 'text-success';
                     break;
-                case 'strategy_optimized':
+                case 'optimized':
                     actionText = '优化策略';
                     colorClass = 'text-info';
                     break;
-                case 'strategy_promoted':
+                case 'promoted':
                     actionText = '提升策略';
                     colorClass = 'text-warning';
                     break;
-                case 'strategy_evolved':
+                case 'protected':
+                    actionText = '保护策略';
+                    colorClass = 'text-secondary';
+                    break;
+                case 'evolved':
                     actionText = '进化策略';
                     colorClass = 'text-primary';
                     break;
                 default:
-                    actionText = log.action || '系统活动';
+                    // 使用details字段作为显示内容，这样能显示完整的进化信息
+                    actionText = log.details || log.action || '系统活动';
+                    colorClass = 'text-muted';
             }
             
             return `
