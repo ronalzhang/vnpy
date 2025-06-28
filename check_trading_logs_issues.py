@@ -9,9 +9,9 @@ def check_trading_logs_issues():
     try:
         conn = psycopg2.connect(
             host='localhost',
-            database='crypto_trading', 
-            user='crypto_user',
-            password='crypto_password123'
+            database='quantitative', 
+            user='quant_user',
+            password='123abc74531'
         )
         cursor = conn.cursor()
         
