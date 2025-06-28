@@ -1918,10 +1918,10 @@ def get_strategy_trade_logs(strategy_id):
             })
         
         else:
-            # 🔥 向后兼容模式 - 显示单笔交易记录
+            # 🔧 修复：从数据库获取正确的交易类型字段
             cursor.execute("""
                 SELECT timestamp, symbol, signal_type, price, quantity, 
-                       expected_return, executed, id, confidence
+                       expected_return, executed, id, confidence, trade_type, is_validation
                 FROM trading_signals 
                 WHERE strategy_id = %s
                 ORDER BY timestamp DESC
@@ -1941,16 +1941,18 @@ def get_strategy_trade_logs(strategy_id):
                 executed = bool(row[6]) if row[6] is not None else False
                 record_id = row[7] if row[7] is not None else 0
                 confidence = float(row[8]) if row[8] is not None else 0.75
+                db_trade_type = row[9] if len(row) > 9 and row[9] else 'score_verification'
+                is_validation = row[10] if len(row) > 10 else True
                 
-                # 判断交易类型 - 前3笔为初始验证
-                if i < 3:
-                    trade_type = 'initial_validation'
-                    trade_mode = '初始验证'
-                elif strategy_score >= 65.0 and executed:
+                # 🔧 修复：使用数据库中的实际字段，不再前端重新计算
+                if db_trade_type == 'real_trading' and not is_validation:
                     trade_type = 'real_trading'
                     trade_mode = '真实交易'
-                else:
+                elif db_trade_type == 'score_verification' or is_validation:
                     trade_type = 'verification'
+                    trade_mode = '验证交易'
+                else:
+                    trade_type = 'verification'  # 默认为验证交易
                     trade_mode = '验证交易'
                 
                 logs.append({
