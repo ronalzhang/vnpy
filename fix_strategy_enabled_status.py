@@ -63,8 +63,16 @@ def fix_strategy_enabled_status():
         """)
         
         all_strategies = cursor.fetchall()
-        enabled_count = sum(1 for s in all_strategies if s[2]) if all_strategies else 0
-        disabled_count = sum(1 for s in all_strategies if not s[2]) if all_strategies else 0
+        enabled_count = 0
+        disabled_count = 0
+        
+        if all_strategies:
+            try:
+                enabled_count = sum(1 for s in all_strategies if len(s) > 2 and s[2])
+                disabled_count = sum(1 for s in all_strategies if len(s) > 2 and not s[2])
+            except (IndexError, TypeError) as e:
+                print(f"⚠️ 处理策略状态时出错: {e}")
+                enabled_count = len(all_strategies)  # 保守估计
         
         print(f"当前状态: {enabled_count} 个启用, {disabled_count} 个停用")
         
@@ -130,9 +138,10 @@ def fix_strategy_enabled_status():
         """)
         
         stats = cursor.fetchone()
-        if stats:
-            total, enabled, disabled = stats
+        if stats and len(stats) >= 3:
+            total, enabled, disabled = stats[0], stats[1], stats[2]
         else:
+            print("⚠️ 无法获取统计信息，使用默认值")
             total, enabled, disabled = 0, 0, 0
         
         print(f"修复后状态:")
