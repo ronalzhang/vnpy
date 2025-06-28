@@ -2488,65 +2488,16 @@ class QuantitativeService:
             print(f"⚠️ 加载门槛配置失败，使用默认值: {e}")
 
     def _auto_rotate_strategies(self):
-        """自动轮换策略"""
-        try:
-            strategies_response = self.get_strategies()
-            if not strategies_response.get('success', False):
-                return
-            
-            strategies = strategies_response.get('data', [])
-            enabled_strategies = [s for s in strategies if s.get('enabled', False)]
-            
-            if len(enabled_strategies) < 2:
-                print("📝 启用策略不足，跳过轮换")
-                return
-            
-            # 找到表现最差的启用策略
-            worst_strategy = min(enabled_strategies, key=lambda x: x.get('final_score', 0))
-            
-            # 找到最好的未启用策略
-            disabled_strategies = [s for s in strategies if not s.get('enabled', False)]
-            if not disabled_strategies:
-                print("📝 无可用的备选策略")
-                return
-                
-            best_disabled = max(disabled_strategies, key=lambda x: x.get('final_score', 0))
-            
-            # 如果备选策略明显更好，则轮换
-            if best_disabled['final_score'] > worst_strategy['final_score'] + 10:  # 至少高10分
-                self._disable_strategy_auto(worst_strategy['id'])
-                self._enable_strategy_auto(best_disabled['id'])
-                print(f"🔄 策略轮换: {worst_strategy['name']}({worst_strategy['final_score']:.1f}) → {best_disabled['name']}({best_disabled['final_score']:.1f})")
-                
-        except Exception as e:
-            print(f"❌ 策略轮换失败: {e}")
+        """自动轮换策略 - 已废弃：与现代化策略管理系统冲突"""
+        # 🔧 彻底禁用：该函数与现代化前端策略管理冲突，已停用
+        print("⚠️ 策略轮换功能已禁用，现由前端统一管理21个优质策略")
+        return
 
     def _auto_review_strategy_performance(self):
-        """自动评估策略性能"""
-        try:
-            strategies_response = self.get_strategies()
-            if not strategies_response.get('success', False):
-                return
-            
-            strategies = strategies_response.get('data', [])
-            enabled_strategies = [s for s in strategies if s.get('enabled', False)]
-            
-            for strategy in enabled_strategies:
-                sid = strategy['id']
-                score = strategy.get('final_score', 0)
-                win_rate = strategy.get('win_rate', 0)
-                
-                # 如果策略表现太差，自动禁用
-                if score < 30 or win_rate < 0.3:
-                    self._disable_strategy_auto(sid)
-                    print(f"⚠️ 自动禁用低表现策略: {strategy['name']} (评分: {score:.1f}, 胜率: {win_rate*100:.1f}%)")
-                
-                # 如果策略表现很好，提升其资金配置
-                elif score > 80 and win_rate > 0.8:
-                    print(f"⭐ 发现优秀策略: {strategy['name']} (评分: {score:.1f}, 胜率: {win_rate*100:.1f}%)")
-                    
-        except Exception as e:
-            print(f"❌ 策略性能评估失败: {e}")
+        """自动评估策略性能 - 已废弃：与现代化策略管理系统冲突"""
+        # 🔧 彻底禁用：该函数与现代化前端策略管理冲突，已停用
+        print("⚠️ 自动性能评估功能已禁用，现由前端统一管理策略启用状态")
+        return
 
     def _enable_strategy_auto(self, strategy_id):
         """自动启用策略"""
@@ -2558,32 +2509,11 @@ class QuantitativeService:
             print(f"❌ 自动启用策略失败: {e}")
 
     def _disable_strategy_auto(self, strategy_id):
-        """自动禁用策略 - 已修复：保护前端显示策略"""
-        try:
-            # 🔧 检查是否是前端显示的策略（前21个）
-            cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT 1 FROM strategies 
-                WHERE id = %s AND id IN (
-                    SELECT id FROM strategies 
-                    WHERE id LIKE 'STRAT_%' AND final_score IS NOT NULL
-                    ORDER BY final_score DESC LIMIT 21
-                )
-            """, (strategy_id,))
-            
-            is_frontend_strategy = cursor.fetchone()
-            
-            if is_frontend_strategy:
-                print(f"🛡️ 策略{strategy_id[-4:]}属于前端显示策略，跳过自动禁用")
-                # 只更新notes表示尝试过禁用，但实际保持启用
-                cursor.execute("UPDATE strategies SET notes = 'auto_disable_protected' WHERE id = %s", (strategy_id,))
-            else:
-                print(f"⚠️ 非前端策略{strategy_id[-4:]}被自动禁用")
-                cursor.execute("UPDATE strategies SET enabled = 0, notes = 'auto_disabled_non_frontend' WHERE id = %s", (strategy_id,))
-            
-            self.conn.commit()
-        except Exception as e:
-            print(f"❌ 策略禁用保护检查失败: {e}")
+        """自动禁用策略 - 已完全禁用：保护前端管理的策略"""
+        # 🔧 完全禁用自动停用功能，防止与现代化系统冲突
+        print(f"🛡️ 自动停用功能已禁用，策略{strategy_id[-4:]}受到保护")
+        print("💡 策略启用/停用现由前端统一管理，确保21个优质策略持续运行")
+        return
 
     def manual_evolution(self):
         """手动触发进化"""
@@ -8790,12 +8720,14 @@ class EvolutionaryStrategyEngine:
             """, (strategy_id, self.current_generation, self.current_cycle, 
                   f"eliminated_{reason}", final_score))
                   
-            # 将策略标记为非活跃而非删除
-            self.quantitative_service.db_manager.execute_query("""
-                UPDATE strategies 
-                SET enabled = 0, last_evolution_time = CURRENT_TIMESTAMP
-                WHERE id = %s
-            """, (strategy_id,))
+            # 🔧 禁用策略停用：进化过程中不再停用策略，只记录淘汰历史
+            print(f"📝 策略{strategy_id[-4:]}进化记录已保存，但保持启用状态")
+            # 原停用代码已禁用，避免与前端策略管理冲突
+            # self.quantitative_service.db_manager.execute_query("""
+            #     UPDATE strategies 
+            #     SET enabled = 0, last_evolution_time = CURRENT_TIMESTAMP
+            #     WHERE id = %s
+            # """, (strategy_id,))
             
         except Exception as e:
             logger.error(f"记录策略淘汰失败: {e}")
