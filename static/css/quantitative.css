@@ -1063,10 +1063,10 @@
         transform: translateY(100%);
         opacity: 0;
     }
-    5% {
+    3% {
         opacity: 1;
     }
-    85% {
+    90% {
         opacity: 1;
     }
     100% {
@@ -1081,35 +1081,35 @@
 }
 
 .evolution-log-content .ticker-item:nth-child(1) { animation-delay: 0s; }
-.evolution-log-content .ticker-item:nth-child(2) { animation-delay: 0.3s; }
-.evolution-log-content .ticker-item:nth-child(3) { animation-delay: 0.6s; }
-.evolution-log-content .ticker-item:nth-child(4) { animation-delay: 0.9s; }
-.evolution-log-content .ticker-item:nth-child(5) { animation-delay: 1.2s; }
-.evolution-log-content .ticker-item:nth-child(6) { animation-delay: 1.5s; }
-.evolution-log-content .ticker-item:nth-child(7) { animation-delay: 1.8s; }
-.evolution-log-content .ticker-item:nth-child(8) { animation-delay: 2.1s; }
-.evolution-log-content .ticker-item:nth-child(9) { animation-delay: 2.4s; }
-.evolution-log-content .ticker-item:nth-child(10) { animation-delay: 2.7s; }
-.evolution-log-content .ticker-item:nth-child(11) { animation-delay: 3.0s; }
-.evolution-log-content .ticker-item:nth-child(12) { animation-delay: 3.3s; }
-.evolution-log-content .ticker-item:nth-child(13) { animation-delay: 3.6s; }
-.evolution-log-content .ticker-item:nth-child(14) { animation-delay: 3.9s; }
-.evolution-log-content .ticker-item:nth-child(15) { animation-delay: 4.2s; }
-.evolution-log-content .ticker-item:nth-child(16) { animation-delay: 4.5s; }
-.evolution-log-content .ticker-item:nth-child(17) { animation-delay: 4.8s; }
-.evolution-log-content .ticker-item:nth-child(18) { animation-delay: 5.1s; }
-.evolution-log-content .ticker-item:nth-child(19) { animation-delay: 5.4s; }
-.evolution-log-content .ticker-item:nth-child(20) { animation-delay: 5.7s; }
-.evolution-log-content .ticker-item:nth-child(21) { animation-delay: 6.0s; }
-.evolution-log-content .ticker-item:nth-child(22) { animation-delay: 6.3s; }
-.evolution-log-content .ticker-item:nth-child(23) { animation-delay: 6.6s; }
-.evolution-log-content .ticker-item:nth-child(24) { animation-delay: 6.9s; }
-.evolution-log-content .ticker-item:nth-child(25) { animation-delay: 7.2s; }
-.evolution-log-content .ticker-item:nth-child(26) { animation-delay: 7.5s; }
-.evolution-log-content .ticker-item:nth-child(27) { animation-delay: 7.8s; }
-.evolution-log-content .ticker-item:nth-child(28) { animation-delay: 8.1s; }
-.evolution-log-content .ticker-item:nth-child(29) { animation-delay: 8.4s; }
-.evolution-log-content .ticker-item:nth-child(30) { animation-delay: 8.7s; }
+.evolution-log-content .ticker-item:nth-child(2) { animation-delay: 0.2s; }
+.evolution-log-content .ticker-item:nth-child(3) { animation-delay: 0.4s; }
+.evolution-log-content .ticker-item:nth-child(4) { animation-delay: 0.6s; }
+.evolution-log-content .ticker-item:nth-child(5) { animation-delay: 0.8s; }
+.evolution-log-content .ticker-item:nth-child(6) { animation-delay: 1.0s; }
+.evolution-log-content .ticker-item:nth-child(7) { animation-delay: 1.2s; }
+.evolution-log-content .ticker-item:nth-child(8) { animation-delay: 1.4s; }
+.evolution-log-content .ticker-item:nth-child(9) { animation-delay: 1.6s; }
+.evolution-log-content .ticker-item:nth-child(10) { animation-delay: 1.8s; }
+.evolution-log-content .ticker-item:nth-child(11) { animation-delay: 2.0s; }
+.evolution-log-content .ticker-item:nth-child(12) { animation-delay: 2.2s; }
+.evolution-log-content .ticker-item:nth-child(13) { animation-delay: 2.4s; }
+.evolution-log-content .ticker-item:nth-child(14) { animation-delay: 2.6s; }
+.evolution-log-content .ticker-item:nth-child(15) { animation-delay: 2.8s; }
+.evolution-log-content .ticker-item:nth-child(16) { animation-delay: 3.0s; }
+.evolution-log-content .ticker-item:nth-child(17) { animation-delay: 3.2s; }
+.evolution-log-content .ticker-item:nth-child(18) { animation-delay: 3.4s; }
+.evolution-log-content .ticker-item:nth-child(19) { animation-delay: 3.6s; }
+.evolution-log-content .ticker-item:nth-child(20) { animation-delay: 3.8s; }
+.evolution-log-content .ticker-item:nth-child(21) { animation-delay: 4.0s; }
+.evolution-log-content .ticker-item:nth-child(22) { animation-delay: 4.2s; }
+.evolution-log-content .ticker-item:nth-child(23) { animation-delay: 4.4s; }
+.evolution-log-content .ticker-item:nth-child(24) { animation-delay: 4.6s; }
+.evolution-log-content .ticker-item:nth-child(25) { animation-delay: 4.8s; }
+.evolution-log-content .ticker-item:nth-child(26) { animation-delay: 5.0s; }
+.evolution-log-content .ticker-item:nth-child(27) { animation-delay: 5.2s; }
+.evolution-log-content .ticker-item:nth-child(28) { animation-delay: 5.4s; }
+.evolution-log-content .ticker-item:nth-child(29) { animation-delay: 5.6s; }
+.evolution-log-content .ticker-item:nth-child(30) { animation-delay: 5.8s; }
 
 /* ⭐ 手机端专门优化 */
 @media (max-width: 768px) {
