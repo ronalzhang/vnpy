@@ -1129,18 +1129,18 @@ class QuantitativeSystem {
         }
     }
 
-    // 显示策略日志
+    // 🔥 重新设计：多标签页策略日志显示
     async showStrategyLogs(strategyId) {
         try {
             // 设置模态框标题
             document.getElementById('strategyLogsModalLabel').innerHTML = 
                 `<i class="fas fa-history"></i> 策略日志 - ${this.getStrategyName(strategyId)}`;
             
-            // 加载交易日志
-            await this.loadTradeLogs(strategyId);
+            // 初始化标签页
+            this.initLogTabs(strategyId);
             
-            // 加载优化记录
-            await this.loadOptimizationLogs(strategyId);
+            // 默认加载实盘日志
+            await this.loadCategorizedLogs(strategyId, 'real_trading');
             
             // 显示模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyLogsModal'));
@@ -1152,750 +1152,316 @@ class QuantitativeSystem {
         }
     }
 
-    // 🔥 重新设计：加载交易周期日志 - 支持交易周期和传统单笔交易两种显示模式
-    async loadTradeLogs(strategyId) {
+    // 🔥 新增：初始化日志标签页
+    initLogTabs(strategyId) {
+        const tabContainer = document.getElementById('strategyLogTabs');
+        if (!tabContainer) return;
+
+        tabContainer.innerHTML = `
+            <ul class="nav nav-pills nav-justified mb-3" id="logTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="real-trading-tab" data-bs-toggle="pill" 
+                            data-bs-target="#real-trading" type="button" role="tab"
+                            onclick="app.switchLogTab('${strategyId}', 'real_trading')">
+                        <i class="fas fa-dollar-sign me-1"></i>实盘日志
+                        <span class="badge bg-success ms-1" id="realTradingCount">0</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="validation-tab" data-bs-toggle="pill" 
+                            data-bs-target="#validation" type="button" role="tab"
+                            onclick="app.switchLogTab('${strategyId}', 'validation')">
+                        <i class="fas fa-vial me-1"></i>验证日志
+                        <span class="badge bg-info ms-1" id="validationCount">0</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="evolution-tab" data-bs-toggle="pill" 
+                            data-bs-target="#evolution" type="button" role="tab"
+                            onclick="app.switchLogTab('${strategyId}', 'evolution')">
+                        <i class="fas fa-dna me-1"></i>进化日志
+                        <span class="badge bg-warning ms-1" id="evolutionCount">0</span>
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="logTabContent">
+                <div class="tab-pane fade show active" id="real-trading" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>时间</th>
+                                    <th>交易对</th>
+                                    <th>信号</th>
+                                    <th>价格</th>
+                                    <th>数量</th>
+                                    <th>盈亏</th>
+                                    <th>置信度</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="realTradingLogs">
+                                <tr><td colspan="8" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="realTradingPagination"></div>
+                </div>
+                
+                <div class="tab-pane fade" id="validation" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>时间</th>
+                                    <th>交易对</th>
+                                    <th>信号</th>
+                                    <th>价格</th>
+                                    <th>数量</th>
+                                    <th>盈亏</th>
+                                    <th>置信度</th>
+                                    <th>验证类型</th>
+                                </tr>
+                            </thead>
+                            <tbody id="validationLogs">
+                                <tr><td colspan="8" class="text-center">点击标签页加载验证日志</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="validationPagination"></div>
+                </div>
+                
+                <div class="tab-pane fade" id="evolution" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>时间</th>
+                                    <th>类型</th>
+                                    <th>触发原因</th>
+                                    <th>旧参数</th>
+                                    <th>新参数</th>
+                                    <th>目标胜率</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody id="evolutionLogs">
+                                <tr><td colspan="7" class="text-center">点击标签页加载进化日志</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="evolutionPagination"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 🔥 新增：切换日志标签页
+    async switchLogTab(strategyId, logType) {
         try {
-            const response = await fetch(`/api/quantitative/strategies/${strategyId}/trade-logs`);
-            const data = await response.json();
+            // 更新标签页状态
+            document.querySelectorAll('#logTabs .nav-link').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.getElementById(`${logType.replace('_', '-')}-tab`).classList.add('active');
             
-            const tbody = document.getElementById('tradeLogsTable');
-            
-            if (data.success && data.logs && data.logs.length > 0) {
-                this.tradeLogs = data.logs;
-                this.displayMode = data.display_mode || 'legacy_trades';
-                this.currentTradeLogPage = 1;
-                this.tradeLogsPerPage = 15;
-                
-                // 根据显示模式渲染不同的表格结构
-                if (this.displayMode === 'trade_cycles') {
-                    this.renderTradeCyclesPage();
-                } else {
-                    this.renderTradeLogsPage();
-                }
-                this.renderTradeLogPagination();
-                
-            } else {
-                const colSpan = this.displayMode === 'trade_cycles' ? '9' : '7';
-                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted">暂无交易记录</td></tr>`;
-                document.getElementById('tradeLogPaginationContainer').innerHTML = '';
-            }
+            // 加载对应类型的日志
+            await this.loadCategorizedLogs(strategyId, logType);
             
         } catch (error) {
-            console.error('加载交易日志失败:', error);
-            const tbody = document.getElementById('tradeLogsTable');
-            if (tbody) {
-                const colSpan = this.displayMode === 'trade_cycles' ? '9' : '7';
-                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-danger">加载失败</td></tr>`;
-            }
-            const container = document.getElementById('tradeLogPaginationContainer');
-            if (container) {
-                container.innerHTML = '';
-            }
+            console.error(`切换到${logType}标签页失败:`, error);
+            this.showMessage(`切换标签页失败`, 'error');
         }
     }
 
-    // 🔥 新增：渲染交易周期页面 - 显示完整的买入卖出周期
-    renderTradeCyclesPage() {
-        const tbody = document.getElementById('tradeLogsTable');
-        const startIndex = (this.currentTradeLogPage - 1) * this.tradeLogsPerPage;
-        const endIndex = startIndex + this.tradeLogsPerPage;
-        const currentCycles = this.tradeLogs.slice(startIndex, endIndex);
-        
-        // 更新表头为交易周期格式
-        const thead = document.querySelector('#tradeLogsTable').closest('table').querySelector('thead');
-        thead.innerHTML = `
-            <tr>
-                <th>周期ID</th>
-                <th>买入时间</th>
-                <th>卖出时间</th>
-                <th>交易对</th>
-                <th>买入价格</th>
-                <th>卖出价格</th>
-                <th>数量</th>
-                <th>持有时长</th>
-                <th>周期盈亏</th>
-                <th>交易类型</th>
-                <th>执行状态</th>
-            </tr>
-        `;
-        
-        // 分类统计
-        const realCycles = currentCycles.filter(cycle => cycle.trade_type === 'real_trading');
-        const validationCycles = currentCycles.filter(cycle => cycle.trade_type === 'verification');
-        const initialCycles = currentCycles.filter(cycle => cycle.trade_type === 'initial_validation');
-        
-        tbody.innerHTML = [
-            // 显示真实交易周期
-            ...realCycles.map(cycle => `
-                <tr class="real-trade-row">
-                    <td><span class="badge bg-primary">${cycle.cycle_id}</span></td>
-                    <td>${this.formatTime(cycle.buy_timestamp)}</td>
-                    <td>${this.formatTime(cycle.sell_timestamp)}</td>
-                    <td>${cycle.symbol}</td>
-                    <td>${cycle.buy_price.toFixed(6)}</td>
-                    <td>${cycle.sell_price.toFixed(6)}</td>
-                    <td>${cycle.quantity.toFixed(6)}</td>
-                    <td>${cycle.holding_minutes}分钟</td>
-                    <td class="${cycle.cycle_pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${cycle.cycle_pnl >= 0 ? '+' : ''}${cycle.cycle_pnl.toFixed(6)}U
-                        <br><small>(${cycle.return_percentage >= 0 ? '+' : ''}${cycle.return_percentage.toFixed(2)}%)</small>
-                    </td>
-                    <td><span class="badge bg-success">${cycle.trade_mode}</span></td>
-                    <td><span class="badge bg-success">${cycle.execution_status}</span></td>
-                </tr>
-            `),
-            // 显示验证交易周期
-            ...validationCycles.map(cycle => `
-                <tr class="validation-trade-row" style="background-color: #f8f9fa;">
-                    <td><span class="badge bg-secondary">${cycle.cycle_id}</span></td>
-                    <td>${this.formatTime(cycle.buy_timestamp)}</td>
-                    <td>${this.formatTime(cycle.sell_timestamp)}</td>
-                    <td>${cycle.symbol}</td>
-                    <td>${cycle.buy_price.toFixed(6)}</td>
-                    <td>${cycle.sell_price.toFixed(6)}</td>
-                    <td>${cycle.quantity.toFixed(6)}</td>
-                    <td>${cycle.holding_minutes}分钟</td>
-                    <td class="${cycle.cycle_pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${cycle.cycle_pnl >= 0 ? '+' : ''}${cycle.cycle_pnl.toFixed(6)}U
-                        <br><small>(${cycle.return_percentage >= 0 ? '+' : ''}${cycle.return_percentage.toFixed(2)}%)</small>
-                    </td>
-                    <td><span class="badge bg-info">${cycle.trade_mode}</span></td>
-                    <td><span class="badge bg-secondary">${cycle.execution_status}</span></td>
-                </tr>
-            `),
-            // 显示初始验证周期
-            ...initialCycles.map(cycle => `
-                <tr class="initial-validation-row" style="background-color: #fff3cd;">
-                    <td><span class="badge bg-warning">${cycle.cycle_id}</span></td>
-                    <td>${this.formatTime(cycle.buy_timestamp)}</td>
-                    <td>${this.formatTime(cycle.sell_timestamp)}</td>
-                    <td>${cycle.symbol}</td>
-                    <td>${cycle.buy_price.toFixed(6)}</td>
-                    <td>${cycle.sell_price.toFixed(6)}</td>
-                    <td>${cycle.quantity.toFixed(6)}</td>
-                    <td>${cycle.holding_minutes}分钟</td>
-                    <td class="${cycle.cycle_pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${cycle.cycle_pnl >= 0 ? '+' : ''}${cycle.cycle_pnl.toFixed(6)}U
-                        <br><small>(${cycle.return_percentage >= 0 ? '+' : ''}${cycle.return_percentage.toFixed(2)}%)</small>
-                    </td>
-                    <td><span class="badge bg-warning">${cycle.trade_mode}</span></td>
-                    <td><span class="badge bg-warning">${cycle.execution_status}</span></td>
-                </tr>
-            `)
-        ].join('');
-        
-        // 添加统计信息
-        const totalReal = this.tradeLogs.filter(cycle => cycle.trade_type === 'real_trading').length;
-        const totalValidation = this.tradeLogs.filter(cycle => cycle.trade_type === 'verification').length;
-        const totalInitial = this.tradeLogs.filter(cycle => cycle.trade_type === 'initial_validation').length;
-        
-        const statsRow = `
-            <tr class="table-info">
-                <td colspan="11" class="text-center">
-                    <strong>当前页：真实交易 ${realCycles.length} 个周期，验证交易 ${validationCycles.length} 个周期，初始验证 ${initialCycles.length} 个周期</strong>
-                    <br><small>总计：真实 ${totalReal} 个，验证 ${totalValidation} 个，初始验证 ${totalInitial} 个</small>
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML = statsRow + tbody.innerHTML;
+    // 🔥 新增：加载分类日志
+    async loadCategorizedLogs(strategyId, logType) {
+        try {
+            const response = await fetch(`/api/quantitative/strategies/${strategyId}/logs-by-category?type=${logType}&limit=100`);
+            const data = await response.json();
+            
+            if (data.success) {
+                this.renderCategorizedLogs(logType, data.logs);
+                this.updateLogTabCounts(data.categorized || {});
+            } else {
+                this.showLogError(logType, data.message || '加载失败');
+            }
+            
+        } catch (error) {
+            console.error(`加载${logType}日志失败:`, error);
+            this.showLogError(logType, '网络错误');
+        }
     }
 
-    // 🔥 修复：渲染传统单笔交易日志页面
-    renderTradeLogsPage() {
-        const tbody = document.getElementById('tradeLogsTable');
-        const startIndex = (this.currentTradeLogPage - 1) * this.tradeLogsPerPage;
-        const endIndex = startIndex + this.tradeLogsPerPage;
-        const currentLogs = this.tradeLogs.slice(startIndex, endIndex);
+    // 🔥 新增：渲染分类日志
+    renderCategorizedLogs(logType, logs) {
+        const containerMap = {
+            'real_trading': 'realTradingLogs',
+            'validation': 'validationLogs', 
+            'evolution': 'evolutionLogs'
+        };
         
-        // 确保表头为单笔交易格式
-        const thead = document.querySelector('#tradeLogsTable').closest('table').querySelector('thead');
-        thead.innerHTML = `
-            <tr>
-                <th>时间</th>
-                <th>信号</th>
-                <th>价格</th>
-                <th>数量</th>
-                <th>置信度</th>
-                <th>交易类型</th>
-                <th>执行状态</th>
-                <th>盈亏</th>
-            </tr>
-        `;
+        const containerId = containerMap[logType];
+        const container = document.getElementById(containerId);
         
-        // 分类统计
-        const realTrades = currentLogs.filter(log => log.trade_type === 'real_trading');
-        const validationTrades = currentLogs.filter(log => log.trade_type === 'verification');
-        const initialTrades = currentLogs.filter(log => log.trade_type === 'initial_validation');
-        
-        tbody.innerHTML = [
-            // 显示真实交易
-            ...realTrades.map(log => `
-                <tr class="real-trade-row">
-                    <td>${this.formatTime(log.timestamp)}</td>
-                    <td><span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">${log.signal_type.toUpperCase()}</span></td>
-                    <td>${log.price.toFixed(6)}</td>
-                    <td>${log.quantity.toFixed(6)}</td>
-                    <td>${(log.confidence * 100).toFixed(1)}%</td>
-                    <td><span class="badge bg-success">${log.trade_mode}</span></td>
-                    <td><span class="badge bg-success">${log.execution_status}</span></td>
-                    <td class="${log.pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${log.pnl >= 0 ? '+' : ''}${log.pnl.toFixed(6)}U
-                    </td>
-                </tr>
-            `),
-            // 显示验证交易
-            ...validationTrades.map(log => `
-                <tr class="validation-trade-row" style="background-color: #f8f9fa;">
-                    <td>${this.formatTime(log.timestamp)}</td>
-                    <td><span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">${log.signal_type.toUpperCase()}</span></td>
-                    <td>${log.price.toFixed(6)}</td>
-                    <td>${log.quantity.toFixed(6)}</td>
-                    <td>${(log.confidence * 100).toFixed(1)}%</td>
-                    <td><span class="badge bg-info">${log.trade_mode}</span></td>
-                    <td><span class="badge bg-secondary">${log.execution_status}</span></td>
-                    <td class="${log.pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${log.pnl >= 0 ? '+' : ''}${log.pnl.toFixed(6)}U
-                    </td>
-                </tr>
-            `),
-            // 显示初始验证交易
-            ...initialTrades.map(log => `
-                <tr class="initial-validation-row" style="background-color: #fff3cd;">
-                    <td>${this.formatTime(log.timestamp)}</td>
-                    <td><span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">${log.signal_type.toUpperCase()}</span></td>
-                    <td>${log.price.toFixed(6)}</td>
-                    <td>${log.quantity.toFixed(6)}</td>
-                    <td>${(log.confidence * 100).toFixed(1)}%</td>
-                    <td><span class="badge bg-warning">${log.trade_mode}</span></td>
-                    <td><span class="badge bg-warning">${log.execution_status}</span></td>
-                    <td class="${log.pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${log.pnl >= 0 ? '+' : ''}${log.pnl.toFixed(6)}U
-                    </td>
-                </tr>
-            `)
-        ].join('');
-        
-        // 添加统计信息
-        const totalReal = this.tradeLogs.filter(log => log.trade_type === 'real_trading').length;
-        const totalValidation = this.tradeLogs.filter(log => log.trade_type === 'verification').length;
-        const totalInitial = this.tradeLogs.filter(log => log.trade_type === 'initial_validation').length;
-        
-        const statsRow = `
-            <tr class="table-info">
-                <td colspan="8" class="text-center">
-                    <strong>当前页：真实交易 ${realTrades.length} 条，验证交易 ${validationTrades.length} 条，初始验证 ${initialTrades.length} 条</strong>
-                    <br><small>总计：真实 ${totalReal} 条，验证 ${totalValidation} 条，初始验证 ${totalInitial} 条</small>
-                </td>
-            </tr>
-        `;
-        tbody.innerHTML = statsRow + tbody.innerHTML;
-    }
-
-    // 🔥 新增：渲染交易日志分页控件
-    renderTradeLogPagination() {
-        const container = document.getElementById('tradeLogPaginationContainer');
         if (!container) return;
         
-        const totalPages = Math.ceil(this.tradeLogs.length / this.tradeLogsPerPage);
-        
-        if (totalPages <= 1) {
-            container.innerHTML = '';
+        if (!logs || logs.length === 0) {
+            container.innerHTML = `<tr><td colspan="8" class="text-center text-muted">暂无${this.getLogTypeName(logType)}记录</td></tr>`;
             return;
         }
         
-        let paginationHtml = `
-            <nav aria-label="交易日志分页">
-                <ul class="pagination pagination-sm justify-content-center">
-                    <li class="page-item ${this.currentTradeLogPage === 1 ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0)" onclick="app.changeTradeLogPage(${this.currentTradeLogPage - 1})">上一页</a>
-                    </li>
-        `;
+        if (logType === 'evolution') {
+            // 渲染进化日志
+            container.innerHTML = logs.map(log => `
+                <tr>
+                    <td>${this.formatTime(log.timestamp)}</td>
+                    <td><span class="badge bg-info">${log.optimization_type || log.signal_type || '参数调整'}</span></td>
+                    <td>${log.trigger_reason || '自动优化'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="app.showParameterDetails('${JSON.stringify(log.old_parameters || {}).replace(/'/g, "\\'")}', '旧参数')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="app.showParameterDetails('${JSON.stringify(log.new_parameters || {}).replace(/'/g, "\\'")}', '新参数')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                    <td>${log.target_success_rate || 0}%</td>
+                    <td>
+                        <span class="badge ${log.validation_passed ? 'bg-success' : 'bg-warning'}">
+                            ${log.validation_passed ? '已应用' : '待验证'}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            // 渲染交易日志（实盘和验证）
+            container.innerHTML = logs.map(log => `
+                <tr class="${logType === 'validation' ? 'table-info' : ''}">
+                    <td>${this.formatTime(log.timestamp)}</td>
+                    <td>${log.symbol || 'N/A'}</td>
+                    <td>
+                        <span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">
+                            ${(log.signal_type || '').toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${log.price ? log.price.toFixed(6) : '0'}</td>
+                    <td>${log.quantity ? log.quantity.toFixed(6) : '0'}</td>
+                    <td class="${log.pnl >= 0 ? 'text-success' : 'text-danger'}">
+                        ${log.pnl >= 0 ? '+' : ''}${(log.pnl || 0).toFixed(6)}U
+                    </td>
+                    <td>${log.confidence ? (log.confidence * 100).toFixed(1) : '0'}%</td>
+                    <td>
+                        <span class="badge ${log.executed ? 'bg-success' : 'bg-secondary'}">
+                            ${log.executed ? '已执行' : '待执行'}
+                        </span>
+                        ${logType === 'validation' ? '<br><small class="text-muted">验证交易</small>' : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    // 🔥 新增：更新标签页计数
+    updateLogTabCounts(categorized) {
+        const countMap = {
+            'real_trading': 'realTradingCount',
+            'validation': 'validationCount',
+            'evolution': 'evolutionCount'
+        };
         
-        // 显示页码
-        for (let i = 1; i <= totalPages; i++) {
-            paginationHtml += `
-                <li class="page-item ${i === this.currentTradeLogPage ? 'active' : ''}">
-                    <a class="page-link" href="javascript:void(0)" onclick="app.changeTradeLogPage(${i})">${i}</a>
-                </li>
+        Object.entries(countMap).forEach(([logType, elementId]) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const count = categorized[logType] ? categorized[logType].length : 0;
+                element.textContent = count;
+            }
+        });
+    }
+
+    // 🔥 新增：显示日志错误
+    showLogError(logType, message) {
+        const containerMap = {
+            'real_trading': 'realTradingLogs',
+            'validation': 'validationLogs',
+            'evolution': 'evolutionLogs'
+        };
+        
+        const containerId = containerMap[logType];
+        const container = document.getElementById(containerId);
+        
+        if (container) {
+            container.innerHTML = `<tr><td colspan="8" class="text-center text-danger">加载失败: ${message}</td></tr>`;
+        }
+    }
+
+    // 🔥 新增：获取日志类型名称
+    getLogTypeName(logType) {
+        const nameMap = {
+            'real_trading': '实盘交易',
+            'validation': '验证交易',
+            'evolution': '策略进化'
+        };
+        return nameMap[logType] || logType;
+    }
+
+    // 🔥 新增：显示参数详情
+    showParameterDetails(parametersJson, title) {
+        try {
+            const parameters = typeof parametersJson === 'string' ? JSON.parse(parametersJson) : parametersJson;
+            
+            let content = '<div class="row">';
+            Object.entries(parameters).forEach(([key, value]) => {
+                content += `
+                    <div class="col-md-6 mb-2">
+                        <strong>${key}:</strong> 
+                        <span class="text-primary">${JSON.stringify(value)}</span>
+                    </div>
+                `;
+            });
+            content += '</div>';
+            
+            // 显示在模态框中
+            const modalHtml = `
+                <div class="modal fade" id="parameterModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${title}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                ${content}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             `;
-        }
-        
-        paginationHtml += `
-                    <li class="page-item ${this.currentTradeLogPage === totalPages ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0)" onclick="app.changeTradeLogPage(${this.currentTradeLogPage + 1})">下一页</a>
-                    </li>
-                </ul>
-            </nav>
-        `;
-        
-        container.innerHTML = paginationHtml;
-    }
-
-    // 🔥 新增：切换交易日志页面
-    changeTradeLogPage(page) {
-        if (page < 1 || page > Math.ceil(this.tradeLogs.length / this.tradeLogsPerPage)) {
-            return;
-        }
-        
-        this.currentTradeLogPage = page;
-        this.renderTradeLogsPage();
-        this.renderTradeLogPagination();
-    }
-
-    // 加载优化记录
-    async loadOptimizationLogs(strategyId) {
-        try {
-            const response = await fetch(`/api/quantitative/strategies/${strategyId}/optimization-logs`);
-            const data = await response.json();
             
-            const tbody = document.getElementById('optimizationLogsTable');
+            // 移除旧模态框
+            const oldModal = document.getElementById('parameterModal');
+            if (oldModal) oldModal.remove();
             
-            if (data.success && data.logs && data.logs.length > 0) {
-                // 存储完整日志数据用于分页
-                this.optimizationLogs = data.logs;
-                this.currentLogPage = 1;
-                this.logsPerPage = 20;  // 🔥 修复：增加每页显示日志数量到20条，支持更多记录查看
-                
-                this.renderOptimizationLogs();
-                this.renderLogPagination();
-            } else {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无优化记录</td></tr>';
-                document.getElementById('logPaginationContainer').innerHTML = '';
-            }
+            // 添加新模态框
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('parameterModal'));
+            modal.show();
             
         } catch (error) {
-            console.error('加载优化记录失败:', error);
-            const tbody = document.getElementById('optimizationLogsTable');
-            if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">加载失败</td></tr>';
-            }
-            const container = document.getElementById('logPaginationContainer');
-            if (container) {
-                container.innerHTML = '';
-            }
+            console.error('显示参数详情失败:', error);
+            this.showMessage('参数解析失败', 'error');
         }
     }
 
-    // 渲染优化日志
-    renderOptimizationLogs() {
-        const tbody = document.getElementById('optimizationLogsTable');
-        const startIndex = (this.currentLogPage - 1) * this.logsPerPage;
-        const endIndex = startIndex + this.logsPerPage;
-        const currentLogs = this.optimizationLogs.slice(startIndex, endIndex);
-        
-        tbody.innerHTML = currentLogs.map(log => `
-            <tr>
-                <td>${this.formatTime(log.timestamp)}</td>
-                <td><span class="badge bg-info">${log.optimization_type || '未知类型'}</span></td>
-                <td><code style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">${JSON.stringify(log.old_parameters || {}, null, 1)}</code></td>
-                <td><code style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">${JSON.stringify(log.new_parameters || {}, null, 1)}</code></td>
-                <td>${log.trigger_reason || '无原因'}</td>
-                <td>${log.target_success_rate || 0}%</td>
-            </tr>
-        `).join('');
-    }
-
-    // 渲染分页按钮
-    renderLogPagination() {
-        const container = document.getElementById('logPaginationContainer');
-        if (!container) return;
-        
-        const totalPages = Math.ceil(this.optimizationLogs.length / this.logsPerPage);
-        
-        if (totalPages <= 1) {
-            container.innerHTML = '';
-            return;
-        }
-        
-        let paginationHtml = `
-            <nav aria-label="优化日志分页">
-                <ul class="pagination pagination-sm justify-content-center">
-                    <li class="page-item ${this.currentLogPage === 1 ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0)" onclick="app.changeLogPage(${this.currentLogPage - 1})">上一页</a>
-                    </li>
-        `;
-        
-        // 显示页码
-        for (let i = 1; i <= totalPages; i++) {
-            paginationHtml += `
-                <li class="page-item ${i === this.currentLogPage ? 'active' : ''}">
-                    <a class="page-link" href="javascript:void(0)" onclick="app.changeLogPage(${i})">${i}</a>
-                </li>
-            `;
-        }
-        
-        paginationHtml += `
-                    <li class="page-item ${this.currentLogPage === totalPages ? 'disabled' : ''}">
-                        <a class="page-link" href="javascript:void(0)" onclick="app.changeLogPage(${this.currentLogPage + 1})">下一页</a>
-                    </li>
-                </ul>
-            </nav>
-        `;
-        
-        container.innerHTML = paginationHtml;
-    }
-
-    // 切换日志页面
-    changeLogPage(page) {
-        if (page < 1 || page > Math.ceil(this.optimizationLogs.length / this.logsPerPage)) {
-            return;
-        }
-        
-        this.currentLogPage = page;
-        this.renderOptimizationLogs();
-        this.renderLogPagination();
-    }
-
-    // 获取策略名称
-    getStrategyName(strategyId) {
-        const strategy = this.strategies.find(s => s.id === strategyId);
-        return strategy ? strategy.name : '未知策略';
-    }
-
-    // 查看策略详情（保留兼容性）
-    viewStrategyDetails(strategyId) {
-        this.showStrategyConfig(strategyId);
-    }
-
-    // 初始化收益曲线图
-    initChart() {
-        this.initPerformanceChart();
-        this.initBalanceChart();
-    }
-
-    // 初始化收益曲线图
-    initPerformanceChart() {
-        const ctx = document.getElementById('performanceChart');
-        if (!ctx) return;
-
-        // 🔥 只显示基于真实数据的收益曲线，不生成任何模拟数据
-        performanceChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: '账户价值',
-                    data: [],
-                    borderColor: '#1677ff',
-                    backgroundColor: 'rgba(22, 119, 255, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        ticks: {
-                            callback: function(value) {
-                                return value.toLocaleString() + 'U';
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
-            }
-        });
-
-        // 加载真实的收益历史数据
-        this.loadRealPerformanceData();
-    }
-
-    // 加载真实收益数据
-    async loadRealPerformanceData() {
-        try {
-            const response = await fetch('/api/quantitative/performance-history');
-            const data = await response.json();
-            
-            if (data.success && data.data && data.data.length > 0) {
-                const labels = data.data.map(item => {
-                    const date = new Date(item.timestamp);
-                    return date.toLocaleDateString();
-                });
-                
-                const values = data.data.map(item => item.account_value);
-                
-                if (performanceChart) {
-                    performanceChart.data.labels = labels;
-                    performanceChart.data.datasets[0].data = values;
-                    performanceChart.update();
-                }
-            } else {
-                // 如果没有真实数据，显示空图表
-                console.log('暂无真实收益数据，显示空图表');
-            }
-        } catch (error) {
-            console.error('加载真实收益数据失败:', error);
-            // 显示空图表而不是错误
-            if (performanceChart) {
-                performanceChart.data.labels = [];
-                performanceChart.data.datasets[0].data = [];
-                performanceChart.update();
-            }
-        }
-    }
-
-    // 初始化资产历史图表
-    initBalanceChart() {
-        const ctx = document.getElementById('balanceChart');
-        if (!ctx) return;
-
-        // 创建资产历史图表（默认90天）
-        this.balanceChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: '总资产',
-                    data: [],
-                    borderColor: '#52c41a',
-                    backgroundColor: 'rgba(82, 196, 26, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointHoverRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
-                },
-                scales: {
-                    x: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: '时间'
-                        }
-                    },
-                    y: {
-                        display: true,
-                        title: {
-                            display: true,
-                            text: '资产 (U)'
-                        },
-                        type: 'logarithmic', // 使用对数刻度显示从10U到10万U的增长
-                        ticks: {
-                            callback: function(value) {
-                                return value.toLocaleString() + 'U';
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            title: function(context) {
-                                return context[0].label;
-                            },
-                            label: function(context) {
-                                const value = context.parsed.y;
-                                return `总资产: ${value.toLocaleString()}U`;
-                            },
-                            afterLabel: function(context) {
-                                const dataIndex = context.dataIndex;
-                                const dataset = context.dataset;
-                                // 显示里程碑信息
-                                if (this.balanceHistory && this.balanceHistory[dataIndex]?.milestone_note) {
-                                    return `🎉 ${this.balanceHistory[dataIndex].milestone_note}`;
-                                }
-                                return '';
-                            }.bind(this)
-                        }
-                    }
-                }
-            }
-        });
-
-        // 加载默认90天数据
-        this.loadBalanceHistory(90);
-    }
-
-    // 加载资产历史数据
-    async loadBalanceHistory(days = 90) {
-        try {
-            console.log(`正在加载 ${days} 天的资产历史...`);
-            const response = await fetch(`/api/quantitative/balance-history?days=${days}`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            console.log('资产历史API响应:', data);
-            
-            if (data.success && data.data && data.data.length > 0) {
-                this.balanceHistory = data.data;
-                console.log(`成功加载 ${data.data.length} 条资产历史记录`);
-                
-                // 更新图表数据
-                const labels = data.data.map(item => {
-                    const date = new Date(item.date || item.timestamp);
-                    return date.toLocaleDateString();
-                });
-                
-                const balances = data.data.map(item => item.balance || item.total_balance);
-                
-                if (this.balanceChart) {
-                    this.balanceChart.data.labels = labels;
-                    this.balanceChart.data.datasets[0].data = balances;
-                    this.balanceChart.update();
-                    console.log('资产图表已更新');
-                } else {
-                    console.warn('资产图表未初始化');
-                }
-                
-                // 更新当前资产显示
-                const currentBalance = data.data[data.data.length - 1].balance || data.data[data.data.length - 1].total_balance;
-                const currentBalanceEl = document.getElementById('currentBalance');
-                if (currentBalanceEl) {
-                    currentBalanceEl.textContent = `${currentBalance.toLocaleString()}U`;
-                    
-                    // 根据资产量设置颜色
-                    if (currentBalance >= 10000) {
-                        currentBalanceEl.className = 'milestone-value text-success';
-                    } else if (currentBalance >= 1000) {
-                        currentBalanceEl.className = 'milestone-value text-primary';
-                    } else if (currentBalance >= 100) {
-                        currentBalanceEl.className = 'milestone-value text-info';
-                    } else {
-                        currentBalanceEl.className = 'milestone-value text-warning';
-                    }
-                    console.log(`当前资产显示已更新: ${currentBalance}U`);
-                }
-                
-                // 显示里程碑提示
-                const milestones = data.data.filter(item => item.milestone_note);
-                if (milestones.length > 0) {
-                    console.log('🎉 资产里程碑:', milestones.map(m => m.milestone_note).join(', '));
-                }
-                
-                            } else {
-                    console.warn('未获取到资产历史数据，响应数据:', data);
-                    // 🔥 不再显示任何模拟数据，只显示真实数据或空状态
-                    if (data.data && data.data.length === 0) {
-                        console.log('返回了空数组，可能是新系统还没有历史数据');
-                    }
-                }
-            
-        } catch (error) {
-            console.error('加载资产历史失败:', error);
-            // 显示错误信息给用户
-            const currentBalanceEl = document.getElementById('currentBalance');
-            if (currentBalanceEl) {
-                currentBalanceEl.textContent = '加载失败';
-                currentBalanceEl.className = 'milestone-value text-danger';
-            }
-        }
-    }
-
-    // 切换资产图表时间范围
-    toggleBalanceChart(days) {
-        // 更新按钮状态
-        document.querySelectorAll('.card-header .btn-sm').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        event.target.classList.add('active');
-        
-        // 重新加载数据
-        this.loadBalanceHistory(parseInt(days));
-    }
-
-    // 刷新所有数据
-    async refreshAllData() {
-        try {
-            await Promise.all([
-                this.loadSystemStatus(),  // 添加系统状态刷新
-                this.loadAccountInfo(),
-                this.loadStrategies(),
-                this.loadPositions(),
-                this.loadSignals()
-            ]);
-            
-            // 更新时间戳
-            document.getElementById('lastUpdate').textContent = '刚刚';
-        } catch (error) {
-            console.error('刷新数据失败:', error);
-        }
-    }
-
-    // 开始自动刷新
-    startAutoRefresh() {
-        // 每30秒刷新一次数据
-        refreshTimer = setInterval(() => {
-            this.refreshAllData();
-        }, 30000);
-    }
-
-    // 停止自动刷新
-    stopAutoRefresh() {
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-            refreshTimer = null;
-        }
-    }
-
-    // 显示消息
-    showMessage(message, type = 'info') {
-        // 创建简单的消息提示
-        const alertClass = {
-            'success': 'alert-success',
-            'error': 'alert-danger',
-            'warning': 'alert-warning',
-            'info': 'alert-info'
-        }[type] || 'alert-info';
-
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
-        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-
-        document.body.appendChild(alertDiv);
-
-        // 3秒后自动消失
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.remove();
-            }
-        }, 3000);
-    }
-
-    // 格式化数字
-    formatNumber(num) {
-        if (typeof num !== 'number') return '0';
-        return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    // 格式化时间
-    formatTime(timestamp) {
-        if (!timestamp) return '-';
-        const date = new Date(timestamp);
-        // 返回完整的日期时间格式：YYYY-MM-DD HH:mm:ss
-        return date.toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
-    }
+    // 🔥 删除旧的loadTradeLogs和loadOptimizationLogs方法，统一使用新的分类方法
 
     // 加载系统状态 - 使用统一状态端点
     async loadSystemStatus() {

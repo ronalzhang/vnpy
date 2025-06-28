@@ -5896,6 +5896,196 @@ class QuantitativeService:
 
     # 🔥 删除重复的评分计算方法 - 使用第7177行的统一实现
 
+    def setup_enhanced_strategy_logs(self):
+        """🔥 新增：设置增强的策略日志系统"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # 创建统一的策略日志表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS unified_strategy_logs (
+                    id SERIAL PRIMARY KEY,
+                    strategy_id TEXT NOT NULL,
+                    log_type VARCHAR(50) NOT NULL,  -- real_trading, validation, evolution, system_operation
+                    log_subtype VARCHAR(50),        -- 子类型：buy, sell, parameter_change, score_update等
+                    
+                    -- 交易相关字段
+                    symbol TEXT,
+                    signal_type TEXT,               -- buy, sell, hold
+                    price DECIMAL(20,8),
+                    quantity DECIMAL(20,8), 
+                    pnl DECIMAL(20,8) DEFAULT 0,
+                    confidence DECIMAL(3,2),
+                    executed BOOLEAN DEFAULT FALSE,
+                    
+                    -- 交易周期相关
+                    cycle_id TEXT,
+                    holding_minutes INTEGER,
+                    mrot_score DECIMAL(10,6),
+                    
+                    -- 进化相关字段
+                    generation INTEGER,
+                    cycle_number INTEGER,
+                    old_parameters JSONB,
+                    new_parameters JSONB,
+                    evolution_stage VARCHAR(50),
+                    validation_passed BOOLEAN,
+                    
+                    -- 评分和性能
+                    old_score DECIMAL(5,2),
+                    new_score DECIMAL(5,2),
+                    performance_metrics JSONB,
+                    
+                    -- 元数据
+                    trigger_reason TEXT,
+                    notes TEXT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by VARCHAR(100) DEFAULT 'system'
+                )
+            ''')
+            
+            # 创建索引
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_unified_strategy_id ON unified_strategy_logs(strategy_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_unified_log_type ON unified_strategy_logs(log_type)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_unified_timestamp ON unified_strategy_logs(timestamp)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_unified_strategy_type ON unified_strategy_logs(strategy_id, log_type)')
+            
+            self.conn.commit()
+            print("✅ 增强的策略日志表创建完成")
+            
+        except Exception as e:
+            print(f"❌ 创建增强日志表失败: {e}")
+
+    def log_enhanced_strategy_trade_v2(self, strategy_id: str, log_type: str, **kwargs):
+        """🔥 新增：增强的策略交易日志记录方法"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # 准备插入数据 - 使用dict方式更灵活
+            log_data = {
+                'strategy_id': strategy_id,
+                'log_type': log_type,
+                'log_subtype': kwargs.get('log_subtype'),
+                'symbol': kwargs.get('symbol'),
+                'signal_type': kwargs.get('signal_type'),
+                'price': kwargs.get('price'),
+                'quantity': kwargs.get('quantity'),
+                'pnl': kwargs.get('pnl', 0),
+                'confidence': kwargs.get('confidence'),
+                'executed': kwargs.get('executed', True),
+                'cycle_id': kwargs.get('cycle_id'),
+                'holding_minutes': kwargs.get('holding_minutes'),
+                'mrot_score': kwargs.get('mrot_score'),
+                'generation': kwargs.get('generation'),
+                'cycle_number': kwargs.get('cycle_number'),
+                'old_parameters': json.dumps(kwargs.get('old_parameters')) if kwargs.get('old_parameters') else None,
+                'new_parameters': json.dumps(kwargs.get('new_parameters')) if kwargs.get('new_parameters') else None,
+                'evolution_stage': kwargs.get('evolution_stage'),
+                'validation_passed': kwargs.get('validation_passed'),
+                'old_score': kwargs.get('old_score'),
+                'new_score': kwargs.get('new_score'),
+                'performance_metrics': json.dumps(kwargs.get('performance_metrics')) if kwargs.get('performance_metrics') else None,
+                'trigger_reason': kwargs.get('trigger_reason'),
+                'notes': kwargs.get('notes'),
+                'created_by': kwargs.get('created_by', 'system')
+            }
+            
+            # 过滤None值
+            filtered_data = {k: v for k, v in log_data.items() if v is not None}
+            
+            # 构建SQL
+            fields = list(filtered_data.keys())
+            placeholders = ', '.join(['%s'] * len(fields))
+            
+            cursor.execute(f'''
+                INSERT INTO unified_strategy_logs ({', '.join(fields)})
+                VALUES ({placeholders})
+                RETURNING id
+            ''', list(filtered_data.values()))
+            
+            log_id = cursor.fetchone()[0]
+            self.conn.commit()
+            
+            return str(log_id)
+            
+        except Exception as e:
+            print(f"❌ 增强日志记录失败: {e}")
+            self.conn.rollback()
+            return None
+
+    def get_strategy_logs_by_category(self, strategy_id: str, log_type: str = None, limit: int = 100):
+        """🔥 新增：按分类获取策略日志"""
+        try:
+            cursor = self.conn.cursor()
+            
+            if log_type:
+                cursor.execute('''
+                    SELECT id, strategy_id, log_type, log_subtype, symbol, signal_type,
+                           price, quantity, pnl, confidence, executed, cycle_id,
+                           holding_minutes, mrot_score, generation, cycle_number,
+                           old_parameters, new_parameters, evolution_stage, validation_passed,
+                           old_score, new_score, performance_metrics, trigger_reason,
+                           notes, timestamp, created_by
+                    FROM unified_strategy_logs
+                    WHERE strategy_id = %s AND log_type = %s
+                    ORDER BY timestamp DESC
+                    LIMIT %s
+                ''', (strategy_id, log_type, limit))
+            else:
+                cursor.execute('''
+                    SELECT id, strategy_id, log_type, log_subtype, symbol, signal_type,
+                           price, quantity, pnl, confidence, executed, cycle_id,
+                           holding_minutes, mrot_score, generation, cycle_number,
+                           old_parameters, new_parameters, evolution_stage, validation_passed,
+                           old_score, new_score, performance_metrics, trigger_reason,
+                           notes, timestamp, created_by
+                    FROM unified_strategy_logs
+                    WHERE strategy_id = %s
+                    ORDER BY timestamp DESC
+                    LIMIT %s
+                ''', (strategy_id, limit))
+            
+            rows = cursor.fetchall()
+            logs = []
+            
+            for row in rows:
+                log_dict = {
+                    'id': row[0],
+                    'strategy_id': row[1],
+                    'log_type': row[2],
+                    'log_subtype': row[3],
+                    'symbol': row[4],
+                    'signal_type': row[5],
+                    'price': float(row[6]) if row[6] else None,
+                    'quantity': float(row[7]) if row[7] else None,
+                    'pnl': float(row[8]) if row[8] else None,
+                    'confidence': float(row[9]) if row[9] else None,
+                    'executed': row[10],
+                    'cycle_id': row[11],
+                    'holding_minutes': row[12],
+                    'mrot_score': float(row[13]) if row[13] else None,
+                    'generation': row[14],
+                    'cycle_number': row[15],
+                    'old_parameters': json.loads(row[16]) if row[16] else None,
+                    'new_parameters': json.loads(row[17]) if row[17] else None,
+                    'evolution_stage': row[18],
+                    'validation_passed': row[19],
+                    'old_score': float(row[20]) if row[20] else None,
+                    'new_score': float(row[21]) if row[21] else None,
+                    'performance_metrics': json.loads(row[22]) if row[22] else None,
+                    'trigger_reason': row[23],
+                    'notes': row[24],
+                    'timestamp': row[25],
+                    'created_by': row[26]
+                }
+                logs.append(log_dict)
+            
+            return logs
+            
+        except Exception as e:
+            print(f"❌ 获取分类日志失败: {e}")
+            return []
+
     def _get_previous_strategy_score(self, strategy_id: int) -> float:
         """获取策略的上一次评分"""
         try:

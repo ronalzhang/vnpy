@@ -511,75 +511,12 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- 日志类型选择 -->
-                    <ul class="nav nav-tabs mb-3" id="logsTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="trade-logs-tab" data-bs-toggle="tab" data-bs-target="#trade-logs" type="button" role="tab">
-                                <i class="fas fa-exchange-alt"></i> 交易日志
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="optimization-logs-tab" data-bs-toggle="tab" data-bs-target="#optimization-logs" type="button" role="tab">
-                                <i class="fas fa-wrench"></i> 优化记录
-                            </button>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content" id="logsTabContent">
-                        <!-- 交易日志 -->
-                        <div class="tab-pane fade show active" id="trade-logs" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>时间</th>
-                                            <th>信号</th>
-                                            <th>价格</th>
-                                            <th>数量</th>
-                                            <th>置信度</th>
-                                            <th>交易类型</th>
-                                            <th>执行状态</th>
-                                            <th>盈亏</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="tradeLogsTable">
-                                        <tr>
-                                            <td colspan="8" class="text-center text-muted">暂无交易记录</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <!-- 交易日志分页控件 -->
-                            <div id="tradeLogPaginationContainer" class="mt-3">
-                                <!-- 分页按钮将在这里动态生成 -->
-                            </div>
-                        </div>
-
-                        <!-- 优化记录 -->
-                        <div class="tab-pane fade" id="optimization-logs" role="tabpanel">
-                            <div class="table-responsive">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>时间</th>
-                                            <th>优化类型</th>
-                                            <th>修改前参数</th>
-                                            <th>修改后参数</th>
-                                            <th>触发原因</th>
-                                            <th>目标成功率</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="optimizationLogsTable">
-                                        <tr>
-                                            <td colspan="6" class="text-center text-muted">暂无优化记录</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <!-- 分页控件 -->
-                            <div id="logPaginationContainer" class="mt-3">
-                                <!-- 分页按钮将在这里动态生成 -->
-                            </div>
+                    <!-- 🔥 新增：多标签页策略日志结构 -->
+                    <div id="strategyLogTabs">
+                        <!-- 标签页内容将由JavaScript动态生成 -->
+                        <div class="text-center p-4">
+                            <i class="fas fa-spinner fa-spin fa-2x text-primary mb-3"></i>
+                            <p class="text-muted">正在初始化日志标签页...</p>
                         </div>
                     </div>
                 </div>
