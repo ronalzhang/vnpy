@@ -426,7 +426,7 @@ class ModernStrategyManager:
                 
                 # 添加进化状态信息
                 last_evolution = strategy.get('last_evolution_time')
-                if last_evolution:
+                if last_evolution and isinstance(last_evolution, datetime):
                     time_since_evolution = (datetime.now() - last_evolution).total_seconds() / 60
                     strategy['evolution_status'] = 'recent' if time_since_evolution < self.config.evolution_interval * 2 else 'normal'
                 else:
@@ -453,7 +453,22 @@ class ModernStrategyManager:
             
         except Exception as e:
             logger.error(f"❌ 获取前端显示数据失败: {e}")
-            return {'display_strategies': [], 'trading_strategies': []}
+            return {
+                'display_strategies': [], 
+                'trading_strategies': [],
+                'config': {
+                    'evolution_interval': 3,
+                    'real_trading_count': 2,
+                    'real_trading_score_threshold': 65.0,
+                    'max_display_strategies': 21
+                },
+                'statistics': {
+                    'total_pool_strategies': 0,
+                    'display_strategies_count': 0,
+                    'trading_strategies_count': 0,
+                    'last_evolution_time': datetime.now().isoformat()
+                }
+            }
 
     async def start_evolution_scheduler(self):
         """启动进化调度器"""
