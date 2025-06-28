@@ -353,11 +353,19 @@ class ModernStrategyManager:
             conn = self._get_db_connection()
             cursor = conn.cursor()
             
+            # 🔧 修复：确保参数可以JSON序列化，将Decimal转换为float
+            serializable_params = {}
+            for key, value in new_params.items():
+                if isinstance(value, Decimal):
+                    serializable_params[key] = float(value)
+                else:
+                    serializable_params[key] = value
+            
             cursor.execute("""
                 UPDATE strategies 
                 SET parameters = %s, last_evolution_time = CURRENT_TIMESTAMP
                 WHERE id = %s
-            """, (json.dumps(new_params), strategy['id']))
+            """, (json.dumps(serializable_params), strategy['id']))
             
             conn.commit()
             conn.close()
