@@ -4372,9 +4372,9 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
             # 查询真实交易日志
             cursor.execute("""
                 SELECT timestamp, symbol, signal_type, price, quantity, 
-                       pnl, executed, confidence, 'real_trading' as log_type
+                       expected_return as pnl, executed, confidence, 'real_trading' as log_type
                 FROM trading_signals 
-                WHERE strategy_id = %s AND executed = true
+                WHERE strategy_id = %s AND executed = 1
                 ORDER BY timestamp DESC
                 LIMIT %s
             """, (strategy_id, limit))
@@ -4383,7 +4383,7 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
             # 查询验证交易日志（is_validation = true）
             cursor.execute("""
                 SELECT timestamp, symbol, signal_type, price, quantity, 
-                       pnl, executed, confidence, 'validation' as log_type
+                       expected_return as pnl, executed, confidence, 'validation' as log_type
                 FROM trading_signals 
                 WHERE strategy_id = %s AND is_validation = true
                 ORDER BY timestamp DESC
@@ -4406,7 +4406,7 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
             # 查询所有类型
             cursor.execute("""
                 SELECT timestamp, symbol, signal_type, price, quantity, 
-                       pnl, executed, confidence, 
+                       expected_return as pnl, executed, confidence, 
                        CASE WHEN is_validation = true THEN 'validation' ELSE 'real_trading' END as log_type
                 FROM trading_signals 
                 WHERE strategy_id = %s
