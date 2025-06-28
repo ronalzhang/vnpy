@@ -86,6 +86,28 @@ def init_quantitative_service():
 init_quantitative_service()
 
 # 数据库连接函数
+
+def log_to_unified_table(strategy_id, log_type, signal_type=None, symbol=None, 
+                        price=None, quantity=None, pnl=0, executed=False, 
+                        confidence=0, cycle_id=None, notes=None):
+    """记录到统一日志表"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT log_strategy_action(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (strategy_id, log_type, signal_type, symbol, price, quantity, 
+              pnl, executed, confidence, cycle_id, notes))
+        
+        log_id = cursor.fetchone()[0] if cursor.fetchone() else None
+        conn.close()
+        return log_id
+        
+    except Exception as e:
+        print(f"记录到统一日志表失败: {e}")
+        return None
+
 def get_db_connection():
     """获取数据库连接"""
     import psycopg2
@@ -4381,72 +4403,90 @@ def get_unified_system_status():
 
 @app.route('/api/quantitative/strategies/<strategy_id>/logs-by-category', methods=['GET'])
 def get_strategy_logs_by_category(strategy_id):
-    """🔥 新增：按分类获取策略日志 - 支持多标签页显示"""
+    """🔥 新增：按分类获取策略日志 - 使用统一日志表"""
     try:
         log_type = request.args.get('type')  # real_trading, validation, evolution
         limit = int(request.args.get('limit', 100))
         
-        # 前端服务不需要quantitative_service，直接使用数据库查询
-        
-        # 检查是否有增强日志表
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 检查unified_strategy_logs表是否存在 (PostgreSQL语法)
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'unified_strategy_logs'
-            )
-        """)
-        has_unified_table = cursor.fetchone()[0]
-        
-        if has_unified_table:
-            # 使用新的增强日志系统 - 直接查询数据库
+        # 使用新的统一日志表
+        if log_type:
             cursor.execute("""
-                SELECT * FROM unified_strategy_logs 
-                WHERE strategy_id = %s AND (%s IS NULL OR log_type = %s)
-                ORDER BY created_at DESC 
+                SELECT strategy_id, log_type, timestamp as created_at, symbol, signal_type, 
+                       price, quantity, pnl, executed, confidence, cycle_id, strategy_score,
+                       evolution_type, old_parameters, new_parameters, trigger_reason, 
+                       improvement, success, notes
+                FROM unified_strategy_logs 
+                WHERE strategy_id = %s AND log_type = %s
+                ORDER BY timestamp DESC 
                 LIMIT %s
-            """, (strategy_id, log_type, log_type, limit))
-            
-            rows = cursor.fetchall()
-            logs = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
-            
-            # 按日志类型分类整理
-            categorized_logs = {
-                'real_trading': [],
-                'validation': [],
-                'evolution': [],
-                'system_operation': []
+            """, (strategy_id, log_type, limit))
+        else:
+            cursor.execute("""
+                SELECT strategy_id, log_type, timestamp as created_at, symbol, signal_type, 
+                       price, quantity, pnl, executed, confidence, cycle_id, strategy_score,
+                       evolution_type, old_parameters, new_parameters, trigger_reason, 
+                       improvement, success, notes
+                FROM unified_strategy_logs 
+                WHERE strategy_id = %s
+                ORDER BY timestamp DESC 
+                LIMIT %s
+            """, (strategy_id, limit))
+        
+        rows = cursor.fetchall()
+        logs = []
+        
+        for row in rows:
+            log_dict = {
+                'strategy_id': row[0],
+                'log_type': row[1],
+                'timestamp': row[2].strftime('%Y-%m-%d %H:%M:%S') if row[2] else '',
+                'symbol': row[3],
+                'signal_type': row[4],
+                'price': float(row[5]) if row[5] else 0,
+                'quantity': float(row[6]) if row[6] else 0,
+                'pnl': float(row[7]) if row[7] else 0,
+                'executed': bool(row[8]) if row[8] is not None else False,
+                'confidence': float(row[9]) if row[9] else 0,
+                'cycle_id': row[10],
+                'strategy_score': float(row[11]) if row[11] else 50.0,
             }
             
-            for log in logs:
-                category = log.get('log_type', 'system_operation')
-                if category in categorized_logs:
-                    categorized_logs[category].append(log)
+            # 进化相关字段
+            if row[1] == 'evolution':
+                log_dict.update({
+                    'evolution_type': row[12],
+                    'old_parameters': row[13] if row[13] else {},
+                    'new_parameters': row[14] if row[14] else {},
+                    'trigger_reason': row[15],
+                    'improvement': float(row[16]) if row[16] else 0,
+                    'success': bool(row[17]) if row[17] is not None else False,
+                })
             
-            # 如果指定了type，只返回对应类型
-            if log_type and log_type in categorized_logs:
-                result_logs = categorized_logs[log_type]
-            else:
-                result_logs = logs
-            
-            conn.close()
-            return jsonify({
-                'success': True,
-                'logs': result_logs,
-                'categorized': categorized_logs,
-                'total_count': len(result_logs),
-                'log_type': log_type,
-                'message': f'获取到 {len(result_logs)} 条{log_type or "全部"}日志'
-            })
+            log_dict['notes'] = row[18] if row[18] else ''
+            logs.append(log_dict)
         
-        else:
-            # 回退到兼容模式
-            conn.close()
-            return get_strategy_trade_logs_compatible(strategy_id, log_type, limit)
-            
+        # 按日志类型分类整理
+        categorized_logs = {
+            'real_trading': [log for log in logs if log['log_type'] == 'real_trading'],
+            'validation': [log for log in logs if log['log_type'] == 'validation'],
+            'evolution': [log for log in logs if log['log_type'] == 'evolution'],
+            'system_operation': [log for log in logs if log['log_type'] == 'system_operation']
+        }
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'logs': logs if not log_type else categorized_logs.get(log_type, []),
+            'categorized': categorized_logs,
+            'total_count': len(logs),
+            'log_type': log_type,
+            'message': f'✅ 从统一日志表获取到 {len(logs)} 条{log_type or "全部"}日志'
+        })
+        
     except Exception as e:
         print(f"获取策略分类日志失败: {e}")
         import traceback
@@ -4456,119 +4496,3 @@ def get_strategy_logs_by_category(strategy_id):
             'message': f'获取失败: {str(e)}'
         }), 500
 
-def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
-    """兼容模式：使用现有表结构获取日志"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 根据请求类型查询不同的数据源
-        if log_type == 'real_trading':
-            # 查询真实交易日志
-            cursor.execute("""
-                SELECT timestamp, symbol, signal_type, price, quantity, 
-                       expected_return as pnl, executed, confidence, 'real_trading' as log_type
-                FROM trading_signals 
-                WHERE strategy_id = %s AND executed = 1
-                ORDER BY timestamp DESC
-                LIMIT %s
-            """, (strategy_id, limit))
-            
-        elif log_type == 'validation':
-            # 查询验证交易日志（is_validation = true）
-            cursor.execute("""
-                SELECT timestamp, symbol, signal_type, price, quantity, 
-                       expected_return as pnl, executed, confidence, 'validation' as log_type
-                FROM trading_signals 
-                WHERE strategy_id = %s AND is_validation = true
-                ORDER BY timestamp DESC
-                LIMIT %s
-            """, (strategy_id, limit))
-            
-        elif log_type == 'evolution':
-            # 查询进化日志
-            cursor.execute("""
-                SELECT timestamp, optimization_type as signal_type, 
-                       old_parameters, new_parameters, trigger_reason,
-                       target_success_rate, 'evolution' as log_type
-                FROM strategy_optimization_logs 
-                WHERE strategy_id = %s
-                ORDER BY timestamp DESC
-                LIMIT %s
-            """, (strategy_id, limit))
-            
-        else:
-            # 查询所有类型
-            cursor.execute("""
-                SELECT timestamp, symbol, signal_type, price, quantity, 
-                       expected_return as pnl, executed, confidence, 
-                       CASE WHEN is_validation = true THEN 'validation' ELSE 'real_trading' END as log_type
-                FROM trading_signals 
-                WHERE strategy_id = %s
-                ORDER BY timestamp DESC
-                LIMIT %s
-            """, (strategy_id, limit))
-        
-        rows = cursor.fetchall()
-        logs = []
-        
-        for row in rows:
-            log_dict = {
-                'timestamp': row[0],
-                'log_type': row[-1],  # 最后一列是log_type
-            }
-            
-            # 根据日志类型填充不同字段
-            if row[-1] == 'evolution':
-                # 🔥 修复：处理JSONB字段，避免重复JSON解析
-                old_params = row[2]
-                if isinstance(old_params, str):
-                    old_params = json.loads(old_params)
-                elif old_params is None:
-                    old_params = {}
-                
-                new_params = row[3]
-                if isinstance(new_params, str):
-                    new_params = json.loads(new_params)
-                elif new_params is None:
-                    new_params = {}
-                
-                log_dict.update({
-                    'signal_type': row[1],
-                    'old_parameters': old_params,
-                    'new_parameters': new_params,
-                    'trigger_reason': row[4],
-                    'target_success_rate': float(row[5]) if row[5] else 0
-                })
-            else:
-                log_dict.update({
-                    'symbol': row[1] if len(row) > 1 else None,
-                    'signal_type': row[2] if len(row) > 2 else None,
-                    'price': float(row[3]) if len(row) > 3 and row[3] else 0,
-                    'quantity': float(row[4]) if len(row) > 4 and row[4] else 0,
-                    'pnl': float(row[5]) if len(row) > 5 and row[5] else 0,
-                    'executed': bool(row[6]) if len(row) > 6 else False,
-                    'confidence': float(row[7]) if len(row) > 7 and row[7] else 0
-                })
-            
-            logs.append(log_dict)
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'logs': logs,
-            'total_count': len(logs),
-            'log_type': log_type,
-            'message': f'兼容模式：获取到 {len(logs)} 条日志'
-        })
-        
-    except Exception as e:
-        print(f"兼容模式获取日志失败: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'获取失败: {str(e)}'
-        }), 500
-
-if __name__ == '__main__':
-    main() 
