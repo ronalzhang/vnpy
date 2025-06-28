@@ -180,102 +180,6 @@ class GlobalStatusManager {
     }
 }
 
-// 🔥 增强的进化日志渲染
-class EnhancedEvolutionRenderer {
-    constructor() {
-        this.logCount = 0;
-        this.maxDisplayLogs = 50;
-    }
-    
-    renderEvolutionLog(logs) {
-        const ticker = document.getElementById('evolutionTicker');
-        const logCountElement = document.getElementById('evolutionLogCount');
-        
-        if (!ticker) return;
-
-        // 更新日志计数
-        this.logCount = logs.length;
-        if (logCountElement) {
-            logCountElement.textContent = `${this.logCount} 条记录`;
-        }
-
-        // 🔧 优化排序和显示
-        const sortedLogs = [...logs].sort((a, b) => {
-            const timeA = new Date(a.timestamp || '1970-01-01').getTime();
-            const timeB = new Date(b.timestamp || '1970-01-01').getTime();
-            return timeB - timeA; // 最新在前
-        });
-        
-        const recentLogs = sortedLogs.slice(0, this.maxDisplayLogs);
-        
-        // 生成增强的HTML内容
-        const tickerContent = recentLogs.map(log => {
-            const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-
-            let actionClass = 'created';
-            let actionText = '新增';
-            let actionIcon = '🆕';
-            
-            switch(log.action) {
-                case 'created':
-                    actionClass = 'created';
-                    actionText = '新增';
-                    actionIcon = '🆕';
-                    break;
-                case 'eliminated':
-                    actionClass = 'eliminated';
-                    actionText = '淘汰';
-                    actionIcon = '❌';
-                    break;
-                case 'optimized':
-                    actionClass = 'optimized';
-                    actionText = '优化';
-                    actionIcon = '⚡';
-                    break;
-                case 'validated':
-                    actionClass = 'validated';
-                    actionText = '验证';
-                    actionIcon = '✅';
-                    break;
-                default:
-                    actionIcon = '📊';
-            }
-
-            return `
-                <div class="ticker-item">
-                    <span class="time">${time}</span>
-                    <span class="action ${actionClass}">${actionIcon} ${actionText}</span>
-                    <span class="message">${log.message || log.details || '策略进化中...'}</span>
-                    ${log.strategy_id ? `<span class="strategy-id" data-id="${log.strategy_id}">ID: ${log.strategy_id.substring(0, 8)}</span>` : ''}
-                </div>
-            `;
-        }).join('');
-
-        // 平滑更新内容
-        ticker.style.opacity = '0.7';
-        setTimeout(() => {
-            ticker.innerHTML = tickerContent || '<div class="ticker-item"><span class="text-muted">暂无进化日志...</span></div>';
-            ticker.style.opacity = '1';
-        }, 200);
-
-        // 添加点击事件监听器
-        ticker.querySelectorAll('.strategy-id').forEach(element => {
-            element.addEventListener('click', (e) => {
-                const strategyId = e.target.dataset.id;
-                if (strategyId && window.app) {
-                    window.app.viewStrategyDetails(strategyId);
-                }
-            });
-        });
-
-        console.log(`✅ 进化日志已更新: ${recentLogs.length}条最新日志`);
-    }
-}
-
 // 系统状态管理类
 class QuantitativeSystem {
     constructor() {
@@ -287,13 +191,11 @@ class QuantitativeSystem {
         this.accountInfo = {};
         this.exchangeStatus = {};
         
-        // 进化日志渲染器
-        this.evolutionRenderer = new EnhancedEvolutionRenderer();
+        // 🔥 使用统一的进化日志管理器，替换原有的分散逻辑
+        this.evolutionLogManager = new UnifiedEvolutionLogManager();
         
         this.bindEvents();
-        // this.initChart(); // 已移除 - 图表功能未实现
         this.loadSystemStatus(); // 加载真实系统状态
-        // this.startAutoRefresh(); // 已移除 - 自动刷新功能未实现，数据通过loadInitialData加载
         this.initEvolutionLog(); // 初始化进化日志
         this.loadManagementConfig(); // 加载管理配置
         this.bindManagementEvents(); // 🔥 确保事件绑定在DOM加载后执行
@@ -1907,118 +1809,35 @@ class QuantitativeSystem {
 
     // ==================== 策略进化日志功能 ====================
     
-    // 初始化进化日志
+    // 🔥 使用统一的进化日志管理器初始化
     initEvolutionLog() {
-        this.startEvolutionLogPolling();
-        
-        // 绑定管理配置事件
-        this.bindManagementEvents();
+        console.log('🔄 初始化进化日志系统...');
+        this.evolutionLogManager.startPolling();
     }
 
-    // 绑定管理配置事件
-    bindManagementEvents() {
-        // 保存配置按钮
-        const saveBtn = document.getElementById('saveManagementConfig');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => {
-                console.log('保存配置按钮被点击');
-                this.saveManagementConfig();
-            });
-        }
-
-        // 重置配置按钮
-        const resetBtn = document.getElementById('resetManagementConfig');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
-                console.log('重置配置按钮被点击');
-                this.resetManagementConfig();
-            });
-        }
-
-        // 全自动策略管理开关
-        const autoMgmtSwitch = document.getElementById('autoManagementEnabled');
-        if (autoMgmtSwitch) {
-            autoMgmtSwitch.addEventListener('change', () => {
-                this.toggleAutoStrategyManagement(autoMgmtSwitch.checked);
-            });
-        }
-        
-        // 加载全自动策略管理状态
-        this.loadAutoManagementStatus();
-
-        // 🔥 添加实时保存功能 - 当输入框失去焦点时自动保存
-        const form = document.getElementById('strategyManagementForm');
-        if (form) {
-            ['evolutionInterval', 'maxStrategies', 'realTradingScore', 'realTradingCount', 'validationAmount', 'realTradingAmount',
-             'minTrades', 'minWinRate', 'minProfit', 'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 
-             'stopLossPercent', 'takeProfitPercent', 'maxHoldingMinutes', 'minProfitForTimeStop',
-             'eliminationDays', 'minScore'].forEach(key => {
-                const input = form.querySelector(`#${key}`);
-                if (input) {
-                    input.addEventListener('blur', () => {
-                        console.log(`${key} 输入框失去焦点，自动保存配置`);
-                        this.saveManagementConfig();
-                    });
-                    input.addEventListener('change', () => {
-                        console.log(`${key} 输入框值变化，自动保存配置`);
-                        this.saveManagementConfig();
-                    });
-                }
-            });
-        }
-    }
-
-    // 开始轮询进化日志
+    // 🔥 简化：移除重复的进化日志轮询方法，统一使用管理器
     startEvolutionLogPolling() {
-        // 立即加载一次
-        this.loadEvolutionLog();
-        
-        // 每30秒更新一次进化日志，避免过于频繁
-        evolutionLogTimer = setInterval(() => {
-            this.loadEvolutionLog();
-        }, 30000);
+        this.evolutionLogManager.startPolling();
     }
 
-    // 停止进化日志轮询
     stopEvolutionLogPolling() {
-        if (evolutionLogTimer) {
-            clearInterval(evolutionLogTimer);
-            evolutionLogTimer = null;
-        }
+        this.evolutionLogManager.stopPolling();
     }
 
-    // 加载进化日志
+    // 🔥 简化：进化日志加载现在由管理器处理
     async loadEvolutionLog() {
-        try {
-            const response = await fetch('/api/quantitative/evolution-log');
-            const data = await response.json();
-            
-            if (data.success && data.logs) {
-                this.renderEvolutionLog(data.logs);
-            }
-        } catch (error) {
-            console.error('加载进化日志失败:', error);
-        }
+        this.evolutionLogManager.refresh();
     }
 
-    // 渲染进化日志 - 使用增强渲染器
+    // 🔥 移除重复的渲染方法，统一由管理器处理
     renderEvolutionLog(logs) {
-        // 保存所有日志到全局变量供全部日志页面使用
+        // 兼容性保持：保存到全局变量
         this.allEvolutionLogs = logs || [];
-
-        // 🔥 使用新的增强渲染器渲染策略进化实时监控区域
-        if (this.evolutionRenderer) {
-            this.evolutionRenderer.renderEvolutionLog(logs);
-        } else {
-            // 降级处理
-            const ticker = document.getElementById('evolutionTicker');
-            if (ticker) {
-                ticker.innerHTML = '<div class="ticker-item"><span class="text-muted">加载中...</span></div>';
-            }
+        // 实际渲染由统一管理器处理
+        if (this.evolutionLogManager) {
+            this.evolutionLogManager.logs = this.allEvolutionLogs;
+            this.evolutionLogManager.renderAllViews();
         }
-
-        // 🔥 同时更新策略管理标题右侧的横向滚动日志
-        this.renderStrategyManagementEvolutionLog(logs);
     }
 
     // 🔥 新增：渲染策略管理标题右侧的横向滚动日志
@@ -2065,8 +1884,12 @@ class QuantitativeSystem {
                     actionText = '进化策略';
                     colorClass = 'text-primary';
                     break;
+                case 'eliminated':
+                    actionText = '淘汰策略';
+                    colorClass = 'text-danger';
+                    break;
                 default:
-                    // 使用details字段作为显示内容，这样能显示完整的进化信息
+                    // 🔥 修复：使用完整的details字段，确保显示完整信息
                     actionText = log.details || log.action || '系统活动';
                     colorClass = 'text-muted';
             }
@@ -2280,6 +2103,310 @@ class QuantitativeSystem {
         // 显示模态框
         const modal = new bootstrap.Modal(document.getElementById('genericModal'));
         modal.show();
+    }
+
+    // 🔥 修复：更新管理配置显示，去掉不必要的小数点，添加参数名称
+    updateManagementConfigDisplay(config) {
+        // 格式化整数显示，去掉小数点
+        const formatInteger = (value) => {
+            return Number.isInteger(value) ? value.toString() : value.toFixed(2);
+        };
+        
+        // 更新当前状态数值，确保整数不显示小数点
+        const updateElement = (id, value, isInteger = false) => {
+            const element = document.getElementById(id);
+            if (element) {
+                if (isInteger && Number.isInteger(value)) {
+                    element.textContent = value.toString(); // 整数不显示小数点
+                } else {
+                    element.textContent = value.toFixed(2);
+                }
+            }
+        };
+        
+        // 🔥 更新四个关键指标（修复格式）
+        updateElement('currentActiveStrategies', config.currentActiveStrategies || 0, true);
+        updateElement('realTradingStrategiesCount', config.realTradingStrategiesCount || 0, true);
+        updateElement('validationStrategiesCount', config.validationStrategiesCount || 0, true);
+        updateElement('totalStrategiesCount', config.totalStrategiesCount || 0, true);
+        
+        // 更新配置参数到表单
+        const configMapping = {
+            'evolutionInterval': config.evolutionInterval || 10,
+            'maxStrategies': config.maxStrategies || 20,
+            'realTradingScore': config.realTradingScore || 65,
+            'realTradingCount': config.realTradingCount || 2,
+            'validationAmount': config.validationAmount || 50,
+            'minTrades': config.minTrades || 10,
+            'minWinRate': config.minWinRate || 65,
+            'realTradingAmount': config.realTradingAmount || 100,
+            'minProfit': config.minProfit || 0,
+            'maxDrawdown': config.maxDrawdown || 10,
+            'minSharpeRatio': config.minSharpeRatio || 1.0,
+            'maxPositionSize': config.maxPositionSize || 100,
+            'stopLossPercent': config.stopLossPercent || 5,
+            'takeProfitPercent': config.takeProfitPercent || 4,
+            'maxHoldingMinutes': config.maxHoldingMinutes || 30,
+            'minProfitForTimeStop': config.minProfitForTimeStop || 1,
+            'eliminationDays': config.eliminationDays || 7,
+            'minScore': config.minScore || 50
+        };
+        
+        Object.entries(configMapping).forEach(([key, value]) => {
+            const element = document.getElementById(key);
+            if (element) {
+                element.value = value;
+            }
+        });
+        
+        console.log('✅ 管理配置显示已更新');
+    }
+}
+
+// 🔥 统一的进化日志滚动管理器
+class UnifiedEvolutionLogManager {
+    constructor() {
+        this.logs = [];
+        this.isLoading = false;
+        this.refreshInterval = 30000; // 30秒刷新一次
+        this.refreshTimer = null;
+        
+        // 滚动配置
+        this.verticalConfig = {
+            containerId: 'evolutionTicker',
+            maxLogs: 30,
+            scrollType: 'vertical',
+            animationDuration: 60000 // 60秒完整滚动
+        };
+        
+        this.horizontalConfig = {
+            containerId: 'strategyManagementEvolutionTicker', 
+            maxLogs: 10,
+            scrollType: 'horizontal',
+            animationDuration: 40000 // 40秒完整滚动
+        };
+    }
+    
+    // 开始日志轮询
+    startPolling() {
+        // 立即加载一次
+        this.loadLogs();
+        
+        // 定时刷新
+        this.refreshTimer = setInterval(() => {
+            this.loadLogs();
+        }, this.refreshInterval);
+        
+        console.log('✅ 进化日志轮询已启动');
+    }
+    
+    // 停止日志轮询
+    stopPolling() {
+        if (this.refreshTimer) {
+            clearInterval(this.refreshTimer);
+            this.refreshTimer = null;
+        }
+        console.log('⏹️ 进化日志轮询已停止');
+    }
+    
+    // 加载日志数据
+    async loadLogs() {
+        if (this.isLoading) return;
+        
+        this.isLoading = true;
+        try {
+            const response = await fetch('/api/quantitative/evolution-log');
+            const data = await response.json();
+            
+            if (data.success && data.logs) {
+                this.logs = data.logs;
+                this.renderAllViews();
+                
+                // 保存到全局变量供其他功能使用
+                if (window.app) {
+                    window.app.allEvolutionLogs = this.logs;
+                }
+            }
+        } catch (error) {
+            console.error('❌ 加载进化日志失败:', error);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+    
+    // 渲染所有视图
+    renderAllViews() {
+        this.renderVerticalView();
+        this.renderHorizontalView();
+        this.updateLogCount();
+    }
+    
+    // 渲染垂直滚动视图（策略进化实时监控区域）
+    renderVerticalView() {
+        const container = document.getElementById(this.verticalConfig.containerId);
+        if (!container) return;
+        
+        if (!this.logs || this.logs.length === 0) {
+            container.innerHTML = '<div class="ticker-item"><span class="text-muted">暂无进化日志...</span></div>';
+            return;
+        }
+        
+        // 🔥 修复：取最新的30条日志，确保显示最新数据
+        const recentLogs = [...this.logs]
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .slice(0, this.verticalConfig.maxLogs);
+        
+        const tickerContent = recentLogs.map(log => {
+            const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            let actionClass = 'created';
+            let actionText = '新增';
+            let actionIcon = '🆕';
+            
+            switch(log.action) {
+                case 'created':
+                    actionClass = 'created';
+                    actionText = '新增';
+                    actionIcon = '🆕';
+                    break;
+                case 'eliminated':
+                    actionClass = 'eliminated';
+                    actionText = '淘汰';
+                    actionIcon = '❌';
+                    break;
+                case 'optimized':
+                    actionClass = 'optimized';
+                    actionText = '优化';
+                    actionIcon = '⚡';
+                    break;
+                case 'validated':
+                    actionClass = 'validated';
+                    actionText = '验证';
+                    actionIcon = '✅';
+                    break;
+                case 'promoted':
+                    actionClass = 'promoted';
+                    actionText = '晋级';
+                    actionIcon = '🔝';
+                    break;
+                case 'protected':
+                    actionClass = 'protected';
+                    actionText = '保护';
+                    actionIcon = '🛡️';
+                    break;
+                case 'evolved':
+                    actionClass = 'evolved';
+                    actionText = '进化';
+                    actionIcon = '🧬';
+                    break;
+                default:
+                    actionIcon = '📊';
+                    actionText = log.action || '系统活动';
+            }
+
+            // 🔥 使用完整的details信息，确保显示完整内容
+            const message = log.details || log.message || '策略进化中...';
+
+            return `
+                <div class="ticker-item">
+                    <span class="time">${time}</span>
+                    <span class="action ${actionClass}">${actionIcon} ${actionText}</span>
+                    <span class="message">${message}</span>
+                    ${log.strategy_id ? `<span class="strategy-id" data-id="${log.strategy_id}">ID: ${log.strategy_id.substring(0, 8)}</span>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        // 平滑更新内容
+        container.style.opacity = '0.7';
+        setTimeout(() => {
+            container.innerHTML = tickerContent;
+            container.style.opacity = '1';
+        }, 200);
+    }
+    
+    // 渲染水平滚动视图（策略管理标题右侧）
+    renderHorizontalView() {
+        const container = document.getElementById(this.horizontalConfig.containerId);
+        if (!container) return;
+        
+        if (!this.logs || this.logs.length === 0) {
+            container.innerHTML = '<div class="log-item"><span class="text-muted">暂无进化日志</span></div>';
+            return;
+        }
+        
+        // 🔥 修复：取最新的10条日志用于横向滚动，确保显示最新且完整的信息
+        const recentLogs = [...this.logs]
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .slice(0, this.horizontalConfig.maxLogs);
+        
+        const logItems = recentLogs.map(log => {
+            const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            let actionText = '';
+            let colorClass = 'text-muted';
+            
+            switch(log.action) {
+                case 'created':
+                    actionText = '创建策略';
+                    colorClass = 'text-success';
+                    break;
+                case 'optimized':
+                    actionText = '优化策略';
+                    colorClass = 'text-info';
+                    break;
+                case 'promoted':
+                    actionText = '提升策略';
+                    colorClass = 'text-warning';
+                    break;
+                case 'protected':
+                    actionText = '保护策略';
+                    colorClass = 'text-secondary';
+                    break;
+                case 'evolved':
+                    actionText = '进化策略';
+                    colorClass = 'text-primary';
+                    break;
+                case 'eliminated':
+                    actionText = '淘汰策略';
+                    colorClass = 'text-danger';
+                    break;
+                default:
+                    // 🔥 修复：使用完整的details字段，确保显示完整信息
+                    actionText = log.details || log.action || '系统活动';
+                    colorClass = 'text-muted';
+            }
+
+            return `
+                <div class="log-item">
+                    <span class="${colorClass}">[${time}] ${actionText}</span>
+                    ${log.strategy_name ? `<small class="text-muted"> - ${log.strategy_name}</small>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = logItems;
+    }
+    
+    // 更新日志计数
+    updateLogCount() {
+        const countElement = document.getElementById('evolutionLogCount');
+        if (countElement && this.logs) {
+            countElement.textContent = `${this.logs.length} 条记录`;
+        }
+    }
+    
+    // 手动刷新
+    refresh() {
+        this.loadLogs();
     }
 }
 
