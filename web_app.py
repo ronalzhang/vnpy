@@ -4291,11 +4291,7 @@ def get_strategy_logs_by_category(strategy_id):
         log_type = request.args.get('type')  # real_trading, validation, evolution
         limit = int(request.args.get('limit', 100))
         
-        if not quantitative_service:
-            return jsonify({
-                'success': False,
-                'message': '量化服务未初始化'
-            }), 500
+        # 前端服务不需要quantitative_service，直接使用数据库查询
         
         # 检查是否有增强日志表
         conn = get_db_connection()
@@ -4309,8 +4305,16 @@ def get_strategy_logs_by_category(strategy_id):
         has_unified_table = cursor.fetchone() is not None
         
         if has_unified_table:
-            # 使用新的增强日志系统
-            logs = quantitative_service.get_strategy_logs_by_category(strategy_id, log_type, limit)
+            # 使用新的增强日志系统 - 直接查询数据库
+            cursor.execute("""
+                SELECT * FROM unified_strategy_logs 
+                WHERE strategy_id = ? AND (? IS NULL OR log_type = ?)
+                ORDER BY created_at DESC 
+                LIMIT ?
+            """, (strategy_id, log_type, log_type, limit))
+            
+            rows = cursor.fetchall()
+            logs = [dict(zip([column[0] for column in cursor.description], row)) for row in rows]
             
             # 按日志类型分类整理
             categorized_logs = {
