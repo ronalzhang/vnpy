@@ -1146,9 +1146,44 @@ def quantitative_strategies():
                 if limit > 0:
                     strategies = strategies[:limit]
                 
-                # 格式化策略数据以兼容前端（现代化版本）
+                # 🔥 修复现代化系统：重新计算胜率和收益，确保与详情页API数据一致
                 formatted_strategies = []
                 for strategy in strategies:
+                    # 🔥 为每个策略重新计算真实数据
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    
+                    cursor.execute("""
+                        SELECT COUNT(*) as total_trades,
+                               COUNT(CASE WHEN expected_return > 0 AND expected_return <= 100 THEN 1 END) as wins,
+                               SUM(CASE WHEN expected_return BETWEEN -100 AND 100 THEN expected_return ELSE 0 END) as total_pnl
+                        FROM trading_signals
+                        WHERE strategy_id = %s AND expected_return IS NOT NULL AND executed = 1
+                    """, (strategy['id'],))
+                    
+                    trade_stats = cursor.fetchone()
+                    actual_total_trades = trade_stats[0] if trade_stats else 0
+                    wins = trade_stats[1] if trade_stats else 0
+                    total_pnl = trade_stats[2] if trade_stats else 0.0
+                    
+                    # 🔥 使用与详情页API完全相同的胜率计算逻辑
+                    calculated_win_rate = (wins / actual_total_trades * 100) if actual_total_trades > 0 else 0
+                    
+                    # 🔥 使用与详情页API完全相同的收益率计算逻辑
+                    total_return_percentage = 0.0
+                    if actual_total_trades > 0 and total_pnl is not None:
+                        average_investment_per_trade = 50.0  # 验证交易金额
+                        total_investment = actual_total_trades * average_investment_per_trade
+                        if total_investment > 0:
+                            total_return_percentage = (float(total_pnl) / total_investment)
+                            total_return_percentage = max(-0.5, min(total_return_percentage, 0.5))
+                    
+                    cursor.close()
+                    conn.close()
+                    
+                    # 🔧 调试输出
+                    print(f"📊 现代化策略API - {strategy['id']}: 已执行={actual_total_trades}, 盈利={wins}, 计算成功率={calculated_win_rate:.2f}%")
+                    
                     formatted_strategy = {
                         'id': strategy['id'],
                         'name': strategy['name'],
@@ -1157,15 +1192,15 @@ def quantitative_strategies():
                         'enabled': True,  # 现代化系统不使用启用/停用概念
                         'final_score': strategy['final_score'],
                         'parameters': strategy.get('parameters', {'quantity': 100, 'threshold': 0.02}),
-                        'total_trades': strategy.get('effective_trades', max(strategy['actual_trades'], strategy['total_trades'])),
-                        'win_rate': strategy['win_rate'] if strategy['win_rate'] > 10 else strategy['win_rate'] * 100,  # 修复胜率显示
-                        'total_return': strategy['total_return'],
+                        'total_trades': actual_total_trades,  # 🔥 使用重新计算的交易次数
+                        'win_rate': round(calculated_win_rate, 2),  # 🔥 使用重新计算的胜率
+                        'total_return': round(total_return_percentage, 2),  # 🔥 使用重新计算的收益率
                         'generation': 1,  # 简化显示
                         'cycle': 1,
                         'evolution_display': '策略池优选',
                         'trade_mode': strategy.get('tier', 'display'),
                         'created_at': strategy.get('created_at', ''),
-                        'daily_return': round(strategy['total_return'] / 30, 6),
+                        'daily_return': round(total_return_percentage / 30, 6),  # 🔥 基于重新计算的收益率
                         'sharpe_ratio': 0.0,
                         'max_drawdown': 0.05,
                         'profit_factor': 1.0,
