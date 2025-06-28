@@ -120,25 +120,23 @@ def fix_trading_logs_system():
         migrated_signals = cursor.rowcount
         print(f"   ✅ 迁移了 {migrated_signals} 条交易信号记录")
         
-        # 迁移进化历史数据
+        # 迁移策略进化历史数据  
         cursor.execute("""
             INSERT INTO unified_strategy_logs 
-            (strategy_id, log_type, timestamp, signal_type, evolution_type, 
-             old_parameters, new_parameters, trigger_reason, improvement, success, notes)
+            (strategy_id, log_type, timestamp, notes, strategy_score, 
+             old_parameters, new_parameters)
             SELECT 
                 strategy_id,
                 'evolution' as log_type,
-                created_time,
-                'evolution' as signal_type,
-                evolution_type,
-                old_parameters::jsonb,
-                new_parameters::jsonb,
-                evolution_reason,
-                improvement,
-                success,
-                CONCAT('世代进化: ', notes) as notes
+                timestamp,
+                CONCAT('进化类型: ', evolution_type, ', 代数: ', generation, 
+                      ', 周期: ', cycle, ', 适应度: ', fitness,
+                      CASE WHEN notes IS NOT NULL THEN ', 备注: ' || notes ELSE '' END) as notes,
+                COALESCE(new_score, score_after, 50.0) as strategy_score,
+                parameters::text as old_parameters,
+                new_parameters::text as new_parameters
             FROM strategy_evolution_history 
-            WHERE created_time >= NOW() - INTERVAL '7 days'
+            WHERE timestamp >= NOW() - INTERVAL '7 days'
             ON CONFLICT DO NOTHING
         """)
         migrated_evolution = cursor.rowcount
