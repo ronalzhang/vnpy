@@ -1133,6 +1133,45 @@ def quantitative_strategies():
             # 🔥 恢复高级管理器，按分值排序显示策略（正确的业务逻辑）
             try:
                 from advanced_strategy_manager import strategy_manager
+                
+                limit = int(request.args.get('limit', None) or 0) 
+                print(f"🚀 策略API请求: limit={limit}")
+                
+                # 使用高级管理器获取显示策略
+                strategies = strategy_manager.get_display_strategies(limit if limit > 0 else None)
+                
+                # 格式化策略数据以兼容前端
+                formatted_strategies = []
+                for strategy in strategies:
+                    formatted_strategy = {
+                        'id': strategy['id'],
+                        'name': strategy['name'],
+                        'symbol': strategy['symbol'] or 'BTC/USDT',
+                        'type': strategy['type'] or 'momentum', 
+                        'enabled': strategy['enabled'],
+                        'final_score': float(strategy['final_score']) if strategy['final_score'] else 0.0,
+                        'parameters': strategy.get('parameters', {'quantity': 100, 'threshold': 0.02}),
+                        'total_trades': strategy['total_trades'],
+                        'win_rate': float(strategy['win_rate']) if strategy['win_rate'] else 0.0,
+                        'total_return': float(strategy['total_return']) if strategy['total_return'] else 0.0,
+                        'generation': strategy.get('generation', 1),
+                        'cycle': strategy.get('cycle', 1),
+                        'evolution_display': f"第{strategy.get('generation', 1)}代第{strategy.get('cycle', 1)}轮",
+                        'trade_mode': 'verification' if float(strategy['final_score'] or 0) < 65 else 'real',
+                        'created_at': strategy.get('created_at', ''),
+                        'daily_return': round(float(strategy['total_return'] or 0) / 30, 6),
+                        'sharpe_ratio': 0.0,
+                        'max_drawdown': 0.05,
+                        'profit_factor': 1.0,
+                        'volatility': 0.02
+                    }
+                    formatted_strategies.append(formatted_strategy)
+                
+                return jsonify({
+                    "status": "success", 
+                    "data": formatted_strategies
+                })
+                
             except ImportError as ie:
                 print(f"⚠️ 高级管理器不可用，使用基础查询: {ie}")
                 # 🔥 修复：统一使用有交易数据的STRAT_格式策略，避免显示空数据策略
