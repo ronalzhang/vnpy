@@ -852,37 +852,132 @@
     color: #999;
 }
 
-/* ==================== Toggle按钮样式 ==================== */
+/* ==================== 现代化Toggle按钮样式 ==================== */
 .btn-toggle {
     position: relative;
-    width: 60px;
-    height: 30px;
-    border-radius: 15px;
-    border: none;
-    background-color: #ccc;
-    transition: background-color 0.3s;
+    width: 70px;
+    height: 36px;
+    background: linear-gradient(135deg, #e9ecef, #ced4da);
+    border: 2px solid #dee2e6;
+    border-radius: 20px;
     cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    box-shadow: 
+        inset 0 2px 4px rgba(0,0,0,0.1),
+        0 1px 3px rgba(0,0,0,0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 2px;
+    overflow: hidden;
 }
 
+.btn-toggle:hover {
+    transform: translateY(-1px);
+    box-shadow: 
+        inset 0 2px 4px rgba(0,0,0,0.1),
+        0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* 量化系统按钮 - 蓝色 */
+.btn-toggle[data-system="quantitative"].active {
+    background: linear-gradient(135deg, #1677ff, #4096ff);
+    border-color: #1677ff;
+    box-shadow: 
+        inset 0 2px 4px rgba(22,119,255,0.2),
+        0 0 20px rgba(22,119,255,0.3);
+}
+
+/* 真实交易按钮 - 红色警告 */
+.btn-toggle[data-system="auto-trading"] {
+    width: 74px;
+}
+
+.btn-toggle[data-system="auto-trading"].active {
+    background: linear-gradient(135deg, #ff7875, #ff4d4f);
+    border-color: #ff4d4f;
+    box-shadow: 
+        inset 0 2px 4px rgba(255,77,79,0.2),
+        0 0 20px rgba(255,77,79,0.3);
+}
+
+/* 默认激活状态 - 绿色 */
 .btn-toggle.active {
-    background-color: var(--success-color);
+    background: linear-gradient(135deg, #52c41a, #73d13d);
+    border-color: #52c41a;
+    box-shadow: 
+        inset 0 2px 4px rgba(82,196,26,0.2),
+        0 0 20px rgba(82,196,26,0.3);
 }
 
+/* 滑块样式 */
 .btn-toggle::after {
     content: '';
     position: absolute;
-    width: 24px;
-    height: 24px;
+    width: 30px;
+    height: 30px;
+    background: linear-gradient(135deg, #ffffff, #f8f9fa);
     border-radius: 50%;
-    background-color: white;
-    top: 3px;
-    left: 3px;
-    transition: left 0.3s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 2px 8px rgba(0,0,0,0.15),
+        0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid rgba(0,0,0,0.1);
+    top: 2px;
+    left: 2px;
 }
 
 .btn-toggle.active::after {
-    left: 33px;
+    transform: translateX(36px);
+    background: linear-gradient(135deg, #ffffff, #f0f9ff);
+    box-shadow: 
+        0 3px 12px rgba(0,0,0,0.2),
+        0 1px 4px rgba(0,0,0,0.1);
+}
+
+.btn-toggle[data-system="auto-trading"].active::after {
+    transform: translateX(40px);
+}
+
+/* 文字指示器 */
+.btn-toggle::before {
+    content: '关';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    font-weight: 600;
+    color: #6c757d;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.btn-toggle.active::before {
+    content: '开';
+    left: 10px;
+    right: auto;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* 特殊文字：真实交易按钮 */
+.btn-toggle[data-system="auto-trading"]::before {
+    font-size: 10px;
+    right: 8px;
+}
+
+.btn-toggle[data-system="auto-trading"]:not(.active)::before {
+    content: '禁用';
+    right: 8px;
+}
+
+.btn-toggle[data-system="auto-trading"].active::before {
+    content: '启用';
+    left: 8px;
+    color: #ffffff;
 }
 
 /* ==================== 性能图表样式 ==================== */
