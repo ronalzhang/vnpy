@@ -291,7 +291,7 @@ class QuantitativeSystem {
         this.evolutionRenderer = new EnhancedEvolutionRenderer();
         
         this.bindEvents();
-        this.initChart();
+        // this.initChart(); // 已移除 - 图表功能未实现
         this.loadSystemStatus(); // 加载真实系统状态
         this.startAutoRefresh();
         this.initEvolutionLog(); // 初始化进化日志
