@@ -1229,11 +1229,12 @@ def quantitative_strategies():
                 # 🔥 按分值排序显示策略，优先显示高分策略（正确的业务逻辑）
                 simple_query = f"""
                     SELECT DISTINCT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
-                           COUNT(t.id) as trade_count, MAX(t.timestamp) as latest_trade
+                           COUNT(t.id) as trade_count, MAX(t.timestamp) as latest_trade,
+                           s.generation, s.cycle
                     FROM strategies s
                     LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
                     WHERE s.id LIKE 'STRAT_%'
-                    GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.final_score
+                    GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.final_score, s.generation, s.cycle
                     ORDER BY s.final_score DESC, COUNT(t.id) DESC, MAX(t.timestamp) DESC
                     LIMIT {limit}
                 """
@@ -1244,7 +1245,7 @@ def quantitative_strategies():
                 strategies = []
                 for row in rows:
                     try:
-                        sid, name, symbol, stype, enabled, score, trade_count, latest_trade = row
+                        sid, name, symbol, stype, enabled, score, trade_count, latest_trade, generation, cycle = row
                         
                         # 🔥 计算真实的win_rate和total_return
                         cursor.execute("""
@@ -1282,9 +1283,9 @@ def quantitative_strategies():
                             'total_trades': actual_total_trades,
                             'win_rate': round(calculated_win_rate, 2),
                             'total_return': round(total_return_percentage, 2),
-                            'generation': 1,
-                            'cycle': 1,
-                            'evolution_display': '第1代第1轮',
+                            'generation': generation or 1,
+                            'cycle': cycle or 1,
+                            'evolution_display': f"第{generation or 1}代第{cycle or 1}轮",
                             'trade_mode': 'verification' if float(score or 0) < 65 else 'real',
                             'created_at': '',
                             'daily_return': round(total_return_percentage / 30, 6) if total_return_percentage else 0.0,
