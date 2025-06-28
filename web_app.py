@@ -4454,10 +4454,23 @@ def get_strategy_trade_logs_compatible(strategy_id, log_type=None, limit=100):
             
             # 根据日志类型填充不同字段
             if row[-1] == 'evolution':
+                # 🔥 修复：处理JSONB字段，避免重复JSON解析
+                old_params = row[2]
+                if isinstance(old_params, str):
+                    old_params = json.loads(old_params)
+                elif old_params is None:
+                    old_params = {}
+                
+                new_params = row[3]
+                if isinstance(new_params, str):
+                    new_params = json.loads(new_params)
+                elif new_params is None:
+                    new_params = {}
+                
                 log_dict.update({
                     'signal_type': row[1],
-                    'old_parameters': json.loads(row[2]) if row[2] else {},
-                    'new_parameters': json.loads(row[3]) if row[3] else {},
+                    'old_parameters': old_params,
+                    'new_parameters': new_params,
                     'trigger_reason': row[4],
                     'target_success_rate': float(row[5]) if row[5] else 0
                 })
