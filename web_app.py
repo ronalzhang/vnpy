@@ -1157,8 +1157,8 @@ def quantitative_strategies():
                         'enabled': True,  # 现代化系统不使用启用/停用概念
                         'final_score': strategy['final_score'],
                         'parameters': strategy.get('parameters', {'quantity': 100, 'threshold': 0.02}),
-                        'total_trades': strategy['actual_trades'],  # 使用真实交易次数
-                        'win_rate': strategy['win_rate'],
+                        'total_trades': strategy.get('effective_trades', max(strategy['actual_trades'], strategy['total_trades'])),
+                        'win_rate': strategy['win_rate'] if strategy['win_rate'] > 10 else strategy['win_rate'] * 100,  # 修复胜率显示
                         'total_return': strategy['total_return'],
                         'generation': 1,  # 简化显示
                         'cycle': 1,
