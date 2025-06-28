@@ -882,16 +882,20 @@
         
         // 🔥 全局函数：策略日志查看
         window.showStrategyLogs = function(strategyId) {
-            if (window.app && window.app.showStrategyLogs) {
+            if (window.app && typeof window.app.showStrategyLogs === 'function') {
                 window.app.showStrategyLogs(strategyId);
             } else {
-                console.error('❌ app对象或showStrategyLogs方法未初始化');
+                console.error('❌ app对象或showStrategyLogs方法未初始化', {
+                    hasApp: !!window.app,
+                    hasMethod: window.app ? typeof window.app.showStrategyLogs : 'no app',
+                    appMethods: window.app ? Object.getOwnPropertyNames(Object.getPrototypeOf(window.app)) : 'no app'
+                });
             }
         };
         
         // 🔥 全局函数：策略配置
         window.showStrategyConfig = function(strategyId) {
-            if (window.app && window.app.showStrategyConfig) {
+            if (window.app && typeof window.app.showStrategyConfig === 'function') {
                 window.app.showStrategyConfig(strategyId);
             } else {
                 console.error('❌ app对象或showStrategyConfig方法未初始化');
@@ -900,7 +904,7 @@
         
         // 🔥 全局函数：余额图表切换
         window.toggleBalanceChart = function(period) {
-            if (window.app && window.app.toggleBalanceChart) {
+            if (window.app && typeof window.app.toggleBalanceChart === 'function') {
                 window.app.toggleBalanceChart(period);
             } else {
                 console.error('❌ app对象或toggleBalanceChart方法未初始化');
