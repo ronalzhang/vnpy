@@ -76,7 +76,7 @@ def fix_strategy_enabled_status():
             # 批量启用前端显示策略
             cursor.execute("""
                 UPDATE strategies 
-                SET enabled = TRUE, updated_at = CURRENT_TIMESTAMP
+                SET enabled = 1, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ANY(%s)
             """, (display_strategy_ids,))
             
@@ -87,7 +87,7 @@ def fix_strategy_enabled_status():
             print("\n🚫 4. 停用非前端显示策略...")
             cursor.execute("""
                 UPDATE strategies 
-                SET enabled = FALSE, updated_at = CURRENT_TIMESTAMP
+                SET enabled = 0, updated_at = CURRENT_TIMESTAMP
                 WHERE id LIKE 'STRAT_%' AND id != ALL(%s)
             """, (display_strategy_ids,))
             
@@ -101,22 +101,20 @@ def fix_strategy_enabled_status():
         # 5. 添加配置禁用旧的策略轮换逻辑
         print("\n🔒 5. 禁用旧的策略轮换逻辑...")
         cursor.execute("""
-            INSERT INTO strategy_management_config (config_key, config_value, description, updated_at)
-            VALUES ('strategy_rotation_enabled', 'false', '禁用旧的策略轮换逻辑', CURRENT_TIMESTAMP)
+            INSERT INTO strategy_management_config (config_key, config_value, updated_at)
+            VALUES ('strategy_rotation_enabled', 'false', CURRENT_TIMESTAMP)
             ON CONFLICT (config_key) 
             DO UPDATE SET 
                 config_value = 'false',
-                description = '禁用旧的策略轮换逻辑',
                 updated_at = CURRENT_TIMESTAMP
         """)
         
         cursor.execute("""
-            INSERT INTO strategy_management_config (config_key, config_value, description, updated_at)
-            VALUES ('auto_disable_enabled', 'false', '禁用自动停用策略功能', CURRENT_TIMESTAMP)
+            INSERT INTO strategy_management_config (config_key, config_value, updated_at)
+            VALUES ('auto_disable_enabled', 'false', CURRENT_TIMESTAMP)
             ON CONFLICT (config_key) 
             DO UPDATE SET 
                 config_value = 'false',
-                description = '禁用自动停用策略功能',
                 updated_at = CURRENT_TIMESTAMP
         """)
         
@@ -125,8 +123,8 @@ def fix_strategy_enabled_status():
         cursor.execute("""
             SELECT 
                 COUNT(*) as total_strategies,
-                COUNT(*) FILTER (WHERE enabled = TRUE) as enabled_strategies,
-                COUNT(*) FILTER (WHERE enabled = FALSE) as disabled_strategies
+                COUNT(*) FILTER (WHERE enabled = 1) as enabled_strategies,
+                COUNT(*) FILTER (WHERE enabled = 0) as disabled_strategies
             FROM strategies 
             WHERE id LIKE 'STRAT_%'
         """)
@@ -194,22 +192,21 @@ def disable_old_rotation_logic():
         
         # 添加控制标志
         configs = [
-            ('modern_system_enabled', 'true', '启用现代化策略管理系统'),
-            ('legacy_rotation_disabled', 'true', '禁用旧的策略轮换功能'),
-            ('auto_disable_strategies', 'false', '禁用自动停用策略功能'),
-            ('enable_all_display_strategies', 'true', '启用所有前端显示策略')
+            ('modern_system_enabled', 'true'),
+            ('legacy_rotation_disabled', 'true'),
+            ('auto_disable_strategies', 'false'),
+            ('enable_all_display_strategies', 'true')
         ]
         
-        for config_key, config_value, description in configs:
+        for config_key, config_value in configs:
             cursor.execute("""
-                INSERT INTO strategy_management_config (config_key, config_value, description, updated_at)
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO strategy_management_config (config_key, config_value, updated_at)
+                VALUES (%s, %s, CURRENT_TIMESTAMP)
                 ON CONFLICT (config_key) 
                 DO UPDATE SET 
                     config_value = %s,
-                    description = %s,
                     updated_at = CURRENT_TIMESTAMP
-            """, (config_key, config_value, description, config_value, description))
+            """, (config_key, config_value, config_value))
         
         conn.commit()
         conn.close()
