@@ -123,18 +123,17 @@ def fix_trading_logs_system():
         # 迁移策略进化历史数据  
         cursor.execute("""
             INSERT INTO unified_strategy_logs 
-            (strategy_id, log_type, timestamp, notes, strategy_score, 
-             old_parameters, new_parameters)
+            (strategy_id, log_type, timestamp, notes, strategy_score)
             SELECT 
                 strategy_id,
                 'evolution' as log_type,
                 timestamp,
-                CONCAT('进化类型: ', evolution_type, ', 代数: ', generation, 
-                      ', 周期: ', cycle, ', 适应度: ', fitness,
+                CONCAT('进化类型: ', COALESCE(evolution_type, 'unknown'), 
+                      ', 代数: ', generation, 
+                      ', 周期: ', cycle, 
+                      ', 适应度: ', fitness,
                       CASE WHEN notes IS NOT NULL THEN ', 备注: ' || notes ELSE '' END) as notes,
-                COALESCE(new_score, score_after, 50.0) as strategy_score,
-                parameters::text as old_parameters,
-                new_parameters::text as new_parameters
+                COALESCE(new_score, score_after, 50.0) as strategy_score
             FROM strategy_evolution_history 
             WHERE timestamp >= NOW() - INTERVAL '7 days'
             ON CONFLICT DO NOTHING
