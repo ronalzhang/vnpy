@@ -124,48 +124,87 @@ class StrategyPoolOptimizer:
             conn.close()
             return {}
     
-    def identify_cleanup_candidates(self) -> List[str]:
-        """识别需要清理的策略"""
+    def get_protected_strategies(self) -> List[str]:
+        """获取受保护的策略ID（前端显示策略）"""
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
         try:
-            # 清理策略的优先级规则
+            # 从配置表获取最大策略数量
+            cursor.execute("SELECT config_value FROM strategy_management_config WHERE config_key = 'maxStrategies'")
+            result = cursor.fetchone()
+            max_display_strategies = int(result[0]) if result else 21
+            
+            # 获取当前前端显示的策略（受保护，不参与清理）
+            cursor.execute("""
+                SELECT id FROM strategies 
+                WHERE final_score >= 30 
+                AND total_trades > 0
+                ORDER BY final_score DESC, total_trades DESC
+                LIMIT %s
+            """, (max_display_strategies,))
+            
+            protected_ids = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            
+            logger.info(f"🛡️ 受保护策略: {len(protected_ids)}个 (前端显示策略)")
+            return protected_ids
+            
+        except Exception as e:
+            logger.error(f"❌ 获取受保护策略失败: {e}")
+            conn.close()
+            return []
+    
+    def identify_cleanup_candidates(self) -> List[str]:
+        """识别需要清理的策略 - 排除前端显示策略"""
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # 获取受保护的策略ID
+            protected_strategies = self.get_protected_strategies()
+            protected_ids_str = "', '".join(protected_strategies)
+            exclude_condition = f"AND id NOT IN ('{protected_ids_str}')" if protected_strategies else ""
+            
+            # 清理策略的优先级规则 - 排除前端显示策略
             cleanup_queries = []
             
-            # 1. 超低分策略 (评分<20分)
+            # 1. 超低分策略 (评分<20分且非前端显示)
             cleanup_queries.append((
                 "very_low_score",
-                "SELECT id FROM strategies WHERE final_score < 20 ORDER BY final_score ASC",
+                f"SELECT id FROM strategies WHERE final_score < 20 {exclude_condition} ORDER BY final_score ASC",
                 "清理超低分策略"
             ))
             
-            # 2. 无交易记录的低分策略 (评分<40分且无交易)
+            # 2. 无交易记录的低分策略 (评分<40分且无交易且非前端显示)
             cleanup_queries.append((
                 "inactive_low_score", 
-                "SELECT id FROM strategies WHERE final_score < 40 AND total_trades = 0 ORDER BY final_score ASC",
+                f"SELECT id FROM strategies WHERE final_score < 40 AND total_trades = 0 {exclude_condition} ORDER BY final_score ASC",
                 "清理无交易的低分策略"
             ))
             
-            # 3. 长期未更新的中低分策略 (评分<50分且30天未更新)
+            # 3. 长期未更新的中低分策略 (评分<50分且30天未更新且非前端显示)
             cleanup_queries.append((
                 "outdated_medium_score",
-                "SELECT id FROM strategies WHERE final_score < 50 AND updated_at < NOW() - INTERVAL '30 days' ORDER BY final_score ASC, updated_at ASC",
+                f"SELECT id FROM strategies WHERE final_score < 50 AND updated_at < NOW() - INTERVAL '30 days' {exclude_condition} ORDER BY final_score ASC, updated_at ASC",
                 "清理过时的中低分策略"
             ))
             
-            # 4. 极少交易的低分策略 (评分<45分且交易<5次)
+            # 4. 极少交易的低分策略 (评分<45分且交易<5次且非前端显示)
             cleanup_queries.append((
                 "minimal_activity_low_score",
-                "SELECT id FROM strategies WHERE final_score < 45 AND total_trades < 5 ORDER BY final_score ASC, total_trades ASC",
+                f"SELECT id FROM strategies WHERE final_score < 45 AND total_trades < 5 {exclude_condition} ORDER BY final_score ASC, total_trades ASC",
                 "清理低活跃度策略"
             ))
             
             cleanup_candidates = []
             current_count = self.analyze_strategy_pool()['total_count']
+            # 目标：保留10000个策略，其中包含前端显示的策略
             target_cleanup = current_count - self.target_pool_size
             
-            logger.info(f"🎯 目标清理策略数: {target_cleanup}")
+            logger.info(f"🎯 当前策略池: {current_count}个")
+            logger.info(f"🛡️ 受保护策略: {len(protected_strategies)}个 (前端显示)")
+            logger.info(f"🗑️ 目标清理: {target_cleanup}个 (保留{self.target_pool_size}个总策略)")
             
             for category, query, description in cleanup_queries:
                 if len(cleanup_candidates) >= target_cleanup:
@@ -183,6 +222,7 @@ class StrategyPoolOptimizer:
             
             conn.close()
             logger.info(f"✅ 总计识别清理候选: {len(cleanup_candidates)}个策略")
+            logger.info(f"🎯 清理后预期: {current_count - len(cleanup_candidates)}个策略 (包含{len(protected_strategies)}个前端显示策略)")
             return cleanup_candidates[:target_cleanup]
             
         except Exception as e:
