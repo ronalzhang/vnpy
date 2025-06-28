@@ -9,6 +9,7 @@
 """
 
 import psycopg2
+import psycopg2.extras
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List
@@ -261,7 +262,7 @@ class StrategyPoolOptimizer:
                             backup_time = CURRENT_TIMESTAMP,
                             original_data = EXCLUDED.original_data,
                             deletion_reason = EXCLUDED.deletion_reason
-                    """, (strategy_id, strategy_data[0], "策略池优化清理"))
+                    """, (strategy_id, psycopg2.extras.Json(strategy_data[0]), "策略池优化清理"))
             
             conn.commit()
             conn.close()
