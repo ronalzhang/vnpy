@@ -1130,10 +1130,9 @@ def quantitative_strategies():
     
     if request.method == 'GET':
         try:
-            # 🔥 强制使用基础查询以显示最新活跃策略
+            # 🔥 恢复高级管理器，按分值排序显示策略（正确的业务逻辑）
             try:
-                # 模拟ImportError，直接跳到基础查询
-                raise ImportError("强制使用基础查询以显示最新活跃策略")
+                from advanced_strategy_manager import strategy_manager
             except ImportError as ie:
                 print(f"⚠️ 高级管理器不可用，使用基础查询: {ie}")
                 # 🔥 修复：统一使用有交易数据的STRAT_格式策略，避免显示空数据策略
@@ -1142,15 +1141,15 @@ def quantitative_strategies():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # 🔥 优先查询有最新交易信号的STRAT_策略（按最新交易时间排序）
+                # 🔥 按分值排序显示策略，优先显示高分策略（正确的业务逻辑）
                 simple_query = f"""
                     SELECT DISTINCT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
                            COUNT(t.id) as trade_count, MAX(t.timestamp) as latest_trade
                     FROM strategies s
-                    INNER JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
+                    LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
                     WHERE s.id LIKE 'STRAT_%'
                     GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.final_score
-                    ORDER BY MAX(t.timestamp) DESC, COUNT(t.id) DESC, s.final_score DESC
+                    ORDER BY s.final_score DESC, COUNT(t.id) DESC, MAX(t.timestamp) DESC
                     LIMIT {limit}
                 """
                 
