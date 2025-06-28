@@ -2045,6 +2045,133 @@ class QuantitativeSystem {
             }
         }, 3000);
     }
+
+    // 🔥 新增：策略管理配置显示
+    showStrategyManagement() {
+        try {
+            // 加载管理配置
+            this.loadManagementConfig();
+            
+            // 显示策略管理模态框
+            const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
+            modal.show();
+        } catch (error) {
+            console.error('显示策略管理失败:', error);
+            this.showMessage('显示策略管理失败', 'error');
+        }
+    }
+
+    // 🔥 新增：余额图表切换
+    toggleBalanceChart(period) {
+        try {
+            console.log(`切换余额图表周期: ${period}天`);
+            
+            // 更新按钮状态
+            document.querySelectorAll('.btn-outline-primary').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // 查找对应的按钮并设置为激活状态
+            const buttons = document.querySelectorAll('.btn-outline-primary');
+            buttons.forEach(btn => {
+                if (btn.textContent.includes(period)) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // 这里可以添加实际的图表切换逻辑
+            // 例如调用图表库的API来更新数据
+            this.loadBalanceChart(period);
+            
+        } catch (error) {
+            console.error('切换余额图表失败:', error);
+            this.showMessage('切换图表失败', 'error');
+        }
+    }
+
+    // 🔥 新增：加载余额图表数据
+    async loadBalanceChart(period) {
+        try {
+            console.log(`加载${period}天的余额数据...`);
+            
+            // 发送请求获取余额历史数据
+            const response = await fetch(`/api/quantitative/balance-history?period=${period}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                // 这里可以集成图表库来渲染数据
+                console.log(`成功加载${period}天的余额数据:`, data.data);
+                this.showMessage(`已切换到${period}天视图`, 'success');
+            } else {
+                console.warn(`加载${period}天余额数据失败:`, data.message);
+                this.showMessage('暂无历史数据', 'warning');
+            }
+            
+        } catch (error) {
+            console.error('加载余额图表数据失败:', error);
+            // 不显示错误消息，避免过多提示
+        }
+    }
+
+    // 🔥 新增：获取策略名称
+    getStrategyName(strategyId) {
+        // 从策略列表中查找对应的策略名称
+        if (this.strategies) {
+            const strategy = this.strategies.find(s => s.id === strategyId);
+            return strategy ? strategy.name : `策略 ${strategyId}`;
+        }
+        return `策略 ${strategyId}`;
+    }
+
+    // 🔥 新增：查看全部日志
+    showAllLogs() {
+        try {
+            console.log('查看全部日志');
+            
+            // 可以显示一个包含所有策略日志的模态框
+            // 或者跳转到专门的日志页面
+            const content = '<div class="text-center"><p>暂无日志数据</p><p class="text-muted">日志功能正在开发中...</p></div>';
+            
+            this.showGenericModal('系统日志', content);
+            
+        } catch (error) {
+            console.error('显示全部日志失败:', error);
+            this.showMessage('显示日志失败', 'error');
+        }
+    }
+
+    // 🔥 新增：显示通用模态框
+    showGenericModal(title, content) {
+        const modalHtml = `
+            <div class="modal fade" id="genericModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">${title}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            ${content}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 移除旧模态框
+        const oldModal = document.getElementById('genericModal');
+        if (oldModal) oldModal.remove();
+        
+        // 添加新模态框
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('genericModal'));
+        modal.show();
+    }
 }
 
 // 🔥 移除重复的全局函数定义，这些函数已在HTML模板中定义，避免冲突 
