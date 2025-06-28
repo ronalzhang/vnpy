@@ -402,7 +402,20 @@ class RealTradingManager:
                 confidence = min(95.0, score)
                 
                 # 🔧 修复：正确设置trade_type和is_validation字段
-                trade_type = "real_trading" if score >= 65.0 else "score_verification"
+                # 🔧 修复：检查全局实盘交易开关，如果关闭则强制为验证交易
+            try:
+                cursor.execute("SELECT real_trading_enabled FROM real_trading_control WHERE id = 1")
+                real_trading_control = cursor.fetchone()
+                real_trading_enabled = real_trading_control[0] if real_trading_control else False
+                
+                # 如果实盘交易未启用，所有交易都应该是验证交易
+                if not real_trading_enabled:
+                    trade_type = "score_verification"
+                else:
+                    trade_type = "real_trading" if score >= 65.0 else "score_verification"
+            except Exception as e:
+                print(f"⚠️ 无法检查实盘交易开关，默认为验证交易: {e}")
+                trade_type = "score_verification"
                 is_validation = score < 65.0
                 
                 # 插入交易信号
