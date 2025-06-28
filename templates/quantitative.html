@@ -1065,9 +1065,9 @@
         // 🔥 全局变量声明（必须在初始化之前，但避免重复声明）
         // systemRunning、autoTradingEnabled、refreshTimer、evolutionLogTimer、managementConfig 已在 quantitative.js 中声明
         
-        // ✅ 确保app是全局变量
-        window.app = null;
-        var app = null; // 用于onclick事件的直接全局变量
+        // ✅ 确保app是全局变量（app变量已在quantitative.js中声明）
+        // window.app = null;  // 将在initializeApp()中设置
+        // var app = null;     // 已在quantitative.js中声明，避免重复
         
         // 🔥 统一的应用初始化函数
         function initializeApp() {
