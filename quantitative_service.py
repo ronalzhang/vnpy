@@ -3980,9 +3980,14 @@ class QuantitativeService:
                         is_validation=is_validation_trade
                     )
                     
-                    # 更新信号状态为已执行
-                    update_query = "UPDATE trading_signals SET executed = 1 WHERE id = %s"
-                    self.db_manager.execute_query(update_query, (signal_id,))
+                    # 🔧 修复：更新信号状态为已执行，同时修正trade_type和is_validation字段
+                    db_trade_type = "real_trading" if not is_validation_trade else "score_verification"
+                    update_query = """
+                        UPDATE trading_signals 
+                        SET executed = 1, trade_type = %s, is_validation = %s, strategy_score = %s
+                        WHERE id = %s
+                    """
+                    self.db_manager.execute_query(update_query, (db_trade_type, is_validation_trade, strategy_score, signal_id))
                     
                     # 🎯 策略评分更新（基于交易周期完成）
                     if cycle_info.get('cycle_completed'):
