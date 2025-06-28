@@ -1130,40 +1130,51 @@ def quantitative_strategies():
     
     if request.method == 'GET':
         try:
-            # 🔥 恢复高级管理器，按分值排序显示策略（正确的业务逻辑）
+            # 🚀 使用现代化分层策略管理系统 3.0
             try:
-                from advanced_strategy_manager import strategy_manager
+                from modern_strategy_manager import get_modern_strategy_manager
                 
                 limit = int(request.args.get('limit', None) or 0) 
-                print(f"🚀 策略API请求: limit={limit}")
+                print(f"🚀 现代化策略API请求: limit={limit}")
                 
-                # 使用高级管理器获取显示策略
-                strategies = strategy_manager.get_display_strategies(limit if limit > 0 else None)
+                # 使用现代化管理器获取前端显示策略
+                manager = get_modern_strategy_manager()
+                frontend_data = manager.get_frontend_display_data()
+                strategies = frontend_data['display_strategies']
                 
-                # 格式化策略数据以兼容前端
+                # 如果指定了limit，则截取
+                if limit > 0:
+                    strategies = strategies[:limit]
+                
+                # 格式化策略数据以兼容前端（现代化版本）
                 formatted_strategies = []
                 for strategy in strategies:
                     formatted_strategy = {
                         'id': strategy['id'],
                         'name': strategy['name'],
-                        'symbol': strategy['symbol'] or 'BTC/USDT',
-                        'type': strategy['type'] or 'momentum', 
-                        'enabled': strategy['enabled'],
-                        'final_score': float(strategy['final_score']) if strategy['final_score'] else 0.0,
+                        'symbol': strategy['symbol'],
+                        'type': strategy['type'], 
+                        'enabled': True,  # 现代化系统不使用启用/停用概念
+                        'final_score': strategy['final_score'],
                         'parameters': strategy.get('parameters', {'quantity': 100, 'threshold': 0.02}),
-                        'total_trades': strategy['total_trades'],
-                        'win_rate': float(strategy['win_rate']) if strategy['win_rate'] else 0.0,
-                        'total_return': float(strategy['total_return']) if strategy['total_return'] else 0.0,
-                        'generation': strategy.get('generation', 1),
-                        'cycle': strategy.get('cycle', 1),
-                        'evolution_display': f"第{strategy.get('generation', 1)}代第{strategy.get('cycle', 1)}轮",
-                        'trade_mode': 'verification' if float(strategy['final_score'] or 0) < 65 else 'real',
+                        'total_trades': strategy['actual_trades'],  # 使用真实交易次数
+                        'win_rate': strategy['win_rate'],
+                        'total_return': strategy['total_return'],
+                        'generation': 1,  # 简化显示
+                        'cycle': 1,
+                        'evolution_display': '策略池优选',
+                        'trade_mode': strategy.get('tier', 'display'),
                         'created_at': strategy.get('created_at', ''),
-                        'daily_return': round(float(strategy['total_return'] or 0) / 30, 6),
+                        'daily_return': round(strategy['total_return'] / 30, 6),
                         'sharpe_ratio': 0.0,
                         'max_drawdown': 0.05,
                         'profit_factor': 1.0,
-                        'volatility': 0.02
+                        'volatility': 0.02,
+                        # 🌟 现代化功能：策略层级和样式
+                        'tier': strategy.get('tier', 'display'),
+                        'is_trading': strategy.get('is_trading', False),
+                        'card_style': strategy.get('card_style', 'normal'),
+                        'evolution_status': strategy.get('evolution_status', 'normal')
                     }
                     formatted_strategies.append(formatted_strategy)
                 
