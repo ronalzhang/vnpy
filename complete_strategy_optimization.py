@@ -375,53 +375,9 @@ class CompleteStrategyOptimizer:
             conn.close()
             
     def _eliminate_poor_strategies(self, strategies: List[Dict[str, Any]]) -> int:
-        """淘汰低性能策略"""
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-        eliminated_count = 0
-        
-        try:
-            for strategy in strategies:
-                # 淘汰条件
-                should_eliminate = (
-                    strategy['final_score'] < self.config['elimination_threshold'] and
-                    strategy['trade_count'] >= 20 and
-                    (strategy['win_rate'] < 0.3 or strategy['total_pnl'] < -100)
-                )
-                
-                # 保护顶级策略
-                if strategy['final_score'] >= 70:
-                    should_eliminate = False
-                    
-                if should_eliminate:
-                    cursor.execute("""
-                        UPDATE strategies 
-                        SET enabled = false,
-                            last_updated = CURRENT_TIMESTAMP
-                        WHERE id = %s
-                    """, (strategy['id'],))
-                    
-                    # 记录淘汰日志
-                    cursor.execute("""
-                        INSERT INTO evolution_logs (strategy_id, generation, individual, action, details, score, timestamp)
-                        VALUES (%s, 1, 1, 'eliminated', %s, %s, CURRENT_TIMESTAMP)
-                    """, (
-                        strategy['id'],
-                        f"性能不佳被淘汰 - 分数: {strategy['final_score']:.2f}, 胜率: {strategy['win_rate']:.2f}",
-                        strategy['final_score']
-                    ))
-                    
-                    eliminated_count += 1
-                    
-            conn.commit()
-            
-        except Exception as e:
-            conn.rollback()
-            self.logger.error(f"❌ 策略淘汰失败: {e}")
-        finally:
-            conn.close()
-            
-        return eliminated_count
+        """淘汰低性能策略 - 已禁用"""
+        self.logger.info("🛡️ 策略淘汰功能已禁用，使用现代化策略管理系统")
+        return 0  # 直接返回，不执行淘汰
         
     def _generate_new_strategies(self, count: int) -> int:
         """生成新策略"""

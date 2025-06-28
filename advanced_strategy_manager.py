@@ -553,51 +553,9 @@ class AdvancedStrategyManager:
             return 0
     
     def _run_strategy_rotation(self) -> int:
-        """运行策略轮换"""
-        try:
-            conn = self.get_db_connection()
-            cursor = conn.cursor()
-            
-            # 禁用表现差的活跃策略
-            cursor.execute("""
-                UPDATE strategies 
-                SET enabled = false, updated_at = CURRENT_TIMESTAMP
-                WHERE id LIKE 'STRAT_%' 
-                  AND enabled = true
-                  AND (
-                      final_score < 45
-                      OR (total_trades >= 15 AND win_rate < 0.5)
-                  )
-            """)
-            
-            disabled_count = cursor.rowcount
-            
-            # 启用表现好的非活跃策略
-            cursor.execute("""
-                UPDATE strategies 
-                SET enabled = true, updated_at = CURRENT_TIMESTAMP
-                WHERE id LIKE 'STRAT_%' 
-                  AND enabled = false
-                  AND final_score >= 50
-                  AND total_trades >= 5
-                ORDER BY final_score DESC
-                LIMIT %s
-            """, (min(5, max(1, disabled_count))))
-            
-            enabled_count = cursor.rowcount
-            
-            conn.commit()
-            cursor.close()
-            conn.close()
-            
-            if disabled_count > 0 or enabled_count > 0:
-                self.logger.info(f"🔄 策略轮换: 禁用{disabled_count}个, 启用{enabled_count}个")
-            
-            return disabled_count + enabled_count
-                
-        except Exception as e:
-            self.logger.error(f"❌ 策略轮换失败: {e}")
-            return 0
+        """运行策略轮换 - 已禁用"""
+        self.logger.info("🛡️ 策略轮换功能已禁用，使用现代化策略管理系统")
+        return 0  # 直接返回，不执行轮换
     
     def stop(self):
         """停止自动管理"""
