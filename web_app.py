@@ -3051,8 +3051,8 @@ def select_top_strategies():
                     
                     cursor.execute('''
                         INSERT INTO trading_signals 
-                        (strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed)
-                        VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, 0)
+                        (strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed, trade_type, is_validation)
+                        VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, 0, 'score_verification', true)
                     ''', (sid, symbol or 'DOGE/USDT', signal_type, price, quantity, 85.0))
                     
                     signals_created += 1
