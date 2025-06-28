@@ -584,10 +584,9 @@ class QuantitativeSystem {
                 tradingBadgeClass = 'bg-info';
             }
             
-            // 🔥 修复：强制使用进化日志显示的最新世代信息
-            // 根据进化日志显示，当前是第2代第1轮，直接硬编码使用最新状态
-            const currentGeneration = 2; // 进化日志显示第2代
-            const currentCycle = 1;      // 进化日志显示第1轮
+            // 🔥 修复：使用实时解析的进化状态，不硬编码
+            const currentGeneration = this.evolutionState?.current_generation || strategy.generation || 1;
+            const currentCycle = this.evolutionState?.current_cycle || strategy.cycle || 1;
             const evolutionDisplay = `第${currentGeneration}代第${currentCycle}轮`;
             
             // 🔥 修复：应用金色样式给真实交易策略
@@ -2293,31 +2292,46 @@ class UnifiedEvolutionLogManager {
                 this.logs = data.logs;
                 this.renderAllViews();
                 
-                // 🔥 修复：从最新的进化日志中解析当前世代信息
-                if (this.logs.length > 0) {
-                    const latestLog = this.logs[0]; // 最新的日志
-                    const evolutionPattern = /第(\d+)代第(\d+)轮/;
-                    
-                    if (latestLog.details && evolutionPattern.test(latestLog.details)) {
-                        const match = latestLog.details.match(evolutionPattern);
-                        if (match && window.app) {
+                                    // 🔥 修复：从最新的进化日志中解析当前世代信息
+                    if (this.logs.length > 0) {
+                        const latestLog = this.logs[0]; // 最新的日志
+                        const evolutionPattern = /第(\d+)代第(\d+)轮/;
+                        
+                        if (latestLog.details && evolutionPattern.test(latestLog.details)) {
+                            const match = latestLog.details.match(evolutionPattern);
+                            if (match && window.app) {
+                                const newGeneration = parseInt(match[1]);
+                                const newCycle = parseInt(match[2]);
+                                
+                                // 检查是否有变化，如果有变化则触发策略卡重新渲染
+                                const oldState = window.app.evolutionState;
+                                const hasChanged = !oldState || 
+                                    oldState.current_generation !== newGeneration || 
+                                    oldState.current_cycle !== newCycle;
+                                
+                                window.app.evolutionState = {
+                                    current_generation: newGeneration,
+                                    current_cycle: newCycle
+                                };
+                                console.log(`✅ 从进化日志解析世代信息: 第${newGeneration}代第${newCycle}轮`);
+                                
+                                // 🔥 如果世代信息发生变化，重新渲染策略卡以更新代数轮数显示
+                                if (hasChanged && window.app.strategies && window.app.strategies.length > 0) {
+                                    console.log('🔄 世代信息已更新，重新渲染策略卡...');
+                                    window.app.renderStrategies();
+                                }
+                            }
+                        }
+                        
+                        // 如果没有从日志解析出来，使用默认值
+                        if (window.app && !window.app.evolutionState) {
                             window.app.evolutionState = {
-                                current_generation: parseInt(match[1]),
-                                current_cycle: parseInt(match[2])
+                                current_generation: 1,
+                                current_cycle: 1
                             };
-                            console.log(`✅ 从进化日志解析世代信息: 第${window.app.evolutionState.current_generation}代第${window.app.evolutionState.current_cycle}轮`);
+                            console.log('⚠️ 使用默认世代信息: 第1代第1轮');
                         }
                     }
-                    
-                    // 如果没有从日志解析出来，使用默认值但更新轮数到8
-                    if (window.app && !window.app.evolutionState) {
-                        window.app.evolutionState = {
-                            current_generation: 1,
-                            current_cycle: 8  // 根据用户反馈，日志显示第8轮
-                        };
-                        console.log('⚠️ 使用默认世代信息: 第1代第8轮');
-                    }
-                }
                 
                 // 保存到全局变量供其他功能使用
                 if (window.app) {
