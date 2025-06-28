@@ -1012,6 +1012,10 @@
     margin: 0;
     padding: 0;
     z-index: 5; /* 中等层级，低于标题 */
+    /* 🔥 性能优化：启用GPU加速 */
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .evolution-log-header {
@@ -1031,11 +1035,14 @@
     padding: 0;
     overflow: hidden;
     z-index: 5;
+    /* 🔥 性能优化：启用GPU加速 */
+    will-change: transform;
+    transform: translateZ(0);
 }
 
 .evolution-log-ticker {
     white-space: nowrap;
-    animation: scroll-left 30s linear infinite; /* 调整滚动速度 */
+    animation: scroll-left 40s linear infinite; /* 🔥 调整为40秒，更平滑 */
     color: #666;
     font-size: 13px;
     font-weight: 400;
@@ -1045,17 +1052,24 @@
     padding: 0;
     margin: 0;
     background: transparent;
+    /* 🔥 性能优化：启用GPU加速，减少重绘 */
+    will-change: transform;
+    transform: translateZ(0);
+    contain: layout style paint;
 }
 
 .evolution-log-ticker .log-item {
     display: inline-block;
-    margin-right: 60px; /* 增加间距 */
+    margin-right: 80px; /* 🔥 增加间距避免空白 */
     white-space: nowrap;
     color: #666;
     font-size: 13px;
     background: transparent;
     padding: 0 8px;
     border-radius: 4px;
+    /* 🔥 性能优化：避免单个元素重绘 */
+    will-change: auto;
+    transform: translateZ(0);
 }
 
 .evolution-log-ticker .log-item.optimized {

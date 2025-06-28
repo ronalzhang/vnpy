@@ -634,8 +634,8 @@ class QuantitativeSystem {
             const winRate = strategy.win_rate || 0;
             const totalReturn = strategy.total_return || 0;
             const totalTrades = strategy.total_trades || 0;
-            const generation = strategy.generation || 1;
-            const round = strategy.cycle || 1;
+            const strategyGeneration = strategy.generation || 1;
+            const strategyCycle = strategy.cycle || 1;
             const qualified = strategy.qualified_for_trading || false;
             
             // 评分状态显示 - 使用65分合格线
@@ -657,17 +657,25 @@ class QuantitativeSystem {
             
             // 策略理论上应该始终运行，进行验证交易
             const autoTradingEnabled = this.systemStatus?.auto_trading_enabled || false;
+            let isRealTrading = false;
             if (autoTradingEnabled && score >= 65) {
                 tradingStatus = '真实交易';
                 tradingBadgeClass = 'bg-success';
+                isRealTrading = true;
             } else {
                 tradingStatus = '验证交易';  // 所有策略都进行验证交易
                 tradingBadgeClass = 'bg-info';
             }
             
+            // 🔥 修复：正确显示代数轮数信息，优先使用generation和cycle字段
+            const evolutionDisplay = strategy.evolution_display || `第${strategyGeneration}代第${strategyCycle}轮`;
+            
+            // 🔥 修复：应用金色样式给真实交易策略
+            const cardClass = `strategy-card ${strategy.enabled ? 'strategy-running' : 'strategy-stopped'} ${isRealTrading ? 'golden' : ''}`;
+            
             return `
             <div class="col-md-4 mb-3">
-                <div class="card strategy-card ${strategy.enabled ? 'strategy-running' : 'strategy-stopped'}">
+                <div class="card ${cardClass}">
                     <div class="card-body">
                         <!-- 顶部：标题和状态 -->
                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -677,7 +685,7 @@ class QuantitativeSystem {
                                         ${strategy.name}
                                     </a>
                                 </h6>
-                                <small class="text-muted">${strategy.symbol} • ${strategy.evolution_display || `第${generation}代第${round}轮`}</small>
+                                <small class="text-muted">${strategy.symbol} • ${evolutionDisplay}</small>
                             </div>
                             <div class="text-end">
                                 <span class="badge ${tradingBadgeClass}">
