@@ -1984,6 +1984,67 @@ class QuantitativeSystem {
             }
         }
     }
+
+    // 🔥 新增：格式化数字方法
+    formatNumber(value) {
+        if (value === null || value === undefined || isNaN(value)) {
+            return '-';
+        }
+        
+        const num = parseFloat(value);
+        
+        // 对于小数，保留合适的精度
+        if (Math.abs(num) < 1) {
+            return num.toFixed(6);
+        } else if (Math.abs(num) < 100) {
+            return num.toFixed(4);
+        } else {
+            return num.toFixed(2);
+        }
+    }
+
+    // 🔥 新增：格式化时间方法
+    formatTime(timestamp) {
+        if (!timestamp) return '-';
+        
+        try {
+            const date = new Date(timestamp);
+            if (isNaN(date.getTime())) return '-';
+            
+            return date.toLocaleString('zh-CN', {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        } catch (error) {
+            console.error('时间格式化错误:', error);
+            return '-';
+        }
+    }
+
+    // 🔥 新增：显示消息方法
+    showMessage(message, type = 'info') {
+        // 创建消息元素
+        const messageEl = document.createElement('div');
+        messageEl.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+        messageEl.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        messageEl.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // 添加到页面
+        document.body.appendChild(messageEl);
+        
+        // 3秒后自动消失
+        setTimeout(() => {
+            if (messageEl.parentNode) {
+                messageEl.remove();
+            }
+        }, 3000);
+    }
 }
 
 // 🔥 移除重复的全局函数定义，这些函数已在HTML模板中定义，避免冲突 
