@@ -468,7 +468,9 @@ class StrategyParameterManager:
             elif config["type"] == "decimal":
                 param_range_dec = [Decimal(str(v)) for v in param_range]
                 range_size = param_range_dec[1] - param_range_dec[0]
-                mutation_size = range_size * mutation_rate
+                # 🔧 修复：确保mutation_rate也是Decimal类型
+                mutation_rate_dec = Decimal(str(mutation_rate))
+                mutation_size = range_size * mutation_rate_dec
                 
                 # 生成一个Decimal类型的随机数
                 random_decimal = Decimal(str(random.uniform(-1, 1)))
@@ -588,10 +590,11 @@ class StrategyParameterManager:
         
         # 交易次数调整因子
         trade_count_factor = Decimal("1.0")
+        total_trades_dec = Decimal(str(total_trades))  # 🔧 修复：转换为Decimal类型
         if total_trades < 10:
-            trade_count_factor = Decimal("0.7") + Decimal("0.03") * total_trades
+            trade_count_factor = Decimal("0.7") + Decimal("0.03") * total_trades_dec
         elif total_trades > 50:
-            trade_count_factor = min(Decimal("1.2"), Decimal("1.0") + Decimal("0.004") * (total_trades - 50))
+            trade_count_factor = min(Decimal("1.2"), Decimal("1.0") + Decimal("0.004") * (total_trades_dec - Decimal("50")))
         
         # 计算加权总分
         weighted_score = (
