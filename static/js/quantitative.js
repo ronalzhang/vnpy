@@ -293,7 +293,7 @@ class QuantitativeSystem {
         this.bindEvents();
         // this.initChart(); // 已移除 - 图表功能未实现
         this.loadSystemStatus(); // 加载真实系统状态
-        this.startAutoRefresh();
+        // this.startAutoRefresh(); // 已移除 - 自动刷新功能未实现，数据通过loadInitialData加载
         this.initEvolutionLog(); // 初始化进化日志
         this.loadManagementConfig(); // 加载管理配置
         this.bindManagementEvents(); // 🔥 确保事件绑定在DOM加载后执行
