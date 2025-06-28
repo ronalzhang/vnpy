@@ -1189,15 +1189,15 @@ def quantitative_strategies():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # 🔥 优先查询有交易信号的STRAT_策略（这些策略有真实数据）
+                # 🔥 优先查询有最新交易信号的STRAT_策略（按最新交易时间排序）
                 simple_query = f"""
                     SELECT DISTINCT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
-                           COUNT(t.id) as trade_count
+                           COUNT(t.id) as trade_count, MAX(t.timestamp) as latest_trade
                     FROM strategies s
                     INNER JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
                     WHERE s.id LIKE 'STRAT_%'
                     GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.final_score
-                    ORDER BY COUNT(t.id) DESC, s.final_score DESC
+                    ORDER BY MAX(t.timestamp) DESC, COUNT(t.id) DESC, s.final_score DESC
                     LIMIT {limit}
                 """
                 
@@ -1207,7 +1207,7 @@ def quantitative_strategies():
                 strategies = []
                 for row in rows:
                     try:
-                        sid, name, symbol, stype, enabled, score, trade_count = row
+                        sid, name, symbol, stype, enabled, score, trade_count, latest_trade = row
                         
                         # 🔥 计算真实的win_rate和total_return
                         cursor.execute("""
