@@ -382,10 +382,10 @@ class QuantitativeSystem {
         if (isRunning) {
             // 系统控制台状态 - 运行中
             if (systemStatusEl) {
-                systemStatusEl.innerHTML = '<span class="status-indicator status-running"></span>在线';
+            systemStatusEl.innerHTML = '<span class="status-indicator status-running"></span>在线';
             }
             if (systemToggle) {
-                systemToggle.classList.add('active');
+            systemToggle.classList.add('active');
             }
             
             // 更新顶部导航栏状态
@@ -399,10 +399,10 @@ class QuantitativeSystem {
         } else {
             // 系统控制台状态 - 离线
             if (systemStatusEl) {
-                systemStatusEl.innerHTML = '<span class="status-indicator status-offline"></span>离线';
+            systemStatusEl.innerHTML = '<span class="status-indicator status-offline"></span>离线';
             }
             if (systemToggle) {
-                systemToggle.classList.remove('active');
+            systemToggle.classList.remove('active');
             }
             
             // 更新顶部导航栏状态
@@ -431,10 +431,10 @@ class QuantitativeSystem {
         
         if (autoTradingToggle) {
             if (isAutoTradingEnabled) {
-                autoTradingToggle.classList.add('active');
+            autoTradingToggle.classList.add('active');
                 console.log('✅ 自动交易状态已启用');
-            } else {
-                autoTradingToggle.classList.remove('active');
+        } else {
+            autoTradingToggle.classList.remove('active');
                 console.log('⚠️ 自动交易状态已禁用');
             }
         }
@@ -1192,14 +1192,14 @@ class QuantitativeSystem {
                             <thead class="table-dark">
                                 <tr>
                                     <th>时间</th>
-                                    <th>交易对</th>
+                <th>交易对</th>
                                     <th>信号</th>
                                     <th>价格</th>
-                                    <th>数量</th>
+                <th>数量</th>
                                     <th>盈亏</th>
                                     <th>置信度</th>
                                     <th>状态</th>
-                                </tr>
+            </tr>
                             </thead>
                             <tbody id="realTradingLogs">
                                 <tr><td colspan="8" class="text-center">加载中...</td></tr>
@@ -1213,16 +1213,16 @@ class QuantitativeSystem {
                     <div class="table-responsive">
                         <table class="table table-sm">
                             <thead class="table-dark">
-                                <tr>
-                                    <th>时间</th>
+            <tr>
+                <th>时间</th>
                                     <th>交易对</th>
-                                    <th>信号</th>
-                                    <th>价格</th>
-                                    <th>数量</th>
-                                    <th>盈亏</th>
+                <th>信号</th>
+                <th>价格</th>
+                <th>数量</th>
+                <th>盈亏</th>
                                     <th>置信度</th>
                                     <th>验证类型</th>
-                                </tr>
+            </tr>
                             </thead>
                             <tbody id="validationLogs">
                                 <tr><td colspan="8" class="text-center">点击标签页加载验证日志</td></tr>
@@ -1244,7 +1244,7 @@ class QuantitativeSystem {
                                     <th>新参数</th>
                                     <th>目标胜率</th>
                                     <th>状态</th>
-                                </tr>
+                </tr>
                             </thead>
                             <tbody id="evolutionLogs">
                                 <tr><td colspan="7" class="text-center">点击标签页加载进化日志</td></tr>
@@ -1936,11 +1936,11 @@ class QuantitativeSystem {
     renderEvolutionLog(logs) {
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
-        
+
         // 🔥 使用新的增强渲染器
         if (this.evolutionRenderer) {
             this.evolutionRenderer.renderEvolutionLog(logs);
-        } else {
+    } else {
             // 降级处理
             const ticker = document.getElementById('evolutionTicker');
             if (ticker) {

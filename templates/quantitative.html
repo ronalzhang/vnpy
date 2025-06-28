@@ -872,8 +872,7 @@
     <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
     <script>
         // 🔥 全局变量声明（必须在初始化之前，但避免重复声明）
-        // systemRunning 已在 quantitative.js 中声明
-        let autoTradingEnabled = false;
+        // systemRunning 和 autoTradingEnabled 已在 quantitative.js 中声明
         let refreshTimer = null;
         let evolutionLogTimer = null;
         let managementConfig = {};
@@ -1195,7 +1194,7 @@
         window.app = window.app || {};
         
     </script>
-    <!-- 实时监控脚本 -->
-    <script src="/static/js/real_time_monitor.js"></script>
+    <!-- 实时监控脚本 - 暂时禁用，待WebSocket服务启动后再启用 -->
+    <!-- <script src="/static/js/real_time_monitor.js"></script> -->
 </body>
 </html> 
