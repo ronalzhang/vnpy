@@ -305,8 +305,32 @@ class QuantitativeSystem {
             this.changeMode(e.target.value);
         });
         
-        // 绑定事件
-        this.refreshAllData();
+        // 初始化数据加载
+        this.loadInitialData();
+    }
+
+    // 🔥 新增：初始化数据加载方法
+    async loadInitialData() {
+        try {
+            // 加载系统状态
+            await this.loadSystemStatus();
+            
+            // 加载策略数据
+            await this.loadStrategies();
+            
+            // 加载账户信息
+            await this.loadAccountInfo();
+            
+            // 加载持仓信息
+            await this.loadPositions();
+            
+            // 加载交易信号
+            await this.loadSignals();
+            
+            console.log('✅ 初始数据加载完成');
+        } catch (error) {
+            console.error('❌ 初始数据加载失败:', error);
+        }
     }
 
     // 系统启停控制
