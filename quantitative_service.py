@@ -3980,17 +3980,24 @@ class QuantitativeService:
                         is_validation=is_validation_trade
                     )
                     
-                            # 🔧 修复：检查全局实盘交易开关，如果关闭则强制为验证交易
-        cursor.execute("SELECT real_trading_enabled FROM real_trading_control WHERE id = 1")
-        real_trading_control = cursor.fetchone()
-        real_trading_enabled = real_trading_control[0] if real_trading_control else False
-        
-        # 如果实盘交易未启用，所有交易都应该是验证交易
-        if not real_trading_enabled:
-            is_validation_trade = True
-            db_trade_type = "score_verification"
-        else:
-            db_trade_type = "real_trading" if not is_validation_trade else "score_verification"
+                    # 🔧 修复：检查全局实盘交易开关，如果关闭则强制为验证交易
+                    try:
+                        cursor = self.conn.cursor()
+                        cursor.execute("SELECT real_trading_enabled FROM real_trading_control WHERE id = 1")
+                        real_trading_control = cursor.fetchone()
+                        real_trading_enabled = real_trading_control[0] if real_trading_control else False
+                        
+                        # 如果实盘交易未启用，所有交易都应该是验证交易
+                        if not real_trading_enabled:
+                            is_validation_trade = True
+                            db_trade_type = "score_verification"
+                        else:
+                            db_trade_type = "real_trading" if not is_validation_trade else "score_verification"
+                    except Exception as e:
+                        print(f"⚠️ 检查实盘交易开关失败: {e}")
+                        db_trade_type = "score_verification"
+                        is_validation_trade = True
+                    
                     update_query = """
                         UPDATE trading_signals 
                         SET executed = 1, trade_type = %s, is_validation = %s, strategy_score = %s
