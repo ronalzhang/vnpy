@@ -449,7 +449,11 @@ class StrategyParameterManager:
             config = self.parameter_rules[param_name]
             param_range = config["range"]
             param_step = config["step"]
-            mutation_rate = config.get("mutation_strength", 0.2) * mutation_strength
+            # 🔧 修复：确保mutation_strength类型一致，避免Decimal * float错误
+            config_mutation_strength = config.get("mutation_strength", 0.2)
+            if isinstance(config_mutation_strength, Decimal):
+                config_mutation_strength = float(config_mutation_strength)
+            mutation_rate = config_mutation_strength * mutation_strength
             
             # 根据市场状态调整参数范围
             market_adaption = config.get("market_adaption", {})
