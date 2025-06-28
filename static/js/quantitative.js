@@ -1928,10 +1928,10 @@ class QuantitativeSystem {
         // 立即加载一次
         this.loadEvolutionLog();
         
-        // 每10秒更新一次进化日志
+        // 每30秒更新一次进化日志，避免过于频繁
         evolutionLogTimer = setInterval(() => {
             this.loadEvolutionLog();
-        }, 10000);
+        }, 30000);
     }
 
     // 停止进化日志轮询
@@ -1961,16 +1961,74 @@ class QuantitativeSystem {
         // 保存所有日志到全局变量供全部日志页面使用
         this.allEvolutionLogs = logs || [];
 
-        // 🔥 使用新的增强渲染器
+        // 🔥 使用新的增强渲染器渲染策略进化实时监控区域
         if (this.evolutionRenderer) {
             this.evolutionRenderer.renderEvolutionLog(logs);
-    } else {
+        } else {
             // 降级处理
             const ticker = document.getElementById('evolutionTicker');
             if (ticker) {
                 ticker.innerHTML = '<div class="ticker-item"><span class="text-muted">加载中...</span></div>';
             }
         }
+
+        // 🔥 同时更新策略管理标题右侧的横向滚动日志
+        this.renderStrategyManagementEvolutionLog(logs);
+    }
+
+    // 🔥 新增：渲染策略管理标题右侧的横向滚动日志
+    renderStrategyManagementEvolutionLog(logs) {
+        const ticker = document.getElementById('strategyManagementEvolutionTicker');
+        if (!ticker) return;
+
+        if (!logs || logs.length === 0) {
+            ticker.innerHTML = '<div class="log-item"><span class="text-muted">暂无进化日志</span></div>';
+            return;
+        }
+
+        // 取最近10条日志用于横向滚动显示
+        const recentLogs = logs.slice(-10);
+        
+        const logItems = recentLogs.map(log => {
+            const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            let actionText = '';
+            let colorClass = 'text-muted';
+            
+            switch(log.action) {
+                case 'strategy_created':
+                    actionText = '创建策略';
+                    colorClass = 'text-success';
+                    break;
+                case 'strategy_optimized':
+                    actionText = '优化策略';
+                    colorClass = 'text-info';
+                    break;
+                case 'strategy_promoted':
+                    actionText = '提升策略';
+                    colorClass = 'text-warning';
+                    break;
+                case 'strategy_evolved':
+                    actionText = '进化策略';
+                    colorClass = 'text-primary';
+                    break;
+                default:
+                    actionText = log.action || '系统活动';
+            }
+            
+            return `
+                <div class="log-item">
+                    <span class="${colorClass}">[${time}] ${actionText}</span>
+                    ${log.strategy_name ? `<small class="text-muted"> - ${log.strategy_name}</small>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        ticker.innerHTML = logItems;
     }
     
     // 🔥 新增：更新策略数据方法（供WebSocket调用）
