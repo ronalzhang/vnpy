@@ -3951,19 +3951,21 @@ def manage_strategy_config():
 
 @app.route('/api/quantitative/evolution-log', methods=['GET'])
 def get_evolution_log():
-    """🔥 获取策略进化日志 - 直接从真实数据库获取"""
+    """🔥 增强：获取策略进化日志 - 包含详细参数变化信息"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
         logs = []
         
-        # 🔥 步骤1：从strategy_evolution_history获取大量真实进化数据（增加到200条保存更多历史）
+        # 🔥 修复：获取完整的进化数据，包含参数变化信息
         cursor.execute("""
             SELECT strategy_id, action_type, evolution_type, generation, cycle, 
-                   score_before, score_after, timestamp, notes
+                   score_before, score_after, parameters, new_parameters,
+                   improvement, parameter_changes, evolution_reason, notes,
+                   created_time, timestamp
             FROM strategy_evolution_history 
-            ORDER BY timestamp DESC 
+            ORDER BY COALESCE(created_time, timestamp) DESC 
             LIMIT 200
         """)
         
@@ -3972,56 +3974,94 @@ def get_evolution_log():
         
         # 处理进化历史记录
         for record in evolution_records:
-            strategy_id, action_type, evolution_type, generation, cycle, score_before, score_after, timestamp, notes = record
+            (strategy_id, action_type, evolution_type, generation, cycle, 
+             score_before, score_after, old_params, new_params,
+             improvement, param_changes, evolution_reason, notes,
+             created_time, timestamp) = record
             
-            # 🔧 修复：构造详细描述，正确显示代数信息和百分制评分
-            if 'mutation' in evolution_type or evolution_type == 'parameter_optimization':
-                details = f"策略{strategy_id[-4:]}变异进化: 第{generation}代第{cycle}轮，评分{int(score_after)}"
+            # 使用更精确的时间戳
+            actual_timestamp = created_time or timestamp
+            
+            # 🔧 增强：构造详细描述，包含参数变化信息
+            if 'parameter_optimization' in evolution_type or 'mutation' in evolution_type:
+                if param_changes:
+                    details = f"策略{strategy_id[-4:]}参数优化: 第{generation}代第{cycle}轮，{param_changes}，评分{score_before:.1f}→{score_after:.1f}"
+                else:
+                    details = f"策略{strategy_id[-4:]}变异进化: 第{generation}代第{cycle}轮，评分{score_before:.1f}→{score_after:.1f}"
                 action = 'optimized'
             elif evolution_type == 'elite_selected':
-                details = f"精英策略{strategy_id[-4:]}晋级: 第{generation}代第{cycle}轮，评分{int(score_after)}"
+                details = f"精英策略{strategy_id[-4:]}晋级: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                 action = 'promoted'
-            elif evolution_type == 'protection_elite_protection':
-                details = f"策略{strategy_id[-4:]}精英保护: 第{generation}代第{cycle}轮，评分{int(score_after)}"
-                action = 'protected'
-            elif evolution_type == 'protection_score_protection':
-                details = f"策略{strategy_id[-4:]}评分保护: 第{generation}代第{cycle}轮，评分{int(score_after)}"
-                action = 'protected'
             elif 'protection' in evolution_type:
-                details = f"策略{strategy_id[-4:]}保护机制激活: 第{generation}代第{cycle}轮，评分{int(score_after)}"
+                details = f"策略{strategy_id[-4:]}保护: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                 action = 'protected'
             elif evolution_type == 'random_creation':
-                details = f"新策略{strategy_id[-4:]}创建: 第{generation}代第{cycle}轮，评分{int(score_after)}"
+                details = f"新策略{strategy_id[-4:]}创建: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                 action = 'created'
-            elif evolution_type == 'unknown' or not evolution_type:
-                details = f"策略{strategy_id[-4:]}进化更新: 第{generation}代第{cycle}轮，评分{int(score_after)}"
-                action = 'evolved'
             else:
-                details = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle}轮，评分{int(score_after)} ({evolution_type})"
+                details = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                 action = 'evolved'
             
-            logs.append({
+            # 🔥 新增：详细的参数变化分析
+            parameter_analysis = None
+            if old_params and new_params and old_params != new_params:
+                try:
+                    old_dict = json.loads(old_params) if isinstance(old_params, str) else old_params
+                    new_dict = json.loads(new_params) if isinstance(new_params, str) else new_params
+                    
+                    if isinstance(old_dict, dict) and isinstance(new_dict, dict):
+                        param_changes_detail = []
+                        for key in set(list(old_dict.keys()) + list(new_dict.keys())):
+                            old_val = old_dict.get(key, 'N/A')
+                            new_val = new_dict.get(key, 'N/A')
+                            if old_val != new_val:
+                                param_changes_detail.append({
+                                    'parameter': key,
+                                    'old_value': old_val,
+                                    'new_value': new_val,
+                                    'change_type': 'modified' if old_val != 'N/A' and new_val != 'N/A' else 'added' if old_val == 'N/A' else 'removed'
+                                })
+                        
+                        parameter_analysis = {
+                            'total_changes': len(param_changes_detail),
+                            'changes': param_changes_detail[:10]  # 只返回前10个变化
+                        }
+                except Exception as e:
+                    print(f"解析参数变化失败: {e}")
+            
+            log_entry = {
                 'action': action,
                 'details': details,
                 'strategy_id': strategy_id,
                 'strategy_name': f"策略{strategy_id[-4:]}",
-                'timestamp': timestamp.isoformat() if timestamp else None
-            })
-        
-        # 🔥 步骤2：由于strategy_optimization_logs表已清理，直接跳过
-        
-        # 🔥 步骤3：由于strategy_evolution_log表已清理，直接跳过
+                'timestamp': actual_timestamp.isoformat() if actual_timestamp else None,
+                'generation': generation,
+                'cycle': cycle,
+                'score_before': float(score_before) if score_before else 0,
+                'score_after': float(score_after) if score_after else 0,
+                'improvement': float(improvement) if improvement else 0,
+                'evolution_type': evolution_type,
+                'evolution_reason': evolution_reason,
+                'parameter_changes': param_changes,
+                'parameter_analysis': parameter_analysis,
+                'notes': notes
+            }
+            
+            logs.append(log_entry)
         
         # 按时间倒序排序
         logs.sort(key=lambda x: x['timestamp'] or '1970-01-01', reverse=True)
         
         conn.close()
         
-        print(f"✅ 总共返回 {len(logs)} 条真实进化日志")
+        print(f"✅ 总共返回 {len(logs)} 条增强进化日志")
         
         return jsonify({
             'success': True,
-            'logs': logs[:100]  # 🔧 返回前100条，支持更丰富的日志展示和分页
+            'logs': logs[:100],  # 返回前100条
+            'total_count': len(logs),
+            'has_parameter_changes': len([l for l in logs if l.get('parameter_analysis')]),
+            'enhancement_info': '包含详细参数变化分析'
         })
         
     except Exception as e:
