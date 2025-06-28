@@ -53,7 +53,7 @@ class RealTimeMonitor:
             password="123abc74531"
         )
     
-    async def register_client(self, websocket, path):
+    async def register_client(self, websocket):
         """注册新的WebSocket客户端"""
         self.connected_clients.add(websocket)
         self.logger.info(f"新客户端连接: {websocket.remote_address}")
@@ -184,12 +184,12 @@ class RealTimeMonitor:
                 # 更新监控数据
                 self.monitoring_data['strategies'] = strategy_data
                 
-                # 异步广播更新 - 修复事件循环问题
-                if hasattr(self, 'loop') and self.loop and self.loop.is_running():
-                    asyncio.run_coroutine_threadsafe(
-                        self.broadcast_update('strategy_update', strategy_data), 
-                        self.loop
-                    )
+                # 暂时禁用WebSocket广播，避免事件循环问题
+                # if hasattr(self, 'loop') and self.loop:
+                #     asyncio.run_coroutine_threadsafe(
+                #         self.broadcast_update('strategy_update', strategy_data), 
+                #         self.loop
+                #     )
                 
                 conn.close()
                 
