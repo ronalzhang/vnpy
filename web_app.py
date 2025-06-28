@@ -4496,3 +4496,7 @@ def get_strategy_logs_by_category(strategy_id):
             'message': f'获取失败: {str(e)}'
         }), 500
 
+# 🔧 修复：添加缺失的程序入口
+if __name__ == "__main__":
+    main()
+
