@@ -2176,20 +2176,45 @@ def get_system_status():
         cursor.close()
         conn.close()
         
+        # 获取现代化策略管理器配置
+        try:
+            from modern_strategy_manager import get_modern_strategy_manager
+            manager = get_modern_strategy_manager()
+            evolution_interval = manager.config.evolution_interval
+            max_strategies = manager.config.max_display_strategies
+            real_trading_enabled = len(manager.select_trading_strategies()) > 0
+        except Exception as e:
+            print(f"获取现代化管理器配置失败: {e}")
+            evolution_interval = 3
+            max_strategies = 21
+            real_trading_enabled = True
+        
         # 包装成前端期望的格式
         response = {
             'success': True,
-            'running': db_status.get('quantitative_running', True),  # 默认运行中
-            'auto_trading_enabled': db_status.get('auto_trading_enabled', False),
-            'total_strategies': db_status.get('total_strategies', 20),  # 从后端日志看到有20个策略
-            'running_strategies': db_status.get('running_strategies', 7),  # 从后端日志看到有7个运行中
-            'selected_strategies': db_status.get('selected_strategies', 3),
-            'current_generation': db_status.get('current_generation', 1),
-            'evolution_enabled': db_status.get('evolution_enabled', True),
-            'last_evolution_time': db_status.get('last_evolution_time'),
-            'last_update_time': db_status.get('last_update_time'),
-            'system_health': db_status.get('system_health', 'running'),
-            'notes': db_status.get('notes')
+            'data': {
+                # 系统基本状态
+                'system_status': 'online',
+                'quantitative_enabled': db_status.get('quantitative_running', True),
+                'real_trading_enabled': real_trading_enabled,
+                
+                # 现代化策略管理器配置
+                'evolution_interval': evolution_interval,
+                'max_strategies': max_strategies,
+                
+                # 策略统计
+                'running': db_status.get('quantitative_running', True),
+                'auto_trading_enabled': db_status.get('auto_trading_enabled', False),
+                'total_strategies': db_status.get('total_strategies', max_strategies),
+                'running_strategies': db_status.get('running_strategies', 7),
+                'selected_strategies': db_status.get('selected_strategies', 3),
+                'current_generation': db_status.get('current_generation', 1),
+                'evolution_enabled': db_status.get('evolution_enabled', True),
+                'last_evolution_time': db_status.get('last_evolution_time'),
+                'last_update_time': db_status.get('last_update_time'),
+                'system_health': db_status.get('system_health', 'running'),
+                'notes': db_status.get('notes')
+            }
         }
         
         return jsonify(response)
