@@ -655,7 +655,7 @@ class QuantitativeSystem {
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div>
                                 <h6 class="card-title mb-0">
-                                    <a href="javascript:void(0)" onclick="window.app.showStrategyConfig('${strategy.id}')" class="text-decoration-none">
+                                    <a href="javascript:void(0)" onclick="showStrategyConfig('${strategy.id}')" class="text-decoration-none">
                                         ${strategy.name}
                                     </a>
                                 </h6>
@@ -710,7 +710,7 @@ class QuantitativeSystem {
                         <!-- 底部：操作按钮 -->
                         <div class="d-flex justify-content-center">
                             <button class="btn btn-sm btn-outline-info" 
-                                    onclick="window.app.showStrategyLogs('${strategy.id}')"
+                                    onclick="showStrategyLogs('${strategy.id}')"
                                     title="查看交易和优化日志">
                                 <i class="fas fa-chart-line me-1"></i>日志
                             </button>

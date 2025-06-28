@@ -349,9 +349,9 @@
                             <i class="fas fa-chart-area"></i> 资产增长历程
                         </h6>
                         <div>
-                            <button class="btn btn-sm btn-outline-primary" onclick="app.toggleBalanceChart('30')">30天</button>
-                            <button class="btn btn-sm btn-outline-primary active" onclick="app.toggleBalanceChart('90')">90天</button>
-                            <button class="btn btn-sm btn-outline-primary" onclick="app.toggleBalanceChart('365')">1年</button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleBalanceChart('30')">30天</button>
+                            <button class="btn btn-sm btn-outline-primary active" onclick="toggleBalanceChart('90')">90天</button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleBalanceChart('365')">1年</button>
                         </div>
                     </div>
                     <div class="card-body">
@@ -892,9 +892,11 @@
             
             try {
                 // 🔥 创建全局app实例
-                window.app = new QuantitativeSystem();
+                const quantSystem = new QuantitativeSystem();
+                window.app = quantSystem;
                 // 🔥 同时设置为直接全局变量，兼容onclick事件
-                app = window.app;
+                window.app = quantSystem;
+                app = quantSystem;
                 console.log('✅ 量化交易系统实例创建成功');
                 
                 // 立即加载数据
@@ -1187,6 +1189,33 @@
             
             window.app.logsCurrentPage = page;
             renderLogsPage();
+        };
+        
+        // 🔥 全局函数：策略日志查看
+        window.showStrategyLogs = function(strategyId) {
+            if (window.app && window.app.showStrategyLogs) {
+                window.app.showStrategyLogs(strategyId);
+            } else {
+                console.error('❌ app对象或showStrategyLogs方法未初始化');
+            }
+        };
+        
+        // 🔥 全局函数：策略配置
+        window.showStrategyConfig = function(strategyId) {
+            if (window.app && window.app.showStrategyConfig) {
+                window.app.showStrategyConfig(strategyId);
+            } else {
+                console.error('❌ app对象或showStrategyConfig方法未初始化');
+            }
+        };
+        
+        // 🔥 全局函数：余额图表切换
+        window.toggleBalanceChart = function(period) {
+            if (window.app && window.app.toggleBalanceChart) {
+                window.app.toggleBalanceChart(period);
+            } else {
+                console.error('❌ app对象或toggleBalanceChart方法未初始化');
+            }
         };
         
         // 确保app对象中的方法也能被全局访问
