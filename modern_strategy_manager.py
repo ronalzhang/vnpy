@@ -297,8 +297,26 @@ class ModernStrategyManager:
             
             for strategy in pool_strategies:
                 last_evolution = strategy.get('last_evolution_time')
-                if not last_evolution or \
-                   (current_time - last_evolution).total_seconds() > self.config.pool_evolution_hours * 3600:
+                # 🔧 修复：确保datetime类型正确比较
+                should_evolve = True
+                if last_evolution:
+                    try:
+                        # 如果是字符串，转换为datetime
+                        if isinstance(last_evolution, str):
+                            last_evolution = datetime.fromisoformat(last_evolution.replace('Z', ''))
+                        elif isinstance(last_evolution, datetime):
+                            pass  # 已经是datetime类型
+                        else:
+                            should_evolve = True  # 无法识别的类型，默认需要进化
+                            
+                        if isinstance(last_evolution, datetime):
+                            time_diff = (current_time - last_evolution).total_seconds()
+                            should_evolve = time_diff > self.config.pool_evolution_hours * 3600
+                    except Exception as e:
+                        logger.warning(f"解析last_evolution_time失败: {e}, 策略{strategy['id']}将进行进化")
+                        should_evolve = True
+                        
+                if should_evolve:
                     strategies_to_evolve.append(strategy)
             
             evolved_count = 0
