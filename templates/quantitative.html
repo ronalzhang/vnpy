@@ -71,68 +71,6 @@
     </header>
 
     <div class="container-fluid mt-4">
-        <!-- 系统状态栏 -->
-        <div class="row mb-3">
-            <div class="col-12">
-                <div class="card border-0 shadow-sm bg-gradient">
-                    <div class="card-body py-2">
-                        <div class="row align-items-center">
-                            <!-- 🔥 统一全局状态指示器 -->
-                            <div class="col-md-3">
-                                <div class="d-flex align-items-center">
-                                    <div class="status-indicator me-2" id="globalStatusIndicator">
-                                        <span class="status-dot bg-secondary"></span>
-                                    </div>
-                                    <div>
-                                        <small class="text-muted">系统状态</small>
-                                        <div class="fw-bold" id="globalSystemStatus">检查中...</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 实时数据连接状态 -->
-                            <div class="col-md-3">
-                                <div class="d-flex align-items-center">
-                                    <div class="status-indicator me-2" id="websocketStatusIndicator">
-                                        <span class="status-dot bg-warning"></span>
-                                    </div>
-                                    <div>
-                                        <small class="text-muted">实时连接</small>
-                                        <div class="fw-bold" id="websocketStatus">连接中...</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 交易所连接状态 -->
-                            <div class="col-md-3">
-                                <div class="d-flex align-items-center">
-                                    <div class="status-indicator me-2" id="exchangeStatusIndicator">
-                                        <span class="status-dot bg-info"></span>
-                                    </div>
-                                    <div>
-                                        <small class="text-muted">交易所API</small>
-                                        <div class="fw-bold" id="exchangeStatus">检查中...</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 策略进化状态 -->
-                            <div class="col-md-3">
-                                <div class="d-flex align-items-center">
-                                    <div class="status-indicator me-2" id="evolutionStatusIndicator">
-                                        <span class="status-dot bg-primary"></span>
-                                    </div>
-                                    <div>
-                                        <small class="text-muted">策略进化</small>
-                                        <div class="fw-bold" id="evolutionStatus">运行中...</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
         
         <!-- 优化后的策略进化滚动日志 -->
         <div class="row mb-4">
