@@ -22,6 +22,8 @@ import signal
 import inspect
 import pkgutil
 import time
+import psycopg2
+import requests
 
 # 创建日志目录
 os.makedirs('logs', exist_ok=True)

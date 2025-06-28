@@ -1,0 +1,46 @@
+{
+  "repair_summary": {
+    "timestamp": "2025-06-29T05:48:39.005248",
+    "status": "SUCCESS",
+    "data_quality_score": 100
+  },
+  "before_repair": {
+    "total_records": 18574,
+    "conflicts": 13,
+    "missing_trade_type": 0,
+    "missing_cycle_id": 11829,
+    "missing_strategy_score": 0
+  },
+  "after_repair": {
+    "total_records": 18574,
+    "conflicts": 0,
+    "missing_trade_type": 0,
+    "missing_cycle_id": 0,
+    "missing_strategy_score": 0
+  },
+  "repair_actions": {
+    "conflicts_fixed": 13,
+    "cycle_ids_generated": 11829,
+    "strategy_scores_fixed": 0,
+    "unified_logs_synced": 72
+  },
+  "unified_logs_distribution": {
+    "evolution": 16260,
+    "validation": 5870,
+    "optimization": 1002,
+    "real_trading": 944
+  },
+  "code_fixes_applied": [
+    "start_evolution_scheduler.py - 修复日志生成逻辑",
+    "modern_strategy_manager.py - 修复验证交易标记",
+    "real_trading_manager.py - 修复交易类型判断",
+    "quantitative_service.py - 修复_execute_pending_signals方法",
+    "web_app.py - 修复策略选择功能"
+  ],
+  "system_status": {
+    "services_status": "ALL_RUNNING",
+    "data_integrity": "FULLY_RESTORED",
+    "new_logs_working": "YES",
+    "historical_data_cleaned": "YES"
+  }
+}

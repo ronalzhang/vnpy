@@ -7983,33 +7983,55 @@ class EvolutionaryStrategyEngine:
 
     def _record_intelligent_evolution_history(self, strategy_id: str, strategy: Dict, 
                                             new_parameters: Dict, improvement: float, reason: str):
-        """记录智能进化历史"""
+        """🔧 修复：记录智能进化历史 - 使用正确的字段名"""
         try:
+            old_params = strategy.get('parameters', {})
+            old_score = strategy.get('final_score', 0)
+            new_score = old_score + improvement
+            
+            # 🔧 分析参数变化详情
+            param_changes = []
+            if isinstance(old_params, dict) and isinstance(new_parameters, dict):
+                for key in set(list(old_params.keys()) + list(new_parameters.keys())):
+                    old_val = old_params.get(key, 'N/A')
+                    new_val = new_parameters.get(key, 'N/A')
+                    if old_val != new_val:
+                        param_changes.append(f"{key}: {old_val}→{new_val}")
+            
+            change_summary = '; '.join(param_changes[:5]) if param_changes else '参数微调优化'
+            
+            # 🔧 使用正确的数据库字段名
             self.db_manager.execute_query("""
                 INSERT INTO strategy_evolution_history 
-                (strategy_id, evolution_type, old_generation, new_generation,
-                 old_cycle, new_cycle, old_parameters, new_parameters,
-                 old_score, new_score, improvement, success, evolution_reason, created_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (strategy_id, generation, cycle, action_type, evolution_type,
+                 parameters, new_parameters, score_before, score_after, new_score,
+                 improvement, success, evolution_reason, parameter_changes, 
+                 notes, created_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (
                 strategy_id,
+                strategy.get('generation', self.current_generation),
+                strategy.get('cycle', self.current_cycle),
+                'evolution',
                 'intelligent_parameter_optimization',
-                strategy['generation'],
-                strategy['generation'] + (1 if improvement >= self.intelligent_evolution_config['parameter_quality_threshold'] * 2 else 0),
-                strategy['cycle'],
-                strategy['cycle'] + 1,
-                json.dumps(strategy['parameters']),
-                json.dumps(new_parameters),
-                strategy['final_score'],
-                strategy['final_score'] + improvement,
-                improvement,
-                True,
-                reason,
-                datetime.now()
+                json.dumps(old_params),      # 旧参数
+                json.dumps(new_parameters),  # 新参数
+                old_score,                   # 旧评分
+                new_score,                   # 新评分
+                new_score,                   # 新评分（字段重复但保持兼容）
+                improvement,                 # 改善程度
+                True,                       # 成功标志
+                reason,                     # 进化原因
+                change_summary,             # 参数变化摘要
+                f'智能进化: {reason}, 参数优化: {len(param_changes)}项变更, 评分改善: {improvement:.2f}'
             ))
+            
+            print(f"✅ 智能进化历史已记录: {strategy_id} ({old_score:.1f} → {new_score:.1f}, 变更{len(param_changes)}个参数)")
             
         except Exception as e:
             print(f"❌ 记录智能进化历史失败: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _update_evolution_statistics(self, total_candidates: int, successful_evolutions: int):
         """更新进化统计"""
@@ -8388,15 +8410,35 @@ class EvolutionaryStrategyEngine:
                 # 确保是百分制整数
                 actual_score = int(round(actual_score))
                 
+                # 🔧 修复：正确记录新策略的参数变化历史
+                parent_strategy = next((s for s in elites if s['id'] == parent_id), None) if parent_id else None
+                old_params = parent_strategy.get('parameters', {}) if parent_strategy else {}
+                new_params = new_strategy.get('parameters', {})
+                
+                # 计算参数变化
+                param_changes = []
+                for key in set(list(old_params.keys()) + list(new_params.keys())):
+                    old_val = old_params.get(key, 'N/A')
+                    new_val = new_params.get(key, 'N/A')
+                    if old_val != new_val:
+                        param_changes.append(f"{key}: {old_val}→{new_val}")
+                
+                change_summary = '; '.join(param_changes[:5]) if param_changes else '新策略生成'
+                
                 self.quantitative_service.db_manager.execute_query("""
                     INSERT INTO strategy_evolution_history 
-                    (strategy_id, generation, cycle, parent_strategy_id, evolution_type, 
-                     new_parameters, score_before, score_after, new_score, created_time)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    (strategy_id, generation, cycle, parent_strategy_id, action_type, evolution_type, 
+                     parameters, new_parameters, score_before, score_after, new_score, 
+                     parameter_changes, notes, created_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """, (new_strategy['id'], self.current_generation, self.current_cycle,
-                      parent_id, evolution_type, 
-                      json.dumps(new_strategy.get('parameters', {})),
-                      0, actual_score, actual_score))
+                      parent_id, 'evolution', evolution_type, 
+                      json.dumps(old_params),  # 父策略参数
+                      json.dumps(new_params),  # 新策略参数
+                      parent_strategy.get('final_score', 0) if parent_strategy else 0, 
+                      actual_score, actual_score,
+                      change_summary,
+                      f'新策略生成: {evolution_type}, 参数变更: {len(param_changes)}项, 评分: {actual_score}'))
                       
         except Exception as e:
             logger.error(f"保存演化历史失败: {e}")
