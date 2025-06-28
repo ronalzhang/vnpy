@@ -360,30 +360,48 @@ class QuantitativeSystem {
         }
     }
 
-    // 自动交易开关
+    // 🔧 修复：真实交易开关 - 停止自动启动，由用户手动控制
     async toggleAutoTrading() {
         try {
-            autoTradingEnabled = !autoTradingEnabled;
+            // 🔧 先获取当前状态，不要依赖全局变量
+            const currentResponse = await fetch('/api/quantitative/auto-trading');
+            const currentData = await currentResponse.json();
+            
+            const currentEnabled = currentData.data?.auto_trading_enabled || currentData.enabled || false;
+            const newEnabled = !currentEnabled;
+            
+            console.log('🔧 真实交易开关:', {
+                当前状态: currentEnabled,
+                目标状态: newEnabled,
+                API响应: currentData
+            });
             
             const response = await fetch('/api/quantitative/auto-trading', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: autoTradingEnabled })
+                body: JSON.stringify({ enabled: newEnabled })
             });
             
             const data = await response.json();
             
             if (data.success) {
+                // 🔧 更新本地状态
+                window.autoTradingEnabled = newEnabled;
+                if (this.systemStatus) {
+                    this.systemStatus.auto_trading_enabled = newEnabled;
+                }
+                
                 this.updateAutoTradingStatus();
-                this.showMessage(autoTradingEnabled ? '自动交易已启用' : '自动交易已禁用', 'success');
+                this.showMessage(newEnabled ? '✅ 真实交易已启用' : '⚠️ 真实交易已禁用', 'success');
+                
+                // 重新加载策略以更新交易状态显示
+                this.loadStrategies();
             } else {
-                autoTradingEnabled = !autoTradingEnabled; // 回滚状态
                 this.showMessage(data.message || '操作失败', 'error');
             }
         } catch (error) {
-            console.error('自动交易控制失败:', error);
-            autoTradingEnabled = !autoTradingEnabled; // 回滚状态
-            this.showMessage('自动交易控制失败', 'error');
+            console.error('真实交易控制失败:', error);
+            this.showMessage('真实交易控制失败', 'error');
         }
     }
 

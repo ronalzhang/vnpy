@@ -3372,6 +3372,9 @@ def manage_auto_trading():
                 return jsonify({
                     'success': True,
                     'enabled': auto_trading_enabled,
+                    'data': {
+                        'auto_trading_enabled': auto_trading_enabled
+                    },
                     'data_source': 'database'
                 })
             except Exception as e:
