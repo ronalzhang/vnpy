@@ -84,7 +84,7 @@ def final_system_repair():
                 price,
                 quantity,
                 0 as pnl,
-                executed,
+                (executed = 1) as executed,
                 confidence,
                 cycle_id,
                 CONCAT('修复同步: ', trade_type) as notes,
