@@ -34,7 +34,7 @@ def fix_trading_logs_system():
         # 确保score_verification类型的记录标记为验证交易
         cursor.execute("""
             UPDATE trading_signals 
-            SET is_validation = true, trade_type = 'validation'
+            SET is_validation = true, trade_type = 'score_verification'
             WHERE trade_type = 'score_verification'
         """)
         fixed_validation = cursor.rowcount
@@ -97,7 +97,9 @@ def fix_trading_logs_system():
             SELECT 
                 strategy_id,
                 CASE 
-                    WHEN is_validation = true THEN 'validation'
+                    WHEN trade_type IN ('score_verification', 'optimization_validation', 
+                                       'initialization_validation', 'periodic_validation') 
+                    THEN 'validation'
                     ELSE 'real_trading'
                 END as log_type,
                 timestamp,
@@ -141,6 +143,23 @@ def fix_trading_logs_system():
         """)
         migrated_evolution = cursor.rowcount
         print(f"   ✅ 迁移了 {migrated_evolution} 条进化历史记录")
+        
+        # 迁移策略优化日志数据
+        cursor.execute("""
+            INSERT INTO unified_strategy_logs 
+            (strategy_id, log_type, timestamp, notes, strategy_score)
+            SELECT 
+                strategy_id,
+                'optimization' as log_type,
+                timestamp,
+                CONCAT('优化结果: ', optimization_result) as notes,
+                COALESCE(new_score, 50.0) as strategy_score
+            FROM strategy_optimization_logs 
+            WHERE timestamp >= NOW() - INTERVAL '7 days'
+            ON CONFLICT DO NOTHING
+        """)
+        migrated_optimization = cursor.rowcount
+        print(f"   ✅ 迁移了 {migrated_optimization} 条策略优化记录")
         
         # 4. 生成缺失的周期ID
         print("\n4. 🔗 生成缺失的周期ID:")
