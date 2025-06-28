@@ -569,8 +569,10 @@ class QuantitativeSystem {
                 tradingBadgeClass = 'bg-info';
             }
             
-            // 🔥 修复：正确显示代数轮数信息，优先使用generation和cycle字段
-            const evolutionDisplay = strategy.evolution_display || `第${strategyGeneration}代第${strategyCycle}轮`;
+            // 🔥 修复：强制使用generation和cycle字段生成代数轮数显示，不依赖后端evolution_display
+            const realGeneration = strategy.generation || strategyGeneration || 1;
+            const realCycle = strategy.cycle || strategyCycle || 1;
+            const evolutionDisplay = `第${realGeneration}代第${realCycle}轮`;
             
             // 🔥 修复：应用金色样式给真实交易策略
             const cardClass = `strategy-card ${strategy.enabled ? 'strategy-running' : 'strategy-stopped'} ${isRealTrading ? 'golden' : ''}`;
