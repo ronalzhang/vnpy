@@ -1811,10 +1811,10 @@ class AutomatedStrategyManager:
             
             # 执行启停操作
             for strategy_id in high_score_strategies:
-                self._enable_strategy(strategy_id)            # ❌ 已禁用自动停用逻辑 - 与现代化策略管理系统冲突
-            # for strategy_id in low_score_strategies:
-            #     self._disable_strategy(strategy_id)
-            print(f"🛡️ 跳过自动停用 {len(low_score_strategies)} 个低分策略 - 现代化管理系统接管")
+                self._enable_strategy(strategy_id)
+                
+            for strategy_id in low_score_strategies:
+                self._disable_strategy(strategy_id)
                 
             logger.info(f"策略选择完成: 启用 {len(high_score_strategies)} 个，停用 {len(low_score_strategies)} 个")
             
@@ -1838,12 +1838,8 @@ class AutomatedStrategyManager:
             logger.error(f"启用策略失败: {e}")
 
     def _disable_strategy(self, strategy_id: str):
-        """停用策略 - 已禁用自动调用"""
+        """停用策略"""
         try:
-            # 🛡️ 保护机制：禁止自动停用前端策略
-            print(f"⚠️ _disable_strategy 被调用，但已禁用自动停用功能: {strategy_id}")
-            print("🛡️ 如需停用策略，请使用前端界面或 stop_strategy() 方法")
-            return  # 直接返回，不执行停用操作
             conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
             if not conn:
                 return
@@ -1989,7 +1985,7 @@ class QuantitativeService:
         
         # 🚀 全自动策略管理配置（手动启用）
         self.auto_strategy_management = {
-            'enabled': False,  # ❌ 已彻底禁用自动管理，防止与现代化系统冲突
+            'enabled': False,  # 默认禁用，需手动启用全自动管理
             'min_active_strategies': 2,  # 最少保持2个活跃策略
             'max_active_strategies': 5,  # 最多同时运行5个策略
             'auto_enable_threshold': 45.0,  # 45分以上自动启用
@@ -2294,9 +2290,8 @@ class QuantitativeService:
         self.auto_evolution_thread.start()
         print("🧬 自动进化线程已启动")
         
-        # ❌ 已禁用全自动策略管理线程 - 与现代化系统冲突
-        # if self.auto_strategy_management['enabled']:
-        if False:  # 强制禁用
+        # 🚀 启动全自动策略管理线程
+        if self.auto_strategy_management['enabled']:
             self._start_auto_strategy_management()
     
     def _start_auto_strategy_management(self):
@@ -2493,24 +2488,12 @@ class QuantitativeService:
             print(f"⚠️ 加载门槛配置失败，使用默认值: {e}")
 
     def _auto_rotate_strategies(self):
-        """策略轮换 - 已禁用"""
-        print("🛡️ 策略轮换功能已禁用，使用现代化策略管理系统")
-        return  # 直接返回，不执行轮换
-        
-        # 原始轮换逻辑已禁用
-        def _original_auto_rotate_strategies(self):
         """自动轮换策略 - 已废弃：与现代化策略管理系统冲突"""
         # 🔧 彻底禁用：该函数与现代化前端策略管理冲突，已停用
         print("⚠️ 策略轮换功能已禁用，现由前端统一管理21个优质策略")
         return
 
     def _auto_review_strategy_performance(self):
-        """策略性能评估 - 已禁用自动停用"""
-        print("🛡️ 策略性能评估自动停用功能已禁用")
-        return  # 直接返回，不执行自动停用
-        
-        # 原始性能评估逻辑已禁用  
-        def _original_auto_review_strategy_performance(self):
         """自动评估策略性能 - 已废弃：与现代化策略管理系统冲突"""
         # 🔧 彻底禁用：该函数与现代化前端策略管理冲突，已停用
         print("⚠️ 自动性能评估功能已禁用，现由前端统一管理策略启用状态")
@@ -9754,12 +9737,11 @@ class EvolutionaryStrategyEngine:
                     )
                     return True  # 允许继续进化
                 else:
-                    # 非前端策略才考虑停用                    # ❌ 已禁用验证失败自动停用逻辑
-                    # self.quantitative_service.db_manager.execute_query(
-                    #     "UPDATE strategies SET notes = 'validation_failed_non_frontend' WHERE id = %s",
-                    #     (strategy_id,)
-                    # )
-                    print(f"🛡️ 跳过验证失败自动停用: {strategy_id} - 现代化管理系统接管")
+                    # 非前端策略才考虑停用
+                    self.quantitative_service.db_manager.execute_query(
+                        "UPDATE strategies SET notes = 'validation_failed_non_frontend' WHERE id = %s",
+                        (strategy_id,)
+                    )
                     return False
             
             return True
