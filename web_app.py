@@ -1130,57 +1130,10 @@ def quantitative_strategies():
     
     if request.method == 'GET':
         try:
-            # 使用高级策略管理器获取策略
+            # 🔥 强制使用基础查询以显示最新活跃策略
             try:
-                from advanced_strategy_manager import strategy_manager
-                
-                limit = int(request.args.get('limit', None) or 0) 
-                print(f"🚀 策略API请求: limit={limit}")
-                
-                # 使用高级管理器获取显示策略
-                strategies = strategy_manager.get_display_strategies(limit if limit > 0 else None)
-                
-                # 格式化策略数据以兼容前端
-                formatted_strategies = []
-                for strategy in strategies:
-                    formatted_strategy = {
-                        'id': strategy['id'],
-                        'name': strategy['name'],
-                        'symbol': strategy['symbol'] or 'BTC/USDT',
-                        'type': strategy['type'] or 'momentum', 
-                        'enabled': strategy['enabled'],
-                        'final_score': strategy['final_score'],
-                        'total_trades': strategy['total_trades'],
-                        'win_rate': strategy['win_rate'] * 100 if strategy['win_rate'] <= 1 else strategy['win_rate'],
-                        'total_return': strategy['total_return'],
-                        'generation': strategy['generation'],
-                        'cycle': strategy['cycle'],
-                        'evolution_display': f"第{strategy['generation']}代第{strategy['cycle']}轮",
-                        'created_at': strategy.get('created_at'),
-                        'updated_at': strategy.get('updated_at'),
-                        'trade_mode': 'real' if strategy['final_score'] >= 65 else 'verification',
-                        'daily_return': 0.0,
-                        'sharpe_ratio': 0.0,
-                        'max_drawdown': 0.05,
-                        'profit_factor': 1.0,
-                        'volatility': 0.02,
-                        'parameters': {
-                            'lookback_period': 20,
-                            'threshold': 0.02,
-                            'quantity': 100,
-                            'stop_loss_pct': 2.0,
-                            'take_profit_pct': 4.0
-                        }
-                    }
-                    formatted_strategies.append(formatted_strategy)
-                
-                print(f"✅ 高级管理器返回 {len(formatted_strategies)} 个策略")
-                
-                return jsonify({
-                    "status": "success", 
-                    "data": formatted_strategies
-                })
-                
+                # 模拟ImportError，直接跳到基础查询
+                raise ImportError("强制使用基础查询以显示最新活跃策略")
             except ImportError as ie:
                 print(f"⚠️ 高级管理器不可用，使用基础查询: {ie}")
                 # 🔥 修复：统一使用有交易数据的STRAT_格式策略，避免显示空数据策略
