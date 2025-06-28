@@ -4297,20 +4297,22 @@ def get_strategy_logs_by_category(strategy_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 检查unified_strategy_logs表是否存在 (SQLite语法)
+        # 检查unified_strategy_logs表是否存在 (PostgreSQL语法)
         cursor.execute("""
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name='unified_strategy_logs'
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'unified_strategy_logs'
+            )
         """)
-        has_unified_table = cursor.fetchone() is not None
+        has_unified_table = cursor.fetchone()[0]
         
         if has_unified_table:
             # 使用新的增强日志系统 - 直接查询数据库
             cursor.execute("""
                 SELECT * FROM unified_strategy_logs 
-                WHERE strategy_id = ? AND (? IS NULL OR log_type = ?)
+                WHERE strategy_id = %s AND (%s IS NULL OR log_type = %s)
                 ORDER BY created_at DESC 
-                LIMIT ?
+                LIMIT %s
             """, (strategy_id, log_type, log_type, limit))
             
             rows = cursor.fetchall()
