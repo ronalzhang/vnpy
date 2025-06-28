@@ -1307,14 +1307,17 @@ class QuantitativeSystem {
             
             if (data.success) {
                 this.renderCategorizedLogs(logType, data.logs);
-                this.updateLogTabCounts(data.categorized || {});
+                // 🔥 修复：直接更新当前标签页的计数
+                this.updateSingleLogTabCount(logType, data.logs?.length || 0);
             } else {
                 this.showLogError(logType, data.message || '加载失败');
+                this.updateSingleLogTabCount(logType, 0);
             }
             
         } catch (error) {
             console.error(`加载${logType}日志失败:`, error);
             this.showLogError(logType, '网络错误');
+            this.updateSingleLogTabCount(logType, 0);
         }
     }
 
@@ -1389,7 +1392,23 @@ class QuantitativeSystem {
         }
     }
 
-    // 🔥 新增：更新标签页计数
+    // 🔥 修复：更新单个标签页计数
+    updateSingleLogTabCount(logType, count) {
+        const countMap = {
+            'real_trading': 'realTradingCount',
+            'validation': 'validationCount',
+            'evolution': 'evolutionCount'
+        };
+        
+        const elementId = countMap[logType];
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = count;
+            console.log(`✅ 已更新 ${logType} 日志计数: ${count}`);
+        }
+    }
+
+    // 🔥 保留：更新所有标签页计数（如需批量更新时使用）
     updateLogTabCounts(categorized) {
         const countMap = {
             'real_trading': 'realTradingCount',
@@ -1995,7 +2014,7 @@ class QuantitativeSystem {
                 minute: '2-digit',
                 second: '2-digit'
             });
-            
+
             let actionText = '';
             let colorClass = 'text-muted';
             
@@ -2025,7 +2044,7 @@ class QuantitativeSystem {
                     actionText = log.details || log.action || '系统活动';
                     colorClass = 'text-muted';
             }
-            
+
             return `
                 <div class="log-item">
                     <span class="${colorClass}">[${time}] ${actionText}</span>
@@ -2118,7 +2137,7 @@ class QuantitativeSystem {
             
             // 显示策略管理模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
-            modal.show();
+        modal.show();
         } catch (error) {
             console.error('显示策略管理失败:', error);
             this.showMessage('显示策略管理失败', 'error');
@@ -2166,7 +2185,7 @@ class QuantitativeSystem {
                 // 这里可以集成图表库来渲染数据
                 console.log(`成功加载${period}天的余额数据:`, data.data);
                 this.showMessage(`已切换到${period}天视图`, 'success');
-            } else {
+        } else {
                 console.warn(`加载${period}天余额数据失败:`, data.message);
                 this.showMessage('暂无历史数据', 'warning');
             }
