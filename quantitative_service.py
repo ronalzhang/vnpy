@@ -4265,12 +4265,28 @@ class QuantitativeService:
                 # 使用默认评分并记录调试信息
                 logger.warning(f"策略评分查询失败，策略ID: {strategy_id}, 错误: {e}, 使用默认评分50.0")
             
-            # 🔧 正确设置交易类型和验证标记（使用数据库约束允许的英文值）
-            if strategy_score >= self.real_trading_threshold:
-                trade_type = "real_trading"
-                is_validation = False
-            else:
-                trade_type = "score_verification"  # 验证交易使用score_verification类型
+            # 🔧 修复：检查全局实盘交易开关，如果关闭则强制为验证交易
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT real_trading_enabled FROM real_trading_control WHERE id = 1")
+                real_trading_control = cursor.fetchone()
+                real_trading_enabled = real_trading_control[0] if real_trading_control else False
+                
+                # 如果实盘交易未启用，所有交易都应该是验证交易
+                if not real_trading_enabled:
+                    trade_type = "score_verification"
+                    is_validation = True
+                else:
+                    # 只有在实盘交易启用时才根据评分判断
+                    if strategy_score >= self.real_trading_threshold:
+                        trade_type = "real_trading"
+                        is_validation = False
+                    else:
+                        trade_type = "score_verification"
+                        is_validation = True
+            except Exception as e:
+                print(f"⚠️ 无法检查实盘交易开关，默认为验证交易: {e}")
+                trade_type = "score_verification"
                 is_validation = True
             
             # 使用数据库管理器保存信号（包含完整字段）
