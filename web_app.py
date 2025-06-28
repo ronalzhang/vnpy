@@ -1195,9 +1195,9 @@ def quantitative_strategies():
                         'total_trades': actual_total_trades,  # 🔥 使用重新计算的交易次数
                         'win_rate': round(calculated_win_rate, 2),  # 🔥 使用重新计算的胜率
                         'total_return': round(total_return_percentage, 2),  # 🔥 使用重新计算的收益率
-                        'generation': 1,  # 简化显示
-                        'cycle': 1,
-                        'evolution_display': '策略池优选',
+                        'generation': strategy.get('generation', 1),  # 🔥 使用数据库中的generation字段
+                        'cycle': strategy.get('cycle', 1),  # 🔥 使用数据库中的cycle字段
+                        'evolution_display': f"第{strategy.get('generation', 1)}代第{strategy.get('cycle', 1)}轮",  # 🔥 修复：动态生成代数轮数显示
                         'trade_mode': strategy.get('tier', 'display'),
                         'created_at': strategy.get('created_at', ''),
                         'daily_return': round(total_return_percentage / 30, 6),  # 🔥 基于重新计算的收益率
