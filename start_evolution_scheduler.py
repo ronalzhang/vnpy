@@ -152,11 +152,15 @@ class EvolutionScheduler:
             conn = self.manager._get_db_connection()
             cursor = conn.cursor()
             
+            # 🔧 修复：正确设置trade_type和is_validation字段
+            trade_type = "real_trading" if is_real else "score_verification"
+            is_validation = not is_real
+            
             cursor.execute("""
                 INSERT INTO trading_signals 
                 (strategy_id, symbol, signal_type, price, quantity, expected_return, 
-                 executed, is_validation, timestamp)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 executed, is_validation, trade_type, timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 signal_data['strategy_id'],
                 signal_data['symbol'],
@@ -165,7 +169,8 @@ class EvolutionScheduler:
                 signal_data['quantity'],
                 signal_data['expected_return'],
                 signal_data['executed'],
-                signal_data['is_validation'],
+                is_validation,
+                trade_type,
                 signal_data['timestamp']
             ))
             

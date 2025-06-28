@@ -374,11 +374,15 @@ class ModernStrategyManager:
             conn = self._get_db_connection()
             cursor = conn.cursor()
             
+            # 🔧 修复：正确设置trade_type和is_validation字段
+            trade_type = "score_verification"  # 验证交易
+            is_validation = True
+            
             cursor.execute("""
                 INSERT INTO trading_signals 
                 (strategy_id, symbol, signal_type, price, quantity, expected_return, 
-                 executed, is_validation, timestamp)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 executed, is_validation, trade_type, timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 validation_result['strategy_id'],
                 validation_result['symbol'], 
@@ -387,7 +391,8 @@ class ModernStrategyManager:
                 validation_result['amount'],
                 validation_result['expected_return'],
                 1,  # 已执行
-                True,  # 验证交易
+                is_validation,
+                trade_type,
                 validation_result['timestamp']
             ))
             

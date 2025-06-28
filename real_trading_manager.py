@@ -401,12 +401,18 @@ class RealTradingManager:
                 quantity = min(10.0, 100.0 / base_price)  # 最多10U的交易
                 confidence = min(95.0, score)
                 
+                # 🔧 修复：正确设置trade_type和is_validation字段
+                trade_type = "real_trading" if score >= 65.0 else "score_verification"
+                is_validation = score < 65.0
+                
                 # 插入交易信号
                 cursor.execute("""
                     INSERT INTO trading_signals 
-                    (strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed)
-                    VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, 0)
-                """, (sid, symbol or 'DOGE/USDT', signal_type, base_price, quantity, confidence))
+                    (strategy_id, symbol, signal_type, price, quantity, confidence, 
+                     timestamp, executed, trade_type, is_validation, strategy_score)
+                    VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, 0, %s, %s, %s)
+                """, (sid, symbol or 'DOGE/USDT', signal_type, base_price, quantity, confidence, 
+                     trade_type, is_validation, score))
                 
                 signals_created += 1
                 print(f"📡 创建信号: {name[:20]} | {signal_type.upper()} | {quantity:.2f} @ ${base_price}")
