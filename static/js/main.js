@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("页面加载完成，初始化系统...");
     
     // 设置API基础URL
-    window.API_BASE_URL = 'http://47.236.39.134:5000';
+    window.API_BASE_URL = 'http://47.236.39.134:8888';
     
     // 初始化系统状态
     updateSystemStatus();
