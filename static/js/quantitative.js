@@ -2161,6 +2161,59 @@ class QuantitativeSystem {
         
         console.log('✅ 管理配置显示已更新');
     }
+
+    // 绑定管理配置事件
+    bindManagementEvents() {
+        // 保存配置按钮
+        const saveBtn = document.getElementById('saveManagementConfig');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                console.log('保存配置按钮被点击');
+                this.saveManagementConfig();
+            });
+        }
+
+        // 重置配置按钮
+        const resetBtn = document.getElementById('resetManagementConfig');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                console.log('重置配置按钮被点击');
+                this.resetManagementConfig();
+            });
+        }
+
+        // 全自动策略管理开关
+        const autoMgmtSwitch = document.getElementById('autoManagementEnabled');
+        if (autoMgmtSwitch) {
+            autoMgmtSwitch.addEventListener('change', () => {
+                this.toggleAutoStrategyManagement(autoMgmtSwitch.checked);
+            });
+        }
+        
+        // 加载全自动策略管理状态
+        this.loadAutoManagementStatus();
+
+        // 🔥 添加实时保存功能 - 当输入框失去焦点时自动保存
+        const form = document.getElementById('strategyManagementForm');
+        if (form) {
+            ['evolutionInterval', 'maxStrategies', 'realTradingScore', 'realTradingCount', 'validationAmount', 'realTradingAmount',
+             'minTrades', 'minWinRate', 'minProfit', 'maxDrawdown', 'minSharpeRatio', 'maxPositionSize', 
+             'stopLossPercent', 'takeProfitPercent', 'maxHoldingMinutes', 'minProfitForTimeStop',
+             'eliminationDays', 'minScore'].forEach(key => {
+                const input = form.querySelector(`#${key}`);
+                if (input) {
+                    input.addEventListener('blur', () => {
+                        console.log(`${key} 输入框失去焦点，自动保存配置`);
+                        this.saveManagementConfig();
+                    });
+                    input.addEventListener('change', () => {
+                        console.log(`${key} 输入框值变化，自动保存配置`);
+                        this.saveManagementConfig();
+                    });
+                }
+            });
+        }
+    }
 }
 
 // 🔥 统一的进化日志滚动管理器
