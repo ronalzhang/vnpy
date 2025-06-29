@@ -3826,7 +3826,7 @@ def get_strategies_compat():
 
 @app.route('/api/quantitative/management-config', methods=['GET', 'POST'])
 def manage_strategy_config():
-    """策略管理配置API"""
+    """策略管理配置API - 支持四层进化配置"""
     try:
         if request.method == 'GET':
             # 获取当前配置
@@ -3843,36 +3843,71 @@ def manage_strategy_config():
                 )
             """)
             
-            # 获取所有配置
+            # 🔥 添加四层进化配置表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS four_tier_evolution_config (
+                    config_key VARCHAR(100) PRIMARY KEY,
+                    config_value TEXT NOT NULL,
+                    description TEXT,
+                    config_category VARCHAR(50) DEFAULT 'general',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 插入四层进化默认配置
+            four_tier_configs = [
+                ('high_freq_pool_size', '2000', '高频池大小', 'tier_size'),
+                ('display_strategies_count', '21', '前端显示数量', 'tier_size'),
+                ('real_trading_count', '3', '实盘交易数量', 'tier_size'),
+                ('low_freq_interval_hours', '24', '策略池进化间隔(小时)', 'evolution_frequency'),
+                ('high_freq_interval_minutes', '60', '高频池进化间隔(分钟)', 'evolution_frequency'),
+                ('display_interval_minutes', '3', '前端显示进化间隔(分钟)', 'evolution_frequency'),
+                ('low_freq_validation_count', '2', '策略池验证次数', 'validation'),
+                ('high_freq_validation_count', '4', '高频池验证次数', 'validation'),
+                ('display_validation_count', '4', '前端显示验证次数', 'validation'),
+                ('validation_amount', '50.0', '验证交易金额(USDT)', 'trading'),
+                ('real_trading_amount', '200.0', '实盘交易金额(USDT)', 'trading'),
+                ('real_trading_score_threshold', '65.0', '实盘交易评分门槛', 'trading')
+            ]
+            
+            for key, value, desc, category in four_tier_configs:
+                cursor.execute("""
+                    INSERT INTO four_tier_evolution_config (config_key, config_value, description, config_category)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (config_key) DO NOTHING
+                """, (key, value, desc, category))
+            
+            # 获取传统配置
             cursor.execute("SELECT config_key, config_value FROM strategy_management_config")
             config_rows = cursor.fetchall()
             
-            # 🔥 从后端实际运行系统获取真实配置参数
-            # 获取演化引擎的实际配置
-            cursor.execute("""
-                SELECT current_generation, total_evolutions, current_cycle 
-                FROM evolution_state WHERE id = 1
-            """)
-            evolution_state = cursor.fetchone()
-            current_generation = evolution_state[0] if evolution_state else 1
-            
-            # 获取实际策略统计信息
-            cursor.execute("SELECT COUNT(*) FROM strategies WHERE is_persistent = 1")
-            total_result = cursor.fetchone()
-            actual_total_strategies = total_result[0] if total_result else 0
-            
-            cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
-            running_result = cursor.fetchone()
-            actual_running_strategies = running_result[0] if running_result else 0
+            # 获取四层进化配置
+            cursor.execute("SELECT config_key, config_value, description, config_category FROM four_tier_evolution_config ORDER BY config_category, config_key")
+            four_tier_rows = cursor.fetchall()
             
             # 构建配置字典
             config = {}
             for key, value in config_rows:
                 try:
-                    # 尝试转换为数字
                     config[key] = float(value) if '.' in value else int(value)
                 except ValueError:
                     config[key] = value
+            
+            # 添加四层进化配置
+            four_tier_config = {}
+            for key, value, desc, category in four_tier_rows:
+                try:
+                    four_tier_config[key] = {
+                        'value': float(value) if '.' in value else int(value),
+                        'description': desc,
+                        'category': category
+                    }
+                except ValueError:
+                    four_tier_config[key] = {
+                        'value': value,
+                        'description': desc, 
+                        'category': category
+                    }
             
             # 设置默认值
             default_config = {
@@ -3901,20 +3936,26 @@ def manage_strategy_config():
                 if key not in config:
                     config[key] = default_value
             
+            conn.commit()
+            conn.close()
+            
             return jsonify({
                 'success': True,
-                'config': config
+                'config': config,
+                'four_tier_config': four_tier_config,
+                'message': '✅ 包含四层进化配置的完整策略管理配置'
             })
             
         elif request.method == 'POST':
             # 保存配置
             data = request.get_json()
             new_config = data.get('config', {})
+            four_tier_updates = data.get('four_tier_config', {})
             
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # 更新配置
+            # 更新传统配置
             for key, value in new_config.items():
                 cursor.execute("""
                     INSERT INTO strategy_management_config (config_key, config_value, updated_at)
@@ -3923,25 +3964,28 @@ def manage_strategy_config():
                     DO UPDATE SET config_value = EXCLUDED.config_value, updated_at = CURRENT_TIMESTAMP
                 """, (key, str(value)))
             
-            # 如果保存了真实交易分值门槛，立即通知quantitative_service
-            if 'realTradingScore' in new_config and quantitative_service:
-                try:
-                    quantitative_service.update_real_trading_threshold(float(new_config['realTradingScore']))
-                except Exception as e:
-                    print(f"更新真实交易门槛失败: {e}")
-            
-            # 如果保存了进化频率，立即通知quantitative_service
-            if 'evolutionInterval' in new_config and quantitative_service:
-                try:
-                    quantitative_service.update_evolution_interval(int(new_config['evolutionInterval']))
-                except Exception as e:
-                    print(f"更新进化频率失败: {e}")
+            # 更新四层进化配置
+            for key, config_data in four_tier_updates.items():
+                if isinstance(config_data, dict) and 'value' in config_data:
+                    cursor.execute("""
+                        UPDATE four_tier_evolution_config 
+                        SET config_value = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE config_key = %s
+                    """, (str(config_data['value']), key))
+                else:
+                    # 兼容直接传值的情况
+                    cursor.execute("""
+                        UPDATE four_tier_evolution_config 
+                        SET config_value = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE config_key = %s
+                    """, (str(config_data), key))
             
             conn.commit()
+            conn.close()
             
             return jsonify({
                 'success': True,
-                'message': '配置保存成功'
+                'message': '✅ 四层进化配置已保存，重启进化调度器后生效'
             })
             
     except Exception as e:
