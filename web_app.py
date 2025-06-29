@@ -1209,7 +1209,7 @@ def quantitative_strategies():
                     
                     formatted_strategy = {
                         'id': strategy['id'],
-                        'name': strategy.get('name', strategy['id']),  # 🔧 修复：使用安全访问
+                        'name': strategy.get('name', f"策略{strategy['id'][-4:]}"),  # 🔧 修复：优先使用数据库name字段
                         'symbol': strategy.get('symbol', 'BTC/USDT'),  # 🔧 修复：使用安全访问
                         'type': strategy.get('type', 'momentum'),  # 🔧 修复：使用安全访问
                         'enabled': True,  # 现代化系统不使用启用/停用概念

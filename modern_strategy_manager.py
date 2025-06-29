@@ -573,6 +573,7 @@ class FourTierStrategyManager:
                 # 格式化策略数据供前端显示
                 formatted_strategy = {
                     'id': strategy['id'],
+                    'name': strategy.get('name', f"策略{strategy['id'][-4:]}"),  # 🔧 修复：添加name字段
                     'symbol': strategy['symbol'],
                     'score': float(strategy['final_score']),
                     'enabled': True,  # 🔧 修复：现代化系统所有策略默认启用
