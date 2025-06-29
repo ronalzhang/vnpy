@@ -1805,10 +1805,9 @@ class AutomatedStrategyManager:
                 if perf['score'] < 30.0
             ]
             
-            # 执行启停操作
-            for strategy_id in high_score_strategies:
-            # for strategy_id in low_score_strategies:
-            print(f"🛡️ 跳过自动停用 {len(low_score_strategies)} 个低分策略 - 现代化管理系统接管")
+            # 执行启停操作 - 现代化管理系统已接管
+            print(f"🛡️ 现代化管理系统已接管策略管理，跳过自动停用逻辑")
+            print(f"📊 高分策略: {len(high_score_strategies)} 个，低分策略: {len(low_score_strategies)} 个")
                 
             logger.info(f"策略选择完成: 启用 {len(high_score_strategies)} 个，停用 {len(low_score_strategies)} 个")
             
