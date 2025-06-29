@@ -2024,6 +2024,9 @@ class QuantitativeService:
         # 🧬 启动进化引擎
         self._init_evolution_engine()
         
+        # 🚀 初始化四层进化系统 - 集成现代化进化架构
+        self._init_four_tier_evolution_system()
+        
         # ⭐ 初始化策略参数模板
         self._init_strategy_templates()
         
@@ -2271,6 +2274,158 @@ class QuantitativeService:
         # if self.auto_strategy_management['enabled']:
         if False:  # 强制禁用
             self._start_auto_strategy_management()
+
+    def _init_four_tier_evolution_system(self):
+        """初始化四层进化系统 - 现代化进化架构"""
+        try:
+            from modern_strategy_manager import get_four_tier_strategy_manager
+            
+            # 初始化四层管理器
+            self.four_tier_manager = get_four_tier_strategy_manager()
+            
+            print("🚀 四层进化系统已初始化")
+            
+            # 启动四层进化调度器
+            self._start_four_tier_evolution_scheduler()
+            
+        except Exception as e:
+            print(f"❌ 四层进化系统初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _start_four_tier_evolution_scheduler(self):
+        """启动四层进化调度器"""
+        try:
+            import asyncio
+            import threading
+            
+            def four_tier_scheduler():
+                """四层进化调度器主线程"""
+                try:
+                    print("🔄 启动四层进化调度器线程...")
+                    
+                    # 创建新的事件循环
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    async def evolution_scheduler():
+                        """四层并发进化调度"""
+                        print("🚀 四层并发进化调度启动")
+                        
+                        # 显示系统统计
+                        stats = self.four_tier_manager.get_evolution_statistics()
+                        print(f"📊 四层进化负载: {stats['totals']['theoretical_total_evolutions_per_hour']}次/小时")
+                        print(f"📊 验证交易负载: {stats['totals']['theoretical_validations_per_hour']}次/小时")
+                        
+                        # 四层并发调度
+                        await asyncio.gather(
+                            self._pool_evolution_scheduler(),      # 第1层：策略池低频进化
+                            self._high_freq_pool_scheduler(),      # 第2层：高频池高频进化  
+                            self._display_strategies_scheduler(),  # 第3层：前端持续高频进化
+                            self._real_trading_scheduler()         # 第4层：实盘交易执行
+                        )
+                    
+                    # 运行四层进化调度
+                    loop.run_until_complete(evolution_scheduler())
+                    
+                except Exception as e:
+                    print(f"❌ 四层进化调度器异常: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # 启动四层进化调度器线程
+            self.four_tier_scheduler_thread = threading.Thread(target=four_tier_scheduler, daemon=True)
+            self.four_tier_scheduler_thread.start()
+            
+            print("✅ 四层进化调度器已启动")
+            
+        except Exception as e:
+            print(f"❌ 启动四层进化调度器失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    async def _pool_evolution_scheduler(self):
+        """第1层：策略池低频进化调度器（24小时间隔）"""
+        print("🔄 [第1层] 策略池低频进化调度器启动")
+        
+        while self.running:
+            try:
+                start_time = datetime.now()
+                
+                # 执行策略池低频进化
+                await self.four_tier_manager.evolve_pool_strategies()
+                
+                execution_time = (datetime.now() - start_time).total_seconds()
+                print(f"✅ [第1层] 策略池低频进化完成，耗时: {execution_time:.2f}秒")
+                
+                # 等待24小时
+                await asyncio.sleep(self.four_tier_manager.config.low_freq_interval_hours * 3600)
+                
+            except Exception as e:
+                print(f"❌ [第1层] 策略池低频进化异常: {e}")
+                await asyncio.sleep(3600)  # 异常时等待1小时重试
+    
+    async def _high_freq_pool_scheduler(self):
+        """第2层：高频池高频进化调度器（60分钟间隔）"""
+        print("🔥 [第2层] 高频池高频进化调度器启动")
+        
+        while self.running:
+            try:
+                start_time = datetime.now()
+                
+                # 执行高频池高频进化
+                await self.four_tier_manager.evolve_high_freq_pool()
+                
+                execution_time = (datetime.now() - start_time).total_seconds()
+                print(f"✅ [第2层] 高频池进化完成，耗时: {execution_time:.2f}秒")
+                
+                # 等待配置的高频间隔
+                await asyncio.sleep(self.four_tier_manager.config.high_freq_interval_minutes * 60)
+                
+            except Exception as e:
+                print(f"❌ [第2层] 高频池进化异常: {e}")
+                await asyncio.sleep(60)  # 异常时等待1分钟重试
+    
+    async def _display_strategies_scheduler(self):
+        """第3层：前端显示策略持续高频进化调度器（3分钟间隔）"""
+        print("🎯 [第3层] 前端显示策略持续高频进化调度器启动")
+        
+        while self.running:
+            try:
+                start_time = datetime.now()
+                
+                # 执行前端显示策略持续高频进化
+                await self.four_tier_manager.evolve_display_strategies()
+                
+                execution_time = (datetime.now() - start_time).total_seconds()
+                print(f"✅ [第3层] 前端策略进化完成，耗时: {execution_time:.2f}秒")
+                
+                # 等待配置的前端进化间隔
+                await asyncio.sleep(self.four_tier_manager.config.display_interval_minutes * 60)
+                
+            except Exception as e:
+                print(f"❌ [第3层] 前端策略进化异常: {e}")
+                await asyncio.sleep(60)  # 异常时等待1分钟重试
+    
+    async def _real_trading_scheduler(self):
+        """第4层：实盘交易执行调度器（1分钟间隔）"""
+        print("💰 [第4层] 实盘交易执行调度器启动")
+        
+        while self.running:
+            try:
+                # 获取实盘交易策略
+                trading_strategies = self.four_tier_manager.get_trading_strategies()
+                
+                if trading_strategies:
+                    print(f"💰 [第4层] 执行{len(trading_strategies)}个精英策略实盘交易")
+                    # 这里可以集成真实的交易执行逻辑
+                
+                # 等待1分钟
+                await asyncio.sleep(60)
+                
+            except Exception as e:
+                print(f"❌ [第4层] 实盘交易执行异常: {e}")
+                await asyncio.sleep(60)
     
     def _start_auto_strategy_management(self):
         """启动全自动策略管理线程"""
