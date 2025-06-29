@@ -4121,32 +4121,82 @@ def get_evolution_log():
                 details = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                 action = 'evolved'
             
-            # 🔥 新增：详细的参数变化分析
+            # 🔧 修复：增强参数变化分析，处理多种数据格式
             parameter_analysis = None
-            if old_params and new_params and old_params != new_params:
+            detailed_param_changes = param_changes  # 保留原始的parameter_changes字段
+            
+            # 尝试从多个字段获取参数变化信息
+            if old_params and new_params:
                 try:
-                    old_dict = json.loads(old_params) if isinstance(old_params, str) else old_params
-                    new_dict = json.loads(new_params) if isinstance(new_params, str) else new_params
+                    # 处理JSON字符串格式
+                    if isinstance(old_params, str):
+                        try:
+                            old_dict = json.loads(old_params)
+                        except:
+                            old_dict = {}
+                    else:
+                        old_dict = old_params if isinstance(old_params, dict) else {}
                     
-                    if isinstance(old_dict, dict) and isinstance(new_dict, dict):
+                    if isinstance(new_params, str):
+                        try:
+                            new_dict = json.loads(new_params)
+                        except:
+                            new_dict = {}
+                    else:
+                        new_dict = new_params if isinstance(new_params, dict) else {}
+                    
+                    # 只有当两个参数都是有效字典且不同时才分析
+                    if isinstance(old_dict, dict) and isinstance(new_dict, dict) and old_dict != new_dict:
                         param_changes_detail = []
-                        for key in set(list(old_dict.keys()) + list(new_dict.keys())):
-                            old_val = old_dict.get(key, 'N/A')
-                            new_val = new_dict.get(key, 'N/A')
+                        all_keys = set(list(old_dict.keys()) + list(new_dict.keys()))
+                        
+                        for key in all_keys:
+                            old_val = old_dict.get(key)
+                            new_val = new_dict.get(key)
+                            
+                            # 检查值是否真的不同（包括数值差异）
                             if old_val != new_val:
-                                param_changes_detail.append({
+                                change_info = {
                                     'parameter': key,
                                     'old_value': old_val,
                                     'new_value': new_val,
-                                    'change_type': 'modified' if old_val != 'N/A' and new_val != 'N/A' else 'added' if old_val == 'N/A' else 'removed'
-                                })
+                                    'change_type': 'modified' if old_val is not None and new_val is not None else 'added' if old_val is None else 'removed'
+                                }
+                                
+                                # 计算数值变化百分比
+                                if isinstance(old_val, (int, float)) and isinstance(new_val, (int, float)) and old_val != 0:
+                                    change_percent = ((new_val - old_val) / old_val) * 100
+                                    change_info['change_percent'] = round(change_percent, 2)
+                                    change_info['absolute_change'] = round(new_val - old_val, 4)
+                                
+                                param_changes_detail.append(change_info)
                         
-                        parameter_analysis = {
-                            'total_changes': len(param_changes_detail),
-                            'changes': param_changes_detail[:10]  # 只返回前10个变化
-                        }
+                        if param_changes_detail:
+                            parameter_analysis = {
+                                'total_changes': len(param_changes_detail),
+                                'changes': param_changes_detail[:10],  # 返回前10个变化
+                                'significant_changes': len([c for c in param_changes_detail if abs(c.get('change_percent', 0)) >= 1.0])
+                            }
+                            
+                            # 如果original parameter_changes为空，自动生成
+                            if not detailed_param_changes:
+                                change_summaries = []
+                                for change in param_changes_detail[:5]:
+                                    if 'change_percent' in change:
+                                        change_summaries.append(f"{change['parameter']}: {change['old_value']}→{change['new_value']} ({change['change_percent']:+.1f}%)")
+                                    else:
+                                        change_summaries.append(f"{change['parameter']}: {change['old_value']}→{change['new_value']}")
+                                detailed_param_changes = '; '.join(change_summaries)
+                                
                 except Exception as e:
                     print(f"解析参数变化失败: {e}")
+                    # 即使解析失败，也尝试显示基本信息
+                    if param_changes:
+                        parameter_analysis = {
+                            'total_changes': 1,
+                            'changes': [{'parameter': 'unknown', 'description': param_changes}],
+                            'significant_changes': 1
+                        }
             
             log_entry = {
                 'action': action,
@@ -4161,7 +4211,7 @@ def get_evolution_log():
                 'improvement': float(improvement) if improvement else 0,
                 'evolution_type': evolution_type,
                 'evolution_reason': evolution_reason,
-                'parameter_changes': param_changes,
+                'parameter_changes': detailed_param_changes,
                 'parameter_analysis': parameter_analysis,
                 'notes': notes
             }

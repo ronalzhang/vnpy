@@ -7051,18 +7051,25 @@ class ParameterOptimizer:
                 # 确保新值在有效范围内
                 new_value = max(min_val, min(max_val, new_value))
                 
-                # 记录有意义的变化（确保至少有0.1%的变化）
-                change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
-                if change_ratio >= 0.001 or abs(new_value - current_value) > 0.001:
-                    optimized_params[param_name] = round(new_value, 6)
-                    changes.append({
-                        'parameter': param_name,
-                        'from': round(current_value, 6),
-                        'to': round(new_value, 6),
-                        'strategy': optimization_strategy,
-                        'reason': bottlenecks.get(param_name, f"{config['logic']} 优化"),
-                        'change_pct': round(change_ratio * 100, 2)
-                    })
+                            # 🔧 记录有意义的变化（确保至少有1%的变化）并计算预期改进
+            change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
+            if change_ratio >= 0.01 or abs(new_value - current_value) > 0.01:  # 提高变化阈值
+                # 🧠 计算预期改进度
+                expected_improvement = self._calculate_expected_improvement(
+                    param_name, current_value, new_value, strategy_stats, optimization_strategy
+                )
+                
+                optimized_params[param_name] = round(new_value, 6)
+                changes.append({
+                    'parameter': param_name,
+                    'from': round(current_value, 6),
+                    'to': round(new_value, 6),
+                    'strategy': optimization_strategy,
+                    'reason': bottlenecks.get(param_name, f"{config.get('logic', '智能')} 优化"),
+                    'change_pct': round(change_ratio * 100, 2),
+                    'expected_improvement': expected_improvement,
+                    'impact_level': self._assess_parameter_impact(param_name, change_ratio)
+                })
             
             return optimized_params, changes
             
@@ -7198,52 +7205,55 @@ class ParameterOptimizer:
         range_position = (current_value - min_val) / (max_val - min_val) if max_val > min_val else 0.5
         
         if rule == 'increase':
-            # 增加参数值，向最大值方向移动
+            # 🔧 增加参数值，向最大值方向移动 - 增大调整幅度确保有效改进
             if current_value < optimal_max:
-                # 在最优范围内，适度增加
-                new_value = min(current_value * random.uniform(1.05, 1.2), optimal_max)
+                # 在最优范围内，较大幅度增加
+                new_value = min(current_value * random.uniform(1.1, 1.4), optimal_max)
             else:
                 # 超出最优范围，大幅增加
-                new_value = min(current_value * random.uniform(1.1, 1.3), max_val)
+                new_value = min(current_value * random.uniform(1.2, 1.6), max_val)
                 
         elif rule == 'decrease':
-            # 减少参数值，向最小值方向移动
+            # 🔧 减少参数值，向最小值方向移动 - 增大调整幅度
             if current_value > optimal_min:
-                # 在最优范围内，适度减少
-                new_value = max(current_value * random.uniform(0.8, 0.95), optimal_min)
+                # 在最优范围内，较大幅度减少
+                new_value = max(current_value * random.uniform(0.6, 0.9), optimal_min)
             else:
-                # 低于最优范围，小幅减少
-                new_value = max(current_value * random.uniform(0.9, 0.95), min_val)
+                # 低于最优范围，中等幅度减少
+                new_value = max(current_value * random.uniform(0.8, 0.95), min_val)
                 
         elif rule == 'moderate_increase':
-            # 适度增加，不要过度
-            new_value = min(current_value * random.uniform(1.02, 1.1), 
+            # 🔧 适度增加，确保有可测量的变化
+            new_value = min(current_value * random.uniform(1.05, 1.25), 
                            (current_value + optimal_max) / 2)
                            
         elif rule == 'adaptive':
-            # 自适应调整，根据市场状态
-            volatility = abs(float(strategy_stats.get('sharpe_ratio', 1)) - 1)
-            if volatility > 0.5:  # 高波动性市场
-                new_value = current_value * random.uniform(0.95, 1.05)  # 保守调整
-            else:  # 低波动性市场
-                new_value = current_value * random.uniform(0.9, 1.1)   # 积极调整
+            # 🔧 自适应调整，根据策略表现状态
+            poor_performance = (win_rate < 50 or total_pnl < 0 or sharpe_ratio < 0.5)
+            if poor_performance:
+                # 表现差时积极调整
+                new_value = current_value * random.uniform(0.7, 1.3)  
+            else:
+                # 表现一般时温和调整
+                new_value = current_value * random.uniform(0.9, 1.1)   
                 
         elif rule.startswith('optimize_to_'):
-            # 优化到特定值
+            # 🔧 优化到特定值 - 加快收敛速度
             target_value = self._extract_target_value(rule, param_name)
             if target_value:
-                # 向目标值缓慢收敛
-                new_value = current_value + (target_value - current_value) * random.uniform(0.1, 0.3)
+                # 向目标值快速收敛，确保明显变化
+                convergence_speed = random.uniform(0.2, 0.6)  # 增加收敛速度
+                new_value = current_value + (target_value - current_value) * convergence_speed
             else:
                 new_value = (optimal_min + optimal_max) / 2  # 默认到最优范围中心
                 
         elif rule == 'fine_tune':
-            # 高分策略的微调
-            new_value = current_value * random.uniform(0.98, 1.02)
+            # 🔧 高分策略的微调 - 确保仍有可测量的变化
+            new_value = current_value * random.uniform(0.95, 1.05)  # 增大微调幅度
             
         else:
-            # 默认的保守调整
-            new_value = current_value * random.uniform(0.95, 1.05)
+            # 🔧 默认调整 - 确保有实际变化
+            new_value = current_value * random.uniform(0.9, 1.1)
         
         # 确保新值在有效范围内
         new_value = max(min_val, min(max_val, new_value))
@@ -7525,6 +7535,93 @@ class ParameterOptimizer:
             })
         
         return changes
+    
+    def _calculate_expected_improvement(self, param_name, old_value, new_value, strategy_stats, optimization_strategy):
+        """🧠 计算参数调整的预期改进度"""
+        try:
+            # 基于参数类型和调整方向计算预期改进
+            change_ratio = abs(new_value - old_value) / old_value if old_value > 0 else 0
+            
+            # 获取当前策略表现
+            current_win_rate = float(strategy_stats.get('win_rate', 50))
+            current_pnl = float(strategy_stats.get('total_pnl', 0))
+            current_sharpe = float(strategy_stats.get('sharpe_ratio', 0))
+            
+            # 基本改进度计算：变化幅度 × 参数重要性
+            base_improvement = change_ratio * self._get_parameter_importance(param_name)
+            
+            # 根据当前表现调整预期改进
+            if current_win_rate < 40:  # 胜率很低
+                performance_multiplier = 1.5  # 高期望改进
+            elif current_win_rate < 60:  # 胜率中等
+                performance_multiplier = 1.2  # 中等期望改进
+            else:  # 胜率较高
+                performance_multiplier = 0.8  # 小幅期望改进
+            
+            # 根据优化策略调整
+            strategy_multiplier = {
+                'aggressive_optimization': 2.0,
+                'moderate_optimization': 1.3,
+                'fine_tuning': 0.6,
+                'conservative': 0.4
+            }.get(optimization_strategy, 1.0)
+            
+            # 计算最终预期改进（以分数形式）
+            expected_improvement = base_improvement * performance_multiplier * strategy_multiplier * 10
+            
+            # 限制在合理范围内
+            return max(0.1, min(15.0, expected_improvement))
+            
+        except Exception as e:
+            print(f"计算预期改进失败: {e}")
+            return 1.0  # 默认小幅改进
+    
+    def _get_parameter_importance(self, param_name):
+        """📊 获取参数的重要性权重"""
+        importance_map = {
+            # 风险控制参数 - 高重要性
+            'stop_loss_pct': 0.9,
+            'take_profit_pct': 0.8,
+            'max_drawdown': 0.9,
+            
+            # 信号生成参数 - 中高重要性
+            'rsi_period': 0.7,
+            'macd_fast_period': 0.7,
+            'macd_slow_period': 0.7,
+            'bb_period': 0.6,
+            'bb_std': 0.6,
+            
+            # 交易量参数 - 中等重要性
+            'quantity': 0.5,
+            'position_size_pct': 0.6,
+            'volume_threshold': 0.4,
+            
+            # 时间窗口参数 - 中等重要性
+            'lookback_period': 0.5,
+            'trend_threshold': 0.5,
+            
+            # 其他参数 - 低重要性
+            'threshold': 0.3,
+            'grid_spacing': 0.4
+        }
+        
+        # 通过参数名模糊匹配
+        for key, importance in importance_map.items():
+            if key in param_name.lower():
+                return importance
+        
+        return 0.3  # 默认重要性
+    
+    def _assess_parameter_impact(self, param_name, change_ratio):
+        """🎯 评估参数变化的影响级别"""
+        if change_ratio < 0.05:  # 5%以下
+            return 'low'
+        elif change_ratio < 0.15:  # 15%以下
+            return 'medium'
+        elif change_ratio < 0.30:  # 30%以下
+            return 'high'
+        else:  # 30%以上
+            return 'extreme'
 
 class EvolutionaryStrategyEngine:
     def _save_evolution_history_fixed(self, strategy_id: int, generation: int, cycle: int, 
