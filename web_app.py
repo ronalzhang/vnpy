@@ -272,6 +272,69 @@ def _get_strategy_trade_mode(score, enabled):
     else:
         return '验证交易'
 
+def _get_basic_strategies_list():
+    """备用的基础策略获取方式"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查询前21个启用的策略
+        cursor.execute("""
+            SELECT id, name, symbol, strategy_type, enabled, parameters, 
+                   final_score, created_time
+            FROM strategies 
+            WHERE enabled = 1 
+            ORDER BY final_score DESC, created_time DESC 
+            LIMIT 21
+        """)
+        
+        strategies = []
+        for row in cursor.fetchall():
+            if len(row) >= 8:
+                strategy_id, name, symbol, strategy_type, enabled, parameters, final_score, created_time = row
+                
+                # 计算基础统计数据
+                cursor.execute("""
+                    SELECT COUNT(*) as total_trades,
+                           SUM(CASE WHEN expected_return > 0 THEN 1 ELSE 0 END) as winning_trades,
+                           SUM(expected_return) as total_return
+                    FROM trading_signals 
+                    WHERE strategy_id = %s
+                """, (strategy_id,))
+                
+                stats = cursor.fetchone()
+                total_trades = stats[0] if stats and stats[0] else 0
+                winning_trades = stats[1] if stats and stats[1] else 0
+                total_return = float(stats[2]) if stats and stats[2] else 0.0
+                
+                win_rate = winning_trades / total_trades if total_trades > 0 else 0.0
+                
+                strategies.append({
+                    'id': strategy_id,
+                    'name': name or f'策略-{strategy_id}',
+                    'symbol': symbol or 'BTC/USDT',
+                    'type': strategy_type or 'unknown',
+                    'enabled': bool(enabled),
+                    'parameters': parameters if parameters else {},
+                    'final_score': float(final_score) if final_score else 50.0,
+                    'win_rate': win_rate,
+                    'total_return': total_return,
+                    'total_trades': total_trades,
+                    'trade_mode': _get_strategy_trade_mode(final_score or 50.0, enabled),
+                    'created_time': created_time.isoformat() if created_time else datetime.now().isoformat(),
+                    'last_updated': datetime.now().isoformat()
+                })
+        
+        cursor.close()
+        conn.close()
+        
+        print(f"✅ 基础方式获取到 {len(strategies)} 个策略")
+        return strategies
+        
+    except Exception as e:
+        print(f"❌ 基础策略获取失败: {e}")
+        return []
+
 # 导入套利系统模块
 try:
     from integrate_arbitrage import init_arbitrage_system
@@ -1160,10 +1223,19 @@ def quantitative_strategies():
                 print(f"🚀 现代化策略API请求: limit={limit}")
                 
                 # 使用现代化管理器获取前端显示策略
-                manager = get_modern_strategy_manager()
-                frontend_data = manager.get_frontend_display_data()
-                # frontend_data直接是策略列表，不是字典
-                strategies = frontend_data
+                try:
+                    from modern_strategy_manager import get_modern_strategy_manager
+                    manager = get_modern_strategy_manager()
+                    frontend_data = manager.get_frontend_display_data()
+                    # frontend_data直接是策略列表，不是字典
+                    strategies = frontend_data
+                except ImportError as e:
+                    print(f"⚠️ 现代化策略管理器导入失败: {e}")
+                    # 降级使用基础策略获取方式
+                    strategies = _get_basic_strategies_list()
+                except Exception as e:
+                    print(f"⚠️ 获取策略数据失败: {e}")
+                    strategies = _get_basic_strategies_list()
                 
                 # 如果指定了limit，则截取
                 if limit > 0:
