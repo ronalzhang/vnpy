@@ -86,7 +86,7 @@ class FourTierEvolutionScheduler:
                 logger.error(f"❌ [第1层] 策略池低频进化异常: {e}")
                 await asyncio.sleep(3600)  # 异常时等待1小时重试
     
-         async def high_freq_pool_scheduler(self):
+    async def high_freq_pool_scheduler(self):
         """第2层：高频池高频进化调度器（60分钟间隔）"""
         logger.info("🔥 [第2层] 高频池高频进化调度器启动")
         
