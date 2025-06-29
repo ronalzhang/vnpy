@@ -1159,10 +1159,11 @@ def quantitative_strategies():
                 limit = int(request.args.get('limit', None) or 0) 
                 print(f"🚀 现代化策略API请求: limit={limit}")
                 
-                # 使用现代化管理器获取前端显示策略
-                manager = get_modern_strategy_manager()
-                frontend_data = manager.get_frontend_display_data()
-                strategies = frontend_data['display_strategies']
+                            # 使用现代化管理器获取前端显示策略
+            manager = get_modern_strategy_manager()
+            frontend_data = manager.get_frontend_display_data()
+            # frontend_data直接是策略列表，不是字典
+            strategies = frontend_data
                 
                 # 如果指定了limit，则截取
                 if limit > 0:
