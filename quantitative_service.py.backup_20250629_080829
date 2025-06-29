@@ -434,6 +434,8 @@ class DatabaseManager:
                     print(f"🎉 资产里程碑达成：{note}")
                 conn.close()
 
+
+
 class QuantitativeStrategy:
     """量化策略基类"""
     
@@ -1377,6 +1379,7 @@ class TrendFollowingStrategy(QuantitativeStrategy):
             
         return (current - low) / (high - low)
 
+
 class AutomatedStrategyManager:
 
     def _safe_get_strategy_attr(self, strategy, attr_path, default=None):
@@ -1800,6 +1803,7 @@ class AutomatedStrategyManager:
                 if perf['score'] >= 65.0
             ]
             
+            # 停用低分策略(30分以下)
             low_score_strategies = [
                 strategy_id for strategy_id, perf in strategy_performances.items()
                 if perf['score'] < 30.0
@@ -1807,7 +1811,9 @@ class AutomatedStrategyManager:
             
             # 执行启停操作
             for strategy_id in high_score_strategies:
+                self._enable_strategy(strategy_id)            # ❌ 已禁用自动停用逻辑 - 与现代化策略管理系统冲突
             # for strategy_id in low_score_strategies:
+            #     self._disable_strategy(strategy_id)
             print(f"🛡️ 跳过自动停用 {len(low_score_strategies)} 个低分策略 - 现代化管理系统接管")
                 
             logger.info(f"策略选择完成: 启用 {len(high_score_strategies)} 个，停用 {len(low_score_strategies)} 个")
@@ -1830,6 +1836,26 @@ class AutomatedStrategyManager:
             
         except Exception as e:
             logger.error(f"启用策略失败: {e}")
+
+    def _disable_strategy(self, strategy_id: str):
+        """停用策略 - 已禁用自动调用"""
+        try:
+            # 🛡️ 保护机制：禁止自动停用前端策略
+            print(f"⚠️ _disable_strategy 被调用，但已禁用自动停用功能: {strategy_id}")
+            print("🛡️ 如需停用策略，请使用前端界面或 stop_strategy() 方法")
+            return  # 直接返回，不执行停用操作
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                return
+                
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE strategies SET enabled = 0 WHERE id = %s
+            ''', (strategy_id,))
+            conn.commit()
+            
+        except Exception as e:
+            logger.error(f"停用策略失败: {e}")
 
     def _log_management_actions(self, strategy_performances: Dict[str, Dict]):
         """记录管理行为日志"""
@@ -2418,6 +2444,7 @@ class QuantitativeService:
                 enabled_strategies.sort(key=lambda x: (x['trade_mode'] == 'validation', x['score']))  # 先禁用验证策略
                 to_disable = currently_enabled - max_active
                 for strategy in enabled_strategies[:to_disable]:
+                    self._disable_strategy_auto(strategy['id'])
                     print(f"❌ 自动禁用策略: {strategy['name']} (评分: {strategy['score']:.1f})")
             
             # 统计信息
@@ -2483,6 +2510,13 @@ class QuantitativeService:
             self.conn.commit()
         except Exception as e:
             print(f"❌ 自动启用策略失败: {e}")
+
+    def _disable_strategy_auto(self, strategy_id):
+        """自动禁用策略 - 已完全禁用：保护前端管理的策略"""
+        # 🔧 完全禁用自动停用功能，防止与现代化系统冲突
+        print(f"🛡️ 自动停用功能已禁用，策略{strategy_id[-4:]}受到保护")
+        print("💡 策略启用/停用现由前端统一管理，确保21个优质策略持续运行")
+        return
 
     def manual_evolution(self):
         """手动触发进化"""
@@ -2685,6 +2719,7 @@ class QuantitativeService:
             # 首先关闭所有策略的真实交易
             for strategy_id in self._get_all_strategies_dict().keys():
                 self.db_manager.execute_query(
+                    "UPDATE strategies SET real_trading_enabled = 0, ranking = NULL WHERE id = %s",
                     (strategy_id,)
                 )
             
@@ -3022,15 +3057,8 @@ class QuantitativeService:
             strategy_response = self.get_strategy(strategy_id)
             if strategy_response:
                 # 更新数据库中的状态
-                
-                print(f"📝 策略管理操作记录: {strategy_response.get('name', strategy_id)}")
-                print("🔄 策略在现代化管理系统中持续运行")
-                
-                # 记录管理操作到日志（可选）
-                try:
-                    self._log_operation("策略管理", f"请求管理策略 {strategy_id}", "记录")
-                except:
-                    pass
+                query = "UPDATE strategies SET enabled = 0 WHERE id = %s"
+                self.db_manager.execute_query(query, (strategy_id,))
                 
                 print(f"⏹️ 策略 {strategy_response.get('name', strategy_id)} 已停止并保存状态")
                 return True
@@ -4502,6 +4530,8 @@ class QuantitativeService:
                 'total_pnl': 0
             }
 
+
+    
     def _get_strategy_evolution_display(self, strategy_id: int) -> str:
         """获取策略演化信息显示"""
         try:
@@ -4996,7 +5026,9 @@ class QuantitativeService:
         
         if 'lookback_period' in params:
             params['lookback_period'] = max(5, min(100, params['lookback_period']))  # 限制在5-100
+    
 
+    
     def _start_auto_management(self):
         """启动自动管理 - 确保信号生成和数据持久化"""
         if hasattr(self, 'auto_management_thread') and self.auto_management_thread and self.auto_management_thread.is_alive():
@@ -5173,7 +5205,8 @@ class QuantitativeService:
         except Exception as e:
             print(f"获取资产历史失败: {e}")
             return []
-
+    
+    
     def _fetch_fresh_balance(self):
         """获取实时余额信息"""
         try:
@@ -5295,6 +5328,7 @@ class QuantitativeService:
             print(f"✅ 记录策略优化日志: {strategy_id} - {optimization_type}")
         except Exception as e:
             print(f"❌ 记录策略优化日志失败: {e}")
+    
 
     def get_strategy_trade_logs(self, strategy_id, limit=200):
         """获取策略交易日志 - 包含验证交易和真实交易的完整记录"""
@@ -5514,6 +5548,7 @@ class QuantitativeService:
         except Exception as e:
             print(f"❌ 创建默认策略失败: {e}")
 
+    
     # ⭐ 新增：系统状态同步方法
     def update_system_status(self, quantitative_running=None, auto_trading_enabled=None, 
                            total_strategies=None, running_strategies=None, 
@@ -5804,6 +5839,7 @@ class QuantitativeService:
         except Exception as e:
             print(f"创建操作日志表失败: {e}")
 
+    
     def _get_current_balance(self):
         """获取当前USDT余额 - 主要用于交易决策"""
         try:
@@ -8599,7 +8635,9 @@ class EvolutionaryStrategyEngine:
         fitness += age_bonus * 0.05
         
         return min(fitness, 100.0)  # 限制在100分以内
-
+    
+    
+    
     def _eliminate_poor_strategies(self, strategies: List[Dict]) -> List[Dict]:
         """淘汰低分策略，但保护高分策略"""
         try:
@@ -8685,7 +8723,9 @@ class EvolutionaryStrategyEngine:
             """, (strategy_id, self.current_generation, self.current_cycle, 
                   f"eliminated_{reason}", final_score))
                   
+            # 🔧 禁用策略停用：进化过程中不再停用策略，只记录淘汰历史
             print(f"📝 策略{strategy_id[-4:]}进化记录已保存，但保持启用状态")
+            # 原停用代码已禁用，避免与前端策略管理冲突
             # self.quantitative_service.db_manager.execute_query("""
             #     UPDATE strategies 
             #     SET enabled = 0, last_evolution_time = CURRENT_TIMESTAMP
@@ -9679,6 +9719,7 @@ class EvolutionaryStrategyEngine:
                 print(f"✅ 策略{strategy_id[-4:]}初始化验证成功，已加入进化池")
             else:
                 print(f"❌ 策略{strategy_id[-4:]}初始化验证失败，但保持启用状态进行持续优化")
+                # 🔧 修复：不再自动停用验证失败的策略，特别是前端显示的优质策略
                 
                 # 检查是否是前端显示的策略（前21个）
                 top21_check = self.quantitative_service.db_manager.execute_query("""
@@ -9692,6 +9733,7 @@ class EvolutionaryStrategyEngine:
                 
                 if top21_check:
                     print(f"🛡️ 策略{strategy_id[-4:]}属于前端显示策略，继续参与进化")
+                    # 只更新notes，不停用策略
                     self.quantitative_service.db_manager.execute_query(
                         "UPDATE strategies SET notes = 'validation_pending_optimization' WHERE id = %s",
                         (strategy_id,)
@@ -9893,6 +9935,7 @@ class EvolutionaryStrategyEngine:
             print(f"❌ 策略参数优化闭环失败: {e}")
             import traceback
             traceback.print_exc()
+    
 
     def _load_current_generation(self) -> int:
         """从数据库加载当前世代数"""
@@ -10177,6 +10220,7 @@ class EvolutionaryStrategyEngine:
         except Exception as e:
             print(f"获取交易策略失败: {e}")
             return []
+
 
     def _force_strategy_initialization_validation(self, strategy_id: int) -> bool:
         """🔧 强制策略初始化验证 - 新策略必须完成3次真实环境模拟交易"""
@@ -12375,6 +12419,8 @@ class EvolutionaryStrategyEngine:
             'breakout': {'lookback_period': 25, 'breakout_threshold': 0.015, 'quantity': 12}
         }
         return default_params.get(strategy_type, {'quantity': 10, 'threshold': 0.01})
+    
+
 
     def _load_configuration_from_db(self):
         """从数据库加载配置参数"""
@@ -12520,6 +12566,7 @@ if __name__ == "__main__":
     main()
 
 # 为了向后兼容，提供全局实例（仅在直接运行时）
+
 
 if __name__ == "__main__":
     quantitative_service = None  # 避免在导入时创建实例

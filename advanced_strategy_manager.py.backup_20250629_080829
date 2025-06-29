@@ -254,6 +254,7 @@ class AdvancedStrategyManager:
                       OR (total_trades >= %s AND win_rate < %s)
                       OR created_at < %s
                   )
+                  AND enabled = false
                 ORDER BY final_score ASC
             """, (
                 self.config['elimination_score_threshold'],
@@ -276,6 +277,7 @@ class AdvancedStrategyManager:
                 cursor.execute("""
                     SELECT id, name, final_score 
                     FROM strategies 
+                    WHERE id LIKE 'STRAT_%' AND enabled = false
                     ORDER BY final_score ASC, total_trades ASC
                     LIMIT %s
                 """, (extra_elimination,))
@@ -651,6 +653,7 @@ class AdvancedStrategyManager:
             import traceback
             traceback.print_exc()
             return []
+
 
 # 全局实例
 strategy_manager = AdvancedStrategyManager()

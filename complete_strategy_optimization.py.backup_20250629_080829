@@ -390,6 +390,7 @@ class CompleteStrategyOptimizer:
             cursor.execute("""
                 SELECT id, parameters, symbol 
                 FROM strategies 
+                WHERE enabled = true AND final_score >= 60
                 ORDER BY final_score DESC 
                 LIMIT 10
             """)
