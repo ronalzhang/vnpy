@@ -489,69 +489,138 @@ class FourTierStrategyManager:
         except Exception as e:
             logger.error(f"❌ 验证交易执行失败: {e}")
 
-    def get_evolution_statistics(self) -> Dict:
-        """获取四层进化统计信息"""
+    def get_evolution_statistics(self):
+        """获取四层进化系统统计信息"""
         try:
+            conn = self._get_db_connection()
+            cursor = conn.cursor()
+            
+            # 获取各层策略数量
             all_strategies = self.get_all_strategies()
-            high_freq_pool = self.get_high_freq_pool()
+            high_freq_strategies = self.get_high_freq_pool()
             display_strategies = self.get_display_strategies()
             trading_strategies = self.get_trading_strategies()
             
-            # 计算理论进化频率
-            display_evolutions_per_hour = len(display_strategies) * (60 // self.config.display_interval_minutes)
-            high_freq_evolutions_per_hour = len(high_freq_pool) * (60 // self.config.high_freq_interval_minutes)
-            low_freq_evolutions_per_hour = len(all_strategies) // self.config.low_freq_interval_hours
-            
-            total_theoretical_evolutions = (
-                display_evolutions_per_hour + 
-                high_freq_evolutions_per_hour + 
-                low_freq_evolutions_per_hour
-            )
-            
-            return {
+            # 计算理论进化次数和验证次数
+            stats = {
                 'tiers': {
                     'pool': {
                         'strategy_count': len(all_strategies),
-                        'evolution_interval': f"{self.config.low_freq_interval_hours}小时",
-                        'theoretical_evolutions_per_hour': low_freq_evolutions_per_hour,
+                        'evolution_interval': f'{self.config.low_freq_interval_hours}小时',
+                        'theoretical_evolutions_per_hour': int(len(all_strategies) / self.config.low_freq_interval_hours),
                         'validation_count_per_evolution': self.config.low_freq_validation_count
                     },
                     'high_freq': {
-                        'strategy_count': len(high_freq_pool),
-                        'evolution_interval': f"{self.config.high_freq_interval_minutes}分钟",
-                        'theoretical_evolutions_per_hour': high_freq_evolutions_per_hour,
+                        'strategy_count': len(high_freq_strategies),
+                        'evolution_interval': f'{self.config.high_freq_interval_minutes}分钟',
+                        'theoretical_evolutions_per_hour': int(len(high_freq_strategies) * (60 / self.config.high_freq_interval_minutes)),
                         'validation_count_per_evolution': self.config.high_freq_validation_count
                     },
                     'display': {
                         'strategy_count': len(display_strategies),
-                        'evolution_interval': f"{self.config.display_interval_minutes}分钟",
-                        'theoretical_evolutions_per_hour': display_evolutions_per_hour,
+                        'evolution_interval': f'{self.config.display_interval_minutes}分钟',
+                        'theoretical_evolutions_per_hour': int(len(display_strategies) * (60 / self.config.display_interval_minutes)),
                         'validation_count_per_evolution': self.config.display_validation_count
                     },
                     'trading': {
                         'strategy_count': len(trading_strategies),
                         'real_trading_threshold': self.config.real_trading_score_threshold
                     }
-                },
-                'totals': {
-                    'total_strategies': len(all_strategies),
-                    'theoretical_total_evolutions_per_hour': total_theoretical_evolutions,
-                    'theoretical_validations_per_hour': (
-                        display_evolutions_per_hour * self.config.display_validation_count +
-                        high_freq_evolutions_per_hour * self.config.high_freq_validation_count +
-                        low_freq_evolutions_per_hour * self.config.low_freq_validation_count
-                    )
-                },
-                'config': {
-                    'high_freq_pool_size': self.config.high_freq_pool_size,
-                    'display_strategies_count': self.config.display_strategies_count,
-                    'real_trading_count': self.config.real_trading_count
                 }
             }
             
+            # 计算总进化次数和验证次数
+            total_evolutions = (
+                stats['tiers']['pool']['theoretical_evolutions_per_hour'] +
+                stats['tiers']['high_freq']['theoretical_evolutions_per_hour'] +
+                stats['tiers']['display']['theoretical_evolutions_per_hour']
+            )
+            
+            total_validations = (
+                stats['tiers']['pool']['theoretical_evolutions_per_hour'] * stats['tiers']['pool']['validation_count_per_evolution'] +
+                stats['tiers']['high_freq']['theoretical_evolutions_per_hour'] * stats['tiers']['high_freq']['validation_count_per_evolution'] +
+                stats['tiers']['display']['theoretical_evolutions_per_hour'] * stats['tiers']['display']['validation_count_per_evolution']
+            )
+            
+            stats['totals'] = {
+                'theoretical_total_evolutions_per_hour': total_evolutions,
+                'theoretical_validations_per_hour': total_validations
+            }
+            
+            conn.close()
+            return stats
+            
         except Exception as e:
-            logger.error(f"❌ 获取进化统计失败: {e}")
-            return {}
+            logger.error(f"获取进化统计信息失败: {e}")
+            return {
+                'tiers': {
+                    'pool': {'strategy_count': 0, 'evolution_interval': '24小时', 'theoretical_evolutions_per_hour': 0, 'validation_count_per_evolution': 2},
+                    'high_freq': {'strategy_count': 0, 'evolution_interval': '60分钟', 'theoretical_evolutions_per_hour': 0, 'validation_count_per_evolution': 4},
+                    'display': {'strategy_count': 0, 'evolution_interval': '3分钟', 'theoretical_evolutions_per_hour': 0, 'validation_count_per_evolution': 4},
+                    'trading': {'strategy_count': 0, 'real_trading_threshold': 65.0}
+                },
+                'totals': {'theoretical_total_evolutions_per_hour': 0, 'theoretical_validations_per_hour': 0}
+            }
+
+    def get_frontend_display_data(self):
+        """获取前端显示数据 - 兼容旧接口"""
+        try:
+            # 获取前端21个策略的详细数据
+            display_strategies = self.get_display_strategies()
+            
+            formatted_strategies = []
+            for strategy in display_strategies:
+                # 格式化策略数据供前端显示
+                formatted_strategy = {
+                    'id': strategy['id'],
+                    'symbol': strategy['symbol'],
+                    'score': float(strategy['final_score']),
+                    'enabled': bool(strategy['enabled']),
+                    'trade_mode': '实盘交易' if strategy['final_score'] >= self.config.real_trading_score_threshold else '验证交易',
+                    'parameters': strategy.get('parameters', {}),
+                    'performance': {
+                        'total_trades': 0,
+                        'win_rate': 0.0,
+                        'total_pnl': 0.0,
+                        'sharpe_ratio': 0.0,
+                        'max_drawdown': 0.0
+                    },
+                    'last_update': strategy.get('last_update', ''),
+                    'strategy_type': strategy.get('strategy_type', 'unknown'),
+                    'creation_time': strategy.get('creation_time', ''),
+                    'tier': 'display'  # 标记为前端显示层
+                }
+                
+                # 获取策略性能数据
+                try:
+                    conn = self._get_db_connection()
+                    cursor = conn.cursor()
+                    
+                    cursor.execute("""
+                        SELECT COUNT(*) as total_trades,
+                               AVG(CASE WHEN expected_return > 0 THEN 1.0 ELSE 0.0 END) as win_rate,
+                               SUM(expected_return) as total_pnl
+                        FROM trading_signals 
+                        WHERE strategy_id = %s
+                    """, (strategy['id'],))
+                    
+                    perf_result = cursor.fetchone()
+                    if perf_result:
+                        formatted_strategy['performance']['total_trades'] = perf_result[0] or 0
+                        formatted_strategy['performance']['win_rate'] = float(perf_result[1] or 0) * 100
+                        formatted_strategy['performance']['total_pnl'] = float(perf_result[2] or 0)
+                    
+                    conn.close()
+                except Exception as e:
+                    logger.warning(f"获取策略{strategy['id']}性能数据失败: {e}")
+                
+                formatted_strategies.append(formatted_strategy)
+            
+            return formatted_strategies
+            
+        except Exception as e:
+            logger.error(f"获取前端显示数据失败: {e}")
+            return []
 
 
 def get_four_tier_strategy_manager() -> FourTierStrategyManager:
