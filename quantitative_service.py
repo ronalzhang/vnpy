@@ -2388,9 +2388,9 @@ class QuantitativeService:
         try:
             # 限制并发数据库连接
             if hasattr(self.four_tier_manager, 'evolve_pool_strategies'):
-                # 执行进化，限制数量
-                result = self.four_tier_manager.evolve_pool_strategies(max_strategies=100)
-                print(f"📊 [第1层] 进化了 {result.get('evolved_count', 0)} 个策略")
+                # 执行进化，不传递max_strategies参数
+                result = self.four_tier_manager.evolve_pool_strategies()
+                print(f"📊 [第1层] 策略池进化完成")
             else:
                 print("⚠️ [第1层] 四层管理器未初始化，跳过进化")
             
@@ -2401,9 +2401,9 @@ class QuantitativeService:
         """安全执行高频池进化 - 带超时和资源控制"""
         try:
             if hasattr(self.four_tier_manager, 'evolve_high_freq_pool'):
-                # 执行高频池进化，限制数量
-                result = self.four_tier_manager.evolve_high_freq_pool(max_strategies=50)
-                print(f"📊 [第2层] 进化了 {result.get('evolved_count', 0)} 个高频策略")
+                # 执行高频池进化，不传递max_strategies参数
+                result = self.four_tier_manager.evolve_high_freq_pool()
+                print(f"📊 [第2层] 高频池进化完成")
             else:
                 print("⚠️ [第2层] 四层管理器未初始化，跳过进化")
             
@@ -2414,8 +2414,8 @@ class QuantitativeService:
         """安全执行前端显示策略进化"""
         try:
             if hasattr(self.four_tier_manager, 'evolve_display_strategies'):
-                result = self.four_tier_manager.evolve_display_strategies(max_strategies=21)
-                print(f"📊 [第3层] 进化了 {result.get('evolved_count', 0)} 个前端显示策略")
+                result = self.four_tier_manager.evolve_display_strategies()
+                print(f"📊 [第3层] 前端显示策略进化完成")
             else:
                 print("⚠️ [第3层] 四层管理器未初始化，跳过进化")
                 
