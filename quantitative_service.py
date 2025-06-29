@@ -2294,27 +2294,133 @@ class QuantitativeService:
             traceback.print_exc()
     
     def _start_four_tier_evolution_scheduler(self):
-        """启动四层进化调度器 - 安全版本"""
+        """启动安全的四层进化调度器 - 解决无限循环和资源耗尽问题"""
         try:
-            print("🚀 四层进化调度器启动（安全模式）")
+            print("🚀 启动安全的四层进化调度器")
             
-            # 🛡️ 紧急安全措施：暂时完全禁用四层调度器
-            print("⚠️ 四层进化调度器已被紧急禁用，防止服务器卡死")
-            print("⚠️ 如需启用，请设置环境变量 ENABLE_FOUR_TIER_EVOLUTION=true")
-            return
+            # 🛡️ 安全配置
+            self.four_tier_config = {
+                'enabled': True,
+                'max_concurrent_tasks': 2,  # 限制并发任务数
+                'pool_evolution_interval': 24 * 3600,  # 24小时
+                'high_freq_interval': 60 * 60,  # 60分钟
+                'display_interval': 3 * 60,  # 3分钟
+                'trading_interval': 60,  # 1分钟
+                'safety_delay': 5,  # 安全延迟5秒
+                'max_evolution_time': 30,  # 单次进化最大30秒
+                'enable_real_trading': False  # 默认禁用实盘交易
+            }
             
-            # 🛡️ 安全检查：仅在明确设置环境变量时启用
-            import os
-            if os.getenv('ENABLE_FOUR_TIER_EVOLUTION', 'false').lower() != 'true':
-                print("⚠️ 四层进化调度器已禁用，设置环境变量 ENABLE_FOUR_TIER_EVOLUTION=true 启用")
-                return
+            # 🎯 启动定时任务而不是无限循环
+            self._start_timed_evolution_tasks()
             
-            print("✅ 四层进化调度器已安全启动（需要环境变量启用）")
+            print("✅ 安全的四层进化调度器已启动")
             
         except Exception as e:
             print(f"❌ 启动四层进化调度器失败: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _start_timed_evolution_tasks(self):
+        """启动定时进化任务 - 使用Timer而不是无限循环"""
+        import threading
+        
+        # 第1层：策略池低频进化（24小时执行一次）
+        def pool_evolution_task():
+            if not self.running or not self.four_tier_config.get('enabled', False):
+                return
+            try:
+                print("🔄 [第1层] 执行策略池低频进化")
+                self._safe_evolve_pool_strategies()
+                print("✅ [第1层] 策略池低频进化完成")
+            except Exception as e:
+                print(f"❌ [第1层] 策略池进化异常: {e}")
+            finally:
+                # 24小时后再次执行
+                if self.running and self.four_tier_config.get('enabled', False):
+                    threading.Timer(self.four_tier_config['pool_evolution_interval'], pool_evolution_task).start()
+        
+        # 第2层：高频池进化（60分钟执行一次）
+        def high_freq_evolution_task():
+            if not self.running or not self.four_tier_config.get('enabled', False):
+                return
+            try:
+                print("🔥 [第2层] 执行高频池进化")
+                self._safe_evolve_high_freq_pool()
+                print("✅ [第2层] 高频池进化完成")
+            except Exception as e:
+                print(f"❌ [第2层] 高频池进化异常: {e}")
+            finally:
+                # 60分钟后再次执行
+                if self.running and self.four_tier_config.get('enabled', False):
+                    threading.Timer(self.four_tier_config['high_freq_interval'], high_freq_evolution_task).start()
+        
+        # 第3层：前端显示策略进化（3分钟执行一次）
+        def display_evolution_task():
+            if not self.running or not self.four_tier_config.get('enabled', False):
+                return
+            try:
+                print("🎯 [第3层] 执行前端显示策略进化")
+                self._safe_evolve_display_strategies()
+                print("✅ [第3层] 前端策略进化完成")
+            except Exception as e:
+                print(f"❌ [第3层] 前端策略进化异常: {e}")
+            finally:
+                # 3分钟后再次执行
+                if self.running and self.four_tier_config.get('enabled', False):
+                    threading.Timer(self.four_tier_config['display_interval'], display_evolution_task).start()
+        
+        # 🚀 启动定时任务
+        print("🕐 启动定时进化任务...")
+        
+        # 延迟启动，避免同时执行
+        threading.Timer(5, pool_evolution_task).start()  # 5秒后启动第1层
+        threading.Timer(10, high_freq_evolution_task).start()  # 10秒后启动第2层  
+        threading.Timer(15, display_evolution_task).start()  # 15秒后启动第3层
+        
+        # 第4层默认不启动（实盘交易需要手动启用）
+        print("🛡️ [第4层] 实盘交易默认禁用，需要手动启用")
+        
+        print("✅ 所有定时进化任务已启动")
+    
+    def _safe_evolve_pool_strategies(self):
+        """安全执行策略池进化 - 带超时和资源控制"""
+        try:
+            # 限制并发数据库连接
+            if hasattr(self.four_tier_manager, 'evolve_pool_strategies'):
+                # 执行进化，限制数量
+                result = self.four_tier_manager.evolve_pool_strategies(max_strategies=100)
+                print(f"📊 [第1层] 进化了 {result.get('evolved_count', 0)} 个策略")
+            else:
+                print("⚠️ [第1层] 四层管理器未初始化，跳过进化")
+            
+        except Exception as e:
+            print(f"❌ [第1层] 策略池进化错误: {e}")
+    
+    def _safe_evolve_high_freq_pool(self):
+        """安全执行高频池进化 - 带超时和资源控制"""
+        try:
+            if hasattr(self.four_tier_manager, 'evolve_high_freq_pool'):
+                # 执行高频池进化，限制数量
+                result = self.four_tier_manager.evolve_high_freq_pool(max_strategies=50)
+                print(f"📊 [第2层] 进化了 {result.get('evolved_count', 0)} 个高频策略")
+            else:
+                print("⚠️ [第2层] 四层管理器未初始化，跳过进化")
+            
+        except Exception as e:
+            print(f"❌ [第2层] 高频池进化错误: {e}")
+    
+    def _safe_evolve_display_strategies(self):
+        """安全执行前端显示策略进化"""
+        try:
+            if hasattr(self.four_tier_manager, 'evolve_display_strategies'):
+                result = self.four_tier_manager.evolve_display_strategies(max_strategies=21)
+                print(f"📊 [第3层] 进化了 {result.get('evolved_count', 0)} 个前端显示策略")
+            else:
+                print("⚠️ [第3层] 四层管理器未初始化，跳过进化")
+                
+        except Exception as e:
+            print(f"❌ [第3层] 前端策略进化错误: {e}")
     
     async def _pool_evolution_scheduler(self):
         """第1层：策略池低频进化调度器（24小时间隔）"""

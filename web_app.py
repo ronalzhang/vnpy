@@ -1154,7 +1154,7 @@ def quantitative_strategies():
         try:
             # 🚀 使用现代化分层策略管理系统 3.0
             try:
-                from modern_strategy_manager import get_modern_strategy_manager
+                # 已删除重复的导入
                 
                 limit = int(request.args.get('limit', None) or 0) 
                 print(f"🚀 现代化策略API请求: limit={limit}")
@@ -2239,7 +2239,7 @@ def get_system_status():
         
         # 获取现代化策略管理器配置
         try:
-            from modern_strategy_manager import get_modern_strategy_manager
+            # 已删除重复的导入
             manager = get_modern_strategy_manager()
             evolution_interval = manager.config.evolution_interval
             max_strategies = manager.config.max_display_strategies
