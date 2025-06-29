@@ -2294,50 +2294,22 @@ class QuantitativeService:
             traceback.print_exc()
     
     def _start_four_tier_evolution_scheduler(self):
-        """启动四层进化调度器"""
+        """启动四层进化调度器 - 安全版本"""
         try:
-            import asyncio
-            import threading
+            print("🚀 四层进化调度器启动（安全模式）")
             
-            def four_tier_scheduler():
-                """四层进化调度器主线程"""
-                try:
-                    print("🔄 启动四层进化调度器线程...")
-                    
-                    # 创建新的事件循环
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    
-                    async def evolution_scheduler():
-                        """四层并发进化调度"""
-                        print("🚀 四层并发进化调度启动")
-                        
-                        # 显示系统统计
-                        stats = self.four_tier_manager.get_evolution_statistics()
-                        print(f"📊 四层进化负载: {stats['totals']['theoretical_total_evolutions_per_hour']}次/小时")
-                        print(f"📊 验证交易负载: {stats['totals']['theoretical_validations_per_hour']}次/小时")
-                        
-                        # 四层并发调度
-                        await asyncio.gather(
-                            self._pool_evolution_scheduler(),      # 第1层：策略池低频进化
-                            self._high_freq_pool_scheduler(),      # 第2层：高频池高频进化  
-                            self._display_strategies_scheduler(),  # 第3层：前端持续高频进化
-                            self._real_trading_scheduler()         # 第4层：实盘交易执行
-                        )
-                    
-                    # 运行四层进化调度
-                    loop.run_until_complete(evolution_scheduler())
-                    
-                except Exception as e:
-                    print(f"❌ 四层进化调度器异常: {e}")
-                    import traceback
-                    traceback.print_exc()
+            # 🛡️ 紧急安全措施：暂时完全禁用四层调度器
+            print("⚠️ 四层进化调度器已被紧急禁用，防止服务器卡死")
+            print("⚠️ 如需启用，请设置环境变量 ENABLE_FOUR_TIER_EVOLUTION=true")
+            return
             
-            # 启动四层进化调度器线程
-            self.four_tier_scheduler_thread = threading.Thread(target=four_tier_scheduler, daemon=True)
-            self.four_tier_scheduler_thread.start()
+            # 🛡️ 安全检查：仅在明确设置环境变量时启用
+            import os
+            if os.getenv('ENABLE_FOUR_TIER_EVOLUTION', 'false').lower() != 'true':
+                print("⚠️ 四层进化调度器已禁用，设置环境变量 ENABLE_FOUR_TIER_EVOLUTION=true 启用")
+                return
             
-            print("✅ 四层进化调度器已启动")
+            print("✅ 四层进化调度器已安全启动（需要环境变量启用）")
             
         except Exception as e:
             print(f"❌ 启动四层进化调度器失败: {e}")
