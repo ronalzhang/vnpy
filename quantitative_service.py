@@ -8265,10 +8265,10 @@ class EvolutionaryStrategyEngine:
                     self.current_generation += 1
                     self.current_cycle = 1
                 else:
-                    # 达到代数上限，重置为第1代第1轮
-                    print("🔄 已达到代数上限9999，重置为第1代第1轮")
-                    self.current_generation = 1
-                    self.current_cycle = 1
+                    # 达到代数上限，保持在9999代但继续轮次
+                    print("🔄 已达到代数上限9999，保持在第9999代继续进化")
+                    self.current_generation = 9999
+                    self.current_cycle = 1  # 重置轮次但保持代数
             
             # 🔧 立即更新到数据库和全局状态
             self._save_generation_state()
@@ -8393,9 +8393,12 @@ class EvolutionaryStrategyEngine:
     def _update_strategies_generation_info(self):
         """🔧 修复：强制同步所有策略的世代信息到当前世代"""
         try:
-            # 🔧 确保current_generation和current_cycle不为None或0
+            # 🔧 修复：保持代数持续性，避免重置
             if not hasattr(self, 'current_generation') or not self.current_generation or self.current_generation <= 0:
-                self.current_generation = 1
+                # 从数据库恢复最新代数，而不是重置为1
+                saved_generation = self._load_current_generation()
+                self.current_generation = max(saved_generation, 1)
+                print(f"📈 恢复策略代数为第{self.current_generation}代（避免重置）")
             if not hasattr(self, 'current_cycle') or not self.current_cycle or self.current_cycle <= 0:
                 self.current_cycle = 1
                 

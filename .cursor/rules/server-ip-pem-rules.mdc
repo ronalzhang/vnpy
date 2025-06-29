@@ -7,4 +7,4 @@ alwaysApply: true
 应用在这个目录下：/root/VNPY
 用pm2管理应用
 服务器上运行的操作要用ssh -i baba.pem root@47.236.39.134+具体命令，比如ssh -i baba.pem root@47.236.39.134 “pm2 status”
-命令里有--lines 50的时候一定加上nosteam才完整。
+命令里有--lines 50的时候一定加上 --nosteam才完整。

@@ -4542,3 +4542,82 @@ def get_strategy_logs_by_category(strategy_id):
 if __name__ == "__main__":
     main()
 
+import threading
+import time
+from datetime import datetime, timedelta
+
+# ... existing code ...
+
+def real_time_sync_daemon():
+    """实时数据同步守护进程 - 每30秒同步一次"""
+    while True:
+        try:
+            time.sleep(30)  # 每30秒执行一次
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 获取最近2分钟未同步的数据
+            cursor.execute('''
+                SELECT ts.strategy_id, ts.signal_type, ts.symbol, ts.price, ts.quantity,
+                       ts.executed, ts.confidence, ts.timestamp,
+                       COALESCE(s.final_score, 50.0) as strategy_score
+                FROM trading_signals ts
+                LEFT JOIN strategies s ON ts.strategy_id = s.id
+                WHERE ts.timestamp > (
+                    SELECT COALESCE(MAX(timestamp), NOW() - INTERVAL '2 minutes') 
+                    FROM unified_strategy_logs
+                )
+                AND ts.timestamp >= NOW() - INTERVAL '2 minutes'
+                ORDER BY ts.timestamp DESC
+                LIMIT 100
+            ''')
+            
+            missing_records = cursor.fetchall()
+            sync_count = 0
+            
+            for record in missing_records:
+                strategy_id, signal_type, symbol, price, quantity, executed, confidence, timestamp, strategy_score = record
+                
+                # 修复布尔值转换
+                executed_bool = bool(executed) if executed is not None else False
+                
+                # 确定日志类型
+                log_type = 'real_trading' if strategy_score >= 65.0 else 'validation'
+                
+                try:
+                    cursor.execute('''
+                        INSERT INTO unified_strategy_logs 
+                        (strategy_id, log_type, signal_type, symbol, price, quantity, 
+                         executed, confidence, strategy_score, timestamp, pnl, notes, cycle_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (strategy_id, timestamp) DO NOTHING
+                    ''', (
+                        strategy_id, log_type, signal_type, symbol, price, quantity,
+                        executed_bool, confidence, strategy_score, timestamp, 0.0, 
+                        f'实时同步: {log_type}', '0'
+                    ))
+                    if cursor.rowcount > 0:
+                        sync_count += 1
+                except Exception as e:
+                    if 'duplicate' not in str(e).lower():
+                        print(f'实时同步失败: {e}')
+                        break
+            
+            conn.commit()
+            conn.close()
+            
+            if sync_count > 0:
+                print(f'🔄 实时同步: {sync_count}条新记录 ({datetime.now().strftime("%H:%M:%S")})')
+                
+        except Exception as e:
+            print(f'❌ 实时同步守护进程错误: {e}')
+            time.sleep(60)  # 出错时等待1分钟再重试
+
+# 启动实时同步守护进程
+sync_thread = threading.Thread(target=real_time_sync_daemon, daemon=True)
+sync_thread.start()
+print('🚀 实时数据同步守护进程已启动（每30秒同步）')
+
+# ... existing code ...
+
