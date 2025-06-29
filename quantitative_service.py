@@ -10161,7 +10161,7 @@ class EvolutionaryStrategyEngine:
                     SELECT s.id, s.name, s.final_score, s.total_trades, s.win_rate, s.total_return,
                            0 as actual_trades, 0 as actual_wins
                     FROM strategies s
-                    WHERE s.enabled = 1 AND s.final_score >= 50
+                    WHERE s.enabled = 1
                     ORDER BY s.final_score DESC
                     LIMIT %s
                 ''', (limit,))

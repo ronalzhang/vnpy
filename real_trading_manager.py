@@ -120,7 +120,7 @@ class RealTradingManager:
                 SUM(t.pnl) as total_pnl
             FROM strategies s
             LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
-            WHERE s.enabled = 1 AND s.final_score >= 80
+                            WHERE s.enabled = 1
             GROUP BY s.id, s.name, s.final_score
             ORDER BY s.final_score DESC
             LIMIT 10
@@ -378,7 +378,7 @@ class RealTradingManager:
             cursor.execute("""
                 SELECT id, name, symbol, final_score 
                 FROM strategies 
-                WHERE enabled = 1 AND final_score >= 70
+                WHERE enabled = 1
                 ORDER BY final_score DESC 
                 LIMIT 5
             """)

@@ -112,7 +112,7 @@ class TradingMonitor:
                    COUNT(t.id) as total_trades
             FROM strategies s
             LEFT JOIN strategy_trade_logs t ON s.id = t.strategy_id
-            WHERE s.enabled = 1 AND s.final_score >= 60
+                            WHERE s.enabled = 1
             GROUP BY s.id, s.name, s.enabled, s.final_score
             ORDER BY s.final_score DESC
             LIMIT 10
@@ -259,7 +259,7 @@ class TradingMonitor:
         # 建议2: 检查策略多样性
         cursor.execute("""
             SELECT COUNT(DISTINCT strategy_type) as types, COUNT(*) as total
-            FROM strategies WHERE enabled = 1 AND final_score >= 60
+            FROM strategies WHERE enabled = 1
         """)
         strategy_diversity = cursor.fetchone()
         
