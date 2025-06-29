@@ -4445,97 +4445,148 @@ def get_unified_system_status():
 
 @app.route('/api/quantitative/strategies/<strategy_id>/logs-by-category', methods=['GET'])
 def get_strategy_logs_by_category(strategy_id):
-    """🔥 新增：按分类获取策略日志 - 使用统一日志表"""
+    """获取策略的分类日志 - 支持分页"""
     try:
-        log_type = request.args.get('type')  # real_trading, validation, evolution
-        limit = int(request.args.get('limit', 100))
-        
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 使用新的统一日志表
-        if log_type:
-            cursor.execute("""
-                SELECT strategy_id, log_type, timestamp as created_at, symbol, signal_type, 
-                       price, quantity, pnl, executed, confidence, cycle_id, strategy_score,
-                       evolution_type, old_parameters, new_parameters, trigger_reason, 
-                       improvement, success, notes
-                FROM unified_strategy_logs 
-                WHERE strategy_id = %s AND log_type = %s
-                ORDER BY timestamp DESC 
-                LIMIT %s
-            """, (strategy_id, log_type, limit))
-        else:
-            cursor.execute("""
-                SELECT strategy_id, log_type, timestamp as created_at, symbol, signal_type, 
-                       price, quantity, pnl, executed, confidence, cycle_id, strategy_score,
-                       evolution_type, old_parameters, new_parameters, trigger_reason, 
-                       improvement, success, notes
-                FROM unified_strategy_logs 
-                WHERE strategy_id = %s
-                ORDER BY timestamp DESC 
-                LIMIT %s
-            """, (strategy_id, limit))
+        # 获取请求参数
+        log_type = request.args.get('type', 'all')  # all, validation, evolution, real_trading
+        limit = int(request.args.get('limit', 30))  # 每页30条
+        page = int(request.args.get('page', 1))     # 页码，从1开始
+        offset = (page - 1) * limit
+        
+        # 构建查询条件
+        where_conditions = ["strategy_id = %s"]
+        params = [strategy_id]
+        
+        if log_type != 'all':
+            where_conditions.append("log_type = %s")
+            params.append(log_type)
+        
+        where_clause = " AND ".join(where_conditions)
+        
+        # 获取总记录数
+        count_query = f"""
+            SELECT COUNT(*) FROM unified_strategy_logs 
+            WHERE {where_clause}
+        """
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()[0]
+        
+        total_pages = (total_count + limit - 1) // limit  # 向上取整
+        
+        # 获取分页数据
+        query = f"""
+            SELECT strategy_id, log_type, timestamp, created_at, symbol, signal_type, 
+                   price, quantity, pnl, executed, confidence, cycle_id, strategy_score,
+                   evolution_type, old_parameters, new_parameters, trigger_reason,
+                   target_success_rate, improvement, success, notes, metadata
+            FROM unified_strategy_logs 
+            WHERE {where_clause}
+            ORDER BY timestamp DESC 
+            LIMIT %s OFFSET %s
+        """
+        params.extend([limit, offset])
+        cursor.execute(query, params)
         
         rows = cursor.fetchall()
-        logs = []
+        
+        # 分类整理日志
+        categorized_logs = {
+            'validation': [],
+            'evolution': [],
+            'real_trading': [],
+            'system_operation': []
+        }
+        
+        all_logs = []
         
         for row in rows:
-            log_dict = {
+            log_entry = {
                 'strategy_id': row[0],
                 'log_type': row[1],
-                'timestamp': row[2].strftime('%Y-%m-%d %H:%M:%S') if row[2] else '',
-                'symbol': row[3],
-                'signal_type': row[4],
-                'price': float(row[5]) if row[5] else 0,
-                'quantity': float(row[6]) if row[6] else 0,
-                'pnl': float(row[7]) if row[7] else 0,
-                'executed': bool(row[8]) if row[8] is not None else False,
-                'confidence': float(row[9]) if row[9] else 0,
-                'cycle_id': row[10],
-                'strategy_score': float(row[11]) if row[11] else 50.0,
+                'timestamp': row[2].strftime('%Y-%m-%d %H:%M:%S') if row[2] else None,
+                'created_at': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else None,
+                'symbol': row[4],
+                'signal_type': row[5],
+                'price': float(row[6]) if row[6] else 0,
+                'quantity': float(row[7]) if row[7] else 0,
+                'pnl': float(row[8]) if row[8] else 0,
+                'executed': bool(row[9]) if row[9] is not None else False,
+                'confidence': float(row[10]) if row[10] else 0,
+                'cycle_id': row[11],
+                'strategy_score': float(row[12]) if row[12] else 0,
+                'evolution_type': row[13],
+                'old_parameters': row[14] if row[14] else {},
+                'new_parameters': row[15] if row[15] else {},
+                'trigger_reason': row[16],
+                'target_success_rate': float(row[17]) if row[17] else 0,
+                'improvement': float(row[18]) if row[18] else 0,
+                'success': bool(row[19]) if row[19] is not None else False,
+                'notes': row[20],
+                'metadata': row[21] if row[21] else {}
             }
             
-            # 进化相关字段
-            if row[1] == 'evolution':
-                log_dict.update({
-                    'evolution_type': row[12],
-                    'old_parameters': row[13] if row[13] else {},
-                    'new_parameters': row[14] if row[14] else {},
-                    'trigger_reason': row[15],
-                    'improvement': float(row[16]) if row[16] else 0,
-                    'success': bool(row[17]) if row[17] is not None else False,
-                })
+            # 添加进化参数对比信息
+            if log_entry['log_type'] == 'evolution' and log_entry['old_parameters'] and log_entry['new_parameters']:
+                parameter_changes = []
+                old_params = log_entry['old_parameters']
+                new_params = log_entry['new_parameters']
+                
+                for key in set(list(old_params.keys()) + list(new_params.keys())):
+                    old_val = old_params.get(key, 'N/A')
+                    new_val = new_params.get(key, 'N/A')
+                    if old_val != new_val:
+                        parameter_changes.append({
+                            'parameter': key,
+                            'old_value': old_val,
+                            'new_value': new_val,
+                            'change_type': 'modified' if old_val != 'N/A' and new_val != 'N/A' else 'added' if old_val == 'N/A' else 'removed'
+                        })
+                
+                log_entry['parameter_changes'] = parameter_changes
+                log_entry['changes_count'] = len(parameter_changes)
             
-            log_dict['notes'] = row[18] if row[18] else ''
-            logs.append(log_dict)
-        
-        # 按日志类型分类整理
-        categorized_logs = {
-            'real_trading': [log for log in logs if log['log_type'] == 'real_trading'],
-            'validation': [log for log in logs if log['log_type'] == 'validation'],
-            'evolution': [log for log in logs if log['log_type'] == 'evolution'],
-            'system_operation': [log for log in logs if log['log_type'] == 'system_operation']
-        }
+            # 分类存储
+            if row[1] in categorized_logs:
+                categorized_logs[row[1]].append(log_entry)
+            else:
+                categorized_logs['system_operation'].append(log_entry)
+            
+            all_logs.append(log_entry)
         
         conn.close()
         
-        return jsonify({
+        # 构建响应
+        response_data = {
             'success': True,
-            'logs': logs if not log_type else categorized_logs.get(log_type, []),
+            'logs': all_logs,
             'categorized': categorized_logs,
-            'total_count': len(logs),
+            'pagination': {
+                'current_page': page,
+                'total_pages': total_pages,
+                'total_count': total_count,
+                'page_size': limit,
+                'has_next': page < total_pages,
+                'has_prev': page > 1,
+                'next_page': page + 1 if page < total_pages else None,
+                'prev_page': page - 1 if page > 1 else None
+            },
             'log_type': log_type,
-            'message': f'✅ 从统一日志表获取到 {len(logs)} 条{log_type or "全部"}日志'
-        })
+            'message': f"✅ 从统一日志表获取到 {len(all_logs)} 条{log_type}日志 (第{page}页，共{total_pages}页)"
+        }
+        
+        return jsonify(response_data)
         
     except Exception as e:
-        print(f"获取策略分类日志失败: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"获取策略日志失败: {e}")
         return jsonify({
-            'success': False,
-            'message': f'获取失败: {str(e)}'
+            'success': False, 
+            'message': f'获取策略日志失败: {str(e)}',
+            'logs': [],
+            'categorized': {'validation': [], 'evolution': [], 'real_trading': [], 'system_operation': []},
+            'pagination': {'current_page': 1, 'total_pages': 0, 'total_count': 0, 'page_size': 30}
         }), 500
 
 # 🔧 修复：添加缺失的程序入口

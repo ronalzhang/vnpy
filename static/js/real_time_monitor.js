@@ -417,4 +417,534 @@ document.addEventListener('DOMContentLoaded', function() {
 // 导出类供其他脚本使用
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = RealTimeMonitorClient;
-} 
+}
+
+// 策略卡分页和参数更新功能增强
+class StrategyCardManager {
+    constructor() {
+        this.currentStrategyId = null;
+        this.currentPage = 1;
+        this.pageSize = 30;
+        this.totalPages = 0;
+        this.logType = 'all'; // all, evolution, validation, real_trading
+        this.logs = [];
+        this.pagination = {};
+    }
+
+    // 加载策略详细信息和日志
+    async loadStrategyDetails(strategyId) {
+        this.currentStrategyId = strategyId;
+        this.currentPage = 1;
+        
+        try {
+            // 并行加载策略信息和日志
+            const [strategyResponse, logsResponse] = await Promise.all([
+                fetch(`/api/quantitative/strategies/${strategyId}`),
+                this.loadStrategyLogs()
+            ]);
+
+            if (strategyResponse.ok) {
+                const strategyData = await strategyResponse.json();
+                this.displayStrategyCard(strategyData);
+            }
+
+            if (logsResponse) {
+                this.displayStrategyLogs(logsResponse);
+            }
+
+        } catch (error) {
+            console.error('加载策略详情失败:', error);
+            this.showError('加载策略详情失败');
+        }
+    }
+
+    // 加载策略日志（支持分页和筛选）
+    async loadStrategyLogs(page = 1, logType = 'all') {
+        if (!this.currentStrategyId) return null;
+
+        this.currentPage = page;
+        this.logType = logType;
+
+        try {
+            const url = `/api/quantitative/strategies/${this.currentStrategyId}/logs-by-category?` +
+                       `page=${page}&limit=${this.pageSize}&type=${logType}`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success) {
+                this.logs = data.logs;
+                this.pagination = data.pagination;
+                this.totalPages = data.pagination.total_pages;
+                return data;
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            console.error('加载策略日志失败:', error);
+            this.showError('加载策略日志失败: ' + error.message);
+            return null;
+        }
+    }
+
+    // 显示策略卡
+    displayStrategyCard(strategyData) {
+        const strategyCard = document.getElementById('strategy-detail-card');
+        if (!strategyCard) return;
+
+        // 更新策略基本信息
+        this.updateStrategyBasicInfo(strategyCard, strategyData);
+        
+        // 更新实时参数
+        this.updateStrategyParameters(strategyCard, strategyData);
+        
+        // 更新性能指标
+        this.updatePerformanceMetrics(strategyCard, strategyData);
+    }
+
+    // 更新策略基本信息
+    updateStrategyBasicInfo(container, data) {
+        const basicInfoHTML = `
+            <div class="strategy-header">
+                <h3>${data.name || data.id}</h3>
+                <span class="strategy-status ${data.enabled ? 'enabled' : 'disabled'}">
+                    ${data.enabled ? '运行中' : '已停用'}
+                </span>
+            </div>
+            <div class="strategy-summary">
+                <div class="metric-group">
+                    <div class="metric">
+                        <label>当前评分</label>
+                        <span class="score-value ${this.getScoreClass(data.final_score)}">
+                            ${(data.final_score || 0).toFixed(1)}
+                        </span>
+                    </div>
+                    <div class="metric">
+                        <label>当前代数</label>
+                        <span class="generation-value">${data.generation || 1}</span>
+                    </div>
+                    <div class="metric">
+                        <label>总交易次数</label>
+                        <span class="trades-value">${data.total_trades || 0}</span>
+                    </div>
+                    <div class="metric">
+                        <label>胜率</label>
+                        <span class="winrate-value">${((data.success_rate || 0) * 100).toFixed(1)}%</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const basicInfoElement = container.querySelector('.strategy-basic-info') || 
+                                container.appendChild(document.createElement('div'));
+        basicInfoElement.className = 'strategy-basic-info';
+        basicInfoElement.innerHTML = basicInfoHTML;
+    }
+
+    // 更新策略参数显示
+    updateStrategyParameters(container, data) {
+        const parameters = data.parameters || {};
+        
+        const parametersHTML = `
+            <div class="parameters-section">
+                <h4>策略参数 <span class="last-update">最后更新: ${data.last_evolution_time || '未知'}</span></h4>
+                <div class="parameters-grid">
+                    ${Object.entries(parameters).map(([key, value]) => `
+                        <div class="parameter-item">
+                            <label class="parameter-name">${this.formatParameterName(key)}</label>
+                            <span class="parameter-value" data-param="${key}">${this.formatParameterValue(value)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="parameter-evolution-info">
+                    <span class="evolution-count">进化次数: ${data.evolution_count || 0}</span>
+                    <span class="last-evolution">最后进化: ${data.last_evolution_time || '未知'}</span>
+                </div>
+            </div>
+        `;
+        
+        const parametersElement = container.querySelector('.strategy-parameters') || 
+                                 container.appendChild(document.createElement('div'));
+        parametersElement.className = 'strategy-parameters';
+        parametersElement.innerHTML = parametersHTML;
+    }
+
+    // 更新性能指标
+    updatePerformanceMetrics(container, data) {
+        const metricsHTML = `
+            <div class="performance-metrics">
+                <h4>性能指标</h4>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">累计盈亏</div>
+                        <div class="metric-value pnl ${(data.total_pnl || 0) >= 0 ? 'positive' : 'negative'}">
+                            ${this.formatCurrency(data.total_pnl || 0)}
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">最大回撤</div>
+                        <div class="metric-value drawdown">
+                            ${((data.max_drawdown || 0) * 100).toFixed(2)}%
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">夏普比率</div>
+                        <div class="metric-value sharpe">
+                            ${(data.sharpe_ratio || 0).toFixed(3)}
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">年化收益率</div>
+                        <div class="metric-value return">
+                            ${((data.annual_return || 0) * 100).toFixed(2)}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const metricsElement = container.querySelector('.performance-metrics') || 
+                              container.appendChild(document.createElement('div'));
+        metricsElement.className = 'performance-metrics';
+        metricsElement.innerHTML = metricsHTML;
+    }
+
+    // 显示策略日志（支持分页）
+    displayStrategyLogs(data) {
+        const logsContainer = document.getElementById('strategy-logs-container');
+        if (!logsContainer) return;
+
+        // 创建日志筛选器
+        this.createLogFilter(logsContainer);
+        
+        // 创建日志表格
+        this.createLogsTable(logsContainer, data.logs);
+        
+        // 创建分页控件
+        this.createPagination(logsContainer, data.pagination);
+    }
+
+    // 创建日志筛选器
+    createLogFilter(container) {
+        const filterHTML = `
+            <div class="logs-filter">
+                <div class="filter-buttons">
+                    <button class="filter-btn ${this.logType === 'all' ? 'active' : ''}" 
+                            onclick="strategyCardManager.filterLogs('all')">全部</button>
+                    <button class="filter-btn ${this.logType === 'evolution' ? 'active' : ''}" 
+                            onclick="strategyCardManager.filterLogs('evolution')">进化日志</button>
+                    <button class="filter-btn ${this.logType === 'validation' ? 'active' : ''}" 
+                            onclick="strategyCardManager.filterLogs('validation')">验证交易</button>
+                    <button class="filter-btn ${this.logType === 'real_trading' ? 'active' : ''}" 
+                            onclick="strategyCardManager.filterLogs('real_trading')">真实交易</button>
+                </div>
+                <div class="logs-stats">
+                    <span>共 ${this.pagination.total_count || 0} 条记录</span>
+                    <span>第 ${this.pagination.current_page || 1} 页 / 共 ${this.pagination.total_pages || 1} 页</span>
+                </div>
+            </div>
+        `;
+
+        const filterElement = container.querySelector('.logs-filter') || 
+                             container.appendChild(document.createElement('div'));
+        filterElement.outerHTML = filterHTML;
+    }
+
+    // 创建日志表格
+    createLogsTable(container, logs) {
+        const tableHTML = `
+            <div class="logs-table-container">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>类型</th>
+                            <th>操作</th>
+                            <th>详情</th>
+                            <th>结果</th>
+                            <th>参数变化</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${logs.map(log => this.createLogRow(log)).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        const tableElement = container.querySelector('.logs-table-container') || 
+                           container.appendChild(document.createElement('div'));
+        tableElement.outerHTML = tableHTML;
+    }
+
+    // 创建单条日志行
+    createLogRow(log) {
+        const time = new Date(log.timestamp).toLocaleString();
+        const logTypeClass = `log-type-${log.log_type}`;
+        
+        let detailsContent = '';
+        let resultContent = '';
+        let parametersContent = '';
+
+        // 根据日志类型显示不同内容
+        switch (log.log_type) {
+            case 'evolution':
+                detailsContent = `
+                    <div class="evolution-details">
+                        <span class="evolution-type">${log.evolution_type || '参数优化'}</span>
+                        <span class="trigger-reason">${log.trigger_reason || '定期优化'}</span>
+                    </div>
+                `;
+                resultContent = `
+                    <div class="evolution-result">
+                        <span class="score-change ${log.improvement >= 0 ? 'positive' : 'negative'}">
+                            ${log.improvement >= 0 ? '+' : ''}${(log.improvement || 0).toFixed(2)}
+                        </span>
+                        <span class="success-indicator ${log.success ? 'success' : 'failed'}">
+                            ${log.success ? '✓' : '✗'}
+                        </span>
+                    </div>
+                `;
+                parametersContent = this.formatParameterChanges(log);
+                break;
+            
+            case 'validation':
+                detailsContent = `
+                    <div class="validation-details">
+                        <span class="symbol">${log.symbol || 'N/A'}</span>
+                        <span class="signal">${log.signal_type || 'N/A'}</span>
+                        <span class="price">$${(log.price || 0).toFixed(2)}</span>
+                    </div>
+                `;
+                resultContent = `
+                    <div class="validation-result">
+                        <span class="pnl ${log.pnl >= 0 ? 'positive' : 'negative'}">
+                            ${log.pnl >= 0 ? '+' : ''}${(log.pnl || 0).toFixed(2)}
+                        </span>
+                        <span class="executed ${log.executed ? 'executed' : 'pending'}">
+                            ${log.executed ? '已执行' : '待执行'}
+                        </span>
+                    </div>
+                `;
+                break;
+                
+            case 'real_trading':
+                detailsContent = `
+                    <div class="trading-details">
+                        <span class="symbol">${log.symbol || 'N/A'}</span>
+                        <span class="signal">${log.signal_type || 'N/A'}</span>
+                        <span class="quantity">${log.quantity || 0}</span>
+                    </div>
+                `;
+                resultContent = `
+                    <div class="trading-result">
+                        <span class="pnl ${log.pnl >= 0 ? 'positive' : 'negative'}">
+                            ${log.pnl >= 0 ? '+' : ''}${(log.pnl || 0).toFixed(2)}
+                        </span>
+                        <span class="confidence">置信度: ${(log.confidence || 0).toFixed(1)}%</span>
+                    </div>
+                `;
+                break;
+        }
+
+        return `
+            <tr class="log-row ${logTypeClass}">
+                <td class="log-time">${time}</td>
+                <td class="log-type">
+                    <span class="type-badge ${log.log_type}">${this.formatLogType(log.log_type)}</span>
+                </td>
+                <td class="log-operation">${log.signal_type || log.evolution_type || 'N/A'}</td>
+                <td class="log-details">${detailsContent}</td>
+                <td class="log-result">${resultContent}</td>
+                <td class="log-parameters">${parametersContent}</td>
+            </tr>
+        `;
+    }
+
+    // 格式化参数变化
+    formatParameterChanges(log) {
+        if (!log.parameter_changes || log.parameter_changes.length === 0) {
+            return '<span class="no-changes">无参数变化</span>';
+        }
+
+        const changesHTML = log.parameter_changes.map(change => {
+            const changeClass = change.change_type;
+            const impact = change.impact_level || 'low';
+            
+            return `
+                <div class="parameter-change ${changeClass} impact-${impact}">
+                    <span class="param-name">${change.parameter}</span>
+                    <span class="param-change-arrow">→</span>
+                    <span class="param-values">
+                        <span class="old-value">${change.old_value}</span>
+                        <span class="new-value">${change.new_value}</span>
+                    </span>
+                    ${change.change_percent ? 
+                        `<span class="change-percent">(${change.change_percent >= 0 ? '+' : ''}${change.change_percent.toFixed(1)}%)</span>` 
+                        : ''
+                    }
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="parameters-changes">
+                <div class="changes-summary">${log.changes_count || 0}项变化</div>
+                <div class="changes-details">${changesHTML}</div>
+            </div>
+        `;
+    }
+
+    // 创建分页控件
+    createPagination(container, pagination) {
+        if (!pagination || pagination.total_pages <= 1) return;
+
+        const paginationHTML = `
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    显示第 ${(pagination.current_page - 1) * this.pageSize + 1} - 
+                    ${Math.min(pagination.current_page * this.pageSize, pagination.total_count)} 条，
+                    共 ${pagination.total_count} 条记录
+                </div>
+                <div class="pagination-controls">
+                    ${this.createPaginationButtons(pagination)}
+                </div>
+            </div>
+        `;
+
+        const paginationElement = container.querySelector('.pagination-container') || 
+                                 container.appendChild(document.createElement('div'));
+        paginationElement.outerHTML = paginationHTML;
+    }
+
+    // 创建分页按钮
+    createPaginationButtons(pagination) {
+        const current = pagination.current_page;
+        const total = pagination.total_pages;
+        const maxVisible = 10; // 最多显示10个页码按钮
+        
+        let buttons = [];
+
+        // 首页和上一页
+        buttons.push(`
+            <button class="page-btn ${current === 1 ? 'disabled' : ''}" 
+                    onclick="strategyCardManager.goToPage(1)" ${current === 1 ? 'disabled' : ''}>
+                首页
+            </button>
+            <button class="page-btn ${current === 1 ? 'disabled' : ''}" 
+                    onclick="strategyCardManager.goToPage(${current - 1})" ${current === 1 ? 'disabled' : ''}>
+                上一页
+            </button>
+        `);
+
+        // 页码按钮
+        let start = Math.max(1, current - Math.floor(maxVisible / 2));
+        let end = Math.min(total, start + maxVisible - 1);
+        
+        if (end - start + 1 < maxVisible) {
+            start = Math.max(1, end - maxVisible + 1);
+        }
+
+        if (start > 1) {
+            buttons.push(`<span class="pagination-ellipsis">...</span>`);
+        }
+
+        for (let i = start; i <= end; i++) {
+            buttons.push(`
+                <button class="page-btn ${i === current ? 'active' : ''}" 
+                        onclick="strategyCardManager.goToPage(${i})">
+                    ${i}
+                </button>
+            `);
+        }
+
+        if (end < total) {
+            buttons.push(`<span class="pagination-ellipsis">...</span>`);
+        }
+
+        // 下一页和末页
+        buttons.push(`
+            <button class="page-btn ${current === total ? 'disabled' : ''}" 
+                    onclick="strategyCardManager.goToPage(${current + 1})" ${current === total ? 'disabled' : ''}>
+                下一页
+            </button>
+            <button class="page-btn ${current === total ? 'disabled' : ''}" 
+                    onclick="strategyCardManager.goToPage(${total})" ${current === total ? 'disabled' : ''}>
+                末页
+            </button>
+        `);
+
+        return buttons.join('');
+    }
+
+    // 跳转到指定页
+    async goToPage(page) {
+        if (page < 1 || page > this.totalPages || page === this.currentPage) return;
+        
+        const data = await this.loadStrategyLogs(page, this.logType);
+        if (data) {
+            this.displayStrategyLogs(data);
+        }
+    }
+
+    // 筛选日志类型
+    async filterLogs(logType) {
+        if (logType === this.logType) return;
+        
+        const data = await this.loadStrategyLogs(1, logType);
+        if (data) {
+            this.displayStrategyLogs(data);
+        }
+    }
+
+    // 辅助函数
+    getScoreClass(score) {
+        if (score >= 80) return 'excellent';
+        if (score >= 70) return 'good';
+        if (score >= 60) return 'average';
+        return 'poor';
+    }
+
+    formatParameterName(name) {
+        const nameMap = {
+            'stop_loss': '止损',
+            'take_profit': '止盈', 
+            'quantity': '数量',
+            'period': '周期',
+            'threshold': '阈值'
+        };
+        return nameMap[name] || name;
+    }
+
+    formatParameterValue(value) {
+        if (typeof value === 'number') {
+            return value.toFixed(4);
+        }
+        return String(value);
+    }
+
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('zh-CN', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(amount);
+    }
+
+    formatLogType(type) {
+        const typeMap = {
+            'evolution': '进化',
+            'validation': '验证',
+            'real_trading': '交易',
+            'system_operation': '系统'
+        };
+        return typeMap[type] || type;
+    }
+
+    showError(message) {
+        console.error(message);
+        // 可以添加用户友好的错误显示
+    }
+}
+
+// 全局实例
+const strategyCardManager = new StrategyCardManager(); 
