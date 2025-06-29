@@ -43,7 +43,7 @@ class EvolutionConfig:
     
     # 进化频率配置（分钟）
     low_freq_interval_hours: int = 24       # 低频进化间隔（小时）
-    high_freq_interval_minutes: int = 3     # 高频进化间隔（分钟）
+    high_freq_interval_minutes: int = 60    # 高频进化间隔（分钟）- 调整为60分钟减轻负担
     display_interval_minutes: int = 3       # 前端进化间隔（分钟）
     
     # 验证交易配置
@@ -104,7 +104,7 @@ class FourTierStrategyManager:
                 ('display_strategies_count', '21', '前端显示数量', 'tier_size'),
                 ('real_trading_count', '3', '实盘交易数量', 'tier_size'),
                 ('low_freq_interval_hours', '24', '低频进化间隔(小时)', 'evolution_frequency'),
-                ('high_freq_interval_minutes', '3', '高频进化间隔(分钟)', 'evolution_frequency'),
+                ('high_freq_interval_minutes', '60', '高频进化间隔(分钟)', 'evolution_frequency'),
                 ('display_interval_minutes', '3', '前端进化间隔(分钟)', 'evolution_frequency'),
                 ('low_freq_validation_count', '2', '低频验证次数', 'validation'),
                 ('high_freq_validation_count', '4', '高频验证次数', 'validation'),
