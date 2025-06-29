@@ -1595,24 +1595,40 @@ class QuantitativeSystem {
     // 更新管理配置表单
     updateManagementForm() {
         if (managementConfig) {
-            document.getElementById('evolutionInterval').value = managementConfig.evolutionInterval || 10;
-            document.getElementById('maxStrategies').value = managementConfig.maxStrategies || 20;
-            document.getElementById('realTradingScore').value = managementConfig.realTradingScore || 65;
-            document.getElementById('realTradingCount').value = managementConfig.realTradingCount || 2;
-            document.getElementById('validationAmount').value = managementConfig.validationAmount || 50;
-            document.getElementById('realTradingAmount').value = managementConfig.realTradingAmount || 100;
-            document.getElementById('minTrades').value = managementConfig.minTrades || 10;
-            document.getElementById('minWinRate').value = managementConfig.minWinRate || 65;
-            document.getElementById('minProfit').value = managementConfig.minProfit || 0;
-            document.getElementById('maxDrawdown').value = managementConfig.maxDrawdown || 10;
-            document.getElementById('minSharpeRatio').value = managementConfig.minSharpeRatio || 1.0;
-            document.getElementById('maxPositionSize').value = managementConfig.maxPositionSize || 100;
-            document.getElementById('stopLossPercent').value = managementConfig.stopLossPercent || 5;
-            document.getElementById('takeProfitPercent').value = managementConfig.takeProfitPercent || 4;
-            document.getElementById('maxHoldingMinutes').value = managementConfig.maxHoldingMinutes || 30;
-            document.getElementById('minProfitForTimeStop').value = managementConfig.minProfitForTimeStop || 1;
-            document.getElementById('eliminationDays').value = managementConfig.eliminationDays || 7;
-            document.getElementById('minScore').value = managementConfig.minScore || 50;
+            // 🔥 修复：安全设置传统配置元素，避免null错误
+            this.safeSetValue('evolutionInterval', managementConfig.evolutionInterval || 10);
+            this.safeSetValue('maxStrategies', managementConfig.maxStrategies || 20);
+            this.safeSetValue('realTradingScore', managementConfig.realTradingScore || 65);
+            this.safeSetValue('realTradingCount', managementConfig.realTradingCount || 2);
+            this.safeSetValue('validationAmount', managementConfig.validationAmount || 50);
+            this.safeSetValue('realTradingAmount', managementConfig.realTradingAmount || 100);
+            this.safeSetValue('minTrades', managementConfig.minTrades || 10);
+            this.safeSetValue('minWinRate', managementConfig.minWinRate || 65);
+            this.safeSetValue('minProfit', managementConfig.minProfit || 0);
+            this.safeSetValue('maxDrawdown', managementConfig.maxDrawdown || 10);
+            this.safeSetValue('minSharpeRatio', managementConfig.minSharpeRatio || 1.0);
+            this.safeSetValue('maxPositionSize', managementConfig.maxPositionSize || 100);
+            this.safeSetValue('stopLossPercent', managementConfig.stopLossPercent || 5);
+            this.safeSetValue('takeProfitPercent', managementConfig.takeProfitPercent || 4);
+            this.safeSetValue('maxHoldingMinutes', managementConfig.maxHoldingMinutes || 30);
+            this.safeSetValue('minProfitForTimeStop', managementConfig.minProfitForTimeStop || 1);
+            this.safeSetValue('eliminationDays', managementConfig.eliminationDays || 7);
+            this.safeSetValue('minScore', managementConfig.minScore || 50);
+        }
+
+        // 🔥 新增：同时初始化四层配置管理器
+        if (window.fourTierConfigManager) {
+            window.fourTierConfigManager.loadConfig();
+        }
+    }
+
+    // 🔥 新增：安全设置元素值的辅助方法
+    safeSetValue(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.value = value;
+        } else {
+            console.debug(`元素 ${elementId} 不存在，跳过设置`);
         }
     }
 
@@ -2001,9 +2017,15 @@ class QuantitativeSystem {
             // 加载管理配置
             this.loadManagementConfig();
             
+            // 🔥 新增：初始化四层配置管理器
+            if (!window.fourTierConfigManager) {
+                window.fourTierConfigManager = new FourTierConfigManager();
+            }
+            window.fourTierConfigManager.init();
+            
             // 显示策略管理模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
-        modal.show();
+            modal.show();
         } catch (error) {
             console.error('显示策略管理失败:', error);
             this.showMessage('显示策略管理失败', 'error');
