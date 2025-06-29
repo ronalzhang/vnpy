@@ -1210,10 +1210,10 @@ def quantitative_strategies():
                     formatted_strategy = {
                         'id': strategy['id'],
                         'name': strategy.get('name', strategy['id']),  # 🔧 修复：使用安全访问
-                        'symbol': strategy['symbol'],
+                        'symbol': strategy.get('symbol', 'BTC/USDT'),  # 🔧 修复：使用安全访问
                         'type': strategy.get('type', 'momentum'),  # 🔧 修复：使用安全访问
                         'enabled': True,  # 现代化系统不使用启用/停用概念
-                        'final_score': strategy['final_score'],
+                        'final_score': strategy.get('score', strategy.get('final_score', 0.0)),  # 🔧 修复：使用安全访问
                         'parameters': strategy.get('parameters', {'quantity': 100, 'threshold': 0.02}),
                         'total_trades': actual_total_trades,  # 🔥 使用重新计算的交易次数
                         'win_rate': round(calculated_win_rate, 2),  # 🔥 使用重新计算的胜率
