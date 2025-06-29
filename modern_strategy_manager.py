@@ -575,7 +575,7 @@ class FourTierStrategyManager:
                     'id': strategy['id'],
                     'symbol': strategy['symbol'],
                     'score': float(strategy['final_score']),
-                    'enabled': bool(strategy['enabled']),
+                    'enabled': True,  # 🔧 修复：现代化系统所有策略默认启用
                     'trade_mode': '实盘交易' if strategy['final_score'] >= self.config.real_trading_score_threshold else '验证交易',
                     'parameters': strategy.get('parameters', {}),
                     'performance': {
