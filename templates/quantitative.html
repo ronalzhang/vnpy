@@ -626,148 +626,140 @@
                         </div>
 
                         <!-- 策略进化配置 -->
-                        <div class="card mb-3">
-                            <div class="card-header">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-dna"></i> 策略进化配置
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <label for="evolutionInterval" class="form-label">进化更新间隔 (分钟)</label>
-                                        <input type="number" class="form-control" id="evolutionInterval" value="10" min="1" max="60">
-                                        <div class="form-text">策略自动进化和创建新策略的间隔时间</div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="maxStrategies" class="form-label">最大策略数量</label>
-                                        <input type="number" class="form-control" id="maxStrategies" value="20" min="5" max="100">
-                                        <div class="form-text">系统同时运行的最大策略数量</div>
-                                    </div>
+                        <div class="config-section">
+                            <h3>🔄 策略进化配置</h3>
+                            <div class="config-grid">
+                                <div class="config-item">
+                                    <label for="evolutionInterval">进化间隔 (分钟)</label>
+                                    <input type="number" id="evolutionInterval" name="evolutionInterval" min="1" max="60">
+                                    <small>传统进化系统间隔</small>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 策略标准配置 -->
-                        <div class="card mb-3">
-                            <div class="card-header">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-trophy"></i> 策略交易标准
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <label for="realTradingScore" class="form-label">真实交易分值门槛</label>
-                                        <input type="number" class="form-control" id="realTradingScore" value="65" min="50" max="100" step="0.1">
-                                        <div class="form-text">策略达到此分值自动进行真实交易</div>
+                        <!-- 🔥 四层进化系统配置 -->
+                        <div class="config-section">
+                            <h3>🚀 四层策略进化系统配置</h3>
+                            
+                            <!-- 层级数量配置 -->
+                            <div class="tier-config-group">
+                                <h4>📊 层级数量配置</h4>
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <label for="high_freq_pool_size">高频池大小</label>
+                                        <input type="number" id="high_freq_pool_size" name="high_freq_pool_size" min="100" max="5000" step="100">
+                                        <small>第2层：参与高频进化的策略数量</small>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label for="realTradingCount" class="form-label">真实交易策略数量</label>
-                                        <input type="number" class="form-control" id="realTradingCount" value="2" min="1" max="10">
-                                        <div class="form-text">开启真实交易时选择前几名策略</div>
+                                    <div class="config-item">
+                                        <label for="display_strategies_count">前端显示数量</label>
+                                        <input type="number" id="display_strategies_count" name="display_strategies_count" min="10" max="50" step="1">
+                                        <small>第3层：前端页面显示的策略数量</small>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label for="validationAmount" class="form-label">验证交易金额 (USDT)</label>
-                                        <input type="number" class="form-control" id="validationAmount" value="50" min="10" max="500" step="10">
-                                        <div class="form-text">策略验证交易的单笔金额</div>
-                                    </div>
-                                </div>
-                                <div class="row mt-3">
-                                    <div class="col-md-4">
-                                        <label for="minTrades" class="form-label">最少交易次数</label>
-                                        <input type="number" class="form-control" id="minTrades" value="10" min="1" max="100">
-                                        <div class="form-text">策略进入真实交易的最少交易次数</div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="minWinRate" class="form-label">最低胜率 (%)</label>
-                                        <input type="number" class="form-control" id="minWinRate" value="65" min="50" max="95" step="0.1">
-                                        <div class="form-text">策略进入真实交易的最低胜率要求</div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="realTradingAmount" class="form-label">真实交易金额 (USDT)</label>
-                                        <input type="number" class="form-control" id="realTradingAmount" value="100" min="50" max="1000" step="10">
-                                        <div class="form-text">真实交易的单笔交易金额</div>
-                                    </div>
-                                </div>
-                                <div class="row mt-3">
-                                    <div class="col-md-4">
-                                        <label for="minProfit" class="form-label">最低收益 (USDT)</label>
-                                        <input type="number" class="form-control" id="minProfit" value="0" min="0" step="0.01">
-                                        <div class="form-text">策略进入真实交易的最低总收益</div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="maxDrawdown" class="form-label">最大回撤 (%)</label>
-                                        <input type="number" class="form-control" id="maxDrawdown" value="10" min="1" max="50" step="0.1">
-                                        <div class="form-text">策略允许的最大回撤率</div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="minSharpeRatio" class="form-label">最低夏普比率</label>
-                                        <input type="number" class="form-control" id="minSharpeRatio" value="1.0" min="0" max="5" step="0.1">
-                                        <div class="form-text">策略的最低夏普比率要求</div>
+                                    <div class="config-item">
+                                        <label for="real_trading_count">实盘交易数量</label>
+                                        <input type="number" id="real_trading_count" name="real_trading_count" min="1" max="10" step="1">
+                                        <small>第4层：符合条件的实盘交易策略数量</small>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- 风险管理配置 -->
-                        <div class="card mb-3">
-                            <div class="card-header">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-shield-alt"></i> 风险管理配置
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <label for="maxPositionSize" class="form-label">最大仓位 (USDT)</label>
-                                        <input type="number" class="form-control" id="maxPositionSize" value="100" min="10" max="10000" step="10">
-                                        <div class="form-text">单个策略的最大仓位金额</div>
+                            <!-- 进化频率配置 -->
+                            <div class="tier-config-group">
+                                <h4>⏰ 进化频率配置</h4>
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <label for="low_freq_interval_hours">策略池进化间隔 (小时)</label>
+                                        <input type="number" id="low_freq_interval_hours" name="low_freq_interval_hours" min="6" max="72" step="6">
+                                        <small>第1层：全部策略低频进化间隔</small>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label for="stopLossPercent" class="form-label">止损百分比 (%)</label>
-                                        <input type="number" class="form-control" id="stopLossPercent" value="5" min="1" max="20" step="0.1">
-                                        <div class="form-text">全局止损触发的亏损百分比</div>
+                                    <div class="config-item">
+                                        <label for="high_freq_interval_minutes">高频池进化间隔 (分钟)</label>
+                                        <input type="number" id="high_freq_interval_minutes" name="high_freq_interval_minutes" min="10" max="180" step="10">
+                                        <small>第2层：高频池策略进化间隔</small>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label for="takeProfitPercent" class="form-label">止盈百分比 (%)</label>
-                                        <input type="number" class="form-control" id="takeProfitPercent" value="4" min="1" max="15" step="0.1">
-                                        <div class="form-text">全局止盈触发的盈利百分比</div>
-                                    </div>
-                                </div>
-                                <div class="row mt-3">
-                                    <div class="col-md-6">
-                                        <label for="maxHoldingMinutes" class="form-label">最大持仓时间 (分钟)</label>
-                                        <input type="number" class="form-control" id="maxHoldingMinutes" value="30" min="5" max="120" step="5">
-                                        <div class="form-text">超过此时间且有盈利将触发时间止盈</div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="minProfitForTimeStop" class="form-label">时间止盈最低收益 (%)</label>
-                                        <input type="number" class="form-control" id="minProfitForTimeStop" value="1" min="0.1" max="5" step="0.1">
-                                        <div class="form-text">时间止盈触发的最低收益率</div>
+                                    <div class="config-item">
+                                        <label for="display_interval_minutes">前端显示进化间隔 (分钟)</label>
+                                        <input type="number" id="display_interval_minutes" name="display_interval_minutes" min="1" max="30" step="1">
+                                        <small>第3层：前端策略持续进化间隔</small>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- 策略淘汰配置 -->
-                        <div class="card mb-3">
-                            <div class="card-header">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-trash-alt"></i> 策略淘汰配置
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <label for="eliminationDays" class="form-label">淘汰周期 (天)</label>
-                                        <input type="number" class="form-control" id="eliminationDays" value="7" min="1" max="30">
-                                        <div class="form-text">策略表现评估和淘汰的周期</div>
+                            <!-- 验证交易配置 -->
+                            <div class="tier-config-group">
+                                <h4>🧪 验证交易配置</h4>
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <label for="low_freq_validation_count">策略池验证次数</label>
+                                        <input type="number" id="low_freq_validation_count" name="low_freq_validation_count" min="1" max="10" step="1">
+                                        <small>第1层：每次进化生成的验证交易数</small>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="minScore" class="form-label">最低评分</label>
-                                        <input type="number" class="form-control" id="minScore" value="50" min="0" max="100" step="0.1">
-                                        <div class="form-text">策略保留的最低评分标准</div>
+                                    <div class="config-item">
+                                        <label for="high_freq_validation_count">高频池验证次数</label>
+                                        <input type="number" id="high_freq_validation_count" name="high_freq_validation_count" min="1" max="10" step="1">
+                                        <small>第2层：每次进化生成的验证交易数</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="display_validation_count">前端显示验证次数</label>
+                                        <input type="number" id="display_validation_count" name="display_validation_count" min="1" max="10" step="1">
+                                        <small>第3层：每次进化生成的验证交易数</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 交易金额配置 -->
+                            <div class="tier-config-group">
+                                <h4>💰 交易金额配置</h4>
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <label for="validation_amount">验证交易金额 (USDT)</label>
+                                        <input type="number" id="validation_amount" name="validation_amount" min="10" max="200" step="10">
+                                        <small>验证交易的单笔金额</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="real_trading_amount">实盘交易金额 (USDT)</label>
+                                        <input type="number" id="real_trading_amount" name="real_trading_amount" min="50" max="1000" step="50">
+                                        <small>实盘交易的单笔金额</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="real_trading_score_threshold">实盘交易评分门槛</label>
+                                        <input type="number" id="real_trading_score_threshold" name="real_trading_score_threshold" min="50" max="90" step="5">
+                                        <small>策略进入实盘交易的最低评分</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 四层系统状态显示 -->
+                            <div class="tier-config-group">
+                                <h4>📈 四层系统状态</h4>
+                                <div class="tier-status-grid">
+                                    <div class="tier-status-card">
+                                        <div class="tier-header">第1层 - 策略池</div>
+                                        <div class="tier-stats">
+                                            <span class="stat-item">策略数量: <span id="tier1_count">-</span></span>
+                                            <span class="stat-item">理论进化: <span id="tier1_evolutions">-</span>/小时</span>
+                                        </div>
+                                    </div>
+                                    <div class="tier-status-card">
+                                        <div class="tier-header">第2层 - 高频池</div>
+                                        <div class="tier-stats">
+                                            <span class="stat-item">策略数量: <span id="tier2_count">-</span></span>
+                                            <span class="stat-item">理论进化: <span id="tier2_evolutions">-</span>/小时</span>
+                                        </div>
+                                    </div>
+                                    <div class="tier-status-card">
+                                        <div class="tier-header">第3层 - 前端显示</div>
+                                        <div class="tier-stats">
+                                            <span class="stat-item">策略数量: <span id="tier3_count">-</span></span>
+                                            <span class="stat-item">理论进化: <span id="tier3_evolutions">-</span>/小时</span>
+                                        </div>
+                                    </div>
+                                    <div class="tier-status-card">
+                                        <div class="tier-header">第4层 - 实盘交易</div>
+                                        <div class="tier-stats">
+                                            <span class="stat-item">策略数量: <span id="tier4_count">-</span></span>
+                                            <span class="stat-item">评分门槛: <span id="tier4_threshold">-</span>分</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

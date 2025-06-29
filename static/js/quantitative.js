@@ -2529,3 +2529,273 @@ class UnifiedEvolutionLogManager {
 }
 
 // 🔥 移除重复的全局函数定义，这些函数已在HTML模板中定义，避免冲突 
+
+// 四层进化配置管理类
+class FourTierConfigManager {
+    constructor() {
+        this.config = {};
+        this.init();
+    }
+
+    async init() {
+        await this.loadConfig();
+        this.setupEventListeners();
+        this.startStatusUpdater();
+    }
+
+    async loadConfig() {
+        try {
+            const response = await fetch('/api/quantitative/management-config');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.config = data.config;
+                const fourTierConfig = data.four_tier_config || {};
+                
+                // 填充传统配置字段
+                this.populateTraditionalConfig(this.config);
+                
+                // 填充四层进化配置字段
+                this.populateFourTierConfig(fourTierConfig);
+                
+                console.log('✅ 四层进化配置加载成功:', fourTierConfig);
+            } else {
+                console.error('❌ 加载配置失败:', data.message);
+            }
+        } catch (error) {
+            console.error('❌ 配置加载异常:', error);
+        }
+    }
+
+    populateTraditionalConfig(config) {
+        // 填充传统配置字段
+        const fields = [
+            'evolutionInterval', 'maxStrategies', 'realTradingScore', 'realTradingCount',
+            'validationAmount', 'realTradingAmount', 'minTrades', 'minWinRate', 
+            'minProfit', 'maxDrawdown', 'minSharpeRatio'
+        ];
+
+        fields.forEach(field => {
+            const element = document.getElementById(field);
+            if (element && config[field] !== undefined) {
+                element.value = config[field];
+            }
+        });
+    }
+
+    populateFourTierConfig(fourTierConfig) {
+        // 填充四层进化配置字段
+        Object.keys(fourTierConfig).forEach(key => {
+            const element = document.getElementById(key);
+            if (element && fourTierConfig[key]) {
+                const value = fourTierConfig[key].value || fourTierConfig[key];
+                element.value = value;
+            }
+        });
+    }
+
+    setupEventListeners() {
+        // 保存配置按钮
+        const saveBtn = document.getElementById('saveConfigBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.saveConfig());
+        }
+
+        // 实时配置更新监听
+        const configInputs = document.querySelectorAll('#management-config input[type="number"]');
+        configInputs.forEach(input => {
+            input.addEventListener('change', () => this.onConfigChange(input));
+        });
+    }
+
+    onConfigChange(input) {
+        const key = input.id;
+        const value = parseFloat(input.value) || 0;
+        
+        // 实时更新本地配置
+        if (this.isFourTierConfig(key)) {
+            // 四层配置更新
+            console.log(`🔧 四层配置更新: ${key} = ${value}`);
+        } else {
+            // 传统配置更新
+            this.config[key] = value;
+            console.log(`🔧 传统配置更新: ${key} = ${value}`);
+        }
+
+        // 实时更新统计显示
+        this.updateTierStats();
+    }
+
+    isFourTierConfig(key) {
+        const fourTierKeys = [
+            'high_freq_pool_size', 'display_strategies_count', 'real_trading_count',
+            'low_freq_interval_hours', 'high_freq_interval_minutes', 'display_interval_minutes',
+            'low_freq_validation_count', 'high_freq_validation_count', 'display_validation_count',
+            'validation_amount', 'real_trading_amount', 'real_trading_score_threshold'
+        ];
+        return fourTierKeys.includes(key);
+    }
+
+    async saveConfig() {
+        try {
+            // 收集传统配置
+            const traditionalConfig = {};
+            const traditionalFields = [
+                'evolutionInterval', 'maxStrategies', 'realTradingScore', 'realTradingCount',
+                'validationAmount', 'realTradingAmount', 'minTrades', 'minWinRate',
+                'minProfit', 'maxDrawdown', 'minSharpeRatio'
+            ];
+
+            traditionalFields.forEach(field => {
+                const element = document.getElementById(field);
+                if (element) {
+                    traditionalConfig[field] = parseFloat(element.value) || 0;
+                }
+            });
+
+            // 收集四层进化配置
+            const fourTierConfig = {};
+            const fourTierFields = [
+                'high_freq_pool_size', 'display_strategies_count', 'real_trading_count',
+                'low_freq_interval_hours', 'high_freq_interval_minutes', 'display_interval_minutes',
+                'low_freq_validation_count', 'high_freq_validation_count', 'display_validation_count',
+                'validation_amount', 'real_trading_amount', 'real_trading_score_threshold'
+            ];
+
+            fourTierFields.forEach(field => {
+                const element = document.getElementById(field);
+                if (element) {
+                    fourTierConfig[field] = parseFloat(element.value) || 0;
+                }
+            });
+
+            // 发送保存请求
+            const response = await fetch('/api/quantitative/management-config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    config: traditionalConfig,
+                    four_tier_config: fourTierConfig
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('✅ 四层进化配置保存成功！重启进化调度器后生效', 'success');
+                
+                // 更新本地配置
+                this.config = { ...this.config, ...traditionalConfig };
+                
+                // 立即更新统计显示
+                this.updateTierStats();
+                
+                console.log('✅ 配置保存成功:', result.message);
+            } else {
+                this.showNotification('❌ 配置保存失败: ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('❌ 保存配置异常:', error);
+            this.showNotification('❌ 配置保存异常: ' + error.message, 'error');
+        }
+    }
+
+    async updateTierStats() {
+        try {
+            // 获取四层系统统计
+            const response = await fetch('/api/quantitative/management-config');
+            const data = await response.json();
+            
+            if (data.success && data.four_tier_config) {
+                const config = data.four_tier_config;
+                
+                // 计算理论进化次数
+                const poolSize = parseInt(config.high_freq_pool_size?.value || 2000);
+                const displayCount = parseInt(config.display_strategies_count?.value || 21);
+                const realTradingCount = parseInt(config.real_trading_count?.value || 3);
+                const realTradingThreshold = parseFloat(config.real_trading_score_threshold?.value || 65);
+                
+                const lowFreqHours = parseInt(config.low_freq_interval_hours?.value || 24);
+                const highFreqMinutes = parseInt(config.high_freq_interval_minutes?.value || 60);
+                const displayMinutes = parseInt(config.display_interval_minutes?.value || 3);
+                
+                // 计算每小时理论进化次数
+                const tier1Evolutions = Math.floor(16337 / lowFreqHours); // 假设总策略数16337
+                const tier2Evolutions = Math.floor(poolSize * (60 / highFreqMinutes));
+                const tier3Evolutions = Math.floor(displayCount * (60 / displayMinutes));
+                
+                // 更新显示
+                this.updateTierDisplay('tier1_count', '16,337');
+                this.updateTierDisplay('tier1_evolutions', tier1Evolutions.toLocaleString());
+                
+                this.updateTierDisplay('tier2_count', poolSize.toLocaleString());
+                this.updateTierDisplay('tier2_evolutions', tier2Evolutions.toLocaleString());
+                
+                this.updateTierDisplay('tier3_count', displayCount.toString());
+                this.updateTierDisplay('tier3_evolutions', tier3Evolutions.toLocaleString());
+                
+                this.updateTierDisplay('tier4_count', realTradingCount.toString());
+                this.updateTierDisplay('tier4_threshold', realTradingThreshold.toString());
+                
+                console.log('📊 四层系统统计已更新');
+            }
+        } catch (error) {
+            console.error('❌ 更新统计失败:', error);
+        }
+    }
+
+    updateTierDisplay(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = value;
+        }
+    }
+
+    startStatusUpdater() {
+        // 立即更新一次
+        this.updateTierStats();
+        
+        // 每30秒更新一次统计
+        setInterval(() => {
+            this.updateTierStats();
+        }, 30000);
+    }
+
+    showNotification(message, type = 'info') {
+        // 创建通知元素
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.zIndex = '9999';
+        notification.style.minWidth = '300px';
+        
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // 3秒后自动移除
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+    }
+}
+
+// 在量化系统初始化时启动四层配置管理器
+document.addEventListener('DOMContentLoaded', function() {
+    // 等待量化系统初始化完成后启动
+    setTimeout(() => {
+        if (typeof window.fourTierConfigManager === 'undefined') {
+            window.fourTierConfigManager = new FourTierConfigManager();
+            console.log('🚀 四层进化配置管理器已启动');
+        }
+    }, 1000);
+});
