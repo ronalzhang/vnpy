@@ -4406,7 +4406,7 @@ class QuantitativeService:
             return False
     
     def _save_signal_to_db(self, signal):
-        """保存交易信号到数据库"""
+        """保存交易信号到PostgreSQL数据库"""
         try:
             # 确保signal是字典类型
             if not isinstance(signal, dict):
@@ -4417,16 +4417,20 @@ class QuantitativeService:
             strategy_id = signal.get('strategy_id')
             strategy_score = 50.0  # 默认分数
             
-            # 获取策略评分
+            # 🔥 修复：使用PostgreSQL连接获取策略评分
             try:
-                strategy_query = "SELECT final_score FROM strategies WHERE id = %s"
-                result = self.db_manager.execute_query(strategy_query, (strategy_id,), fetch_one=True)
+                # 使用self.conn（PostgreSQL连接）而不是db_manager
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT final_score FROM strategies WHERE id = %s", (strategy_id,))
+                result = cursor.fetchone()
                 if result:
                     strategy_score = float(result[0])
+                    print(f"✅ 获取策略评分: {strategy_id[-4:]} = {strategy_score}")
+                else:
+                    print(f"⚠️ 策略{strategy_id[-4:]}未找到，使用默认评分50.0")
             except Exception as e:
-                print(f"⚠️ 获取策略评分失败: {e} (策略ID: {strategy_id})")
-                # 使用默认评分并记录调试信息
-                logger.warning(f"策略评分查询失败，策略ID: {strategy_id}, 错误: {e}, 使用默认评分50.0")
+                print(f"⚠️ 获取策略评分失败: {e} (策略ID: {strategy_id[-4:]})")
+                # 使用默认评分，但不记录WARNING，避免日志混乱
             
             # 🔧 修复：检查全局实盘交易开关，如果关闭则强制为验证交易
             try:
@@ -4452,31 +4456,34 @@ class QuantitativeService:
                 trade_type = "score_verification"
                 is_validation = True
             
-            # 使用数据库管理器保存信号（包含完整字段）
+            # 🔥 修复：直接使用PostgreSQL连接保存信号
+            cursor = self.conn.cursor()
             query = '''
                 INSERT INTO trading_signals 
-                (id, strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed, priority, trade_type, is_validation)
+                (strategy_id, symbol, signal_type, price, quantity, confidence, timestamp, executed, priority, trade_type, is_validation, details)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             '''
             
             params = (
-                signal.get('id'),
                 signal.get('strategy_id'),
-                signal.get('symbol'),
-                signal.get('signal_type'),
+                signal.get('symbol', 'BTC/USDT'),
+                signal.get('signal_type', 'BUY'),
                 signal.get('price', 0.0),
                 signal.get('quantity', 0.0),
                 signal.get('confidence', 0.0),
                 signal.get('timestamp'),
-                signal.get('executed', 0),
+                signal.get('executed', False),
                 signal.get('priority', 'normal'),
                 trade_type,
-                is_validation
+                is_validation,
+                f"策略评分: {strategy_score}, 交易类型: {trade_type}"
             )
             
-            self.db_manager.execute_query(query, params)
+            cursor.execute(query, params)
+            self.conn.commit()
+            
             trade_type_cn = "真实交易" if trade_type == "real_trading" else "验证交易"
-            print(f"✅ 保存{trade_type_cn}信号: {strategy_id[-4:]} | {signal.get('signal_type').upper()}")
+            print(f"✅ 保存{trade_type_cn}信号到PostgreSQL: {strategy_id[-4:]} | {signal.get('signal_type', 'BUY').upper()}")
             return True
             
         except Exception as e:
