@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-现代化分层策略管理系统 3.0
-- 策略池概念：数据库保存所有策略作为策略池
-- 分层管理：策略池 → 前端显示 → 真实交易
-- 配置驱动：基于数据库配置进行策略选择和进化
-- 动态进化：高频优化前端策略，定期测试策略池
+四层策略进化竞争系统 4.0
+- 策略池：全部策略低频进化（竞争排名）
+- 高频池：前2000策略高频进化（竞争前端）
+- 前端显示：21个策略持续高频进化（最优展示）
+- 真实交易：前几个策略实盘交易
 """
 
 import psycopg2
@@ -28,134 +28,155 @@ logger = logging.getLogger(__name__)
 
 class StrategyTier(Enum):
     """策略层级"""
-    POOL = "pool"           # 策略池：所有策略
-    DISPLAY = "display"     # 前端显示：优质策略
-    TRADING = "trading"     # 真实交易：精英策略
+    POOL = "pool"           # 策略池：全部策略低频进化
+    HIGH_FREQ = "high_freq" # 高频池：前2000策略高频进化
+    DISPLAY = "display"     # 前端显示：21个策略持续高频
+    TRADING = "trading"     # 真实交易：前几个策略实盘
 
 @dataclass
-class StrategyConfig:
-    """策略管理配置"""
-    # 进化配置
-    evolution_interval: int = 3  # 分钟
+class EvolutionConfig:
+    """四层进化配置"""
+    # 层级数量配置
+    high_freq_pool_size: int = 2000        # 高频池大小
+    display_strategies_count: int = 21      # 前端显示数量
+    real_trading_count: int = 3             # 实盘交易数量
     
-    # 真实交易门槛
-    real_trading_score: float = 65.0
-    real_trading_count: int = 2
-    real_trading_amount: float = 100.0
+    # 进化频率配置（分钟）
+    low_freq_interval_hours: int = 24       # 低频进化间隔（小时）
+    high_freq_interval_minutes: int = 3     # 高频进化间隔（分钟）
+    display_interval_minutes: int = 3       # 前端进化间隔（分钟）
     
     # 验证交易配置
-    validation_amount: float = 50.0
-    min_trades: int = 30
-    min_win_rate: float = 75.0
-    min_profit: float = 100.0
-    max_drawdown: float = 4.0
-    min_sharpe_ratio: float = 1.5
+    low_freq_validation_count: int = 2      # 低频验证交易次数
+    high_freq_validation_count: int = 4     # 高频验证交易次数
+    display_validation_count: int = 4       # 前端验证交易次数
     
-    # 前端显示配置
-    max_display_strategies: int = 21
-    min_display_score: float = 10.0
+    # 交易金额配置
+    validation_amount: float = 50.0         # 验证交易金额
+    real_trading_amount: float = 200.0      # 实盘交易金额
     
-    # 策略池管理
-    pool_evolution_hours: int = 24  # 策略池进化间隔（小时）
-    elimination_days: int = 15      # 淘汰周期（天）
+    # 竞争门槛
+    real_trading_score_threshold: float = 65.0  # 实盘交易评分门槛
 
-class ModernStrategyManager:
-    """现代化策略管理器"""
+class FourTierStrategyManager:
+    """四层策略进化竞争管理器"""
     
     def __init__(self, db_config: Dict = None):
         self.db_config = db_config or {
             'host': 'localhost',
-            'database': 'quantitative',
+            'database': 'quantitative', 
             'user': 'quant_user',
             'password': '123abc74531'
         }
         self.param_manager = StrategyParameterManager()
-        self.config = StrategyConfig()
+        self.config = EvolutionConfig()
         
-        # 加载配置
+        # 从数据库加载配置
         self._load_config_from_db()
         
-        logger.info("🚀 现代化策略管理器已初始化")
+        logger.info("🚀 四层策略进化竞争系统已初始化")
+        logger.info(f"📊 配置: 高频池{self.config.high_freq_pool_size}个, 前端{self.config.display_strategies_count}个")
 
     def _get_db_connection(self):
         """获取数据库连接"""
         return psycopg2.connect(**self.db_config)
 
     def _load_config_from_db(self):
-        """从数据库加载配置"""
+        """从数据库加载四层配置"""
         try:
             conn = self._get_db_connection()
             cursor = conn.cursor()
             
-            cursor.execute("SELECT config_key, config_value FROM strategy_management_config")
+            # 创建配置表（如果不存在）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS four_tier_evolution_config (
+                    config_key VARCHAR(100) PRIMARY KEY,
+                    config_value TEXT NOT NULL,
+                    description TEXT,
+                    config_category VARCHAR(50) DEFAULT 'general',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            
+            # 插入默认配置
+            default_configs = [
+                ('high_freq_pool_size', '2000', '高频池大小', 'tier_size'),
+                ('display_strategies_count', '21', '前端显示数量', 'tier_size'),
+                ('real_trading_count', '3', '实盘交易数量', 'tier_size'),
+                ('low_freq_interval_hours', '24', '低频进化间隔(小时)', 'evolution_frequency'),
+                ('high_freq_interval_minutes', '3', '高频进化间隔(分钟)', 'evolution_frequency'),
+                ('display_interval_minutes', '3', '前端进化间隔(分钟)', 'evolution_frequency'),
+                ('low_freq_validation_count', '2', '低频验证次数', 'validation'),
+                ('high_freq_validation_count', '4', '高频验证次数', 'validation'),
+                ('display_validation_count', '4', '前端验证次数', 'validation'),
+                ('validation_amount', '50.0', '验证交易金额', 'trading'),
+                ('real_trading_amount', '200.0', '实盘交易金额', 'trading'),
+                ('real_trading_score_threshold', '65.0', '实盘交易评分门槛', 'trading')
+            ]
+            
+            for key, value, desc, category in default_configs:
+                cursor.execute("""
+                    INSERT INTO four_tier_evolution_config (config_key, config_value, description, config_category)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (config_key) DO NOTHING
+                """, (key, value, desc, category))
+            
+            # 加载配置
+            cursor.execute("SELECT config_key, config_value FROM four_tier_evolution_config")
             configs = cursor.fetchall()
             
-            config_map = {
-                'evolutionInterval': 'evolution_interval',
-                'realTradingScore': 'real_trading_score', 
-                'realTradingCount': 'real_trading_count',
-                'realTradingAmount': 'real_trading_amount',
-                'validationAmount': 'validation_amount',
-                'minTrades': 'min_trades',
-                'minWinRate': 'min_win_rate',
-                'minProfit': 'min_profit',
-                'maxDrawdown': 'max_drawdown',
-                'minSharpeRatio': 'min_sharpe_ratio',
-                'maxStrategies': 'max_display_strategies',
-                'minScore': 'min_display_score',
-                'eliminationDays': 'elimination_days'
-            }
-            
             for config_key, config_value in configs:
-                if config_key in config_map:
-                    attr_name = config_map[config_key]
-                    if hasattr(self.config, attr_name):
-                        # 类型转换
-                        current_value = getattr(self.config, attr_name)
-                        if isinstance(current_value, int):
-                            setattr(self.config, attr_name, int(float(config_value)))
-                        elif isinstance(current_value, float):
-                            setattr(self.config, attr_name, float(config_value))
-                        else:
-                            setattr(self.config, attr_name, config_value)
+                if hasattr(self.config, config_key):
+                    # 类型转换
+                    current_value = getattr(self.config, config_key)
+                    if isinstance(current_value, int):
+                        setattr(self.config, config_key, int(float(config_value)))
+                    elif isinstance(current_value, float):
+                        setattr(self.config, config_key, float(config_value))
+                    else:
+                        setattr(self.config, config_key, config_value)
             
+            conn.commit()
             conn.close()
-            logger.info(f"✅ 策略管理配置已加载: 进化间隔{self.config.evolution_interval}分钟, 真实交易门槛{self.config.real_trading_score}分")
+            
+            logger.info(f"✅ 四层进化配置已加载")
             
         except Exception as e:
-            logger.error(f"❌ 加载策略管理配置失败: {e}")
+            logger.error(f"❌ 加载四层配置失败: {e}")
 
-    def get_strategy_pool(self) -> List[Dict]:
-        """获取策略池中的所有策略"""
+    def get_all_strategies(self) -> List[Dict]:
+        """获取策略池中的所有策略（第1层）"""
         try:
             conn = self._get_db_connection()
             cursor = conn.cursor()
             
-            # 获取所有策略，不区分启用/停用状态
+            # 获取所有启用策略，按评分排序
             cursor.execute("""
                 SELECT s.id, s.name, s.symbol, s.type, s.final_score, s.parameters,
                        s.win_rate, s.total_return, s.total_trades, s.created_at,
-                       s.last_evolution_time, s.notes,
-                       COUNT(t.id) as actual_trades,
+                       s.last_evolution_time, s.notes, s.generation, s.cycle,
+                       COUNT(t.id) as recent_trades,
                        MAX(t.timestamp) as last_trade_time
                 FROM strategies s
-                LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
-                WHERE s.final_score IS NOT NULL
+                LEFT JOIN trading_signals t ON s.id = t.strategy_id 
+                    AND t.executed = 1 
+                    AND t.timestamp >= NOW() - INTERVAL '7 days'
+                WHERE s.enabled = 1
                 GROUP BY s.id, s.name, s.symbol, s.type, s.final_score, s.parameters,
                          s.win_rate, s.total_return, s.total_trades, s.created_at,
-                         s.last_evolution_time, s.notes
-                ORDER BY s.final_score DESC, s.total_trades DESC
+                         s.last_evolution_time, s.notes, s.generation, s.cycle
+                ORDER BY s.final_score DESC NULLS LAST, s.total_trades DESC
             """)
             
             rows = cursor.fetchall()
             strategies = []
             
-            for row in rows:
+            for i, row in enumerate(rows):
                 strategy = {
                     'id': row[0],
                     'name': row[1],
                     'symbol': row[2] or 'BTC/USDT',
-                    'type': row[3] or 'momentum',
+                    'type': row[3] or 'momentum', 
                     'final_score': float(row[4]) if row[4] else 0.0,
                     'parameters': json.loads(row[5]) if row[5] else {},
                     'win_rate': float(row[6]) if row[6] else 0.0,
@@ -164,8 +185,11 @@ class ModernStrategyManager:
                     'created_at': row[9],
                     'last_evolution_time': row[10],
                     'notes': row[11],
-                    'actual_trades': int(row[12]) if row[12] else 0,
-                    'last_trade_time': row[13],
+                    'generation': int(row[12]) if row[12] else 1,
+                    'cycle': int(row[13]) if row[13] else 1,
+                    'recent_trades': int(row[14]) if row[14] else 0,
+                    'last_trade_time': row[15],
+                    'ranking': i + 1,  # 全局排名
                     'tier': StrategyTier.POOL.value
                 }
                 strategies.append(strategy)
@@ -178,174 +202,196 @@ class ModernStrategyManager:
             logger.error(f"❌ 获取策略池失败: {e}")
             return []
 
-    def select_display_strategies(self) -> List[Dict]:
-        """从策略池中选择优质策略用于前端显示"""
+    def get_high_freq_pool(self) -> List[Dict]:
+        """获取高频池策略（第2层：前2000个）"""
         try:
-            all_strategies = self.get_strategy_pool()
+            all_strategies = self.get_all_strategies()
             
-            # 筛选条件
-            display_strategies = []
+            # 选择前N个策略进入高频池
+            high_freq_strategies = all_strategies[:self.config.high_freq_pool_size]
             
-            for strategy in all_strategies:
-                # 🔧 修复筛选逻辑：使用total_trades而不是actual_trades
-                total_trades = max(strategy['actual_trades'], strategy['total_trades'])
-                
-                # 基本门槛筛选（进一步降低门槛以显示21个策略）
-                if (strategy['final_score'] >= max(30, self.config.min_display_score // 2) and
-                    total_trades >= max(5, self.config.min_trades // 6)):  # 大幅降低门槛
-                    
-                    strategy['tier'] = StrategyTier.DISPLAY.value
-                    strategy['effective_trades'] = total_trades  # 添加有效交易次数
-                    display_strategies.append(strategy)
+            for strategy in high_freq_strategies:
+                strategy['tier'] = StrategyTier.HIGH_FREQ.value
+                strategy['high_freq_ranking'] = high_freq_strategies.index(strategy) + 1
             
-            # 按分值排序，取前N个
-            display_strategies.sort(key=lambda x: x['final_score'], reverse=True)
-            selected = display_strategies[:self.config.max_display_strategies]
-            
-            logger.info(f"✅ 已选择 {len(selected)} 个优质策略用于前端显示")
-            return selected
+            logger.info(f"🔥 高频池选择了前 {len(high_freq_strategies)} 个策略")
+            return high_freq_strategies
             
         except Exception as e:
-            logger.error(f"❌ 选择前端显示策略失败: {e}")
+            logger.error(f"❌ 获取高频池失败: {e}")
             return []
 
-    def select_trading_strategies(self) -> List[Dict]:
-        """从前端显示策略中选择精英策略用于真实交易"""
+    def get_display_strategies(self) -> List[Dict]:
+        """获取前端显示策略（第3层：前21个）"""
         try:
-            display_strategies = self.select_display_strategies()
+            high_freq_pool = self.get_high_freq_pool()
             
-            # 应用严格的真实交易门槛
-            trading_strategies = []
+            # 从高频池中选择前N个策略用于前端显示
+            display_strategies = high_freq_pool[:self.config.display_strategies_count]
             
             for strategy in display_strategies:
-                # 🔧 修复真实交易筛选逻辑
-                effective_trades = strategy.get('effective_trades', strategy['actual_trades'])
-                # 重新计算胜率（基于真实数据）
-                calculated_win_rate = strategy['win_rate'] if strategy['win_rate'] > 10 else strategy['win_rate'] * 100
-                
-                # 严格门槛筛选（进一步降低要求以获得真实交易策略）
-                meets_criteria = (
-                    strategy['final_score'] >= max(60, self.config.real_trading_score * 0.9) and  # 降低分值要求
-                    calculated_win_rate >= max(40, self.config.min_win_rate * 0.5) and  # 大幅降低胜率要求
-                    strategy['total_return'] >= self.config.min_profit / 50000 and  # 进一步调整收益阈值
-                    effective_trades >= max(3, self.config.min_trades // 10)  # 大幅降低交易次数要求
-                )
-                
-                if meets_criteria:
-                    strategy['tier'] = StrategyTier.TRADING.value
-                    trading_strategies.append(strategy)
+                strategy['tier'] = StrategyTier.DISPLAY.value
+                strategy['display_ranking'] = display_strategies.index(strategy) + 1
             
-            # 按综合评分排序，取前N个
-            trading_strategies.sort(key=lambda x: (
-                x['final_score'] * 0.4 + 
-                x['win_rate'] * 0.3 + 
-                x['total_return'] * 1000 * 0.3
-            ), reverse=True)
-            
-            selected = trading_strategies[:self.config.real_trading_count]
-            
-            logger.info(f"🏆 已选择 {len(selected)} 个精英策略用于真实交易")
-            return selected
+            logger.info(f"🎯 前端显示选择了前 {len(display_strategies)} 个策略")
+            return display_strategies
             
         except Exception as e:
-            logger.error(f"❌ 选择真实交易策略失败: {e}")
+            logger.error(f"❌ 获取前端显示策略失败: {e}")
+            return []
+
+    def get_trading_strategies(self) -> List[Dict]:
+        """获取实盘交易策略（第4层：前几个）"""
+        try:
+            display_strategies = self.get_display_strategies()
+            
+            # 从前端显示中选择符合实盘门槛的策略
+            trading_candidates = [
+                s for s in display_strategies 
+                if s['final_score'] >= self.config.real_trading_score_threshold
+            ]
+            
+            # 取前N个用于实盘交易
+            trading_strategies = trading_candidates[:self.config.real_trading_count]
+            
+            for strategy in trading_strategies:
+                strategy['tier'] = StrategyTier.TRADING.value
+                strategy['trading_ranking'] = trading_strategies.index(strategy) + 1
+            
+            logger.info(f"💰 实盘交易选择了 {len(trading_strategies)} 个精英策略")
+            return trading_strategies
+            
+        except Exception as e:
+            logger.error(f"❌ 获取实盘交易策略失败: {e}")
             return []
 
     def get_strategies_by_tier(self, tier: StrategyTier) -> List[Dict]:
         """根据层级获取策略"""
         if tier == StrategyTier.POOL:
-            return self.get_strategy_pool()
+            return self.get_all_strategies()
+        elif tier == StrategyTier.HIGH_FREQ:
+            return self.get_high_freq_pool()
         elif tier == StrategyTier.DISPLAY:
-            return self.select_display_strategies()
+            return self.get_display_strategies()
         elif tier == StrategyTier.TRADING:
-            return self.select_trading_strategies()
+            return self.get_trading_strategies()
         else:
             return []
 
-    async def evolve_display_strategies(self):
-        """高频进化前端显示策略（每3分钟）"""
-        try:
-            display_strategies = self.select_display_strategies()
-            evolved_count = 0
-            
-            for strategy in display_strategies:
-                try:
-                    # 执行参数优化
-                    if await self._evolve_strategy_parameters(strategy):
-                        evolved_count += 1
-                        
-                        # 执行验证交易
-                        await self._execute_validation_trade(strategy)
-                        
-                except Exception as e:
-                    logger.error(f"❌ 策略 {strategy['id']} 进化失败: {e}")
-                    continue
-            
-            logger.info(f"🔄 前端策略高频进化完成: {evolved_count}/{len(display_strategies)} 个策略已优化")
-            
-        except Exception as e:
-            logger.error(f"❌ 前端策略进化失败: {e}")
-
     async def evolve_pool_strategies(self):
-        """定期进化策略池（每24小时）"""
+        """策略池低频进化（第1层：全部策略，24小时间隔）"""
         try:
-            pool_strategies = self.get_strategy_pool()
+            all_strategies = self.get_all_strategies()
             
-            # 选择需要进化的策略
+            # 筛选需要低频进化的策略
             strategies_to_evolve = []
             current_time = datetime.now()
             
-            for strategy in pool_strategies:
+            for strategy in all_strategies:
                 last_evolution = strategy.get('last_evolution_time')
-                # 🔧 修复：确保datetime类型正确比较
                 should_evolve = True
+                
                 if last_evolution:
                     try:
-                        # 如果是字符串，转换为datetime
                         if isinstance(last_evolution, str):
                             last_evolution = datetime.fromisoformat(last_evolution.replace('Z', ''))
-                        elif isinstance(last_evolution, datetime):
-                            pass  # 已经是datetime类型
-                        else:
-                            should_evolve = True  # 无法识别的类型，默认需要进化
-                            
+                        
                         if isinstance(last_evolution, datetime):
                             time_diff = (current_time - last_evolution).total_seconds()
-                            should_evolve = time_diff > self.config.pool_evolution_hours * 3600
-                    except Exception as e:
-                        logger.warning(f"解析last_evolution_time失败: {e}, 策略{strategy['id']}将进行进化")
+                            should_evolve = time_diff > self.config.low_freq_interval_hours * 3600
+                    except Exception:
                         should_evolve = True
-                        
+                
                 if should_evolve:
                     strategies_to_evolve.append(strategy)
             
             evolved_count = 0
             for strategy in strategies_to_evolve:
                 try:
-                    if await self._evolve_strategy_parameters(strategy, pool_mode=True):
+                    # 执行低频参数进化
+                    if await self._evolve_strategy_parameters(
+                        strategy, 
+                        evolution_type='low_freq',
+                        validation_count=self.config.low_freq_validation_count
+                    ):
                         evolved_count += 1
                         
                 except Exception as e:
-                    logger.error(f"❌ 策略池策略 {strategy['id']} 进化失败: {e}")
+                    logger.error(f"❌ 策略 {strategy['id']} 低频进化失败: {e}")
                     continue
             
-            logger.info(f"🔄 策略池定期进化完成: {evolved_count}/{len(strategies_to_evolve)} 个策略已优化")
+            logger.info(f"🔄 策略池低频进化完成: {evolved_count}/{len(strategies_to_evolve)} 个策略已优化")
             
         except Exception as e:
-            logger.error(f"❌ 策略池进化失败: {e}")
+            logger.error(f"❌ 策略池低频进化失败: {e}")
 
-    async def _evolve_strategy_parameters(self, strategy: Dict, pool_mode: bool = False) -> bool:
-        """进化策略参数"""
+    async def evolve_high_freq_pool(self):
+        """高频池高频进化（第2层：前2000个策略，3分钟间隔）"""
+        try:
+            high_freq_strategies = self.get_high_freq_pool()
+            
+            evolved_count = 0
+            for strategy in high_freq_strategies:
+                try:
+                    # 执行高频参数进化
+                    if await self._evolve_strategy_parameters(
+                        strategy,
+                        evolution_type='high_freq',
+                        validation_count=self.config.high_freq_validation_count
+                    ):
+                        evolved_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"❌ 高频池策略 {strategy['id']} 进化失败: {e}")
+                    continue
+            
+            logger.info(f"🔥 高频池进化完成: {evolved_count}/{len(high_freq_strategies)} 个策略已优化")
+            
+        except Exception as e:
+            logger.error(f"❌ 高频池进化失败: {e}")
+
+    async def evolve_display_strategies(self):
+        """前端显示策略持续高频进化（第3层：21个策略，3分钟间隔）"""
+        try:
+            display_strategies = self.get_display_strategies()
+            
+            evolved_count = 0
+            for strategy in display_strategies:
+                try:
+                    # 执行前端持续高频进化
+                    if await self._evolve_strategy_parameters(
+                        strategy,
+                        evolution_type='display',
+                        validation_count=self.config.display_validation_count
+                    ):
+                        evolved_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"❌ 前端策略 {strategy['id']} 进化失败: {e}")
+                    continue
+            
+            logger.info(f"🎯 前端策略进化完成: {evolved_count}/{len(display_strategies)} 个策略已优化")
+            
+        except Exception as e:
+            logger.error(f"❌ 前端策略进化失败: {e}")
+
+    async def _evolve_strategy_parameters(self, strategy: Dict, evolution_type: str, validation_count: int) -> bool:
+        """统一的策略参数进化方法"""
         try:
             current_params = strategy.get('parameters', {})
-            strategy_type = strategy.get('type', 'momentum')
             
-            # 基于当前表现生成新参数
-            mutation_strength = 0.3 if pool_mode else 0.1  # 策略池变异更激进
+            # 根据进化类型设置变异强度
+            mutation_strengths = {
+                'low_freq': 0.3,     # 低频变异更激进
+                'high_freq': 0.2,    # 高频中等变异
+                'display': 0.1       # 前端精细变异
+            }
+            
+            mutation_strength = mutation_strengths.get(evolution_type, 0.2)
             
             # 生成变异参数
             new_params = self.param_manager.generate_parameter_mutations(
-                current_params, 
+                current_params,
                 mutation_strength=mutation_strength
             )
             
@@ -353,7 +399,7 @@ class ModernStrategyManager:
             conn = self._get_db_connection()
             cursor = conn.cursor()
             
-            # 🔧 修复：确保参数可以JSON序列化，将Decimal转换为float
+            # 参数序列化处理
             serializable_params = {}
             for key, value in new_params.items():
                 if isinstance(value, Decimal):
@@ -361,18 +407,36 @@ class ModernStrategyManager:
                 else:
                     serializable_params[key] = value
             
+            # 更新策略参数和进化时间
             cursor.execute("""
                 UPDATE strategies 
-                SET parameters = %s, last_evolution_time = CURRENT_TIMESTAMP
+                SET parameters = %s, 
+                    last_evolution_time = CURRENT_TIMESTAMP,
+                    cycle = COALESCE(cycle, 0) + 1
                 WHERE id = %s
             """, (json.dumps(serializable_params), strategy['id']))
+            
+            # 记录进化历史
+            cursor.execute("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, evolution_type, old_parameters, new_parameters,
+                 trigger_reason, created_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, (
+                strategy['id'],
+                strategy.get('generation', 1),
+                strategy.get('cycle', 1) + 1,
+                evolution_type,
+                json.dumps(current_params),
+                json.dumps(serializable_params),
+                f"{evolution_type}进化: 变异强度{mutation_strength}"
+            ))
             
             conn.commit()
             conn.close()
             
-            # 记录进化日志
-            await self._log_evolution_event(strategy['id'], 'parameter_optimization', 
-                                           f"参数优化: {len(new_params)}个参数已更新")
+            # 执行验证交易
+            await self._execute_validation_trades(strategy, evolution_type, validation_count)
             
             return True
             
@@ -380,207 +444,136 @@ class ModernStrategyManager:
             logger.error(f"❌ 策略参数进化失败: {e}")
             return False
 
-    async def _execute_validation_trade(self, strategy: Dict):
+    async def _execute_validation_trades(self, strategy: Dict, evolution_type: str, validation_count: int):
         """执行验证交易"""
         try:
-            # 模拟验证交易逻辑
-            # 实际实现中，这里会调用交易引擎执行小额验证交易
-            
-            validation_result = {
-                'strategy_id': strategy['id'],
-                'symbol': strategy['symbol'],
-                'amount': self.config.validation_amount,
-                'signal_type': random.choice(['buy', 'sell']),
-                'timestamp': datetime.now(),
-                'is_validation': True,
-                'expected_return': random.uniform(-2, 5)  # 模拟收益
-            }
-            
-            # 记录验证交易信号
             conn = self._get_db_connection()
             cursor = conn.cursor()
             
-            # 🔧 修复：正确设置trade_type和is_validation字段
-            trade_type = "score_verification"  # 验证交易
-            is_validation = True
-            
-            cursor.execute("""
-                INSERT INTO trading_signals 
-                (strategy_id, symbol, signal_type, price, quantity, expected_return, 
-                 executed, is_validation, trade_type, timestamp)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                validation_result['strategy_id'],
-                validation_result['symbol'], 
-                validation_result['signal_type'],
-                100.0,  # 模拟价格
-                validation_result['amount'],
-                validation_result['expected_return'],
-                1,  # 已执行
-                is_validation,
-                trade_type,
-                validation_result['timestamp']
-            ))
+            for i in range(validation_count):
+                # 生成验证交易信号
+                signal_data = {
+                    'strategy_id': strategy['id'],
+                    'symbol': strategy['symbol'],
+                    'signal_type': random.choice(['buy', 'sell']),
+                    'price': 100.0 + random.uniform(-5, 5),
+                    'quantity': self.config.validation_amount,
+                    'expected_return': random.uniform(-1, 3),
+                    'timestamp': datetime.now()
+                }
+                
+                cursor.execute("""
+                    INSERT INTO trading_signals 
+                    (strategy_id, symbol, signal_type, price, quantity, expected_return,
+                     executed, is_validation, trade_type, timestamp, cycle_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    signal_data['strategy_id'],
+                    signal_data['symbol'],
+                    signal_data['signal_type'], 
+                    signal_data['price'],
+                    signal_data['quantity'],
+                    signal_data['expected_return'],
+                    1,  # executed
+                    True,  # is_validation
+                    f"{evolution_type}_validation",  # trade_type
+                    signal_data['timestamp'],
+                    f"{evolution_type}_{i+1}"  # cycle_id
+                ))
             
             conn.commit()
             conn.close()
             
-            logger.info(f"✅ 策略 {strategy['id']} 验证交易已执行")
+            logger.debug(f"✅ 策略 {strategy['id']} 完成 {validation_count} 次{evolution_type}验证交易")
             
         except Exception as e:
             logger.error(f"❌ 验证交易执行失败: {e}")
 
-    async def _log_evolution_event(self, strategy_id: str, optimization_type: str, trigger_reason: str):
-        """记录进化事件"""
+    def get_evolution_statistics(self) -> Dict:
+        """获取四层进化统计信息"""
         try:
-            conn = self._get_db_connection()
-            cursor = conn.cursor()
+            all_strategies = self.get_all_strategies()
+            high_freq_pool = self.get_high_freq_pool()
+            display_strategies = self.get_display_strategies()
+            trading_strategies = self.get_trading_strategies()
             
-            cursor.execute("""
-                INSERT INTO strategy_optimization_logs 
-                (strategy_id, optimization_type, trigger_reason, timestamp, 
-                 old_parameters, new_parameters)
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
-            """, (
-                strategy_id, optimization_type, trigger_reason,
-                json.dumps({}), json.dumps({})  # 简化版本
-            ))
+            # 计算理论进化频率
+            display_evolutions_per_hour = len(display_strategies) * (60 // self.config.display_interval_minutes)
+            high_freq_evolutions_per_hour = len(high_freq_pool) * (60 // self.config.high_freq_interval_minutes)
+            low_freq_evolutions_per_hour = len(all_strategies) // self.config.low_freq_interval_hours
             
-            conn.commit()
-            conn.close()
+            total_theoretical_evolutions = (
+                display_evolutions_per_hour + 
+                high_freq_evolutions_per_hour + 
+                low_freq_evolutions_per_hour
+            )
             
-        except Exception as e:
-            logger.error(f"❌ 记录进化事件失败: {e}")
-
-    def get_frontend_display_data(self) -> Dict:
-        """获取前端显示数据"""
-        try:
-            # 获取不同层级的策略
-            display_strategies = self.select_display_strategies()
-            trading_strategies = self.select_trading_strategies()
-            
-            # 标记策略层级
-            for strategy in display_strategies:
-                strategy['is_trading'] = strategy['id'] in [s['id'] for s in trading_strategies]
-                strategy['card_style'] = 'golden' if strategy['is_trading'] else 'normal'
-                
-                # 添加进化状态信息
-                last_evolution = strategy.get('last_evolution_time')
-                if last_evolution and isinstance(last_evolution, datetime):
-                    time_since_evolution = (datetime.now() - last_evolution).total_seconds() / 60
-                    strategy['evolution_status'] = 'recent' if time_since_evolution < self.config.evolution_interval * 2 else 'normal'
-                else:
-                    strategy['evolution_status'] = 'pending'
-            
-            result = {
-                'display_strategies': display_strategies,
-                'trading_strategies': trading_strategies,
-                'config': {
-                    'evolution_interval': self.config.evolution_interval,
-                    'real_trading_count': self.config.real_trading_count,
-                    'real_trading_score_threshold': self.config.real_trading_score,
-                    'max_display_strategies': self.config.max_display_strategies
-                },
-                'statistics': {
-                    'total_pool_strategies': len(self.get_strategy_pool()),
-                    'display_strategies_count': len(display_strategies),
-                    'trading_strategies_count': len(trading_strategies),
-                    'last_evolution_time': datetime.now().isoformat()
-                }
-            }
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"❌ 获取前端显示数据失败: {e}")
             return {
-                'display_strategies': [], 
-                'trading_strategies': [],
-                'config': {
-                    'evolution_interval': 3,
-                    'real_trading_count': 2,
-                    'real_trading_score_threshold': 65.0,
-                    'max_display_strategies': 21
+                'tiers': {
+                    'pool': {
+                        'strategy_count': len(all_strategies),
+                        'evolution_interval': f"{self.config.low_freq_interval_hours}小时",
+                        'theoretical_evolutions_per_hour': low_freq_evolutions_per_hour,
+                        'validation_count_per_evolution': self.config.low_freq_validation_count
+                    },
+                    'high_freq': {
+                        'strategy_count': len(high_freq_pool),
+                        'evolution_interval': f"{self.config.high_freq_interval_minutes}分钟",
+                        'theoretical_evolutions_per_hour': high_freq_evolutions_per_hour,
+                        'validation_count_per_evolution': self.config.high_freq_validation_count
+                    },
+                    'display': {
+                        'strategy_count': len(display_strategies),
+                        'evolution_interval': f"{self.config.display_interval_minutes}分钟",
+                        'theoretical_evolutions_per_hour': display_evolutions_per_hour,
+                        'validation_count_per_evolution': self.config.display_validation_count
+                    },
+                    'trading': {
+                        'strategy_count': len(trading_strategies),
+                        'real_trading_threshold': self.config.real_trading_score_threshold
+                    }
                 },
-                'statistics': {
-                    'total_pool_strategies': 0,
-                    'display_strategies_count': 0,
-                    'trading_strategies_count': 0,
-                    'last_evolution_time': datetime.now().isoformat()
+                'totals': {
+                    'total_strategies': len(all_strategies),
+                    'theoretical_total_evolutions_per_hour': total_theoretical_evolutions,
+                    'theoretical_validations_per_hour': (
+                        display_evolutions_per_hour * self.config.display_validation_count +
+                        high_freq_evolutions_per_hour * self.config.high_freq_validation_count +
+                        low_freq_evolutions_per_hour * self.config.low_freq_validation_count
+                    )
+                },
+                'config': {
+                    'high_freq_pool_size': self.config.high_freq_pool_size,
+                    'display_strategies_count': self.config.display_strategies_count,
+                    'real_trading_count': self.config.real_trading_count
                 }
             }
-
-    async def start_evolution_scheduler(self):
-        """启动进化调度器"""
-        logger.info("🚀 策略进化调度器已启动")
-        
-        try:
-            while True:
-                # 高频进化前端显示策略
-                await self.evolve_display_strategies()
-                
-                # 等待配置的间隔时间
-                await asyncio.sleep(self.config.evolution_interval * 60)
-                
+            
         except Exception as e:
-            logger.error(f"❌ 策略进化调度器异常: {e}")
-
-    async def start_pool_evolution_scheduler(self):
-        """启动策略池进化调度器"""
-        logger.info("🚀 策略池进化调度器已启动")
-        
-        try:
-            while True:
-                # 定期进化策略池
-                await self.evolve_pool_strategies()
-                
-                # 等待24小时
-                await asyncio.sleep(self.config.pool_evolution_hours * 3600)
-                
-        except Exception as e:
-            logger.error(f"❌ 策略池进化调度器异常: {e}")
+            logger.error(f"❌ 获取进化统计失败: {e}")
+            return {}
 
 
-# 单例模式
-_modern_strategy_manager = None
+def get_four_tier_strategy_manager() -> FourTierStrategyManager:
+    """获取四层策略管理器实例"""
+    global _manager_instance
+    if '_manager_instance' not in globals():
+        _manager_instance = FourTierStrategyManager()
+    return _manager_instance
 
-def get_modern_strategy_manager() -> ModernStrategyManager:
-    """获取现代化策略管理器单例"""
-    global _modern_strategy_manager
-    if _modern_strategy_manager is None:
-        _modern_strategy_manager = ModernStrategyManager()
-    return _modern_strategy_manager
+# 兼容性别名
+def get_modern_strategy_manager() -> FourTierStrategyManager:
+    """向后兼容的管理器获取方法"""
+    return get_four_tier_strategy_manager()
 
-# 异步启动函数
-async def start_evolution_system():
-    """启动策略进化系统"""
-    manager = get_modern_strategy_manager()
+async def start_four_tier_evolution_system():
+    """启动四层进化系统"""
+    manager = get_four_tier_strategy_manager()
     
-    # 并发运行两个调度器
-    await asyncio.gather(
-        manager.start_evolution_scheduler(),
-        manager.start_pool_evolution_scheduler()
-    )
-
-if __name__ == "__main__":
-    # 测试运行
-    manager = get_modern_strategy_manager()
+    logger.info("🚀 四层策略进化竞争系统启动")
     
-    # 测试基础功能
-    print("=== 测试现代化策略管理器 ===")
+    # 显示系统统计
+    stats = manager.get_evolution_statistics()
+    logger.info(f"📊 系统配置: {stats}")
     
-    # 测试策略池
-    pool_strategies = manager.get_strategy_pool()
-    print(f"策略池策略数量: {len(pool_strategies)}")
-    
-    # 测试前端显示策略选择
-    display_strategies = manager.select_display_strategies()
-    print(f"前端显示策略数量: {len(display_strategies)}")
-    
-    # 测试真实交易策略选择
-    trading_strategies = manager.select_trading_strategies()
-    print(f"真实交易策略数量: {len(trading_strategies)}")
-    
-    # 测试前端数据获取
-    frontend_data = manager.get_frontend_display_data()
-    print(f"前端数据: {len(frontend_data['display_strategies'])} 个显示策略, {len(frontend_data['trading_strategies'])} 个交易策略") 
+    return manager 
