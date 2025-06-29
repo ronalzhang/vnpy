@@ -1209,9 +1209,9 @@ def quantitative_strategies():
                     
                     formatted_strategy = {
                         'id': strategy['id'],
-                        'name': strategy['name'],
+                        'name': strategy.get('name', strategy['id']),  # 🔧 修复：使用安全访问
                         'symbol': strategy['symbol'],
-                        'type': strategy['type'], 
+                        'type': strategy.get('type', 'momentum'),  # 🔧 修复：使用安全访问
                         'enabled': True,  # 现代化系统不使用启用/停用概念
                         'final_score': strategy['final_score'],
                         'parameters': strategy.get('parameters', {'quantity': 100, 'threshold': 0.02}),
