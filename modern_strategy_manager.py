@@ -563,13 +563,34 @@ class FourTierStrategyManager:
             }
 
     def get_frontend_display_data(self):
-        """获取前端显示数据 - 兼容旧接口"""
+        """获取前端显示数据 - 兼容旧接口，包含正确的层级分配"""
         try:
-            # 获取前端21个策略的详细数据
+            # 🔥 获取所有层级的策略
             display_strategies = self.get_display_strategies()
+            trading_strategies = self.get_trading_strategies()
+            
+            # 🔥 合并策略，优先显示交易策略
+            all_strategies = []
+            
+            # 首先添加真实交易策略（设置正确的tier和trade_mode）
+            for strategy in trading_strategies:
+                strategy['tier'] = 'trading'
+                strategy['trade_mode'] = '真实交易'
+                all_strategies.append(strategy)
+                
+            # 然后添加剩余的显示策略（排除已经在交易层级的策略）
+            trading_ids = {s['id'] for s in trading_strategies}
+            for strategy in display_strategies:
+                if strategy['id'] not in trading_ids:
+                    strategy['tier'] = 'display'
+                    strategy['trade_mode'] = '验证交易'
+                    all_strategies.append(strategy)
+            
+            # 限制前端显示数量
+            all_strategies = all_strategies[:self.config.display_strategies_count]
             
             formatted_strategies = []
-            for strategy in display_strategies:
+            for strategy in all_strategies:
                 # 格式化策略数据供前端显示
                 formatted_strategy = {
                     'id': strategy['id'],
@@ -577,7 +598,7 @@ class FourTierStrategyManager:
                     'symbol': strategy['symbol'],
                     'score': float(strategy['final_score']),
                     'enabled': True,  # 🔧 修复：现代化系统所有策略默认启用
-                    'trade_mode': '实盘交易' if strategy['final_score'] >= self.config.real_trading_score_threshold else '验证交易',
+                    'trade_mode': strategy.get('trade_mode', '验证交易'),  # 🔥 使用已设置的trade_mode
                     'parameters': strategy.get('parameters', {}),
                     'performance': {
                         'total_trades': 0,
@@ -589,7 +610,8 @@ class FourTierStrategyManager:
                     'last_update': strategy.get('last_update', ''),
                     'strategy_type': strategy.get('strategy_type', 'unknown'),
                     'creation_time': strategy.get('creation_time', ''),
-                    'tier': 'display'  # 标记为前端显示层
+                    'tier': strategy.get('tier', 'display'),  # 🔥 使用已设置的tier
+                    'is_trading': strategy.get('tier') == 'trading'  # 🔥 标记是否为真实交易
                 }
                 
                 # 获取策略性能数据

@@ -3747,7 +3747,7 @@ def enable_real_trading():
         
         cursor.execute("""
             UPDATE system_status 
-            SET real_trading_enabled = TRUE
+            SET auto_trading_enabled = TRUE
         """)
         
         # 记录启用日志
@@ -3784,7 +3784,7 @@ def disable_real_trading():
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE system_status 
-            SET real_trading_enabled = FALSE
+            SET auto_trading_enabled = FALSE
         """)
         
         cursor.close()
@@ -3808,8 +3808,8 @@ def get_real_trading_status():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 检查真实交易开关状态
-        cursor.execute("SELECT real_trading_enabled FROM system_status LIMIT 1")
+        # 检查真实交易开关状态（统一使用auto_trading_enabled字段）
+        cursor.execute("SELECT auto_trading_enabled FROM system_status LIMIT 1")
         status_result = cursor.fetchone()
         real_trading_enabled = status_result[0] if status_result else False
         
