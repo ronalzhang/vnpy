@@ -102,8 +102,9 @@ def clean_quantitative_service():
 def clean_all_files():
     """清理所有文件中的停用逻辑"""
     files_to_clean = [
-        "advanced_strategy_manager.py",
-        "complete_strategy_optimization.py"
+        # 已删除重复文件，使用统一的modern_strategy_manager.py
+        "quantitative_service.py",
+        "modern_strategy_manager.py"
     ]
     
     for file_path in files_to_clean:
