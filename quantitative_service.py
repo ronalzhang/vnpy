@@ -7879,6 +7879,26 @@ class EvolutionaryStrategyEngine:
         self.population_size = 20  # 添加种群大小
         self.parameter_optimizer = ParameterOptimizer()  # 🧠 添加智能参数优化器
         
+        # 🧠 添加智能参数映射器
+        self.parameter_mapping = {
+            'rsi_overbought': 'rsi_upper',
+            'rsi_oversold': 'rsi_lower', 
+            'bb_upper_mult': 'bollinger_std',
+            'bb_period': 'bollinger_period',
+            'ema_fast_period': 'macd_fast_period',
+            'ema_slow_period': 'macd_slow_period',
+            'sma_period': 'ema_period',
+            'adx_period': 'atr_period',
+            'adx_threshold': 'threshold',
+            'breakout_period': 'period',
+            'breakout_threshold': 'threshold',
+            'grid_size': 'grid_spacing',
+            'grid_levels': 'levels',
+            'momentum_threshold': 'threshold',
+            'trend_period': 'period',
+            'stop_loss_pct': 'stop_loss'
+        }
+        
         # 🔧 修复：确保数据表存在并修复世代数据一致性
         self._ensure_required_tables()
         self._fix_generation_data_consistency()
@@ -8878,6 +8898,10 @@ class EvolutionaryStrategyEngine:
         except Exception as e:
             logger.error(f"保存演化快照失败: {e}")
     
+    def _map_parameter_name(self, param_name: str) -> str:
+        """🧠 智能参数名称映射 - 解决参数名称不匹配问题"""
+        return self.parameter_mapping.get(param_name, param_name)
+
     def _save_evolution_history(self, elites: List[Dict], new_strategies: List[Dict]):
         """保存演化历史"""
         try:
@@ -9059,15 +9083,16 @@ class EvolutionaryStrategyEngine:
     def _evaluate_all_strategies(self) -> List[Dict]:
         """🔧 评估所有当前策略 - 增强验证数据生成"""
         try:
-            # 🔧 修复：直接从数据库获取策略数据
-            strategies_data = self.quantitative_service.db_manager.execute_query("""
-                SELECT id, name, type, symbol, final_score, win_rate, total_return, 
-                       total_trades, parameters, enabled, protected_status, created_at
-                FROM strategies 
-                WHERE enabled = 1 AND final_score IS NOT NULL
-                ORDER BY final_score DESC
-                LIMIT %s
-            """, (self.evolution_config['max_strategies'],), fetch_all=True)
+                    # 🔧 修复：从数据库获取所有启用策略，不限制格式
+        strategies_data = self.quantitative_service.db_manager.execute_query("""
+            SELECT id, name, type, symbol, final_score, win_rate, total_return, 
+                   total_trades, parameters, enabled, protected_status, created_at,
+                   generation, cycle
+            FROM strategies 
+            WHERE enabled = 1 AND final_score IS NOT NULL AND final_score > 0
+            ORDER BY final_score DESC
+            LIMIT %s
+        """, (self.evolution_config.get('max_strategies', 100),), fetch_all=True)
             
             if not strategies_data:
                 print("⚠️ 数据库中没有找到启用的策略")
