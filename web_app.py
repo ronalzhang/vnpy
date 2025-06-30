@@ -3036,7 +3036,7 @@ def select_top_strategies():
                    COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) as wins,
                    SUM(t.expected_return) as total_pnl
             FROM strategies s
-            LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = true
+            LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
             WHERE s.enabled = 1
             GROUP BY s.id, s.name, s.final_score
             HAVING COUNT(t.id) >= 10 
@@ -3058,7 +3058,7 @@ def select_top_strategies():
                        COUNT(CASE WHEN t.expected_return > 0 THEN 1 END) as wins,
                        SUM(t.expected_return) as total_pnl
                 FROM strategies s
-                LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = true
+                LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
                 WHERE s.enabled = 1
                 GROUP BY s.id, s.name, s.final_score
                 HAVING COUNT(t.id) >= 3
@@ -4401,7 +4401,7 @@ def test_strategies_query():
             SELECT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
                    COUNT(t.id) as total_trades
             FROM strategies s
-            LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = true
+            LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
             WHERE s.id LIKE 'STRAT_%'
             GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.final_score
             ORDER BY COUNT(t.id) DESC, s.final_score DESC

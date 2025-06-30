@@ -96,7 +96,7 @@ class TradingMonitor:
                     COUNT(*) as total_logs,
                     COUNT(CASE WHEN trade_type = 'simulation' THEN 1 END) as sim_trades,
                     COUNT(CASE WHEN trade_type = 'real' THEN 1 END) as real_trades,
-                    COUNT(CASE WHEN executed = true THEN 1 END) as executed_trades
+                    COUNT(CASE WHEN executed = 1 THEN 1 END) as executed_trades
                 FROM strategy_trade_logs 
                 WHERE timestamp > NOW() - INTERVAL '%s minutes'
             """ % minutes)
@@ -129,7 +129,7 @@ class TradingMonitor:
         cursor.execute("""
             SELECT 
                 COUNT(*) as total_signals,
-                COUNT(CASE WHEN executed = true THEN 1 END) as executed_signals,
+                COUNT(CASE WHEN executed = 1 THEN 1 END) as executed_signals,
                 COUNT(CASE WHEN timestamp > NOW() - INTERVAL '1 hour' THEN 1 END) as recent_signals
             FROM trading_signals
         """)
