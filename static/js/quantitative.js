@@ -1646,18 +1646,41 @@ class QuantitativeSystem {
     // 更新管理配置表单
     updateManagementForm() {
         if (managementConfig) {
-            // 🔧 修复：使用HTML中实际存在的元素ID
-            this.safeSetValue('eliminationDays', managementConfig.eliminationDays || 15);
-            this.safeSetValue('minScore', managementConfig.minScore || 20);
-            this.safeSetValue('validation_amount', managementConfig.validationAmount || 50);
-            this.safeSetValue('real_trading_amount', managementConfig.realTradingAmount || 100);
-            this.safeSetValue('real_trading_score_threshold', managementConfig.realTradingScore || 65);
+            console.log('🔍 开始更新管理配置表单，配置数据:', managementConfig);
             
-            // 🔧 新增：实盘交易控制参数 (使用正确的HTML ID)
-            this.safeSetValue('real_trading_enabled', managementConfig.real_trading_enabled || false);
-            this.safeSetValue('min_simulation_days', managementConfig.min_simulation_days || 7);
-            this.safeSetValue('min_sim_win_rate', managementConfig.min_sim_win_rate || 65);
-            this.safeSetValue('min_sim_total_pnl', managementConfig.min_sim_total_pnl || 5);
+            // 🔧 策略淘汰配置
+            this.safeSetValue('eliminationDays', managementConfig.eliminationDays);
+            this.safeSetValue('minScore', managementConfig.minScore);
+            
+            // 🔧 四层数量配置 (使用API中的对应字段)
+            this.safeSetValue('high_freq_pool_size', managementConfig.maxStrategies || 20); // 第2层策略池大小
+            this.safeSetValue('display_strategies_count', managementConfig.maxStrategies || 20); // 第3层显示数量
+            this.safeSetValue('real_trading_count', managementConfig.realTradingCount); // 第4层实盘数量
+            
+            // 🔧 进化频率配置
+            this.safeSetValue('low_freq_interval_hours', managementConfig.paramValidationHours || 24);
+            this.safeSetValue('high_freq_interval_minutes', managementConfig.evolutionInterval ? managementConfig.evolutionInterval * 60 : 180);
+            this.safeSetValue('display_interval_minutes', managementConfig.evolutionInterval);
+            
+            // 🔧 统一验证配置
+            this.safeSetValue('unified_validation_count', managementConfig.paramValidationTrades || 20);
+            this.safeSetValue('validation_score_threshold_high', 80); // 默认高分门槛80分
+            this.safeSetValue('validation_score_threshold_mid', 60);  // 默认中分门槛60分
+            
+            // 🔧 交易金额配置
+            this.safeSetValue('validation_amount', managementConfig.validationAmount);
+            this.safeSetValue('real_trading_amount', managementConfig.realTradingAmount);
+            this.safeSetValue('real_trading_score_threshold', managementConfig.realTradingScore);
+            
+            // 🔧 实盘交易控制参数
+            this.safeSetValue('real_trading_enabled', managementConfig.real_trading_enabled);
+            this.safeSetValue('min_simulation_days', managementConfig.min_simulation_days);
+            this.safeSetValue('min_sim_win_rate', managementConfig.min_sim_win_rate);
+            this.safeSetValue('min_sim_total_pnl', managementConfig.min_sim_total_pnl);
+            
+            console.log('✅ 管理配置表单更新完成');
+        } else {
+            console.warn('⚠️ managementConfig为空，无法更新表单');
         }
     }
 
