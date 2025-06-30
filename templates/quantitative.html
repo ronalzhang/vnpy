@@ -540,102 +540,37 @@
                 </div>
                 <div class="modal-body">
                     <form id="strategyManagementForm">
-                        <!-- 全自动策略管理 -->
+                        <!-- 策略运行状态仪表盘 -->
                         <div class="card mb-3">
                             <div class="card-header">
                                 <h6 class="mb-0">
-                                    <i class="fas fa-robot"></i> 全自动策略管理
+                                    <i class="fas fa-chart-pie"></i> 策略运行状态
                                 </h6>
                             </div>
                             <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div>
-                                        <strong>启用全自动策略管理</strong>
-                                        <p class="text-muted mb-0 small">自动选择、启用、轮换和优化策略，实现全自动量化交易</p>
+                                <!-- 简化的状态显示，移除复杂配置 -->
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <div class="metric-value" id="currentActiveStrategies">-</div>
+                                        <div class="metric-label">活跃策略</div>
                                     </div>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" role="switch" id="autoManagementEnabled">
-                                        <label class="form-check-label" for="autoManagementEnabled">
-                                            <span id="autoManagementStatus" class="text-muted">禁用</span>
-                                        </label>
+                                    <div class="col-md-3">
+                                        <div class="metric-value text-success" id="realTradingStrategiesCount">-</div>
+                                        <div class="metric-label">真实交易</div>
                                     </div>
-                                </div>
-                                
-                                <div id="autoManagementConfig" style="display: none;">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <label for="minActiveStrategies" class="form-label">最少活跃策略数</label>
-                                            <input type="number" class="form-control" id="minActiveStrategies" value="2" min="1" max="10">
-                                            <div class="form-text">系统自动保持的最少运行策略数量</div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label for="maxActiveStrategies" class="form-label">最多活跃策略数</label>
-                                            <input type="number" class="form-control" id="maxActiveStrategies" value="5" min="2" max="20">
-                                            <div class="form-text">系统同时运行的最多策略数量</div>
-                                        </div>
+                                    <div class="col-md-3">
+                                        <div class="metric-value text-info" id="validationStrategiesCount">-</div>
+                                        <div class="metric-label">验证交易</div>
                                     </div>
-                                    <div class="row mt-3">
-                                        <div class="col-md-6">
-                                            <label for="autoEnableThreshold" class="form-label">自动启用门槛</label>
-                                            <input type="number" class="form-control" id="autoEnableThreshold" value="45" min="20" max="80" step="0.1">
-                                            <div class="form-text">策略达到此分值自动启用验证交易</div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label for="autoSelectionInterval" class="form-label">选择检查间隔 (分钟)</label>
-                                            <input type="number" class="form-control" id="autoSelectionInterval" value="10" min="5" max="60">
-                                            <div class="form-text">自动检查和选择策略的间隔时间</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mt-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="strategyRotationEnabled" checked>
-                                            <label class="form-check-label" for="strategyRotationEnabled">
-                                                启用策略轮换机制
-                                            </label>
-                                        </div>
-                                        <div class="form-text">自动替换表现不佳的策略为更优秀的策略</div>
-                                    </div>
-                                    
-                                    <!-- 实时状态显示 -->
-                                    <div class="mt-4 p-3 bg-light rounded">
-                                        <h6 class="mb-2">
-                                            <i class="fas fa-chart-pie"></i> 当前状态
-                                        </h6>
-                                        <div class="row text-center">
-                                            <div class="col-md-3">
-                                                <div class="metric-value" id="currentActiveStrategies">-</div>
-                                                <div class="metric-label">活跃策略</div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="metric-value text-success" id="realTradingStrategiesCount">-</div>
-                                                <div class="metric-label">真实交易</div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="metric-value text-info" id="validationStrategiesCount">-</div>
-                                                <div class="metric-label">验证交易</div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="metric-value text-muted" id="totalStrategiesCount">-</div>
-                                                <div class="metric-label">总策略数</div>
-                                            </div>
-                                        </div>
+                                    <div class="col-md-3">
+                                        <div class="metric-value text-muted" id="totalStrategiesCount">-</div>
+                                        <div class="metric-label">总策略数</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 策略进化配置 -->
-                        <div class="config-section">
-                            <h3>🔄 策略进化配置</h3>
-                            <div class="config-grid">
-                                <div class="config-item">
-                                    <label for="evolutionInterval">进化间隔 (分钟)</label>
-                                    <input type="number" id="evolutionInterval" name="evolutionInterval" min="1" max="60">
-                                    <small>传统进化系统间隔</small>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- 注释：策略进化配置已整合到四层进化系统配置中 -->
 
                         <!-- 🔥 四层进化系统配置 -->
                         <div class="config-section">
@@ -668,6 +603,11 @@
                                 <h4>⏰ 进化频率配置</h4>
                                 <div class="config-grid">
                                     <div class="config-item">
+                                        <label for="evolutionInterval">传统系统进化间隔 (分钟)</label>
+                                        <input type="number" id="evolutionInterval" name="evolutionInterval" min="1" max="60" step="1">
+                                        <small>传统进化系统的基础间隔设置</small>
+                                    </div>
+                                    <div class="config-item">
                                         <label for="low_freq_interval_hours">策略池进化间隔 (小时)</label>
                                         <input type="number" id="low_freq_interval_hours" name="low_freq_interval_hours" min="6" max="72" step="6">
                                         <small>第1层：全部策略低频进化间隔</small>
@@ -681,6 +621,23 @@
                                         <label for="display_interval_minutes">前端显示进化间隔 (分钟)</label>
                                         <input type="number" id="display_interval_minutes" name="display_interval_minutes" min="1" max="30" step="1">
                                         <small>第3层：前端策略持续进化间隔</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 策略淘汰配置 -->
+                            <div class="tier-config-group">
+                                <h4>⚡ 策略淘汰配置</h4>
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <label for="minScore">淘汰评分阈值 (分)</label>
+                                        <input type="number" id="minScore" name="minScore" min="5" max="50" step="5">
+                                        <small>低于此评分的策略将被淘汰（当前：10分）</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="eliminationDays">淘汰检查周期 (天)</label>
+                                        <input type="number" id="eliminationDays" name="eliminationDays" min="1" max="30" step="1">
+                                        <small>每隔几天检查一次淘汰条件</small>
                                     </div>
                                 </div>
                             </div>

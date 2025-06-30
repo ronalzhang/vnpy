@@ -217,6 +217,9 @@ class QuantitativeSystem {
             // 加载系统状态
             await this.loadSystemStatus();
             
+            // 🔧 新增：专门加载auto_trading状态
+            await this.loadAutoTradingStatus();
+            
             // 加载策略数据
             await this.loadStrategies();
             
@@ -232,6 +235,51 @@ class QuantitativeSystem {
             console.log('✅ 初始数据加载完成');
         } catch (error) {
             console.error('❌ 初始数据加载失败:', error);
+        }
+    }
+
+    // 🔧 新增：专门加载auto_trading状态
+    async loadAutoTradingStatus() {
+        try {
+            const response = await fetch('/api/quantitative/auto-trading');
+            const data = await response.json();
+            
+            if (data.success || data.data) {
+                const autoTradingEnabled = data.data?.auto_trading_enabled || data.enabled || false;
+                
+                console.log('🔧 加载auto_trading状态:', {
+                    API响应: data,
+                    解析状态: autoTradingEnabled
+                });
+                
+                // 更新全局状态
+                window.autoTradingEnabled = autoTradingEnabled;
+                
+                // 更新实例状态
+                if (!this.systemStatus) {
+                    this.systemStatus = {};
+                }
+                this.systemStatus.auto_trading_enabled = autoTradingEnabled;
+                
+                // 更新界面显示
+                this.updateAutoTradingStatus();
+                
+                console.log('✅ auto_trading状态加载成功:', autoTradingEnabled);
+            } else {
+                console.warn('⚠️ auto_trading状态获取失败，使用默认值false');
+                window.autoTradingEnabled = false;
+                if (this.systemStatus) {
+                    this.systemStatus.auto_trading_enabled = false;
+                }
+                this.updateAutoTradingStatus();
+            }
+        } catch (error) {
+            console.error('❌ 加载auto_trading状态失败:', error);
+            window.autoTradingEnabled = false;
+            if (this.systemStatus) {
+                this.systemStatus.auto_trading_enabled = false;
+            }
+            this.updateAutoTradingStatus();
         }
     }
 
@@ -333,11 +381,11 @@ class QuantitativeSystem {
             }
             
             // 更新顶部导航栏状态
-            const statusElements = document.querySelectorAll('[data-status-text]');
-            statusElements.forEach(el => {
-                el.textContent = '在线';
-                el.className = 'text-success';
-            });
+            const statusElement = document.getElementById('system-status-text');
+            if (statusElement) {
+                statusElement.textContent = '在线';
+                statusElement.className = 'text-success';
+            }
             
             console.log('✅ 系统状态已更新为在线');
         } else {
@@ -350,11 +398,11 @@ class QuantitativeSystem {
             }
             
             // 更新顶部导航栏状态
-            const statusElements = document.querySelectorAll('[data-status-text]');
-            statusElements.forEach(el => {
-                el.textContent = '离线';
-                el.className = 'text-muted';
-            });
+            const statusElement = document.getElementById('system-status-text');
+            if (statusElement) {
+                statusElement.textContent = '离线';
+                statusElement.className = 'text-muted';
+            }
             
             console.log('⚠️ 系统状态已更新为离线');
         }
@@ -1467,12 +1515,12 @@ class QuantitativeSystem {
                 
                 // 更新全局状态变量
                 window.systemRunning = isOnline || isDegraded;
-                window.autoTradingEnabled = data.data.services?.strategy_engine === 'online';
+                // 🔧 修复：不要将strategy_engine状态映射到auto_trading_enabled
+                // auto_trading_enabled应该从专门的API获取，不是strategy_engine状态
                 
                 // 保存到实例变量
                 this.systemStatus = {
                     running: isOnline || isDegraded,
-                    auto_trading_enabled: data.data.services?.strategy_engine === 'online',
                     overall_status: data.data.overall_status,
                     services: data.data.services,
                     details: data.data.details,
