@@ -3981,24 +3981,27 @@ def manage_strategy_config():
             
             # 设置默认值
             default_config = {
-                'evolutionInterval': 10,
-                'maxStrategies': 20,
+                'maxStrategies': 21,
                 'realTradingScore': 65.0,
                 'realTradingCount': 2,
-                'validationAmount': 50.0,
                 'realTradingAmount': 100.0,
-                'minTrades': 10,
-                'minWinRate': 65.0,
-                'minProfit': 0.0,
-                'maxDrawdown': 10.0,
-                'minSharpeRatio': 1.0,
+                'validationAmount': 50.0,
+                'minWinRate': 45.0,
+                'minTrades': 30,
+                'minProfit': 100.0,
+                'minSharpeRatio': 1.5,
+                'maxDrawdown': 4.0,
                 'maxPositionSize': 100.0,
                 'stopLossPercent': 5.0,
                 'takeProfitPercent': 4.0,
                 'maxHoldingMinutes': 30,
                 'minProfitForTimeStop': 1.0,
                 'eliminationDays': 7,
-                'minScore': 50.0
+                'minScore': 50.0,
+                # 🔧 新增：参数验证配置
+                'paramValidationTrades': 20,  # 参数修改后需要的验证交易次数
+                'paramValidationHours': 24,   # 参数修改后需要的等待时间（小时）
+                'enableStrictValidation': True  # 是否启用严格验证
             }
             
             # 合并默认配置和数据库配置
@@ -5014,8 +5017,52 @@ def get_strategy_trade_mode(score, strategy_id=None, parameters_recently_changed
             if last_change:
                 hours_since_change = (datetime.now() - last_change).total_seconds() / 3600
                 
-                # 🚨 严格验证要求：参数修改后需要至少20次验证交易 + 24小时等待
-                if hours_since_change < 24 or validation_count < 20:
+                # 🚨 从配置中读取验证要求
+                try:
+                    config_conn = get_db_connection()
+                    config_cursor = config_conn.cursor()
+                    
+                    config_cursor.execute("""
+                        SELECT config_value FROM strategy_management_config 
+                        WHERE config_key IN ('paramValidationTrades', 'paramValidationHours', 'enableStrictValidation')
+                    """)
+                    config_rows = config_cursor.fetchall()
+                    
+                    # 设置默认值
+                    required_trades = 20
+                    required_hours = 24
+                    strict_validation = True
+                    
+                    # 从配置中读取
+                    for (value,) in config_rows:
+                        if 'trades' in str(value).lower():
+                            required_trades = int(value)
+                        elif 'hours' in str(value).lower():
+                            required_hours = int(value)
+                        elif 'validation' in str(value).lower():
+                            strict_validation = str(value).lower() == 'true'
+                    
+                    config_cursor.execute("SELECT config_value FROM strategy_management_config WHERE config_key = 'paramValidationTrades'")
+                    trades_result = config_cursor.fetchone()
+                    if trades_result:
+                        required_trades = int(trades_result[0])
+                    
+                    config_cursor.execute("SELECT config_value FROM strategy_management_config WHERE config_key = 'paramValidationHours'")
+                    hours_result = config_cursor.fetchone()
+                    if hours_result:
+                        required_hours = int(hours_result[0])
+                    
+                    config_cursor.close()
+                    config_conn.close()
+                    
+                except Exception as e:
+                    print(f"⚠️ 读取验证配置失败，使用默认值: {e}")
+                    required_trades = 20
+                    required_hours = 24
+                    strict_validation = True
+                
+                # 🚨 基于配置的严格验证要求
+                if strict_validation and (hours_since_change < required_hours or validation_count < required_trades):
                     return "验证交易"  # 强制验证交易，保护资金安全
                     
         except Exception as e:
