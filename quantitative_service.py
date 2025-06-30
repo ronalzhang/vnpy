@@ -4689,10 +4689,10 @@ class QuantitativeService:
                     is_validation = True
                 else:
                     # 只有在实盘交易启用时才根据评分判断
-                    if strategy_score >= self.real_trading_threshold:
-                        trade_type = "real_trading"
-                        is_validation = False
-                    else:
+            if strategy_score >= self.real_trading_threshold:
+                trade_type = "real_trading"
+                is_validation = False
+            else:
                         trade_type = "score_verification"
                         is_validation = True
             except Exception as e:
@@ -4984,7 +4984,7 @@ class QuantitativeService:
                 'avg_pnl': 0,
                 'total_pnl': 0
             }
-
+    
     def _get_strategy_evolution_display(self, strategy_id: int) -> str:
         """获取策略演化信息显示"""
         try:
@@ -5479,7 +5479,7 @@ class QuantitativeService:
         
         if 'lookback_period' in params:
             params['lookback_period'] = max(5, min(100, params['lookback_period']))  # 限制在5-100
-
+    
     def _start_auto_management(self):
         """启动自动管理 - 确保信号生成和数据持久化"""
         if hasattr(self, 'auto_management_thread') and self.auto_management_thread and self.auto_management_thread.is_alive():
@@ -5667,7 +5667,7 @@ class QuantitativeService:
         except Exception as e:
             print(f"获取资产历史失败: {e}")
             return []
-
+    
     def _fetch_fresh_balance(self):
         """获取实时余额信息"""
         try:
@@ -6007,7 +6007,7 @@ class QuantitativeService:
             
         except Exception as e:
             print(f"❌ 创建默认策略失败: {e}")
-
+    
     # ⭐ 新增：系统状态同步方法
     def update_system_status(self, quantitative_running=None, auto_trading_enabled=None, 
                            total_strategies=None, running_strategies=None, 
@@ -6297,7 +6297,7 @@ class QuantitativeService:
             self.conn.commit()
         except Exception as e:
             print(f"创建操作日志表失败: {e}")
-
+    
     def _get_current_balance(self):
         """获取当前USDT余额 - 主要用于交易决策"""
         try:
@@ -7305,40 +7305,40 @@ class ParameterOptimizer:
                     mapped_param_name = self._map_parameter_name(param_name)
                     if mapped_param_name not in self.optimization_directions:
                         print(f"⚠️ 跳过不支持的参数: {param_name}")
-                        continue
-                        
+                    continue
+                    
                     config = self.optimization_directions[mapped_param_name]
-                    min_val, max_val = config['range']
-                    
-                    # 确保当前值在合理范围内
+                min_val, max_val = config['range']
+                
+                # 确保当前值在合理范围内
                     current_value = max(min_val, min(max_val, float(param_value)))
-                    
-                    # 基于表现瓶颈决定优化方向
-                    optimization_strategy = self.get_optimization_strategy(
+                
+                # 基于表现瓶颈决定优化方向
+                optimization_strategy = self.get_optimization_strategy(
                         mapped_param_name, current_score, bottlenecks, strategy_stats
-                    )
-                    
-                    new_value = self.apply_intelligent_optimization(
+                )
+                
+                new_value = self.apply_intelligent_optimization(
                         mapped_param_name, current_value, optimization_strategy, config, strategy_stats
-                    )
-                    
-                    # 确保新值在有效范围内
-                    new_value = max(min_val, min(max_val, new_value))
-                    
+                )
+                
+                # 确保新值在有效范围内
+                new_value = max(min_val, min(max_val, new_value))
+                
                     # 🔧 记录有意义的变化（确保至少有1%的变化）并计算预期改进
-                    change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
+                change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
                     if change_ratio >= 0.01 or abs(new_value - current_value) > 0.01:  # 提高变化阈值
                         # 🧠 计算预期改进度
                         expected_improvement = self._calculate_expected_improvement(
                             mapped_param_name, current_value, new_value, strategy_stats, optimization_strategy
                         )
                         
-                        optimized_params[param_name] = round(new_value, 6)
-                        changes.append({
-                            'parameter': param_name,
-                            'from': round(current_value, 6),
-                            'to': round(new_value, 6),
-                            'strategy': optimization_strategy,
+                    optimized_params[param_name] = round(new_value, 6)
+                    changes.append({
+                        'parameter': param_name,
+                        'from': round(current_value, 6),
+                        'to': round(new_value, 6),
+                        'strategy': optimization_strategy,
                             'reason': bottlenecks.get(param_name, f"{config.get('logic', '智能')} 优化"),
                             'change_pct': round(change_ratio * 100, 2),
                             'expected_improvement': expected_improvement,
@@ -9019,7 +9019,7 @@ class EvolutionaryStrategyEngine:
             
         except Exception as e:
             print(f"❌ 记录统一验证事件失败: {e}")
-
+    
     def run_evolution_cycle(self):
         """运行演化周期，确保完整持久化 - 🔥 使用统一验证交易逻辑"""
         try:
@@ -9122,7 +9122,7 @@ class EvolutionaryStrategyEngine:
     def _map_parameter_name(self, param_name: str) -> str:
         """🧠 智能参数名称映射 - 解决参数名称不匹配问题"""
         return self.parameter_mapping.get(param_name, param_name)
-
+    
     def _save_evolution_history(self, elites: List[Dict], new_strategies: List[Dict]):
         """保存演化历史"""
         try:
@@ -9417,7 +9417,7 @@ class EvolutionaryStrategyEngine:
         fitness += age_bonus * 0.05
         
         return min(fitness, 100.0)  # 限制在100分以内
-
+    
     def _eliminate_poor_strategies(self, strategies: List[Dict]) -> List[Dict]:
         """淘汰低分策略，但保护高分策略"""
         try:
@@ -9900,7 +9900,7 @@ class EvolutionaryStrategyEngine:
             
         except Exception as e:
             print(f"❌ 记录进化验证日志失败: {e}")
-
+    
     def _generate_validation_trades_for_strategy(self, strategy_id: str, strategy: Dict, count: int = 3) -> List[Dict]:
         """🔧 新增：为策略生成验证交易，确保有性能数据用于进化"""
         validation_trades = []
@@ -10640,7 +10640,7 @@ class EvolutionaryStrategyEngine:
                     print(f"🛡️ 策略{strategy_id[-4:]}属于前端显示策略，继续参与进化")
                     # 🔧 修复：确保strategy_id有效再执行UPDATE
                     if strategy_id and strategy_id != 'None':
-                        self.quantitative_service.db_manager.execute_query(
+                self.quantitative_service.db_manager.execute_query(
                             "UPDATE strategies SET notes = 'validation_pending_optimization' WHERE id = %s",
                             (str(strategy_id),)
                         )
@@ -10652,7 +10652,7 @@ class EvolutionaryStrategyEngine:
                     #     (strategy_id,)
                     # )
                     print(f"🛡️ 跳过验证失败自动停用: {strategy_id} - 现代化管理系统接管")
-                    return False
+                return False
             
             return True
             

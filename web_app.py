@@ -4655,11 +4655,11 @@ def get_strategy_logs_by_category(strategy_id):
         where_conditions = ["strategy_id = %s"]
         params = [strategy_id]
         
-        # 根据log_type映射到trade_type
+        # 🔧 修复数据类型匹配：executed是integer类型，需要用1/0而不是true/false
         if log_type == 'validation':
             where_conditions.append("(trade_type = '验证交易' OR is_validation = true)")
         elif log_type == 'real_trading':
-            where_conditions.append("(trade_type = '真实交易' OR (is_validation = false AND executed = true))")
+            where_conditions.append("(trade_type = '真实交易' OR (is_validation = false AND executed = 1))")
         elif log_type == 'evolution':
             where_conditions.append("(trade_type = '进化交易' OR cycle_id IS NOT NULL)")
         

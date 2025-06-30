@@ -374,7 +374,7 @@ class QuantitativeSystem {
         if (isRunning) {
             // 系统控制台状态 - 运行中
             if (systemStatusEl) {
-            systemStatusEl.innerHTML = '<span class="status-indicator status-running"></span>在线';
+            systemStatusEl.innerHTML = '<span class="status-dot online"></span>在线';
             }
             if (systemToggle) {
             systemToggle.classList.add('active');
@@ -391,7 +391,7 @@ class QuantitativeSystem {
         } else {
             // 系统控制台状态 - 离线
             if (systemStatusEl) {
-            systemStatusEl.innerHTML = '<span class="status-indicator status-offline"></span>离线';
+            systemStatusEl.innerHTML = '<span class="status-dot offline"></span>离线';
             }
             if (systemToggle) {
             systemToggle.classList.remove('active');
