@@ -4171,7 +4171,7 @@ def get_trading_validation_logs():
         if strategy_id:
             cursor.execute("""
                 SELECT ts.strategy_id, ts.symbol, ts.signal_type, ts.price, ts.quantity,
-                       ts.expected_profit, ts.risk_level, ts.executed, ts.result,
+                       ts.confidence, ts.executed, ts.result,
                        ts.timestamp, s.name as strategy_name
                 FROM trading_signals ts
                 LEFT JOIN strategies s ON ts.strategy_id = s.id
@@ -4182,7 +4182,7 @@ def get_trading_validation_logs():
         else:
             cursor.execute("""
                 SELECT ts.strategy_id, ts.symbol, ts.signal_type, ts.price, ts.quantity,
-                       ts.expected_profit, ts.risk_level, ts.executed, ts.result,
+                       ts.confidence, ts.executed, ts.result,
                        ts.timestamp, s.name as strategy_name
                 FROM trading_signals ts
                 LEFT JOIN strategies s ON ts.strategy_id = s.id
@@ -4199,7 +4199,7 @@ def get_trading_validation_logs():
         
         logs = []
         for row in results:
-            strategy_id, symbol, signal_type, price, quantity, expected_profit, risk_level, executed, result, timestamp, strategy_name = row
+            strategy_id, symbol, signal_type, price, quantity, confidence, executed, result, timestamp, strategy_name = row
             
             log_entry = {
                 'strategy_id': strategy_id,
@@ -4208,8 +4208,7 @@ def get_trading_validation_logs():
                 'action': f"{signal_type}验证" if signal_type else "验证交易",
                 'price': float(price) if price else 0,
                 'quantity': float(quantity) if quantity else 0,
-                'expected_profit': float(expected_profit) if expected_profit else 0,
-                'risk_level': risk_level or 'medium',
+                'confidence': float(confidence) if confidence else 0,
                 'executed': bool(executed) if executed is not None else False,
                 'result': result or '待执行',
                 'timestamp': timestamp.isoformat() if timestamp else ''
