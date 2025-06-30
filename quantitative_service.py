@@ -1899,6 +1899,168 @@ class AutomatedStrategyManager:
                     if strategy_risk > self.risk_limit:
                         self._limit_strategy_position(strategy_id)
                         logger.warning(f"策略 {strategy_id} 风险过高，已限制仓位")
+
+    def _optimize_parameters_aggressively(self, current_params: Dict, performance: Dict) -> Dict:
+        """激进参数优化 - 大幅度调整策略参数"""
+        import random
+        try:
+            optimized_params = current_params.copy()
+            
+            # 激进优化强度20-30%
+            adjustment_range = 0.3
+            
+            # 针对关键参数进行大幅调整
+            for param_name, param_value in current_params.items():
+                if isinstance(param_value, (int, float)) and param_value > 0:
+                    # 随机选择增减方向
+                    direction = random.choice([-1, 1])
+                    adjustment = random.uniform(0.15, adjustment_range)
+                    
+                    new_value = param_value * (1 + direction * adjustment)
+                    
+                    # 确保参数在合理范围内
+                    new_value = self._ensure_parameter_bounds(param_name, new_value)
+                    optimized_params[param_name] = new_value
+            
+            return optimized_params
+        except Exception as e:
+            logger.error(f"激进参数优化失败: {e}")
+            return current_params
+
+    def _optimize_parameters_precisely(self, current_params: Dict, performance: Dict) -> Dict:
+        """精细参数优化 - 中等幅度精确调整"""
+        import random
+        try:
+            optimized_params = current_params.copy()
+            
+            # 精细优化强度5-10%
+            adjustment_range = 0.1
+            
+            # 基于性能指标针对性优化
+            win_rate = performance.get('win_rate', 50.0)
+            total_return = performance.get('total_return', 0.0)
+            
+            for param_name, param_value in current_params.items():
+                if isinstance(param_value, (int, float)) and param_value > 0:
+                    
+                    # 根据表现问题选择优化方向
+                    if win_rate < 65 and 'threshold' in param_name:
+                        # 胜率不够，降低入场门槛
+                        adjustment = -random.uniform(0.03, adjustment_range)
+                    elif total_return < 10 and 'profit' in param_name:
+                        # 收益不够，提高止盈目标
+                        adjustment = random.uniform(0.05, adjustment_range)
+                    else:
+                        # 常规随机微调
+                        adjustment = random.choice([-1, 1]) * random.uniform(0.02, adjustment_range)
+                    
+                    new_value = param_value * (1 + adjustment)
+                    new_value = self._ensure_parameter_bounds(param_name, new_value)
+                    optimized_params[param_name] = new_value
+            
+            return optimized_params
+        except Exception as e:
+            logger.error(f"精细参数优化失败: {e}")
+            return current_params
+
+    def _optimize_parameters_conservatively(self, current_params: Dict, performance: Dict) -> Dict:
+        """保守参数优化 - 小幅度微调"""
+        import random
+        try:
+            optimized_params = current_params.copy()
+            
+            # 保守优化强度1-3%
+            adjustment_range = 0.03
+            
+            # 只对少数参数进行轻微调整
+            param_names = list(current_params.keys())
+            selected_params = random.sample(param_names, min(3, len(param_names)))
+            
+            for param_name in selected_params:
+                param_value = current_params[param_name]
+                if isinstance(param_value, (int, float)) and param_value > 0:
+                    
+                    # 轻微随机调整
+                    adjustment = random.choice([-1, 1]) * random.uniform(0.005, adjustment_range)
+                    new_value = param_value * (1 + adjustment)
+                    new_value = self._ensure_parameter_bounds(param_name, new_value)
+                    optimized_params[param_name] = new_value
+            
+            return optimized_params
+        except Exception as e:
+            logger.error(f"保守参数优化失败: {e}")
+            return current_params
+
+    def _record_parameter_evolution_history(self, strategy_id: str, old_params: Dict, new_params: Dict, performance: Dict, optimization_type: str):
+        """记录参数进化历史到数据库"""
+        try:
+            import json
+            
+            # 分析参数变化
+            param_changes = []
+            for key in set(list(old_params.keys()) + list(new_params.keys())):
+                old_val = old_params.get(key, 0)
+                new_val = new_params.get(key, 0)
+                if old_val != new_val:
+                    change_pct = ((new_val - old_val) / old_val * 100) if old_val != 0 else 0
+                    param_changes.append(f"{key}: {old_val:.4f}→{new_val:.4f} ({change_pct:+.1f}%)")
+            
+            change_summary = '; '.join(param_changes[:5]) if param_changes else '参数微调'
+            
+            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
+            if not conn:
+                logger.error("❌ 数据库连接不可用，无法记录进化历史")
+                return
+                
+            cursor = conn.cursor()
+            
+            # 记录到进化历史表
+            cursor.execute("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, generation, cycle, action_type, evolution_type,
+                 parameters, new_parameters, score_before, score_after,
+                 parameter_changes, parameter_analysis, evolution_reason, notes,
+                 created_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, (
+                strategy_id,
+                1,  # generation
+                1,  # cycle
+                'parameter_evolution',
+                f'automated_{optimization_type}',
+                json.dumps(old_params),
+                json.dumps(new_params),
+                performance.get('score', 70.0),
+                performance.get('score', 70.0) + 1.0,  # 预期小幅提升
+                change_summary,
+                json.dumps({
+                    'total_changes': len(param_changes),
+                    'changes': param_changes[:10],
+                    'optimization_type': optimization_type,
+                    'change_summary': change_summary
+                }),
+                f"自动{optimization_type}: 策略评分{performance.get('score', 70.0):.1f}分",
+                f"系统执行{optimization_type}，参数变更{len(param_changes)}项: {change_summary}"
+            ))
+            
+            conn.commit()
+            logger.info(f"✅ 记录策略 {strategy_id} 的{optimization_type}历史: {len(param_changes)}个参数变更")
+            
+        except Exception as e:
+            logger.error(f"❌ 记录参数进化历史失败: {e}")
+
+    def _ensure_parameter_bounds(self, param_name: str, value: float) -> float:
+        """🎯 确保参数在合理范围内"""
+        if param_name in ['rsi_period', 'lookback_period', 'ma_period']:
+            return max(5, min(50, int(value)))
+        elif param_name in ['threshold', 'profit_target', 'stop_loss']:
+            return max(0.001, min(0.1, value))
+        elif param_name in ['grid_spacing', 'volatility_threshold']:
+            return max(0.0001, min(0.05, value))
+        elif 'quantity' in param_name:
+            return max(0.001, min(1000, value))
+        else:
+            return max(0.001, value)  # 通用正数限制
     
 class QuantitativeService:
     """
@@ -13451,155 +13613,6 @@ if __name__ == "__main__":
     main()
 
 # 为了向后兼容，提供全局实例（仅在直接运行时）
-
-    def _optimize_parameters_aggressively(self, current_params: Dict, performance: Dict) -> Dict:
-        """激进参数优化 - 大幅度调整策略参数"""
-        import random
-        try:
-            optimized_params = current_params.copy()
-            
-            # 激进优化强度20-30%
-            adjustment_range = 0.3
-            
-            # 针对关键参数进行大幅调整
-            for param_name, param_value in current_params.items():
-                if isinstance(param_value, (int, float)) and param_value > 0:
-                    # 随机选择增减方向
-                    direction = random.choice([-1, 1])
-                    adjustment = random.uniform(0.15, adjustment_range)
-                    
-                    new_value = param_value * (1 + direction * adjustment)
-                    
-                    # 确保参数在合理范围内
-                    new_value = self._ensure_parameter_bounds(param_name, new_value)
-                    optimized_params[param_name] = new_value
-            
-            return optimized_params
-        except Exception as e:
-            logger.error(f"激进参数优化失败: {e}")
-            return current_params
-
-    def _optimize_parameters_precisely(self, current_params: Dict, performance: Dict) -> Dict:
-        """精细参数优化 - 中等幅度精确调整"""
-        import random
-        try:
-            optimized_params = current_params.copy()
-            
-            # 精细优化强度5-10%
-            adjustment_range = 0.1
-            
-            # 基于性能指标针对性优化
-            win_rate = performance.get('win_rate', 50.0)
-            total_return = performance.get('total_return', 0.0)
-            
-            for param_name, param_value in current_params.items():
-                if isinstance(param_value, (int, float)) and param_value > 0:
-                    
-                    # 根据表现问题选择优化方向
-                    if win_rate < 65 and 'threshold' in param_name:
-                        # 胜率不够，降低入场门槛
-                        adjustment = -random.uniform(0.03, adjustment_range)
-                    elif total_return < 10 and 'profit' in param_name:
-                        # 收益不够，提高止盈目标
-                        adjustment = random.uniform(0.05, adjustment_range)
-                    else:
-                        # 常规随机微调
-                        adjustment = random.choice([-1, 1]) * random.uniform(0.02, adjustment_range)
-                    
-                    new_value = param_value * (1 + adjustment)
-                    new_value = self._ensure_parameter_bounds(param_name, new_value)
-                    optimized_params[param_name] = new_value
-            
-            return optimized_params
-        except Exception as e:
-            logger.error(f"精细参数优化失败: {e}")
-            return current_params
-
-    def _optimize_parameters_conservatively(self, current_params: Dict, performance: Dict) -> Dict:
-        """保守参数优化 - 小幅度微调"""
-        import random
-        try:
-            optimized_params = current_params.copy()
-            
-            # 保守优化强度1-3%
-            adjustment_range = 0.03
-            
-            # 只对少数参数进行轻微调整
-            param_names = list(current_params.keys())
-            selected_params = random.sample(param_names, min(3, len(param_names)))
-            
-            for param_name in selected_params:
-                param_value = current_params[param_name]
-                if isinstance(param_value, (int, float)) and param_value > 0:
-                    
-                    # 轻微随机调整
-                    adjustment = random.choice([-1, 1]) * random.uniform(0.005, adjustment_range)
-                    new_value = param_value * (1 + adjustment)
-                    new_value = self._ensure_parameter_bounds(param_name, new_value)
-                    optimized_params[param_name] = new_value
-            
-            return optimized_params
-        except Exception as e:
-            logger.error(f"保守参数优化失败: {e}")
-            return current_params
-
-    def _record_parameter_evolution_history(self, strategy_id: str, old_params: Dict, new_params: Dict, performance: Dict, optimization_type: str):
-        """记录参数进化历史到数据库"""
-        try:
-            import json
-            
-            # 分析参数变化
-            param_changes = []
-            for key in set(list(old_params.keys()) + list(new_params.keys())):
-                old_val = old_params.get(key, 0)
-                new_val = new_params.get(key, 0)
-                if old_val != new_val:
-                    change_pct = ((new_val - old_val) / old_val * 100) if old_val != 0 else 0
-                    param_changes.append(f"{key}: {old_val:.4f}→{new_val:.4f} ({change_pct:+.1f}%)")
-            
-            change_summary = '; '.join(param_changes[:5]) if param_changes else '参数微调'
-            
-            conn = self.quantitative_service.conn if hasattr(self.quantitative_service, 'conn') else None
-            if not conn:
-                logger.error("❌ 数据库连接不可用，无法记录进化历史")
-                return
-                
-            cursor = conn.cursor()
-            
-            # 记录到进化历史表
-            cursor.execute("""
-                INSERT INTO strategy_evolution_history 
-                (strategy_id, generation, cycle, action_type, evolution_type,
-                 parameters, new_parameters, score_before, score_after,
-                 parameter_changes, parameter_analysis, evolution_reason, notes,
-                 created_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-            """, (
-                strategy_id,
-                1,  # generation
-                1,  # cycle
-                'parameter_evolution',
-                f'automated_{optimization_type}',
-                json.dumps(old_params),
-                json.dumps(new_params),
-                performance.get('score', 70.0),
-                performance.get('score', 70.0) + 1.0,  # 预期小幅提升
-                change_summary,
-                json.dumps({
-                    'total_changes': len(param_changes),
-                    'changes': param_changes[:10],
-                    'optimization_type': optimization_type,
-                    'change_summary': change_summary
-                }),
-                f"自动{optimization_type}: 策略评分{performance.get('score', 70.0):.1f}分",
-                f"系统执行{optimization_type}，参数变更{len(param_changes)}项: {change_summary}"
-            ))
-            
-            conn.commit()
-            logger.info(f"✅ 记录策略 {strategy_id} 的{optimization_type}历史: {len(param_changes)}个参数变更")
-            
-        except Exception as e:
-            logger.error(f"❌ 记录参数进化历史失败: {e}")
 
 if __name__ == "__main__":
     quantitative_service = None  # 避免在导入时创建实例
