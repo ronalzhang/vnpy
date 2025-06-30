@@ -1578,7 +1578,7 @@
     background-color: white !important;
     color: #212529 !important; /* 🔧 修复：使用更深的颜色增强对比度 */
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-    appearance: auto; /* 🔧 确保下拉箭头显示 */
+    appearance: none; /* 🔧 移除默认箭头，使用自定义箭头 */
 }
 
 .config-item select:focus {

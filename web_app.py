@@ -4842,8 +4842,7 @@ def get_strategy_logs_by_category(strategy_id):
             
             cursor.execute("""
                 SELECT strategy_id, optimization_type, trigger_reason, old_parameters, new_parameters,
-                       target_success_rate, improvement, timestamp, notes, validation_passed,
-                       evolution_type, created_at
+                       target_success_rate, timestamp, validation_passed, created_time
                 FROM strategy_optimization_logs 
                 WHERE strategy_id = %s
                 ORDER BY timestamp DESC 
@@ -4853,22 +4852,22 @@ def get_strategy_logs_by_category(strategy_id):
             evolution_rows = cursor.fetchall()
             
             for row in evolution_rows:
-                strategy_id_db, optimization_type, trigger_reason, old_parameters, new_parameters, target_success_rate, improvement, timestamp, notes, validation_passed, evolution_type, created_at = row
+                strategy_id_db, optimization_type, trigger_reason, old_parameters, new_parameters, target_success_rate, timestamp, validation_passed, created_time = row
                 
                 log_entry = {
                     'strategy_id': strategy_id_db,
                     'log_type': 'evolution',
                     'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else None,
-                    'created_at': created_at.strftime('%Y-%m-%d %H:%M:%S') if created_at else None,
+                    'created_at': created_time.strftime('%Y-%m-%d %H:%M:%S') if created_time else None,
                     'optimization_type': optimization_type or '参数优化',
                     'trigger_reason': trigger_reason or '自动优化',
                     'old_parameters': old_parameters or {},
                     'new_parameters': new_parameters or {},
                     'target_success_rate': float(target_success_rate) if target_success_rate else 0,
-                    'improvement': float(improvement) if improvement else 0,
-                    'notes': notes or '',
+                    'improvement': 0,
+                    'notes': f'{optimization_type} - {trigger_reason or "自动优化"}',
                     'validation_passed': bool(validation_passed) if validation_passed is not None else False,
-                    'evolution_type': evolution_type,
+                    'evolution_type': optimization_type,
                     'symbol': None,
                     'signal_type': None,
                     'price': 0,
