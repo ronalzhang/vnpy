@@ -1575,7 +1575,8 @@
     border: 1px solid #ced4da;
     border-radius: 4px;
     font-size: 14px;
-    background-color: white;
+    background-color: white !important;
+    color: #495057 !important;
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
@@ -1583,6 +1584,19 @@
     border-color: #80bdff;
     outline: 0;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* 🔧 修复下拉选项字体颜色问题 */
+.config-item select option {
+    background-color: white !important;
+    color: #212529 !important;
+    padding: 8px 12px;
+}
+
+.config-item select option:checked,
+.config-item select option:hover {
+    background-color: #007bff !important;
+    color: white !important;
 }
 
 /* 🛡️ 实盘交易控制配置项增强 (基于现有config-item) */
