@@ -2677,7 +2677,7 @@ def quantitative_config():
             # 返回当前系统配置和模式说明
             config = {
                 'current_mode': 'auto',  # 当前默认自动模式
-                'auto_trading_enabled': getattr(quantitative_service, 'auto_trading_enabled', True) if quantitative_service else True,
+                'auto_trading_enabled': getattr(quantitative_service, 'auto_trading_enabled', False) if quantitative_service else False,
                 'max_positions': 10,
                 'risk_limit': 0.05,
                 'exchange': 'binance',
@@ -2731,15 +2731,15 @@ def quantitative_config():
                         quantitative_service.set_auto_trading(False)
                         logger.info("切换到手动模式，已禁用自动交易")
                     elif mode == 'auto':
-                        # 自动模式：启用自动交易，使用平衡参数
-                        quantitative_service.set_auto_trading(True)
+                        # 自动模式：自动交易需要用户手动开启，默认关闭保护资金
+                        quantitative_service.set_auto_trading(False)
                         # 这里可以调整策略参数为平衡型
-                        logger.info("切换到自动模式，已启用自动交易")
+                        logger.info("切换到自动模式，自动交易保持关闭状态（需手动开启）")
                     elif mode == 'aggressive':
-                        # 激进模式：启用自动交易，调整为激进参数
-                        quantitative_service.set_auto_trading(True)
+                        # 激进模式：自动交易需要用户手动开启，默认关闭保护资金
+                        quantitative_service.set_auto_trading(False)
                         # 这里可以调整策略参数为激进型
-                        logger.info("切换到激进模式，追求高收益")
+                        logger.info("切换到激进模式，自动交易保持关闭状态（需手动开启）")
                 except Exception as e:
                     logger.error(f"切换运行模式失败: {e}")
                     return jsonify({
