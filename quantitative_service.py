@@ -7324,23 +7324,21 @@ class ParameterOptimizer:
                     
                     # 确保新值在有效范围内
                     new_value = max(min_val, min(max_val, new_value))
-                # 确保新值在有效范围内
-                new_value = max(min_val, min(max_val, new_value))
-                
+                    
                     # 🔧 记录有意义的变化（确保至少有1%的变化）并计算预期改进
-                change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
+                    change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
                     if change_ratio >= 0.01 or abs(new_value - current_value) > 0.01:  # 提高变化阈值
                         # 🧠 计算预期改进度
                         expected_improvement = self._calculate_expected_improvement(
                             mapped_param_name, current_value, new_value, strategy_stats, optimization_strategy
                         )
                         
-                    optimized_params[param_name] = round(new_value, 6)
-                    changes.append({
-                        'parameter': param_name,
-                        'from': round(current_value, 6),
-                        'to': round(new_value, 6),
-                        'strategy': optimization_strategy,
+                        optimized_params[param_name] = round(new_value, 6)
+                        changes.append({
+                            'parameter': param_name,
+                            'from': round(current_value, 6),
+                            'to': round(new_value, 6),
+                            'strategy': optimization_strategy,
                             'reason': bottlenecks.get(param_name, f"{config.get('logic', '智能')} 优化"),
                             'change_pct': round(change_ratio * 100, 2),
                             'expected_improvement': expected_improvement,
