@@ -2020,14 +2020,8 @@ class QuantitativeService:
         self.simulator = StrategySimulator(self)
         self.strategy_manager = AutomatedStrategyManager(self)
         
-        # 🧬 启动进化引擎
-        self._init_evolution_engine()
-        
-        # 🚀 初始化四层进化系统 - 集成现代化进化架构
-        self._init_four_tier_evolution_system()
-        
-        # 🏆 初始化完美策略进化系统
-        self._init_perfect_evolution_system()
+        # 🚀 统一使用Modern Strategy Manager - 删除重复进化系统
+        self._init_unified_evolution_system()
         
         # ⭐ 初始化策略参数模板
         self._init_strategy_templates()
@@ -2229,22 +2223,35 @@ class QuantitativeService:
             print(f"❌ 初始化交易所客户端失败: {e}")
             return {}
     
-    def _init_evolution_engine(self):
-        """初始化进化引擎"""
+    def _init_unified_evolution_system(self):
+        """🚀 统一进化系统 - 使用Modern Strategy Manager"""
         try:
-            self.evolution_engine = EvolutionaryStrategyEngine(self)
+            from modern_strategy_manager import FourTierStrategyManager
             
-            # 🔧 确保策略初始化验证表存在
-            self.evolution_engine._create_strategy_initialization_table()
+            # 初始化统一的进化管理器
+            self.evolution_manager = FourTierStrategyManager()
             
-            print("🧬 进化引擎已启动")
+            print("🚀 统一进化系统已初始化 (Modern Strategy Manager)")
+            print("   📊 管理策略进化、参数优化和实盘交易")
             
-            # 启动自动进化线程
-            if self.evolution_enabled:
-                self._start_auto_evolution()
-                
+            # 设置统一配置
+            self.evolution_config = {
+                'enabled': True,
+                'evolution_interval': 180,  # 3分钟间隔
+                'max_concurrent_evolutions': 3,
+                'use_intelligent_evolution': True
+            }
+            
+            print("✅ 统一进化系统配置完成")
+            
+        except ImportError as e:
+            print(f"⚠️ Modern Strategy Manager模块未找到: {e}")
+            self.evolution_manager = None
         except Exception as e:
-            print(f"❌ 进化引擎初始化失败: {e}")
+            print(f"❌ 统一进化系统初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
+            self.evolution_manager = None
     
     def _start_auto_evolution(self):
         """启动自动进化线程"""
@@ -2277,75 +2284,12 @@ class QuantitativeService:
         if False:  # 强制禁用
             self._start_auto_strategy_management()
 
-    def _init_four_tier_evolution_system(self):
-        """初始化四层进化系统 - 现代化进化架构"""
-        try:
-            from modern_strategy_manager import get_four_tier_strategy_manager
-            
-            # 初始化四层管理器
-            self.four_tier_manager = get_four_tier_strategy_manager()
-            
-            print("🚀 四层进化系统已初始化")
-            
-            # 启动四层进化调度器
-            self._start_four_tier_evolution_scheduler()
-            
-        except Exception as e:
-            print(f"❌ 四层进化系统初始化失败: {e}")
-            import traceback
-            traceback.print_exc()
+    # 🗑️ 已删除重复的进化系统：
+    # - _init_four_tier_evolution_system()
+    # - _init_perfect_evolution_system()
+    # 统一使用 _init_unified_evolution_system()
     
-    def _init_perfect_evolution_system(self):
-        """🏆 初始化完美策略进化系统"""
-        try:
-            from perfect_evolution_integration import PerfectEvolutionIntegrator
-            
-            # 初始化完美进化集成器
-            self.perfect_evolution_integrator = PerfectEvolutionIntegrator(self)
-            
-            print("🏆 完美策略进化系统已初始化")
-            print("   目标: 100分+100%胜率+最大收益+最短持有时间")
-            
-            # 可选：启动完美进化系统（如果需要自动运行）
-            if getattr(self, 'auto_perfect_evolution', False):
-                self._start_perfect_evolution_background()
-            
-        except ImportError as e:
-            print(f"⚠️ 完美进化系统模块未找到: {e}")
-            print("   请确保 perfect_evolution_integration.py 文件存在")
-            self.perfect_evolution_integrator = None
-        except Exception as e:
-            print(f"❌ 完美进化系统初始化失败: {e}")
-            import traceback
-            traceback.print_exc()
-            self.perfect_evolution_integrator = None
-    
-    def _start_perfect_evolution_background(self):
-        """🏆 启动完美进化系统后台任务"""
-        if not self.perfect_evolution_integrator:
-            return
-            
-        import threading
-        import asyncio
-        
-        def run_perfect_evolution():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(
-                    self.perfect_evolution_integrator.start_perfect_evolution_system()
-                )
-            except Exception as e:
-                print(f"❌ 完美进化系统运行错误: {e}")
-            finally:
-                loop.close()
-        
-        self.perfect_evolution_thread = threading.Thread(
-            target=run_perfect_evolution, 
-            daemon=True
-        )
-        self.perfect_evolution_thread.start()
-        print("🏆 完美进化系统后台线程已启动")
+    # 🗑️ 已删除重复的完美进化后台任务
     
     def _start_four_tier_evolution_scheduler(self):
         """启动安全的四层进化调度器 - 解决无限循环和资源耗尽问题"""
