@@ -1224,8 +1224,8 @@ def quantitative_strategies():
                 # 使用现代化管理器获取前端显示策略
                 try:
                     from modern_strategy_manager import get_modern_strategy_manager
-                    manager = get_modern_strategy_manager()
-                    frontend_data = manager.get_frontend_display_data()
+                manager = get_modern_strategy_manager()
+                frontend_data = manager.get_frontend_display_data()
                     # frontend_data直接是策略列表，不是字典
                     strategies = frontend_data
                 except ImportError as e:
@@ -4597,15 +4597,15 @@ def get_unified_system_status():
             
             # 如果有启用的策略且有近期信号，认为策略引擎在线
             if enabled_strategies > 0 and recent_signals > 0:
-                status['services']['strategy_engine'] = 'online'
+                    status['services']['strategy_engine'] = 'online'
                 status['details']['enabled_strategies'] = enabled_strategies
                 status['details']['recent_signals'] = recent_signals
             elif enabled_strategies > 0:
                 status['services']['strategy_engine'] = 'degraded'  # 有策略但无近期信号
                 status['details']['enabled_strategies'] = enabled_strategies
                 status['details']['recent_signals'] = recent_signals
-            else:
-                status['services']['strategy_engine'] = 'offline'
+                else:
+                    status['services']['strategy_engine'] = 'offline'
                 status['details']['strategy_note'] = '无启用的策略'
                 
         except Exception as e:
@@ -4672,12 +4672,12 @@ def get_strategy_logs_by_category(strategy_id):
         # 获取分页数据
         query = f"""
             SELECT strategy_id, log_type, timestamp, created_at, symbol, signal_type, 
-                   price, quantity, pnl, executed, confidence, cycle_id, strategy_score,
-                   evolution_type, old_parameters, new_parameters, trigger_reason,
+                       price, quantity, pnl, executed, confidence, cycle_id, strategy_score,
+                       evolution_type, old_parameters, new_parameters, trigger_reason, 
                    target_success_rate, improvement, success, notes, metadata
-            FROM unified_strategy_logs 
+                FROM unified_strategy_logs 
             WHERE {where_clause}
-            ORDER BY timestamp DESC 
+                ORDER BY timestamp DESC 
             LIMIT %s OFFSET %s
         """
         params.extend([limit, offset])
@@ -4775,7 +4775,7 @@ def get_strategy_logs_by_category(strategy_id):
     except Exception as e:
         logger.error(f"获取策略日志失败: {e}")
         return jsonify({
-            'success': False, 
+            'success': False,
             'message': f'获取策略日志失败: {str(e)}',
             'logs': [],
             'categorized': {'validation': [], 'evolution': [], 'real_trading': [], 'system_operation': []},

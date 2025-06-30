@@ -2096,7 +2096,7 @@ class QuantitativeSystem {
             
             // 显示策略管理模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
-            modal.show();
+        modal.show();
         } catch (error) {
             console.error('显示策略管理失败:', error);
             this.showMessage('显示策略管理失败', 'error');

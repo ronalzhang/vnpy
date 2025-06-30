@@ -5519,11 +5519,22 @@ class QuantitativeService:
             # 保存状态到数据库
             self._save_auto_trading_status()
             
-            print(f"🔄 自动交易已{'启用' if enabled else '禁用'}")
-            return True
-        except Exception as e:
-            print(f"❌ 设置自动交易失败: {e}")
-            return False
+                    print(f"🔄 自动交易已{'启用' if enabled else '禁用'}")
+        return True
+    except Exception as e:
+        print(f"❌ 设置自动交易失败: {e}")
+        return False
+
+def _save_auto_trading_status(self):
+    """保存auto_trading_enabled状态到数据库"""
+    try:
+        # 🔧 修复：添加缺失的状态保存方法
+        self.update_system_status(auto_trading_enabled=self.auto_trading_enabled)
+        print(f"💾 auto_trading状态已保存到数据库: {self.auto_trading_enabled}")
+        return True
+    except Exception as e:
+        print(f"❌ 保存auto_trading状态失败: {e}")
+        return False
     
     def get_signals(self, limit=50):
         """获取交易信号 - 返回标准格式"""
@@ -8869,10 +8880,9 @@ class EvolutionaryStrategyEngine:
                 logger.warning("⚠️ 没有可用策略进行演化")
                 return
             
-            # 🔍 1.5. 定期验证高分策略（每2轮进化执行一次）
-            if self.current_cycle % 2 == 0:
-                print(f"🔬 执行高分策略定期验证...")
-                self._validate_high_score_strategies_periodically()
+            # 🔧 修复：每次进化都伴随验证交易（不只是高分策略）
+            print(f"🔬 为所有策略生成进化伴随验证交易...")
+            self._generate_evolution_validation_trades(strategies)
             
             # 2. 保存演化前状态快照
             self._save_evolution_snapshot("before_evolution", strategies)
@@ -9657,6 +9667,79 @@ class EvolutionaryStrategyEngine:
             'total_trades': 1
         }
     
+    def _generate_evolution_validation_trades(self, strategies: List[Dict]):
+        """🔧 新增：为每次进化的所有策略生成伴随验证交易"""
+        try:
+            print(f"🔬 开始为{len(strategies)}个策略生成进化伴随验证交易...")
+            total_generated = 0
+            
+            for strategy in strategies:
+                strategy_id = str(strategy['id'])
+                strategy_score = strategy.get('final_score', 0)
+                
+                # 🔧 根据策略评分确定验证交易次数
+                if strategy_score >= 80:
+                    validation_count = 4  # 高分策略需要更多验证
+                elif strategy_score >= 60:
+                    validation_count = 3  # 中等策略标准验证
+                else:
+                    validation_count = 2  # 低分策略基础验证
+                
+                print(f"🎯 策略{strategy_id[-4:]}({strategy_score:.1f}分) 生成{validation_count}次验证交易")
+                
+                # 生成验证交易
+                validation_trades = self._generate_validation_trades_for_strategy(
+                    strategy_id, strategy, count=validation_count
+                )
+                
+                total_generated += len(validation_trades)
+                
+                # 在进化日志中记录这次验证
+                if validation_trades:
+                    self._record_evolution_validation_log(
+                        strategy_id, 
+                        validation_count, 
+                        len(validation_trades),
+                        f"进化伴随验证: 第{self.current_generation}代第{self.current_cycle}轮"
+                    )
+            
+            print(f"✅ 进化伴随验证完成：为{len(strategies)}个策略生成{total_generated}次验证交易")
+            
+        except Exception as e:
+            print(f"❌ 生成进化伴随验证交易失败: {e}")
+    
+    def _record_evolution_validation_log(self, strategy_id: str, planned_count: int, 
+                                       actual_count: int, context: str):
+        """记录进化验证日志"""
+        try:
+            from datetime import datetime
+            
+            conn = self.quantitative_service.db_manager.conn if hasattr(self, 'quantitative_service') else self.conn
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO strategy_logs 
+                (strategy_id, log_type, signal_type, confidence, timestamp, 
+                 evolution_type, trigger_reason, is_validation, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                strategy_id,
+                'evolution',
+                'parameter_optimization',
+                0.85,  # 进化操作的置信度
+                datetime.now(),
+                f"进化伴随验证 {actual_count}/{planned_count}",
+                context,
+                False,  # 这是进化日志，不是验证交易日志
+                f"策略进化时生成{actual_count}次验证交易（计划{planned_count}次）"
+            ))
+            conn.commit()
+            
+            print(f"📝 已记录策略{strategy_id[-4:]}的进化验证日志")
+            
+        except Exception as e:
+            print(f"❌ 记录进化验证日志失败: {e}")
+
     def _generate_validation_trades_for_strategy(self, strategy_id: str, strategy: Dict, count: int = 3) -> List[Dict]:
         """🔧 新增：为策略生成验证交易，确保有性能数据用于进化"""
         validation_trades = []
@@ -9682,17 +9765,66 @@ class EvolutionaryStrategyEngine:
                 if trade_result:
                     validation_trades.append(trade_result)
                     
-                    # 保存到数据库
-                    self.quantitative_service.log_enhanced_strategy_trade(
-                        strategy_id=strategy_id,
-                        signal_type=trade_result['signal_type'],
-                        price=trade_result['price'],
-                        quantity=trade_result['quantity'],
-                        confidence=trade_result['confidence'],
-                        executed=1,  # 验证交易默认执行
-                        pnl=trade_result['pnl'],
-                        is_validation=True  # 明确标记为验证交易
-                    )
+                    # 🔧 修复：直接保存到数据库，避免引用错误
+                    try:
+                        import json
+                        from datetime import datetime
+                        
+                        conn = self.quantitative_service.db_manager.conn if hasattr(self, 'quantitative_service') else self.conn
+                        cursor = conn.cursor()
+                        
+                        cursor.execute("""
+                            INSERT INTO trading_signals 
+                            (strategy_id, signal_type, price, quantity, confidence, executed, expected_return, 
+                             timestamp, is_validation, trade_type, symbol)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            strategy_id,
+                            trade_result['signal_type'],
+                            trade_result['price'],
+                            trade_result['quantity'],
+                            trade_result['confidence'],
+                            1,  # executed
+                            trade_result['pnl'],
+                            datetime.now(),
+                            True,  # is_validation
+                            'validation',
+                            symbol
+                        ))
+                        conn.commit()
+                        
+                        # 🔧 修复：同时记录到统一日志表
+                        cursor.execute("""
+                            INSERT INTO strategy_logs 
+                            (strategy_id, log_type, signal_type, price, quantity, pnl, executed, confidence, 
+                             timestamp, symbol, evolution_type, trigger_reason, is_validation)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            strategy_id,
+                            'validation',
+                            trade_result['signal_type'],
+                            trade_result['price'],
+                            trade_result['quantity'],
+                            trade_result['pnl'],
+                            1,  # executed
+                            trade_result['confidence'],
+                            datetime.now(),
+                            symbol,
+                            f"进化伴随验证 {i+1}/{count}",
+                            f"进化伴随验证 {i+1}/{count}",
+                            True
+                        ))
+                        conn.commit()
+                        
+                        print(f"✅ 验证交易已保存到数据库")
+                        
+                    except Exception as save_error:
+                        print(f"❌ 保存验证交易失败: {save_error}")
+                        # 尝试回滚
+                        try:
+                            conn.rollback()
+                        except:
+                            pass
                     
                     print(f"✅ 验证交易{i+1}: {trade_result['signal_type'].upper()}, 盈亏: {trade_result['pnl']:.4f}U")
                 else:
