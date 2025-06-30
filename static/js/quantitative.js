@@ -1633,13 +1633,6 @@ class QuantitativeSystem {
             
             if (data.success && data.config) {
                 Object.assign(managementConfig, data.config);
-                
-                // 🔥 修复：正确处理四层进化配置数据
-                if (data.four_tier_config) {
-                    window.fourTierConfig = data.four_tier_config;
-                    console.log('✅ 四层进化配置已加载:', window.fourTierConfig);
-                }
-                
                 this.updateManagementForm();
                 console.log('✅ 管理配置加载完成');
             } else {
@@ -1653,68 +1646,18 @@ class QuantitativeSystem {
     // 更新管理配置表单
     updateManagementForm() {
         if (managementConfig) {
-            // 🔧 修复：安全设置传统配置元素，避免null错误（删除evolutionInterval）
-            this.safeSetValue('maxStrategies', managementConfig.maxStrategies || 20);
-            this.safeSetValue('realTradingScore', managementConfig.realTradingScore || 65);
-            this.safeSetValue('realTradingCount', managementConfig.realTradingCount || 2);
-            this.safeSetValue('validationAmount', managementConfig.validationAmount || 50);
-            this.safeSetValue('realTradingAmount', managementConfig.realTradingAmount || 100);
-            this.safeSetValue('minTrades', managementConfig.minTrades || 10);
-            this.safeSetValue('minWinRate', managementConfig.minWinRate || 65);
-            this.safeSetValue('minProfit', managementConfig.minProfit || 0);
-            this.safeSetValue('maxDrawdown', managementConfig.maxDrawdown || 10);
-            this.safeSetValue('minSharpeRatio', managementConfig.minSharpeRatio || 1.0);
-            this.safeSetValue('maxPositionSize', managementConfig.maxPositionSize || 100);
-            this.safeSetValue('stopLossPercent', managementConfig.stopLossPercent || 5);
-            this.safeSetValue('takeProfitPercent', managementConfig.takeProfitPercent || 4);
-            this.safeSetValue('maxHoldingMinutes', managementConfig.maxHoldingMinutes || 30);
-            this.safeSetValue('minProfitForTimeStop', managementConfig.minProfitForTimeStop || 1);
-            this.safeSetValue('eliminationDays', managementConfig.eliminationDays || 7);
-            this.safeSetValue('minScore', managementConfig.minScore || 50);
+            // 🔧 修复：使用HTML中实际存在的元素ID
+            this.safeSetValue('eliminationDays', managementConfig.eliminationDays || 15);
+            this.safeSetValue('minScore', managementConfig.minScore || 20);
+            this.safeSetValue('validation_amount', managementConfig.validationAmount || 50);
+            this.safeSetValue('real_trading_amount', managementConfig.realTradingAmount || 100);
+            this.safeSetValue('real_trading_score_threshold', managementConfig.realTradingScore || 65);
             
-            // 🔧 新增：参数验证配置
-            this.safeSetValue('paramValidationTrades', managementConfig.paramValidationTrades || 20);
-            
-            // 🔧 新增：设置实盘交易控制参数
+            // 🔧 新增：实盘交易控制参数 (使用正确的HTML ID)
             this.safeSetValue('real_trading_enabled', managementConfig.real_trading_enabled || false);
             this.safeSetValue('min_simulation_days', managementConfig.min_simulation_days || 7);
             this.safeSetValue('min_sim_win_rate', managementConfig.min_sim_win_rate || 65);
             this.safeSetValue('min_sim_total_pnl', managementConfig.min_sim_total_pnl || 5);
-        }
-        
-        // 🔥 新增：处理四层进化配置数据 (修复空单元格问题)
-        if (window.fourTierConfig) {
-            console.log('🔍 开始填充四层进化配置:', window.fourTierConfig);
-            
-            // 四层进化配置字段映射
-            const fourTierFields = {
-                'high_freq_pool_size': 2000,
-                'display_strategies_count': 21,
-                'real_trading_count': 3,
-                'low_freq_interval_hours': 24,
-                'high_freq_interval_minutes': 60,
-                'display_interval_minutes': 3,
-                'unified_validation_count': 4,
-                'validation_score_threshold_high': 80,
-                'validation_score_threshold_mid': 60
-            };
-            
-            Object.entries(fourTierFields).forEach(([key, defaultValue]) => {
-                const configItem = window.fourTierConfig[key];
-                let value = defaultValue;
-                
-                if (configItem) {
-                    // 处理嵌套对象格式 {value: xxx, description: xxx}
-                    if (typeof configItem === 'object' && configItem.value !== undefined) {
-                        value = configItem.value;
-                    } else {
-                        value = configItem;
-                    }
-                }
-                
-                this.safeSetValue(key, value);
-                console.log(`✅ 设置 ${key} = ${value}`);
-            });
         }
     }
 
@@ -1722,9 +1665,15 @@ class QuantitativeSystem {
     safeSetValue(elementId, value) {
         const element = document.getElementById(elementId);
         if (element) {
-            element.value = value;
+            if (element.tagName === 'SELECT') {
+                // 对于select元素，需要确保值转换为字符串
+                element.value = String(value);
+            } else {
+                element.value = value;
+            }
+            console.log(`✅ 设置 ${elementId} = ${value}`);
         } else {
-            console.debug(`元素 ${elementId} 不存在，跳过设置`);
+            console.warn(`⚠️  元素 ${elementId} 不存在，无法设置值`);
         }
     }
 
