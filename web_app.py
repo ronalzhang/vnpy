@@ -1224,10 +1224,8 @@ def quantitative_strategies():
                 # 使用现代化管理器获取前端显示策略
                 try:
                     from modern_strategy_manager import get_modern_strategy_manager
-                manager = get_modern_strategy_manager()
-                frontend_data = manager.get_frontend_display_data()
-                    # frontend_data直接是策略列表，不是字典
-                    strategies = frontend_data
+                    manager = get_modern_strategy_manager()
+                    frontend_data = manager.get_frontend_display_data()
                 except ImportError as e:
                     print(f"⚠️ 现代化策略管理器导入失败: {e}")
                     # 降级使用基础策略获取方式
