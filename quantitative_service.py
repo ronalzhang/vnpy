@@ -3243,9 +3243,22 @@ class QuantitativeService:
             return True
         
         try:
-            # ⭐ 启动量化系统（策略进化），但不启动自动交易
+            # ⭐ 启动量化系统（策略进化），从数据库恢复auto_trading状态
             self.running = True
-            self.auto_trading_enabled = False  # 默认不开启自动交易，由用户控制
+            
+            # 🔧 修复：从数据库恢复auto_trading_enabled状态，不要重置
+            try:
+                query = "SELECT auto_trading_enabled FROM system_status WHERE id = 1 ORDER BY last_updated DESC LIMIT 1"
+                result = self.db_manager.execute_query(query, fetch_one=True)
+                if result and len(result) > 0:
+                    self.auto_trading_enabled = bool(result[0] if hasattr(result, '__getitem__') else result.get('auto_trading_enabled', False))
+                    print(f"🔧 从数据库恢复auto_trading状态: {self.auto_trading_enabled}")
+                else:
+                    self.auto_trading_enabled = False  # 只有在数据库没有记录时才默认为False
+                    print("🔧 数据库无auto_trading记录，默认设置为False")
+            except Exception as e:
+                print(f"⚠️ 恢复auto_trading状态失败，使用默认值False: {e}")
+                self.auto_trading_enabled = False
             
             # ⭐ 更新数据库状态 - 分离系统运行和自动交易，包含策略计数
             strategies_response = self.get_strategies()
@@ -3254,12 +3267,12 @@ class QuantitativeService:
             
             self.update_system_status(
                 quantitative_running=True,
-                auto_trading_enabled=False,  # 明确设置自动交易关闭
+                auto_trading_enabled=self.auto_trading_enabled,  # 🔧 使用恢复的状态，不强制设为False
                 total_strategies=len(strategies),
                 running_strategies=len(enabled_strategies),
                 selected_strategies=len([s for s in enabled_strategies if s.get('final_score', 0) >= 55]),  # 🔧 降低门槛以启动验证交易
                 system_health='online',
-                notes='量化系统已启动，策略正在进化，自动交易待开启'
+                notes=f'量化系统已启动，策略正在进化，自动交易{"已开启" if self.auto_trading_enabled else "待开启"}'
             )
             
             print("🚀 量化交易系统启动成功")
@@ -8873,7 +8886,7 @@ class EvolutionaryStrategyEngine:
             # 5. 生成新策略（变异和交叉）
             new_strategies = self._generate_new_strategies(elites, survivors)
             
-            # 🔧 修复：正确更新世代信息 - 10轮一代，代数上限9999
+            # 🔧 修复：正确更新世代信息 - 80轮一代，代数上限9999
             self.current_cycle += 1
             if self.current_cycle > 80:  # 每80轮为一代，符合用户调整要求
                 if self.current_generation < 9999:  # 代数上限9999
