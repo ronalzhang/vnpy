@@ -7987,7 +7987,7 @@ class EvolutionaryStrategyEngine:
             'mutation_rate': 0.25,  # 降低变异率，提高稳定性
             'crossover_rate': 0.75,  # 提高交叉率
             'elite_ratio': 0.15,  # 保留最好的15%
-            'elimination_threshold': float(db_config.get('minScore', 45.0)),  # 从数据库获取淘汰阈值
+            'elimination_threshold': self._get_dynamic_elimination_threshold(),  # 🎯 渐进式淘汰阈值
             'trading_threshold': float(db_config.get('realTradingScore', 65.0)),  # 从数据库获取真实交易阈值
             'precision_threshold': 80.0,  # 80分开始精细化优化
             'min_trades': int(db_config.get('minTrades', 10)),  # 从数据库获取最小交易次数
@@ -8013,6 +8013,40 @@ class EvolutionaryStrategyEngine:
         }
         
         print(f"🔧 进化引擎配置已加载: 进化间隔={self.evolution_config['evolution_interval']}秒, 最大策略数={self.evolution_config['max_strategies']}, 淘汰阈值={self.evolution_config['elimination_threshold']}")
+        
+    def _get_dynamic_elimination_threshold(self) -> float:
+        """🚀 获取渐进式淘汰阈值 - 根据系统发展阶段动态调整"""
+        try:
+            # 获取系统策略统计
+            strategies_data = self.db_manager.execute_query("""
+                SELECT 
+                    COUNT(*) as total_strategies,
+                    AVG(final_score) as avg_score,
+                    COUNT(CASE WHEN final_score >= 90 THEN 1 END) as ultimate_count,
+                    COUNT(CASE WHEN final_score >= 80 AND final_score < 90 THEN 1 END) as elite_count,
+                    COUNT(CASE WHEN final_score >= 70 AND final_score < 80 THEN 1 END) as quality_count
+                FROM strategies WHERE enabled = 1 AND final_score > 0
+            """, fetch_one=True)
+            
+            if strategies_data:
+                total_strategies, avg_score, ultimate_count, elite_count, quality_count = strategies_data
+                high_score_count = ultimate_count + elite_count + quality_count
+                
+                # 🎯 渐进式淘汰阈值决策
+                if high_score_count >= 50:  # 终极阶段
+                    return 75.0
+                elif high_score_count >= 20:  # 精英阶段
+                    return 65.0
+                elif avg_score >= 55:  # 成长阶段
+                    return 50.0
+                else:  # 初期阶段
+                    return 40.0
+            else:
+                return 45.0  # 默认阈值
+                
+        except Exception as e:
+            print(f"⚠️ 获取渐进式淘汰阈值失败: {e}")
+            return 45.0  # 出错时使用默认值
         
         # 初始化世代和轮次信息
         self.current_generation = self._load_current_generation()
@@ -8842,7 +8876,7 @@ class EvolutionaryStrategyEngine:
             
             # 🔧 修复：正确更新世代信息 - 10轮一代，代数上限9999
             self.current_cycle += 1
-            if self.current_cycle > 10:  # 每10轮为一代，符合用户要求
+            if self.current_cycle > 80:  # 每80轮为一代，符合用户调整要求
                 if self.current_generation < 9999:  # 代数上限9999
                     self.current_generation += 1
                     self.current_cycle = 1

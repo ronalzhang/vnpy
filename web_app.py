@@ -264,13 +264,12 @@ def calculate_strategy_volatility(strategy_id):
         return 0.0
 
 def _get_strategy_trade_mode(score, enabled):
-    """根据策略分数和启用状态确定交易模式"""
+    """根据策略分数和启用状态确定交易模式 - 渐进式评分系统"""
     if not enabled:
         return '已停止'
-    elif score >= 65.0:
-        return '真实交易'
     else:
-        return '验证交易'
+        # 🎯 使用新的渐进式交易模式判断，保留二分法逻辑
+        return get_strategy_trade_mode(score)
 
 def _get_basic_strategies_list():
     """备用的基础策略获取方式"""
@@ -1954,12 +1953,10 @@ def get_strategy_trade_logs(strategy_id):
                 if total_completed_cycles <= 3 and i >= (total_completed_cycles - 3):
                     trade_type = 'initial_validation'
                     trade_mode = '初始验证'
-                elif strategy_score >= 65.0:
-                    trade_type = 'real_trading'
-                    trade_mode = '真实交易'
                 else:
-                    trade_type = 'verification'
-                    trade_mode = '验证交易'
+                    # 🎯 使用渐进式评分系统判断交易模式
+                    trade_mode = get_strategy_trade_mode(strategy_score)
+                    trade_type = 'real_trading' if trade_mode == '真实交易' else 'verification'
                 
                 # 计算收益率
                 investment_amount = buy_price * quantity if buy_price and quantity else 50.0
@@ -4826,8 +4823,9 @@ def real_time_sync_daemon():
                 # 修复布尔值转换
                 executed_bool = bool(executed) if executed is not None else False
                 
-                # 确定日志类型
-                log_type = 'real_trading' if strategy_score >= 65.0 else 'validation'
+                # 🎯 使用渐进式评分系统确定日志类型
+                trade_mode = get_strategy_trade_mode(strategy_score)
+                log_type = 'real_trading' if trade_mode == '真实交易' else 'validation'
                 
                 try:
                     cursor.execute('''
@@ -4862,6 +4860,127 @@ def real_time_sync_daemon():
 sync_thread = threading.Thread(target=real_time_sync_daemon, daemon=True)
 sync_thread.start()
 print('🚀 实时数据同步守护进程已启动（每30秒同步）')
+
+# ... existing code ...
+
+def get_strategy_tier_by_score(score):
+    """🎯 渐进式策略分级系统 - 统一评分标准"""
+    if score >= 90:
+        return {
+            'tier': 'ultimate',
+            'name': '🌟 终极策略',
+            'description': '85%+胜率, 20%+收益, <2%回撤',
+            'fund_allocation': 1.0,  # 100%最大配置
+            'is_real_trading': True
+        }
+    elif score >= 80:
+        return {
+            'tier': 'elite', 
+            'name': '⭐ 精英策略',
+            'description': '75%+胜率, 15%+收益, <5%回撤',
+            'fund_allocation': 0.8,  # 80%大额配置
+            'is_real_trading': True
+        }
+    elif score >= 70:
+        return {
+            'tier': 'quality',
+            'name': '📈 优质策略', 
+            'description': '65%+胜率, 10%+收益, <10%回撤',
+            'fund_allocation': 0.6,  # 60%适中配置
+            'is_real_trading': True
+        }
+    elif score >= 60:
+        return {
+            'tier': 'potential',
+            'name': '🌱 潜力策略',
+            'description': '55%+胜率, 5%+收益, <15%回撤', 
+            'fund_allocation': 0.3,  # 30%小额配置
+            'is_real_trading': False  # 验证交易
+        }
+    elif score >= 50:
+        return {
+            'tier': 'developing',
+            'name': '👁️ 发展策略',
+            'description': '仅观察，不分配资金',
+            'fund_allocation': 0.0,  # 0%仅观察
+            'is_real_trading': False  # 验证交易
+        }
+    else:
+        return {
+            'tier': 'poor',
+            'name': '🗑️ 劣质策略', 
+            'description': '待淘汰',
+            'fund_allocation': 0.0,
+            'is_real_trading': False
+        }
+
+def get_elimination_threshold_by_stage(total_strategies, avg_score):
+    """🚀 渐进式淘汰机制 - 根据系统发展阶段动态调整淘汰阈值"""
+    high_score_count = 0  # 需要从数据库查询具体数据
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 统计各分数段策略数量
+        cursor.execute("""
+            SELECT 
+                COUNT(CASE WHEN final_score >= 90 THEN 1 END) as ultimate_count,
+                COUNT(CASE WHEN final_score >= 80 AND final_score < 90 THEN 1 END) as elite_count,
+                COUNT(CASE WHEN final_score >= 70 AND final_score < 80 THEN 1 END) as quality_count,
+                COUNT(CASE WHEN final_score >= 60 AND final_score < 70 THEN 1 END) as potential_count
+            FROM strategies WHERE enabled = 1
+        """)
+        
+        result = cursor.fetchone()
+        if result:
+            ultimate_count, elite_count, quality_count, potential_count = result
+            high_score_count = ultimate_count + elite_count + quality_count
+        
+        cursor.close()
+        conn.close()
+        
+    except Exception as e:
+        print(f"⚠️ 查询策略分布失败: {e}")
+    
+    # 🎯 渐进式淘汰阈值决策
+    if high_score_count >= 50:  # 终极阶段：有足够多的高分策略
+        return {
+            'threshold': 75.0,
+            'stage': '🏆 终极阶段',
+            'description': '75分以下淘汰，追求完美策略'
+        }
+    elif high_score_count >= 20:  # 精英阶段：有一定数量高分策略
+        return {
+            'threshold': 65.0,
+            'stage': '🚀 精英阶段', 
+            'description': '65分以下淘汰，优化期'
+        }
+    elif avg_score >= 55:  # 成长阶段：平均分较高
+        return {
+            'threshold': 50.0,
+            'stage': '📈 成长阶段',
+            'description': '50分以下淘汰，提升期'
+        }
+    else:  # 初期阶段：策略质量较低
+        return {
+            'threshold': 40.0,
+            'stage': '🌱 初期阶段',
+            'description': '40分以下淘汰，培养期'
+        }
+
+# ... existing code ...
+
+# 修改现有的评分判断逻辑
+def get_strategy_trade_mode(score):
+    """策略交易模式判断 - 保留验证交易vs真实交易二分法"""
+    tier_info = get_strategy_tier_by_score(score)
+    
+    # 🎯 保留用户要求的二分法逻辑：大量验证交易 + 少量真实交易
+    if score >= 70.0:  # 70分以上才进行真实交易
+        return "真实交易"
+    else:
+        return "验证交易"  # 60-69分潜力策略也用验证交易完善
 
 # ... existing code ...
 
