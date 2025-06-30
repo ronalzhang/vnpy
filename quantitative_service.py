@@ -1730,22 +1730,19 @@ class AutomatedStrategyManager:
                 if perf['score'] >= 85.0
             }
             
-            # 4. 随机选择部分策略进行探索性进化
-            import random
-            all_strategies = list(strategy_performances.items())
-            random_candidates = dict(random.sample(all_strategies, min(3, len(all_strategies))))
+            # 🔥 修复：确保所有策略都参与进化，不使用随机选择
+            # 移除随机选择逻辑，确保所有策略都被包含
             
-            # 合并所有候选策略
+            # 🎯 所有策略都参与进化：poor + good + elite = 全策略覆盖
             evolution_candidates.update(poor_strategies)
             evolution_candidates.update(good_strategies)
             evolution_candidates.update(elite_strategies)
-            evolution_candidates.update(random_candidates)
             
             if not evolution_candidates:
                 logger.info("没有可用的策略数据，跳过参数优化")
                 return
                 
-            logger.info(f"🧬 开始参数进化: 差策略{len(poor_strategies)}个, 良策略{len(good_strategies)}个, 精英{len(elite_strategies)}个, 随机{len(random_candidates)}个")
+            logger.info(f"🧬 开始参数进化: 差策略{len(poor_strategies)}个, 良策略{len(good_strategies)}个, 精英{len(elite_strategies)}个 (全策略进化)")
             
             # 🔧 修复：对所有候选策略进行适当强度的参数优化
             for strategy_id, performance in evolution_candidates.items():
@@ -1760,8 +1757,8 @@ class AutomatedStrategyManager:
                     strategy_score = performance.get('score', 70.0)
                     
                     # 🎯 统一进化逻辑：所有策略都进行参数优化，不设分数门槛
-                                            optimized_params = self._optimize_parameters_intelligently(current_params, performance)
-                        optimization_type = "display"
+                    optimized_params = self._optimize_parameters_intelligently(current_params, performance)
+                    optimization_type = "display"
                     
                     print(f"🧬 策略 {strategy_id[-8:]} 进行智能进化 (评分: {strategy_score:.1f})")
                     

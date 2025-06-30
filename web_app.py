@@ -4157,6 +4157,78 @@ def sync_real_trading_config():
             'message': f'同步失败: {str(e)}'
         })
 
+@app.route('/api/quantitative/trading-validation-logs', methods=['GET'])
+def get_trading_validation_logs():
+    """获取交易验证日志"""
+    try:
+        limit = int(request.args.get('limit', 50))
+        strategy_id = request.args.get('strategy_id', '')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 查询验证交易记录
+        if strategy_id:
+            cursor.execute("""
+                SELECT ts.strategy_id, ts.symbol, ts.signal_type, ts.price, ts.quantity,
+                       ts.expected_profit, ts.risk_level, ts.executed, ts.result,
+                       ts.timestamp, s.name as strategy_name
+                FROM trading_signals ts
+                LEFT JOIN strategies s ON ts.strategy_id = s.id
+                WHERE ts.strategy_id LIKE %s AND ts.signal_type = 'validation'
+                ORDER BY ts.timestamp DESC 
+                LIMIT %s
+            """, (f'%{strategy_id}%', limit))
+        else:
+            cursor.execute("""
+                SELECT ts.strategy_id, ts.symbol, ts.signal_type, ts.price, ts.quantity,
+                       ts.expected_profit, ts.risk_level, ts.executed, ts.result,
+                       ts.timestamp, s.name as strategy_name
+                FROM trading_signals ts
+                LEFT JOIN strategies s ON ts.strategy_id = s.id
+                WHERE ts.signal_type = 'validation'
+                ORDER BY ts.timestamp DESC 
+                LIMIT %s
+            """, (limit,))
+        
+        results = cursor.fetchall()
+        
+        if not results:
+            conn.close()
+            return jsonify({'success': True, 'logs': [], 'message': '暂无验证日志'})
+        
+        logs = []
+        for row in results:
+            strategy_id, symbol, signal_type, price, quantity, expected_profit, risk_level, executed, result, timestamp, strategy_name = row
+            
+            log_entry = {
+                'strategy_id': strategy_id,
+                'strategy_name': strategy_name or f"策略{strategy_id[-8:]}",
+                'symbol': symbol,
+                'action': f"{signal_type}验证" if signal_type else "验证交易",
+                'price': float(price) if price else 0,
+                'quantity': float(quantity) if quantity else 0,
+                'expected_profit': float(expected_profit) if expected_profit else 0,
+                'risk_level': risk_level or 'medium',
+                'executed': bool(executed) if executed is not None else False,
+                'result': result or '待执行',
+                'timestamp': timestamp.isoformat() if timestamp else ''
+            }
+            logs.append(log_entry)
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True, 
+            'logs': logs,
+            'total_count': len(logs),
+            'message': f'获取到 {len(logs)} 条验证日志'
+        })
+        
+    except Exception as e:
+        print(f"获取验证日志失败: {e}")
+        return jsonify({'success': False, 'error': str(e), 'logs': []})
+
 @app.route('/api/quantitative/evolution-log', methods=['GET'])
 def get_evolution_log():
     """🔥 增强：获取策略进化日志 - 包含详细参数变化信息"""
