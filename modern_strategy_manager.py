@@ -67,7 +67,7 @@ class FourTierStrategyManager:
         self.db_config = db_config or {
             'host': 'localhost',
             'database': 'quantitative',
-            'user': 'quant_user', 
+            'user': 'quant_user',
             'password': '123abc74531'
         }
         
@@ -130,13 +130,13 @@ class FourTierStrategyManager:
             
             for config_key, config_value in configs:
                 if hasattr(self.config, config_key):
-                    # 类型转换
+                        # 类型转换
                     current_value = getattr(self.config, config_key)
-                    if isinstance(current_value, int):
+                        if isinstance(current_value, int):
                         setattr(self.config, config_key, int(float(config_value)))
-                    elif isinstance(current_value, float):
+                        elif isinstance(current_value, float):
                         setattr(self.config, config_key, float(config_value))
-                    else:
+                        else:
                         setattr(self.config, config_key, config_value)
             
             conn.commit()
@@ -179,7 +179,7 @@ class FourTierStrategyManager:
                     'id': row[0],
                     'name': row[1],
                     'symbol': row[2] or 'BTC/USDT',
-                    'type': row[3] or 'momentum', 
+                    'type': row[3] or 'momentum',
                     'final_score': float(row[4]) if row[4] else 0.0,
                     'parameters': json.loads(row[5]) if row[5] else {},
                     'win_rate': float(row[6]) if row[6] else 0.0,
@@ -394,7 +394,7 @@ class FourTierStrategyManager:
             
             # 生成变异参数
             new_params = self.param_manager.generate_parameter_mutations(
-                current_params,
+                current_params, 
                 mutation_strength=mutation_strength
             )
             
@@ -475,21 +475,21 @@ class FourTierStrategyManager:
             for i in range(validation_count):
                 # 生成验证交易信号
                 signal_data = {
-                    'strategy_id': strategy['id'],
-                    'symbol': strategy['symbol'],
-                    'signal_type': random.choice(['buy', 'sell']),
+                'strategy_id': strategy['id'],
+                'symbol': strategy['symbol'],
+                'signal_type': random.choice(['buy', 'sell']),
                     'price': 100.0 + random.uniform(-5, 5),
                     'quantity': self.config.validation_amount,
                     'expected_return': random.uniform(-1, 3),
                     'timestamp': datetime.now()
                 }
-                
-                cursor.execute("""
-                    INSERT INTO trading_signals 
-                    (strategy_id, symbol, signal_type, price, quantity, expected_return,
+            
+            cursor.execute("""
+                INSERT INTO trading_signals 
+                (strategy_id, symbol, signal_type, price, quantity, expected_return, 
                      executed, is_validation, trade_type, timestamp, cycle_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
+            """, (
                     signal_data['strategy_id'],
                     signal_data['symbol'],
                     signal_data['signal_type'], 
@@ -520,7 +520,7 @@ class FourTierStrategyManager:
             )
             
             if should_rollback:
-                await self._rollback_strategy_parameters(strategy, evolution_type, 
+                self._rollback_strategy_parameters_sync(strategy, evolution_type, 
                                                        old_score, new_estimated_score, 
                                                        avg_validation_return)
             else:
@@ -540,10 +540,10 @@ class FourTierStrategyManager:
         except Exception as e:
             logger.error(f"❌ 验证交易执行失败: {e}")
 
-    async def _rollback_strategy_parameters(self, strategy: Dict, evolution_type: str, 
+    def _rollback_strategy_parameters_sync(self, strategy: Dict, evolution_type: str, 
                                           old_score: float, new_score: float, 
                                           validation_return: float):
-        """🔄 参数回退机制：恢复到上一个稳定的参数配置"""
+        """🔄 参数回退机制：恢复到上一个稳定的参数配置 (同步版本)"""
         try:
             conn = self._get_db_connection()
             cursor = conn.cursor()
@@ -603,7 +603,7 @@ class FourTierStrategyManager:
                 
             else:
                 # 🚨 没有找到稳定配置，使用默认安全参数
-                await self._apply_safe_default_parameters(strategy, evolution_type, new_score)
+                self._apply_safe_default_parameters_sync(strategy, evolution_type, new_score)
             
             conn.commit()
             conn.close()
@@ -611,8 +611,8 @@ class FourTierStrategyManager:
         except Exception as e:
             logger.error(f"❌ 参数回退失败: {e}")
 
-    async def _apply_safe_default_parameters(self, strategy: Dict, evolution_type: str, failed_score: float):
-        """🛡️ 应用安全的默认参数配置"""
+    def _apply_safe_default_parameters_sync(self, strategy: Dict, evolution_type: str, failed_score: float):
+        """🛡️ 应用安全的默认参数配置 (同步版本)"""
         try:
             conn = self._get_db_connection()
             cursor = conn.cursor()
@@ -874,7 +874,7 @@ class FourTierStrategyManager:
             conn.close()
             
             logger.info(f"📝 记录策略进化: {strategy_id[:8]}... {evolution_type} {old_score:.2f}→{new_score:.2f}")
-            
+                
         except Exception as e:
             logger.error(f"❌ 记录策略进化失败: {e}")
     
@@ -942,8 +942,8 @@ class FourTierStrategyManager:
                         )
                         
                         evolved_count += 1
-                        
-                except Exception as e:
+                
+        except Exception as e:
                     logger.error(f"❌ 进化策略{strategy['id'][:8]}失败: {e}")
                     continue
             
@@ -1114,7 +1114,7 @@ class FourTierStrategyManager:
                         'parameters': json.loads(current_params) if isinstance(current_params, str) else current_params
                     }
                     
-                    await self._rollback_strategy_parameters(
+                    self._rollback_strategy_parameters_sync(
                         strategy_data, 
                         "performance_check",
                         current_score, 

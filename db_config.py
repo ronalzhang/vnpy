@@ -85,7 +85,7 @@ class DatabaseAdapter:
                         elif isinstance(param, str) and param == 'None':
                             print(f"⚠️ 参数{i}为字符串'None': {params}")
                     
-                    cursor.execute(query, params)
+                cursor.execute(query, params)
                 except (IndexError, TypeError) as param_error:
                     print(f"❌ 参数处理错误: {param_error}")
                     print(f"Query: {query}")
