@@ -1692,7 +1692,7 @@ class QuantitativeSystem {
                 // 对于select元素，需要确保值转换为字符串
                 element.value = String(value);
             } else {
-                element.value = value;
+            element.value = value;
             }
             console.log(`✅ 设置 ${elementId} = ${value}`);
         } else {

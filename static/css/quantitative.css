@@ -1576,27 +1576,46 @@
     border-radius: 4px;
     font-size: 14px;
     background-color: white !important;
-    color: #495057 !important;
+    color: #212529 !important; /* 🔧 修复：使用更深的颜色增强对比度 */
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    appearance: auto; /* 🔧 确保下拉箭头显示 */
 }
 
 .config-item select:focus {
     border-color: #80bdff;
     outline: 0;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    color: #212529 !important; /* 🔧 修复：聚焦时也保持深色字体 */
 }
 
 /* 🔧 修复下拉选项字体颜色问题 */
 .config-item select option {
     background-color: white !important;
-    color: #212529 !important;
+    color: #212529 !important; /* 🔧 修复：选项文字使用深色 */
     padding: 8px 12px;
+    font-weight: normal; /* 🔧 确保字体粗细正常 */
 }
 
 .config-item select option:checked,
 .config-item select option:hover {
     background-color: #007bff !important;
     color: white !important;
+}
+
+/* 🔧 新增：确保禁用状态下仍可见 */
+.config-item select:disabled {
+    background-color: #e9ecef !important;
+    color: #6c757d !important;
+    cursor: not-allowed;
+}
+
+/* 🔧 新增：针对特定浏览器的下拉菜单样式修复 */
+.config-item select:not([multiple]) {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+    padding-right: 2.25rem;
 }
 
 /* 🛡️ 实盘交易控制配置项增强 (基于现有config-item) */

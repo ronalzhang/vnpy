@@ -4810,7 +4810,7 @@ def get_unified_system_status():
 
 @app.route('/api/quantitative/strategies/<strategy_id>/logs-by-category', methods=['GET'])
 def get_strategy_logs_by_category(strategy_id):
-    """获取策略的分类日志 - 支持分页 🔧 修复：直接从trading_signals表读取"""
+    """获取策略的分类日志 - 支持分页 🔧 修复：同时从trading_signals和strategy_optimization_logs表读取"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -4821,46 +4821,7 @@ def get_strategy_logs_by_category(strategy_id):
         page = int(request.args.get('page', 1))     # 页码，从1开始
         offset = (page - 1) * limit
         
-        # 🔧 修复：直接从trading_signals表查询，按trade_type分类
-        where_conditions = ["strategy_id = %s"]
-        params = [strategy_id]
-        
-        # 🔧 修复数据类型匹配：executed是integer类型，需要用1/0而不是true/false
-        if log_type == 'validation':
-            where_conditions.append("(trade_type = '验证交易' OR is_validation = true)")
-        elif log_type == 'real_trading':
-            where_conditions.append("(trade_type = '真实交易' OR (is_validation = false AND executed = 1))")
-        elif log_type == 'evolution':
-            where_conditions.append("(trade_type = '进化交易' OR cycle_id IS NOT NULL)")
-        
-        where_clause = " AND ".join(where_conditions)
-        
-        # 获取总记录数
-        count_query = f"""
-            SELECT COUNT(*) FROM trading_signals 
-            WHERE {where_clause}
-        """
-        cursor.execute(count_query, params)
-        total_count = cursor.fetchone()[0]
-        
-        total_pages = (total_count + limit - 1) // limit  # 向上取整
-        
-        # 🔧 修复：从trading_signals表获取分页数据
-        query = f"""
-            SELECT strategy_id, signal_type, symbol, price, quantity, expected_return as pnl,
-                   executed, confidence, timestamp, strategy_score, cycle_id, trade_type,
-                   is_validation, cycle_status, holding_minutes, mrot_score, open_time, close_time
-            FROM trading_signals 
-            WHERE {where_clause}
-            ORDER BY timestamp DESC 
-            LIMIT %s OFFSET %s
-        """
-        params.extend([limit, offset])
-        cursor.execute(query, params)
-        
-        rows = cursor.fetchall()
-        
-        # 🔧 修复：分类整理从trading_signals表读取的日志
+        # 🔧 修复：根据日志类型使用不同的查询逻辑
         categorized_logs = {
             'validation': [],
             'evolution': [],
@@ -4869,58 +4830,172 @@ def get_strategy_logs_by_category(strategy_id):
         }
         
         all_logs = []
+        total_count = 0
         
-        for row in rows:
-            # 🔧 修复：适配trading_signals表的字段结构
-            strategy_id, signal_type, symbol, price, quantity, pnl, executed, confidence, timestamp, strategy_score, cycle_id, trade_type, is_validation, cycle_status, holding_minutes, mrot_score, open_time, close_time = row
+        if log_type == 'evolution' or log_type == 'all':
+            # 🔧 修复：从strategy_optimization_logs表查询进化日志
+            cursor.execute("""
+                SELECT COUNT(*) FROM strategy_optimization_logs 
+                WHERE strategy_id = %s
+            """, (strategy_id,))
+            evolution_count = cursor.fetchone()[0]
             
-            # 确定日志类型
-            if trade_type == '验证交易' or is_validation:
-                log_type = 'validation'
-            elif trade_type == '真实交易' or (executed and not is_validation):
-                log_type = 'real_trading'
-            elif cycle_id or trade_type == '进化交易':
-                log_type = 'evolution'
-            else:
-                log_type = 'system_operation'
+            cursor.execute("""
+                SELECT strategy_id, optimization_type, trigger_reason, old_parameters, new_parameters,
+                       target_success_rate, improvement, timestamp, notes, validation_passed,
+                       evolution_type, created_at
+                FROM strategy_optimization_logs 
+                WHERE strategy_id = %s
+                ORDER BY timestamp DESC 
+                LIMIT %s OFFSET %s
+            """, (strategy_id, limit, offset))
             
-            log_entry = {
-                'strategy_id': strategy_id,
-                'log_type': log_type,
-                'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else None,
-                'created_at': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else None,
-                'symbol': symbol,
-                'signal_type': signal_type,
-                'price': float(price) if price else 0,
-                'quantity': float(quantity) if quantity else 0,
-                'pnl': float(pnl) if pnl else 0,
-                'executed': bool(executed) if executed is not None else False,
-                'confidence': float(confidence) if confidence else 0,
-                'cycle_id': cycle_id,
-                'strategy_score': float(strategy_score) if strategy_score else 0,
-                'trade_type': trade_type,
-                'is_validation': bool(is_validation) if is_validation is not None else True,
-                'cycle_status': cycle_status,
-                'holding_minutes': int(holding_minutes) if holding_minutes else 0,
-                'mrot_score': float(mrot_score) if mrot_score else 0,
-                'open_time': open_time.strftime('%Y-%m-%d %H:%M:%S') if open_time else None,
-                'close_time': close_time.strftime('%Y-%m-%d %H:%M:%S') if close_time else None,
-                'notes': f'{trade_type or "交易记录"} - {signal_type} {symbol}',
-                'evolution_type': None,
-                'old_parameters': {},
-                'new_parameters': {},
-                'trigger_reason': None,
-                'target_success_rate': 0,
-                'improvement': 0,
-                'success': bool(executed),
-                'metadata': {}
-            }
+            evolution_rows = cursor.fetchall()
             
-            # 分类存储
-            categorized_logs[log_type].append(log_entry)
-            all_logs.append(log_entry)
+            for row in evolution_rows:
+                strategy_id_db, optimization_type, trigger_reason, old_parameters, new_parameters, target_success_rate, improvement, timestamp, notes, validation_passed, evolution_type, created_at = row
+                
+                log_entry = {
+                    'strategy_id': strategy_id_db,
+                    'log_type': 'evolution',
+                    'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else None,
+                    'created_at': created_at.strftime('%Y-%m-%d %H:%M:%S') if created_at else None,
+                    'optimization_type': optimization_type or '参数优化',
+                    'trigger_reason': trigger_reason or '自动优化',
+                    'old_parameters': old_parameters or {},
+                    'new_parameters': new_parameters or {},
+                    'target_success_rate': float(target_success_rate) if target_success_rate else 0,
+                    'improvement': float(improvement) if improvement else 0,
+                    'notes': notes or '',
+                    'validation_passed': bool(validation_passed) if validation_passed is not None else False,
+                    'evolution_type': evolution_type,
+                    'symbol': None,
+                    'signal_type': None,
+                    'price': 0,
+                    'quantity': 0,
+                    'pnl': 0,
+                    'executed': validation_passed,
+                    'confidence': 0,
+                    'cycle_id': None,
+                    'strategy_score': 0,
+                    'trade_type': 'evolution',
+                    'is_validation': False,
+                    'cycle_status': None,
+                    'holding_minutes': 0,
+                    'mrot_score': 0,
+                    'open_time': None,
+                    'close_time': None,
+                    'success': bool(validation_passed),
+                    'metadata': {}
+                }
+                
+                categorized_logs['evolution'].append(log_entry)
+                all_logs.append(log_entry)
+            
+            if log_type == 'evolution':
+                total_count = evolution_count
+        
+        # 🔧 修复：从trading_signals表查询交易日志（验证和真实交易）
+        if log_type in ['validation', 'real_trading', 'all']:
+            where_conditions = ["strategy_id = %s"]
+            params = [strategy_id]
+            
+            if log_type == 'validation':
+                where_conditions.append("(trade_type = '验证交易' OR is_validation = true)")
+            elif log_type == 'real_trading':
+                where_conditions.append("(trade_type = '真实交易' OR (is_validation = false AND executed = 1))")
+            
+            where_clause = " AND ".join(where_conditions)
+            
+            # 获取交易日志总记录数
+            count_query = f"""
+                SELECT COUNT(*) FROM trading_signals 
+                WHERE {where_clause}
+            """
+            cursor.execute(count_query, params)
+            trading_count = cursor.fetchone()[0]
+            
+            if log_type != 'evolution':
+                total_count = trading_count
+            
+            # 获取交易日志数据
+            query = f"""
+                SELECT strategy_id, signal_type, symbol, price, quantity, expected_return as pnl,
+                       executed, confidence, timestamp, strategy_score, cycle_id, trade_type,
+                       is_validation, cycle_status, holding_minutes, mrot_score, open_time, close_time
+                FROM trading_signals 
+                WHERE {where_clause}
+                ORDER BY timestamp DESC 
+                LIMIT %s OFFSET %s
+            """
+            params.extend([limit, offset])
+            cursor.execute(query, params)
+            
+            trading_rows = cursor.fetchall()
+            
+            for row in trading_rows:
+                strategy_id_db, signal_type, symbol, price, quantity, pnl, executed, confidence, timestamp, strategy_score, cycle_id, trade_type, is_validation, cycle_status, holding_minutes, mrot_score, open_time, close_time = row
+                
+                # 确定日志类型
+                if trade_type == '验证交易' or is_validation:
+                    current_log_type = 'validation'
+                elif trade_type == '真实交易' or (executed and not is_validation):
+                    current_log_type = 'real_trading'
+                else:
+                    current_log_type = 'system_operation'
+                
+                log_entry = {
+                    'strategy_id': strategy_id_db,
+                    'log_type': current_log_type,
+                    'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else None,
+                    'created_at': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else None,
+                    'symbol': symbol,
+                    'signal_type': signal_type,
+                    'price': float(price) if price else 0,
+                    'quantity': float(quantity) if quantity else 0,
+                    'pnl': float(pnl) if pnl else 0,
+                    'executed': bool(executed) if executed is not None else False,
+                    'confidence': float(confidence) if confidence else 0,
+                    'cycle_id': cycle_id,
+                    'strategy_score': float(strategy_score) if strategy_score else 0,
+                    'trade_type': trade_type,
+                    'is_validation': bool(is_validation) if is_validation is not None else True,
+                    'cycle_status': cycle_status,
+                    'holding_minutes': int(holding_minutes) if holding_minutes else 0,
+                    'mrot_score': float(mrot_score) if mrot_score else 0,
+                    'open_time': open_time.strftime('%Y-%m-%d %H:%M:%S') if open_time else None,
+                    'close_time': close_time.strftime('%Y-%m-%d %H:%M:%S') if close_time else None,
+                    'notes': f'{trade_type or "交易记录"} - {signal_type} {symbol}',
+                    'evolution_type': None,
+                    'old_parameters': {},
+                    'new_parameters': {},
+                    'trigger_reason': None,
+                    'target_success_rate': 0,
+                    'improvement': 0,
+                    'success': bool(executed),
+                    'metadata': {},
+                    'optimization_type': None,
+                    'validation_passed': bool(executed)
+                }
+                
+                # 分类存储
+                categorized_logs[current_log_type].append(log_entry)
+                all_logs.append(log_entry)
+        
+        # 🔧 处理all类型的总计数
+        if log_type == 'all':
+            cursor.execute("SELECT COUNT(*) FROM strategy_optimization_logs WHERE strategy_id = %s", (strategy_id,))
+            evolution_total = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM trading_signals WHERE strategy_id = %s", (strategy_id,))
+            trading_total = cursor.fetchone()[0]
+            total_count = evolution_total + trading_total
         
         conn.close()
+        
+        # 按时间排序所有日志
+        all_logs.sort(key=lambda x: x['timestamp'] or '', reverse=True)
+        
+        total_pages = (total_count + limit - 1) // limit if total_count > 0 else 1
         
         # 构建响应
         response_data = {
@@ -4938,7 +5013,7 @@ def get_strategy_logs_by_category(strategy_id):
                 'prev_page': page - 1 if page > 1 else None
             },
             'log_type': log_type,
-            'message': f"✅ 从交易信号表获取到 {len(all_logs)} 条{log_type}日志 (第{page}页，共{total_pages}页)"
+            'message': f"✅ 获取到 {len(all_logs)} 条{log_type}日志 (第{page}页，共{total_pages}页)"
         }
         
         return jsonify(response_data)
