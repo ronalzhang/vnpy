@@ -1633,10 +1633,20 @@ class QuantitativeSystem {
             
             if (data.success && data.config) {
                 Object.assign(managementConfig, data.config);
+                
+                // 🔥 修复：正确处理四层进化配置数据
+                if (data.four_tier_config) {
+                    window.fourTierConfig = data.four_tier_config;
+                    console.log('✅ 四层进化配置已加载:', window.fourTierConfig);
+                }
+                
                 this.updateManagementForm();
+                console.log('✅ 管理配置加载完成');
+            } else {
+                console.error('❌ 管理配置加载失败:', data.message);
             }
         } catch (error) {
-            console.error('加载管理配置失败:', error);
+            console.error('❌ 加载管理配置异常:', error);
         }
     }
 
@@ -1670,6 +1680,41 @@ class QuantitativeSystem {
             this.safeSetValue('min_simulation_days', managementConfig.min_simulation_days || 7);
             this.safeSetValue('min_sim_win_rate', managementConfig.min_sim_win_rate || 65);
             this.safeSetValue('min_sim_total_pnl', managementConfig.min_sim_total_pnl || 5);
+        }
+        
+        // 🔥 新增：处理四层进化配置数据 (修复空单元格问题)
+        if (window.fourTierConfig) {
+            console.log('🔍 开始填充四层进化配置:', window.fourTierConfig);
+            
+            // 四层进化配置字段映射
+            const fourTierFields = {
+                'high_freq_pool_size': 2000,
+                'display_strategies_count': 21,
+                'real_trading_count': 3,
+                'low_freq_interval_hours': 24,
+                'high_freq_interval_minutes': 60,
+                'display_interval_minutes': 3,
+                'unified_validation_count': 4,
+                'validation_score_threshold_high': 80,
+                'validation_score_threshold_mid': 60
+            };
+            
+            Object.entries(fourTierFields).forEach(([key, defaultValue]) => {
+                const configItem = window.fourTierConfig[key];
+                let value = defaultValue;
+                
+                if (configItem) {
+                    // 处理嵌套对象格式 {value: xxx, description: xxx}
+                    if (typeof configItem === 'object' && configItem.value !== undefined) {
+                        value = configItem.value;
+                    } else {
+                        value = configItem;
+                    }
+                }
+                
+                this.safeSetValue(key, value);
+                console.log(`✅ 设置 ${key} = ${value}`);
+            });
         }
     }
 
