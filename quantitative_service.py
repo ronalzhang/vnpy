@@ -5519,22 +5519,22 @@ class QuantitativeService:
             # 保存状态到数据库
             self._save_auto_trading_status()
             
-                    print(f"🔄 自动交易已{'启用' if enabled else '禁用'}")
-        return True
-    except Exception as e:
-        print(f"❌ 设置自动交易失败: {e}")
-        return False
+            print(f"🔄 自动交易已{'启用' if enabled else '禁用'}")
+            return True
+        except Exception as e:
+            print(f"❌ 设置自动交易失败: {e}")
+            return False
 
-def _save_auto_trading_status(self):
-    """保存auto_trading_enabled状态到数据库"""
-    try:
-        # 🔧 修复：添加缺失的状态保存方法
-        self.update_system_status(auto_trading_enabled=self.auto_trading_enabled)
-        print(f"💾 auto_trading状态已保存到数据库: {self.auto_trading_enabled}")
-        return True
-    except Exception as e:
-        print(f"❌ 保存auto_trading状态失败: {e}")
-        return False
+    def _save_auto_trading_status(self):
+        """保存auto_trading_enabled状态到数据库"""
+        try:
+            # 🔧 修复：添加缺失的状态保存方法
+            self.update_system_status(auto_trading_enabled=self.auto_trading_enabled)
+            print(f"💾 auto_trading状态已保存到数据库: {self.auto_trading_enabled}")
+            return True
+        except Exception as e:
+            print(f"❌ 保存auto_trading状态失败: {e}")
+            return False
     
     def get_signals(self, limit=50):
         """获取交易信号 - 返回标准格式"""
