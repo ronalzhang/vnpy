@@ -9083,8 +9083,8 @@ class EvolutionaryStrategyEngine:
     def _evaluate_all_strategies(self) -> List[Dict]:
         """🔧 评估所有当前策略 - 增强验证数据生成"""
         try:
-                    # 🔧 修复：从数据库获取所有启用策略，不限制格式
-        strategies_data = self.quantitative_service.db_manager.execute_query("""
+            # 🔧 修复：从数据库获取所有启用策略，不限制格式
+            strategies_data = self.quantitative_service.db_manager.execute_query("""
             SELECT id, name, type, symbol, final_score, win_rate, total_return, 
                    total_trades, parameters, enabled, protected_status, created_at,
                    generation, cycle
