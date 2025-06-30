@@ -10055,10 +10055,12 @@ class EvolutionaryStrategyEngine:
                 
                 if top21_check:
                     print(f"🛡️ 策略{strategy_id[-4:]}属于前端显示策略，继续参与进化")
-                    self.quantitative_service.db_manager.execute_query(
-                        "UPDATE strategies SET notes = 'validation_pending_optimization' WHERE id = %s",
-                        (strategy_id,)
-                    )
+                    # 🔧 修复：确保strategy_id有效再执行UPDATE
+                    if strategy_id and strategy_id != 'None':
+                        self.quantitative_service.db_manager.execute_query(
+                            "UPDATE strategies SET notes = 'validation_pending_optimization' WHERE id = %s",
+                            (str(strategy_id),)
+                        )
                     return True  # 允许继续进化
                 else:
                     # 非前端策略才考虑停用                    # ❌ 已禁用验证失败自动停用逻辑
