@@ -28,7 +28,7 @@
                             </a>
                             <div class="system-status">
                                                         <span class="status-dot offline" id="system-status-indicator"></span>
-                        <span id="system-status-text">离线</span>
+                                <span id="system-status-text">离线</span>
                                 <span id="current-time">2025/6/4 05:05:27</span>
                             </div>
                         </div>
@@ -565,10 +565,10 @@
                                             <div class="col-md-3">
                                                 <div class="metric-value text-muted" id="totalStrategiesCount">-</div>
                                                 <div class="metric-label">总策略数</div>
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
 
                         <!-- 注释：策略进化配置已整合到四层进化系统配置中 -->
 
@@ -584,7 +584,7 @@
                                         <label for="high_freq_pool_size">高频池大小</label>
                                         <input type="number" id="high_freq_pool_size" name="high_freq_pool_size" min="100" max="5000" step="100">
                                         <small>第2层：参与高频进化的策略数量</small>
-                                    </div>
+                            </div>
                                     <div class="config-item">
                                         <label for="display_strategies_count">前端显示数量</label>
                                         <input type="number" id="display_strategies_count" name="display_strategies_count" min="10" max="50" step="1">
@@ -594,7 +594,7 @@
                                         <label for="real_trading_count">实盘交易数量</label>
                                         <input type="number" id="real_trading_count" name="real_trading_count" min="1" max="10" step="1">
                                         <small>第4层：符合条件的实盘交易策略数量</small>
-                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -621,9 +621,9 @@
                                         <label for="display_interval_minutes">前端显示进化间隔 (分钟)</label>
                                         <input type="number" id="display_interval_minutes" name="display_interval_minutes" min="1" max="30" step="1">
                                         <small>第3层：前端策略持续进化间隔</small>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
+                                    </div>
 
                             <!-- 策略淘汰配置 -->
                             <div class="tier-config-group">
@@ -633,13 +633,13 @@
                                         <label for="minScore">淘汰评分阈值 (分)</label>
                                         <input type="number" id="minScore" name="minScore" min="5" max="50" step="5">
                                         <small>低于此评分的策略将被淘汰（当前：10分）</small>
-                            </div>
+                                    </div>
                                     <div class="config-item">
                                         <label for="eliminationDays">淘汰检查周期 (天)</label>
                                         <input type="number" id="eliminationDays" name="eliminationDays" min="1" max="30" step="1">
                                         <small>每隔几天检查一次淘汰条件</small>
                                     </div>
-                                    </div>
+                                </div>
                                     </div>
 
                                                         <!-- 🔥 统一验证交易配置 -->
@@ -661,9 +661,9 @@
                                         <label for="validation_score_threshold_mid">中等策略门槛</label>
                                         <input type="number" id="validation_score_threshold_mid" name="validation_score_threshold_mid" min="50" max="80" step="5">
                                         <small>60分以上策略使用3次验证交易</small>
-                                    </div>
                                 </div>
                             </div>
+                        </div>
 
                             <!-- 交易金额配置 -->
                             <div class="tier-config-group">

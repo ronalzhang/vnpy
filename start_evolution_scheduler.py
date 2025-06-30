@@ -194,7 +194,7 @@ class FourTierEvolutionScheduler:
             
             cursor.execute("""
                 INSERT INTO trading_signals 
-                (strategy_id, symbol, signal_type, price, quantity, expected_return,
+                (strategy_id, symbol, signal_type, price, quantity, expected_return, 
                  executed, is_validation, trade_type, timestamp)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (

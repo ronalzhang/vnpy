@@ -4082,7 +4082,9 @@ def get_evolution_log():
         # 🔥 修复：获取完整的进化数据，包含参数变化信息
         cursor.execute("""
             SELECT strategy_id, action_type, evolution_type, generation, cycle, 
-                   score_before, score_after, parameters, new_parameters,
+                   score_before, score_after, 
+                   COALESCE(parameters, old_parameters) as old_params,
+                   new_parameters,
                    improvement, parameter_changes, evolution_reason, notes,
                    created_time, timestamp
             FROM strategy_evolution_history 
