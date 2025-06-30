@@ -4689,11 +4689,12 @@ class QuantitativeService:
                     is_validation = True
                 else:
                     # 只有在实盘交易启用时才根据评分判断
-            if strategy_score >= self.real_trading_threshold:
-                trade_type = "real_trading"
-                is_validation = False
-            else:
+                    if strategy_score >= self.real_trading_threshold:
+                        trade_type = "real_trading"
+                        is_validation = False
+                    else:
                         trade_type = "score_verification"
+                        is_validation = True
                         is_validation = True
             except Exception as e:
                 print(f"⚠️ 无法检查实盘交易开关，默认为验证交易: {e}")
@@ -7305,23 +7306,24 @@ class ParameterOptimizer:
                     mapped_param_name = self._map_parameter_name(param_name)
                     if mapped_param_name not in self.optimization_directions:
                         print(f"⚠️ 跳过不支持的参数: {param_name}")
-                    continue
+                        continue
                     
                     config = self.optimization_directions[mapped_param_name]
-                min_val, max_val = config['range']
-                
-                # 确保当前值在合理范围内
+                    min_val, max_val = config[range]
+                    
                     current_value = max(min_val, min(max_val, float(param_value)))
-                
-                # 基于表现瓶颈决定优化方向
-                optimization_strategy = self.get_optimization_strategy(
+                    current_value = max(min_val, min(max_val, float(param_value)))
+                    
+                    # 基于表现瓶颈决定优化方向
+                    optimization_strategy = self.get_optimization_strategy(
                         mapped_param_name, current_score, bottlenecks, strategy_stats
-                )
-                
-                new_value = self.apply_intelligent_optimization(
+                    )
+                    new_value = self.apply_intelligent_optimization(
                         mapped_param_name, current_value, optimization_strategy, config, strategy_stats
-                )
-                
+                    )
+                    
+                    # 确保新值在有效范围内
+                    new_value = max(min_val, min(max_val, new_value))
                 # 确保新值在有效范围内
                 new_value = max(min_val, min(max_val, new_value))
                 
