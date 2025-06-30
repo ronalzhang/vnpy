@@ -128,7 +128,7 @@ class FourTierStrategyManager:
             cursor.execute("SELECT config_key, config_value FROM four_tier_evolution_config")
             configs = cursor.fetchall()
             
-                        for config_key, config_value in configs:
+            for config_key, config_value in configs:
                 if hasattr(self.config, config_key):
                     # 类型转换
                     current_value = getattr(self.config, config_key)
@@ -475,34 +475,34 @@ class FourTierStrategyManager:
             for i in range(validation_count):
                 # 生成验证交易信号
                 signal_data = {
-                'strategy_id': strategy['id'],
-                'symbol': strategy['symbol'],
-                'signal_type': random.choice(['buy', 'sell']),
+                    'strategy_id': strategy['id'],
+                    'symbol': strategy['symbol'],
+                    'signal_type': random.choice(['buy', 'sell']),
                     'price': 100.0 + random.uniform(-5, 5),
                     'quantity': self.config.validation_amount,
                     'expected_return': random.uniform(-1, 3),
                     'timestamp': datetime.now()
                 }
-            
-            cursor.execute("""
-                INSERT INTO trading_signals 
-                (strategy_id, symbol, signal_type, price, quantity, expected_return, 
-                     executed, is_validation, trade_type, timestamp, cycle_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                    signal_data['strategy_id'],
-                    signal_data['symbol'],
-                    signal_data['signal_type'], 
-                    signal_data['price'],
-                    signal_data['quantity'],
-                    signal_data['expected_return'],
-                    1,  # executed
-                    True,  # is_validation
-                    f"{evolution_type}_validation",  # trade_type
-                    signal_data['timestamp'],
-                    f"{evolution_type}_{i+1}"  # cycle_id
-                ))
                 
+                cursor.execute("""
+                    INSERT INTO trading_signals 
+                    (strategy_id, symbol, signal_type, price, quantity, expected_return, 
+                         executed, is_validation, trade_type, timestamp, cycle_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                        signal_data['strategy_id'],
+                        signal_data['symbol'],
+                        signal_data['signal_type'], 
+                        signal_data['price'],
+                        signal_data['quantity'],
+                        signal_data['expected_return'],
+                        1,  # executed
+                        True,  # is_validation
+                        f"{evolution_type}_validation",  # trade_type
+                        signal_data['timestamp'],
+                        f"{evolution_type}_{i+1}"  # cycle_id
+                    ))
+                    
                 # 收集验证结果
                 validation_results.append(signal_data['expected_return'])
             
