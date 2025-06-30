@@ -4085,7 +4085,7 @@ def get_evolution_log():
                    score_before, score_after, 
                    COALESCE(parameters, old_parameters) as old_params,
                    new_parameters,
-                   improvement, parameter_changes, evolution_reason, notes,
+                   improvement, parameter_changes, parameter_analysis, evolution_reason, notes,
                    created_time, timestamp
             FROM strategy_evolution_history 
             ORDER BY COALESCE(created_time, timestamp) DESC 
@@ -4099,7 +4099,7 @@ def get_evolution_log():
         for record in evolution_records:
             (strategy_id, action_type, evolution_type, generation, cycle, 
              score_before, score_after, old_params, new_params,
-             improvement, param_changes, evolution_reason, notes,
+             improvement, param_changes, db_parameter_analysis, evolution_reason, notes,
              created_time, timestamp) = record
             
             # 使用更精确的时间戳
@@ -4125,9 +4125,19 @@ def get_evolution_log():
                 details = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                 action = 'evolved'
             
-            # 🔧 修复：增强参数变化分析，处理多种数据格式
+            # 🔧 修复：优先使用数据库中的parameter_analysis，然后生成备用分析
             parameter_analysis = None
             detailed_param_changes = param_changes  # 保留原始的parameter_changes字段
+            
+            # 优先使用数据库中的parameter_analysis
+            if db_parameter_analysis:
+                try:
+                    if isinstance(db_parameter_analysis, str):
+                        parameter_analysis = json.loads(db_parameter_analysis)
+                    else:
+                        parameter_analysis = db_parameter_analysis
+                except:
+                    parameter_analysis = None
             
             # 尝试从多个字段获取参数变化信息
             if old_params and new_params:
