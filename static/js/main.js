@@ -381,10 +381,10 @@ function updateSystemStatus() {
             // 更新导航栏状态指示器
             if (statusIndicator && statusText) {
                 if (isRunning) {
-                    statusIndicator.className = 'status-indicator status-running';
-                    statusText.textContent = '运行中';
+                    statusIndicator.className = 'status-dot online';
+                    statusText.textContent = '在线';
                 } else {
-                    statusIndicator.className = 'status-indicator status-offline';
+                    statusIndicator.className = 'status-dot offline';
                     statusText.textContent = '离线';
                 }
             }
@@ -418,7 +418,7 @@ function updateSystemStatus() {
             const statusIndicator = document.getElementById('system-status-indicator');
             const statusText = document.getElementById('system-status-text');
             if (statusIndicator && statusText) {
-                statusIndicator.className = 'status-indicator status-offline';
+                statusIndicator.className = 'status-dot offline';
                 statusText.textContent = '离线';
             }
         });

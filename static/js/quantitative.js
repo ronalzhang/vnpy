@@ -1667,6 +1667,12 @@ class QuantitativeSystem {
             this.safeSetValue('paramValidationTrades', managementConfig.paramValidationTrades || 20);
             this.safeSetValue('paramValidationHours', managementConfig.paramValidationHours || 24);
             this.safeSetCheckbox('enableStrictValidation', managementConfig.enableStrictValidation !== false);  // 默认为true
+            
+            // 🔧 新增：统一验证交易配置字段映射
+            this.safeSetValue('unified_validation_count', managementConfig.paramValidationTrades || 4);  // 统一验证次数
+            this.safeSetValue('validation_score_threshold_high', 80);  // 高分策略门槛
+            this.safeSetValue('validation_score_threshold_mid', 60);   // 中等策略门槛
+            this.safeSetValue('real_trading_score_threshold', managementConfig.realTradingScore || 65);  // 实盘交易评分门槛
         }
 
         // 🔥 新增：同时初始化四层配置管理器
@@ -1704,28 +1710,33 @@ class QuantitativeSystem {
     async saveManagementConfig() {
         try {
             const updatedConfig = {
-                evolutionInterval: parseInt(document.getElementById('evolutionInterval').value) || 10,
-                maxStrategies: parseInt(document.getElementById('maxStrategies').value) || 20,
-                realTradingScore: parseFloat(document.getElementById('realTradingScore').value) || 65,
-                realTradingCount: parseInt(document.getElementById('realTradingCount').value) || 2,
-                validationAmount: parseFloat(document.getElementById('validationAmount').value) || 50,
-                realTradingAmount: parseFloat(document.getElementById('realTradingAmount').value) || 100,
-                minTrades: parseInt(document.getElementById('minTrades').value) || 10,
-                minWinRate: parseFloat(document.getElementById('minWinRate').value) || 65,
-                minProfit: parseFloat(document.getElementById('minProfit').value) || 0,
-                maxDrawdown: parseFloat(document.getElementById('maxDrawdown').value) || 10,
-                minSharpeRatio: parseFloat(document.getElementById('minSharpeRatio').value) || 1.0,
-                maxPositionSize: parseFloat(document.getElementById('maxPositionSize').value) || 100,
-                stopLossPercent: parseFloat(document.getElementById('stopLossPercent').value) || 5,
-                takeProfitPercent: parseFloat(document.getElementById('takeProfitPercent').value) || 4,
-                maxHoldingMinutes: parseInt(document.getElementById('maxHoldingMinutes').value) || 30,
-                minProfitForTimeStop: parseFloat(document.getElementById('minProfitForTimeStop').value) || 1,
-                eliminationDays: parseInt(document.getElementById('eliminationDays').value) || 7,
-                minScore: parseFloat(document.getElementById('minScore').value) || 50,
+                evolutionInterval: parseInt(document.getElementById('evolutionInterval')?.value) || 10,
+                maxStrategies: parseInt(document.getElementById('maxStrategies')?.value) || 20,
+                realTradingScore: parseFloat(document.getElementById('realTradingScore')?.value) || 65,
+                realTradingCount: parseInt(document.getElementById('realTradingCount')?.value) || 2,
+                validationAmount: parseFloat(document.getElementById('validationAmount')?.value) || 50,
+                realTradingAmount: parseFloat(document.getElementById('realTradingAmount')?.value) || 100,
+                minTrades: parseInt(document.getElementById('minTrades')?.value) || 10,
+                minWinRate: parseFloat(document.getElementById('minWinRate')?.value) || 65,
+                minProfit: parseFloat(document.getElementById('minProfit')?.value) || 0,
+                maxDrawdown: parseFloat(document.getElementById('maxDrawdown')?.value) || 10,
+                minSharpeRatio: parseFloat(document.getElementById('minSharpeRatio')?.value) || 1.0,
+                maxPositionSize: parseFloat(document.getElementById('maxPositionSize')?.value) || 100,
+                stopLossPercent: parseFloat(document.getElementById('stopLossPercent')?.value) || 5,
+                takeProfitPercent: parseFloat(document.getElementById('takeProfitPercent')?.value) || 4,
+                maxHoldingMinutes: parseInt(document.getElementById('maxHoldingMinutes')?.value) || 30,
+                minProfitForTimeStop: parseFloat(document.getElementById('minProfitForTimeStop')?.value) || 1,
+                eliminationDays: parseInt(document.getElementById('eliminationDays')?.value) || 7,
+                minScore: parseFloat(document.getElementById('minScore')?.value) || 50,
                 // 🔧 新增：参数验证配置
                 paramValidationTrades: parseInt(document.getElementById('paramValidationTrades')?.value) || 20,
                 paramValidationHours: parseInt(document.getElementById('paramValidationHours')?.value) || 24,
-                enableStrictValidation: document.getElementById('enableStrictValidation')?.checked !== false
+                enableStrictValidation: document.getElementById('enableStrictValidation')?.checked !== false,
+                // 🔧 新增：统一验证交易配置
+                unified_validation_count: parseInt(document.getElementById('unified_validation_count')?.value) || 4,
+                validation_score_threshold_high: parseFloat(document.getElementById('validation_score_threshold_high')?.value) || 80,
+                validation_score_threshold_mid: parseFloat(document.getElementById('validation_score_threshold_mid')?.value) || 60,
+                real_trading_score_threshold: parseFloat(document.getElementById('real_trading_score_threshold')?.value) || 65
             };
 
             const response = await fetch('/api/quantitative/management-config', {
@@ -1780,7 +1791,12 @@ class QuantitativeSystem {
             // 🔧 新增：参数验证配置默认值
             paramValidationTrades: 20,
             paramValidationHours: 24,
-            enableStrictValidation: true
+            enableStrictValidation: true,
+            // 🔧 新增：统一验证交易配置默认值
+            unified_validation_count: 4,
+            validation_score_threshold_high: 80,
+            validation_score_threshold_mid: 60,
+            real_trading_score_threshold: 65
         };
 
         Object.assign(managementConfig, defaultConfig);
