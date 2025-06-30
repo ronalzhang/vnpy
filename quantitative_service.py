@@ -5006,7 +5006,7 @@ class QuantitativeService:
                                final_score, win_rate, total_return, total_trades,
                                created_at, updated_at, generation, cycle
                         FROM strategies 
-                        WHERE id LIKE 'STRAT_%' 
+                        WHERE enabled = 1 AND final_score IS NOT NULL AND final_score > 0
                         ORDER BY final_score DESC, total_trades DESC
                         LIMIT {max_strategies}
                     """
@@ -8118,10 +8118,10 @@ class EvolutionaryStrategyEngine:
                 SELECT id, name, final_score, parameters, generation, cycle, 
                        type, symbol, updated_at, enabled
                 FROM strategies 
-                WHERE enabled = 1 AND id LIKE 'STRAT_%'
+                WHERE enabled = 1 AND final_score IS NOT NULL AND final_score > 0
                 ORDER BY final_score DESC
                 LIMIT %s
-            """, (self.evolution_config['max_strategies'],), fetch_all=True)
+            """, (self.evolution_config.get('max_strategies', 100),), fetch_all=True)
             
             for strategy in strategies:
                 evolution_reason = self._evaluate_intelligent_evolution_need(strategy)
@@ -10288,7 +10288,7 @@ class EvolutionaryStrategyEngine:
                         SELECT 1 FROM strategies 
                         WHERE id = %s AND id IN (
                             SELECT id FROM strategies 
-                            WHERE id LIKE 'STRAT_%' AND final_score IS NOT NULL
+                            WHERE enabled = 1 AND final_score IS NOT NULL AND final_score > 0
                             ORDER BY final_score DESC LIMIT 21
                         )
                     """, (str(strategy_id),), fetch_one=True)
