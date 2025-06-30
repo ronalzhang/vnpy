@@ -9059,14 +9059,26 @@ class EvolutionaryStrategyEngine:
     def _evaluate_all_strategies(self) -> List[Dict]:
         """🔧 评估所有当前策略 - 增强验证数据生成"""
         try:
-            strategies_data = self.quantitative_service.get_strategies()
-            if not strategies_data.get('success'):
+            # 🔧 修复：直接从数据库获取策略数据
+            strategies_data = self.quantitative_service.db_manager.execute_query("""
+                SELECT id, name, type, symbol, final_score, win_rate, total_return, 
+                       total_trades, parameters, enabled, protected_status, created_at
+                FROM strategies 
+                WHERE enabled = 1 AND final_score IS NOT NULL
+                ORDER BY final_score DESC
+                LIMIT %s
+            """, (self.evolution_config['max_strategies'],), fetch_all=True)
+            
+            if not strategies_data:
+                print("⚠️ 数据库中没有找到启用的策略")
                 return []
+            
+            print(f"📊 从数据库获取到 {len(strategies_data)} 个策略，开始评估...")
             
             strategies = []
             validation_count = 0
             
-            for strategy in strategies_data['data']:
+            for strategy in strategies_data:
                 try:
                     strategy_id = str(strategy['id'])
                     
