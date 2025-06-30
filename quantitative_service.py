@@ -4987,7 +4987,7 @@ class QuantitativeService:
                        final_score, win_rate, total_return, total_trades,
                        created_at, updated_at, generation, cycle
                 FROM strategies 
-                WHERE id LIKE 'STRAT_%' 
+                WHERE enabled = 1 AND final_score IS NOT NULL AND final_score > 0
                 ORDER BY final_score DESC, total_trades DESC
                 LIMIT %s
             """
@@ -5017,8 +5017,8 @@ class QuantitativeService:
                     return {'success': False, 'error': str(e), 'data': []}
             
             if not rows:
-                print("⚠️ 没有找到STRAT_格式的策略，数据库可能存在问题")
-                # 如果没有STRAT_策略，说明数据库有问题，返回空结果而不是短格式策略
+                print("⚠️ 没有找到启用的策略，可能需要启用一些策略")
+                # 如果没有启用策略，返回空结果
                 return {'success': True, 'data': []}
             
             strategies_list = []
