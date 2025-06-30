@@ -4237,65 +4237,55 @@ def get_evolution_log():
         
         logs = []
         
-        # 🔥 修复：获取完整的进化数据，包含参数变化信息
+        # 🔥 修复：从正确的数据库表strategy_evolution_logs获取进化数据
         cursor.execute("""
-            SELECT strategy_id, action_type, evolution_type, generation, cycle, 
+            SELECT strategy_id, evolution_type, generation, cycle_number, 
                    score_before, score_after, 
-                   COALESCE(parameters, old_parameters) as old_params,
-                   new_parameters,
-                   improvement, parameter_changes, parameter_analysis, evolution_reason, notes,
-                   created_time, timestamp
-            FROM strategy_evolution_history 
-            ORDER BY COALESCE(created_time, timestamp) DESC 
+                   old_parameters, new_parameters,
+                   improvement, details, timestamp, created_at
+            FROM strategy_evolution_logs 
+            ORDER BY COALESCE(timestamp, created_at) DESC 
             LIMIT 200
         """)
         
         evolution_records = cursor.fetchall()
         print(f"🔍 获取到 {len(evolution_records)} 条进化历史记录")
         
-        # 处理进化历史记录
+        # 处理进化历史记录（修复字段映射）
         for record in evolution_records:
-            (strategy_id, action_type, evolution_type, generation, cycle, 
+            (strategy_id, evolution_type, generation, cycle_number, 
              score_before, score_after, old_params, new_params,
-             improvement, param_changes, db_parameter_analysis, evolution_reason, notes,
-             created_time, timestamp) = record
+             improvement, details, timestamp, created_at) = record
             
             # 使用更精确的时间戳
-            actual_timestamp = created_time or timestamp
+            actual_timestamp = timestamp or created_at
             
-            # 🔧 增强：构造详细描述，包含参数变化信息
-            if 'parameter_optimization' in evolution_type or 'mutation' in evolution_type:
-                if param_changes:
-                    details = f"策略{strategy_id[-4:]}参数优化: 第{generation}代第{cycle}轮，{param_changes}，评分{score_before:.1f}→{score_after:.1f}"
-                else:
-                    details = f"策略{strategy_id[-4:]}变异进化: 第{generation}代第{cycle}轮，评分{score_before:.1f}→{score_after:.1f}"
-                action = 'optimized'
-            elif evolution_type == 'elite_selected':
-                details = f"精英策略{strategy_id[-4:]}晋级: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
-                action = 'promoted'
-            elif 'protection' in evolution_type:
-                details = f"策略{strategy_id[-4:]}保护: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
-                action = 'protected'
-            elif evolution_type == 'random_creation':
-                details = f"新策略{strategy_id[-4:]}创建: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
-                action = 'created'
-            else:
-                details = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
+            # 🔧 从details字段提取已有的描述信息，或生成新的
+            if details:
+                # 使用数据库中已有的详细描述
+                detail_text = details
                 action = 'evolved'
+            else:
+                # 生成新的描述信息
+                if 'automated_display' in evolution_type or 'optimization' in evolution_type:
+                    detail_text = f"策略{strategy_id[-4:]}参数优化: 第{generation}代第{cycle_number}轮，评分{score_before:.1f}→{score_after:.1f}"
+                    action = 'optimized'
+                elif evolution_type == 'elite_selected':
+                    detail_text = f"精英策略{strategy_id[-4:]}晋级: 第{generation}代第{cycle_number}轮，评分{score_after:.1f}"
+                    action = 'promoted'
+                elif 'protection' in evolution_type:
+                    detail_text = f"策略{strategy_id[-4:]}保护: 第{generation}代第{cycle_number}轮，评分{score_after:.1f}"
+                    action = 'protected'
+                elif evolution_type == 'random_creation':
+                    detail_text = f"新策略{strategy_id[-4:]}创建: 第{generation}代第{cycle_number}轮，评分{score_after:.1f}"
+                    action = 'created'
+                else:
+                    detail_text = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle_number}轮，评分{score_after:.1f}"
+                    action = 'evolved'
             
-            # 🔧 修复：优先使用数据库中的parameter_analysis，然后生成备用分析
+            # 🔧 处理参数分析
             parameter_analysis = None
-            detailed_param_changes = param_changes  # 保留原始的parameter_changes字段
-            
-            # 优先使用数据库中的parameter_analysis
-            if db_parameter_analysis:
-                try:
-                    if isinstance(db_parameter_analysis, str):
-                        parameter_analysis = json.loads(db_parameter_analysis)
-                    else:
-                        parameter_analysis = db_parameter_analysis
-                except:
-                    parameter_analysis = None
+            detailed_param_changes = ""
             
             # 尝试从多个字段获取参数变化信息
             if old_params and new_params:
@@ -4372,20 +4362,20 @@ def get_evolution_log():
             
             log_entry = {
                 'action': action,
-                'details': details,
+                'details': detail_text,
                 'strategy_id': strategy_id,
                 'strategy_name': f"策略{strategy_id[-4:]}",
                 'timestamp': actual_timestamp.isoformat() if actual_timestamp else None,
                 'generation': generation,
-                'cycle': cycle,
+                'cycle': cycle_number,
                 'score_before': float(score_before) if score_before else 0,
                 'score_after': float(score_after) if score_after else 0,
                 'improvement': float(improvement) if improvement else 0,
                 'evolution_type': evolution_type,
-                'evolution_reason': evolution_reason,
+                'evolution_reason': '',
                 'parameter_changes': detailed_param_changes,
                 'parameter_analysis': parameter_analysis,
-                'notes': notes
+                'notes': details or ''
             }
             
             logs.append(log_entry)
