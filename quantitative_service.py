@@ -10038,14 +10038,20 @@ class EvolutionaryStrategyEngine:
                 print(f"❌ 策略{strategy_id[-4:]}初始化验证失败，但保持启用状态进行持续优化")
                 
                 # 检查是否是前端显示的策略（前21个）
-                top21_check = self.quantitative_service.db_manager.execute_query("""
-                    SELECT 1 FROM strategies 
-                    WHERE id = %s AND id IN (
-                        SELECT id FROM strategies 
-                        WHERE id LIKE 'STRAT_%' AND final_score IS NOT NULL
-                        ORDER BY final_score DESC LIMIT 21
-                    )
-                """, (strategy_id,), fetch_one=True)
+                # 🔧 调试：检查strategy_id值
+                print(f"🔍 调试top21_check查询，strategy_id: '{strategy_id}', type: {type(strategy_id)}")
+                if not strategy_id or strategy_id == 'None':
+                    print(f"⚠️ strategy_id为空或None，跳过top21_check查询")
+                    top21_check = None
+                else:
+                    top21_check = self.quantitative_service.db_manager.execute_query("""
+                        SELECT 1 FROM strategies 
+                        WHERE id = %s AND id IN (
+                            SELECT id FROM strategies 
+                            WHERE id LIKE 'STRAT_%' AND final_score IS NOT NULL
+                            ORDER BY final_score DESC LIMIT 21
+                        )
+                    """, (str(strategy_id),), fetch_one=True)
                 
                 if top21_check:
                     print(f"🛡️ 策略{strategy_id[-4:]}属于前端显示策略，继续参与进化")
