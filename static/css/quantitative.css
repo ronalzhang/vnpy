@@ -1080,7 +1080,7 @@
 .evolution-log-ticker {
     display: flex;
     white-space: nowrap;
-    animation: scroll-left 30s linear infinite;
+    animation: scroll-left 40s linear infinite; /* 🔧 修复：延长到40秒，避免频繁重置 */
     overflow: hidden;
     width: 100%;
 }
@@ -1176,7 +1176,7 @@
     .evolution-log-ticker {
         line-height: 32px;
         font-size: 12px; /* 手机端稍小字体 */
-        animation: scroll-left 25s linear infinite; /* 手机端稍快滚动 */
+        animation: scroll-left 35s linear infinite; /* 🔧 修复：手机端延长到35秒 */
     }
     
     .evolution-log-ticker .log-item {
@@ -1231,7 +1231,7 @@
     .evolution-log-ticker {
         line-height: 28px;
         font-size: 11px; /* 小屏幕更小字体 */
-        animation: scroll-left 20s linear infinite; /* 小屏幕更快滚动 */
+        animation: scroll-left 32s linear infinite; /* 🔧 修复：小屏幕延长到32秒 */
     }
     
     .evolution-log-ticker .log-item {

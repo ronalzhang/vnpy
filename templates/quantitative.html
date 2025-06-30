@@ -642,49 +642,28 @@
                                     </div>
                                     </div>
 
-                            <!-- 验证交易配置 -->
+                                                        <!-- 🔥 统一验证交易配置 -->
                             <div class="tier-config-group">
-                                <h4>🧪 验证交易配置</h4>
+                                <h4>🔬 统一验证交易配置</h4>
+                                <p><small>🎯 进化本质就是参数修改，无论是自动进化还是手动调整，都使用统一的验证机制</small></p>
                                 <div class="config-grid">
                                     <div class="config-item">
-                                        <label for="low_freq_validation_count">策略池验证次数</label>
-                                        <input type="number" id="low_freq_validation_count" name="low_freq_validation_count" min="1" max="10" step="1">
-                                        <small>第1层：每次进化生成的验证交易数</small>
-                                </div>
-                                    <div class="config-item">
-                                        <label for="high_freq_validation_count">高频池验证次数</label>
-                                        <input type="number" id="high_freq_validation_count" name="high_freq_validation_count" min="1" max="10" step="1">
-                                        <small>第2层：每次进化生成的验证交易数</small>
+                                        <label for="unified_validation_count">统一验证交易次数</label>
+                                        <input type="number" id="unified_validation_count" name="unified_validation_count" min="2" max="8" step="1">
+                                        <small>所有参数调整后的验证交易次数（高分策略=4次，中等=3次，低分=2次）</small>
                                     </div>
                                     <div class="config-item">
-                                        <label for="display_validation_count">前端显示验证次数</label>
-                                        <input type="number" id="display_validation_count" name="display_validation_count" min="1" max="10" step="1">
-                                        <small>第3层：每次进化生成的验证交易数</small>
-                                    </div>
-                                    </div>
-                                </div>
-
-                            <!-- 参数验证配置 -->
-                            <div class="tier-config-group">
-                                <h4>🔬 参数验证配置</h4>
-                                <div class="config-grid">
-                                    <div class="config-item">
-                                        <label for="paramValidationTrades">参数修改后验证交易次数</label>
-                                        <input type="number" id="paramValidationTrades" name="paramValidationTrades" min="5" max="50" step="5">
-                                        <small>参数修改后需要的验证交易次数（默认20次）</small>
+                                        <label for="validation_score_threshold_high">高分策略门槛</label>
+                                        <input type="number" id="validation_score_threshold_high" name="validation_score_threshold_high" min="70" max="90" step="5">
+                                        <small>80分以上策略使用4次验证交易</small>
                                     </div>
                                     <div class="config-item">
-                                        <label for="paramValidationHours">参数修改后等待时间 (小时)</label>
-                                        <input type="number" id="paramValidationHours" name="paramValidationHours" min="6" max="72" step="6">
-                                        <small>参数修改后需要的等待时间（默认24小时）</small>
+                                        <label for="validation_score_threshold_mid">中等策略门槛</label>
+                                        <input type="number" id="validation_score_threshold_mid" name="validation_score_threshold_mid" min="50" max="80" step="5">
+                                        <small>60分以上策略使用3次验证交易</small>
                                     </div>
-                                    <div class="config-item">
-                                        <label for="enableStrictValidation">启用严格验证</label>
-                                        <input type="checkbox" id="enableStrictValidation" name="enableStrictValidation" class="form-check-input">
-                                        <small>是否启用严格的参数验证机制</small>
                                 </div>
                             </div>
-                        </div>
 
                             <!-- 交易金额配置 -->
                             <div class="tier-config-group">

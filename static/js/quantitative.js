@@ -2331,8 +2331,9 @@ class UnifiedEvolutionLogManager {
     constructor() {
         this.logs = [];
         this.isLoading = false;
-        this.refreshInterval = 5000; // 🔥 优化：5秒刷新一次，提升响应速度
+        this.refreshInterval = 30000; // 🔧 修复：30秒刷新一次，避免动画重置
         this.refreshTimer = null;
+        this.lastLogCount = 0; // 追踪日志数量变化
         
         // 滚动配置
         this.verticalConfig = {
@@ -2382,8 +2383,18 @@ class UnifiedEvolutionLogManager {
             const data = await response.json();
             
             if (data.success && data.logs) {
+                // 🔧 修复：只有在日志数量变化时才重新渲染，避免动画重置
+                const hasNewLogs = data.logs.length !== this.lastLogCount;
                 this.logs = data.logs;
-                this.renderAllViews();
+                this.lastLogCount = data.logs.length;
+                
+                if (hasNewLogs) {
+                    console.log(`📝 检测到新的进化日志，重新渲染 (${data.logs.length}条)`);
+                    this.renderAllViews();
+                } else {
+                    console.log(`📊 日志数量无变化，跳过重新渲染 (${data.logs.length}条)`);
+                    this.updateLogCount(); // 只更新计数
+                }
                 
                                     // 🔥 修复：从最新的进化日志中解析当前世代信息
                     if (this.logs.length > 0) {
