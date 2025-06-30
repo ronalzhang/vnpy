@@ -481,31 +481,7 @@
 /* ==================== 状态指示器 ==================== */
 /* 继承全站状态指示器样式，但添加量化交易页面的特定需求 */
 
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #333; /* 默认黑色 */
-    display: inline-block;
-    margin-right: 8px;
-}
-
-/* 在线状态 - 金色闪动 */
-.status-dot.online {
-    background-color: #ffd700;
-    animation: golden-pulse 2s infinite;
-    box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
-}
-
-/* 离线状态 - 黑色 */
-.status-dot.offline {
-    background-color: #333;
-}
-
-/* 警告状态 - 橙色 */
-.status-dot.warning {
-    background-color: #faad14;
-}
+/* 🗑️ Bootstrap颜色变体的status-dot定义已删除，统一使用styles.css定义 */
 
 /* 确保交易所状态指示器也使用正确样式 */
 .exchange-card .status-indicator {
@@ -1255,60 +1231,6 @@
 .status-indicator {
     position: relative;
     display: inline-block;
-}
-
-.status-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
-    position: relative;
-    animation: pulse 2s infinite;
-}
-
-.status-dot.bg-success {
-    background-color: #28a745 !important;
-    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
-}
-
-.status-dot.bg-danger {
-    background-color: #dc3545 !important;
-    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
-}
-
-.status-dot.bg-warning {
-    background-color: #ffc107 !important;
-    box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
-}
-
-.status-dot.bg-info {
-    background-color: #17a2b8 !important;
-    box-shadow: 0 0 10px rgba(23, 162, 184, 0.5);
-}
-
-.status-dot.bg-primary {
-    background-color: #007bff !important;
-    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
-}
-
-.status-dot.bg-secondary {
-    background-color: #6c757d !important;
-    animation: none;
-}
-
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.1);
-        opacity: 0.7;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
 }
 
 /* 🎨 增强进化日志滚动效果 */
