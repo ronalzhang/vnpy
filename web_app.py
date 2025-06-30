@@ -1201,6 +1201,11 @@ def quantitative():
     """量化交易页面"""
     return render_template('quantitative.html')
 
+@app.route('/quantitative')
+def quantitative_main():
+    """量化交易页面主入口"""
+    return render_template('quantitative.html')
+
 @app.route('/operations-log.html')
 def operations_log():
     """操作日志页面"""
