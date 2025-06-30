@@ -2640,7 +2640,10 @@ class UnifiedEvolutionLogManager {
 class FourTierConfigManager {
     constructor() {
         this.config = {};
-        this.init();
+        this.isLoading = false;
+        // 🔧 新增：配置同步状态追踪
+        this.lastSyncTime = null;
+        this.syncErrors = [];
     }
 
     async init() {
@@ -2916,6 +2919,116 @@ class FourTierConfigManager {
                 notification.parentNode.removeChild(notification);
             }
         }, 3000);
+    }
+
+    // 🔧 新增：配置同步验证方法
+    async validateConfigSync() {
+        try {
+            // 获取前端当前配置
+            const frontendConfig = this.getCurrentFormConfig();
+            
+            // 获取后端配置
+            const response = await fetch('/api/quantitative/four-tier-config');
+            const backendData = await response.json();
+            
+            if (!backendData.success) {
+                throw new Error('获取后端配置失败');
+            }
+            
+            const backendConfig = backendData.config;
+            
+            // 检查关键配置项是否同步
+            const keyFields = [
+                'real_trading_score_threshold', 'validation_amount', 
+                'real_trading_amount', 'display_validation_count'
+            ];
+            
+            const mismatches = [];
+            for (const field of keyFields) {
+                const frontendValue = frontendConfig[field];
+                const backendValue = backendConfig[field]?.value || backendConfig[field];
+                
+                if (Math.abs(frontendValue - backendValue) > 0.01) {
+                    mismatches.push({
+                        field,
+                        frontend: frontendValue,
+                        backend: backendValue
+                    });
+                }
+            }
+            
+            if (mismatches.length > 0) {
+                console.warn('🚨 发现配置不同步:', mismatches);
+                this.syncErrors = mismatches;
+                this.showSyncWarning(mismatches);
+                return false;
+            }
+            
+            this.lastSyncTime = new Date();
+            this.syncErrors = [];
+            console.log('✅ 前后端配置同步正常');
+            return true;
+            
+        } catch (error) {
+            console.error('❌ 配置同步验证失败:', error);
+            this.syncErrors.push({ error: error.message });
+            return false;
+        }
+    }
+
+    // 🔧 新增：显示同步警告
+    showSyncWarning(mismatches) {
+        const warningDiv = document.createElement('div');
+        warningDiv.className = 'alert alert-warning sync-warning';
+        warningDiv.innerHTML = `
+            <h6>⚠️ 配置同步异常</h6>
+            <p>检测到前后端配置不一致：</p>
+            <ul>
+                ${mismatches.map(m => `<li><strong>${m.field}</strong>: 前端=${m.frontend}, 后端=${m.backend}</li>`).join('')}
+            </ul>
+            <button class="btn btn-sm btn-primary" onclick="fourTierManager.autoSyncConfig()">自动同步</button>
+            <button class="btn btn-sm btn-secondary" onclick="this.parentElement.remove()">忽略</button>
+        `;
+        
+        const configSection = document.querySelector('.four-tier-config-section');
+        if (configSection) {
+            configSection.insertBefore(warningDiv, configSection.firstChild);
+        }
+    }
+
+    // 🔧 新增：自动同步配置
+    async autoSyncConfig() {
+        try {
+            await this.loadConfig();
+            await this.validateConfigSync();
+            
+            // 移除警告提示
+            document.querySelectorAll('.sync-warning').forEach(warning => warning.remove());
+            
+            quantitativeSystem.showMessage('✅ 配置已自动同步', 'success');
+            
+        } catch (error) {
+            quantitativeSystem.showMessage('❌ 自动同步失败: ' + error.message, 'error');
+        }
+    }
+
+    // 🔧 新增：获取当前表单配置
+    getCurrentFormConfig() {
+        const config = {};
+        const fields = [
+            'real_trading_score_threshold', 'validation_amount', 
+            'real_trading_amount', 'display_validation_count',
+            'high_freq_validation_count', 'low_freq_validation_count'
+        ];
+        
+        fields.forEach(field => {
+            const element = document.getElementById(field);
+            if (element) {
+                config[field] = parseFloat(element.value) || 0;
+            }
+        });
+        
+        return config;
     }
 }
 

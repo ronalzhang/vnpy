@@ -1639,5 +1639,224 @@
     }
 }
 
+/* 🔧 实盘交易控制参数样式增强 */
+.real-trading-control-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 15px 0;
+    color: white;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.real-trading-control-section h4 {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.real-trading-control-section h4::before {
+    content: "🛡️";
+    margin-right: 8px;
+    font-size: 1.2em;
+}
+
+.real-trading-control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.real-trading-control-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.real-trading-control-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.real-trading-control-item label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #f8f9fa;
+}
+
+.real-trading-control-item input,
+.real-trading-control-item select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.real-trading-control-item input:focus,
+.real-trading-control-item select:focus {
+    outline: none;
+    border-color: #4dabf7;
+    box-shadow: 0 0 0 3px rgba(77, 171, 247, 0.2);
+    background: white;
+}
+
+.real-trading-control-item small {
+    display: block;
+    margin-top: 6px;
+    color: #e9ecef;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* 启用状态切换样式 */
+.real-trading-enabled-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.real-trading-enabled-toggle.enabled {
+    border-color: #51cf66;
+    background: rgba(81, 207, 102, 0.2);
+}
+
+.real-trading-enabled-toggle.disabled {
+    border-color: #ffa8a8;
+    background: rgba(255, 168, 168, 0.2);
+}
+
+.toggle-switch {
+    position: relative;
+    width: 50px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.toggle-switch.active {
+    background: #51cf66;
+}
+
+.toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active::after {
+    transform: translateX(26px);
+}
+
+/* 配置同步警告样式 */
+.sync-warning {
+    border-left: 4px solid #ffa726;
+    background: linear-gradient(90deg, rgba(255, 167, 38, 0.1) 0%, rgba(255, 167, 38, 0.05) 100%);
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { 
+        border-left-color: #ffa726; 
+        background: linear-gradient(90deg, rgba(255, 167, 38, 0.1) 0%, rgba(255, 167, 38, 0.05) 100%);
+    }
+    50% { 
+        border-left-color: #ff7043; 
+        background: linear-gradient(90deg, rgba(255, 112, 67, 0.15) 0%, rgba(255, 112, 67, 0.08) 100%);
+    }
+}
+
+.sync-warning h6 {
+    color: #ffa726;
+    margin-bottom: 10px;
+}
+
+.sync-warning ul {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.sync-warning li {
+    margin: 5px 0;
+    color: #666;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .real-trading-control-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .real-trading-control-section {
+        padding: 15px;
+        margin: 10px 0;
+    }
+    
+    .real-trading-enabled-toggle {
+        padding: 10px 12px;
+    }
+}
+
+/* 四层配置状态指示器 */
+.tier-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.tier-status-indicator.synced {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.tier-status-indicator.syncing {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+    animation: pulse 1.5s infinite;
+}
+
+.tier-status-indicator.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 
 
