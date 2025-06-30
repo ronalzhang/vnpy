@@ -4074,6 +4074,79 @@ def manage_strategy_config():
             'message': f'操作失败: {str(e)}'
         })
 
+@app.route('/api/quantitative/sync-real-trading-config', methods=['POST'])
+def sync_real_trading_config():
+    """同步四层进化配置到real_trading_control表"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 从四层进化配置获取实盘交易控制参数
+        cursor.execute("""
+            SELECT config_key, config_value FROM four_tier_evolution_config 
+            WHERE config_category = 'real_trading_control'
+        """)
+        
+        config_data = dict(cursor.fetchall())
+        
+        # 确保real_trading_control表存在
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS real_trading_control (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                real_trading_enabled BOOLEAN DEFAULT FALSE,
+                min_simulation_days INTEGER DEFAULT 7,
+                min_sim_win_rate DECIMAL(5,2) DEFAULT 65.00,
+                min_sim_total_pnl DECIMAL(10,8) DEFAULT 5.00000000,
+                max_risk_per_trade DECIMAL(5,2) DEFAULT 2.00,
+                max_daily_risk DECIMAL(5,2) DEFAULT 10.00,
+                qualified_strategies_count INTEGER DEFAULT 0,
+                last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # 插入或更新配置
+        cursor.execute("""
+            INSERT INTO real_trading_control (id) VALUES (1)
+            ON CONFLICT (id) DO NOTHING
+        """)
+        
+        # 更新参数
+        if 'real_trading_enabled' in config_data:
+            real_trading_enabled = config_data['real_trading_enabled'].lower() == 'true'
+            cursor.execute("UPDATE real_trading_control SET real_trading_enabled = %s WHERE id = 1", 
+                         (real_trading_enabled,))
+        
+        if 'min_simulation_days' in config_data:
+            cursor.execute("UPDATE real_trading_control SET min_simulation_days = %s WHERE id = 1", 
+                         (int(config_data['min_simulation_days']),))
+        
+        if 'min_sim_win_rate' in config_data:
+            cursor.execute("UPDATE real_trading_control SET min_sim_win_rate = %s WHERE id = 1", 
+                         (float(config_data['min_sim_win_rate']),))
+        
+        if 'min_sim_total_pnl' in config_data:
+            cursor.execute("UPDATE real_trading_control SET min_sim_total_pnl = %s WHERE id = 1", 
+                         (float(config_data['min_sim_total_pnl']),))
+        
+        # 更新时间戳
+        cursor.execute("UPDATE real_trading_control SET last_update = CURRENT_TIMESTAMP WHERE id = 1")
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': '✅ 实盘交易控制参数已同步',
+            'synced_params': list(config_data.keys())
+        })
+        
+    except Exception as e:
+        logger.error(f"同步实盘交易配置失败: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'同步失败: {str(e)}'
+        })
+
 @app.route('/api/quantitative/evolution-log', methods=['GET'])
 def get_evolution_log():
     """🔥 增强：获取策略进化日志 - 包含详细参数变化信息"""
@@ -5102,78 +5175,5 @@ def get_strategy_trade_mode(score, strategy_id=None, parameters_recently_changed
 
 # ... existing code ...
 
-@app.route('/api/quantitative/sync-real-trading-config', methods=['POST'])
-def sync_real_trading_config():
-    """同步四层进化配置到real_trading_control表"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 从四层进化配置获取实盘交易控制参数
-        cursor.execute("""
-            SELECT config_key, config_value FROM four_tier_evolution_config 
-            WHERE config_category = 'real_trading_control'
-        """)
-        
-        config_data = dict(cursor.fetchall())
-        
-        # 确保real_trading_control表存在
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS real_trading_control (
-                id INTEGER PRIMARY KEY DEFAULT 1,
-                real_trading_enabled BOOLEAN DEFAULT FALSE,
-                min_simulation_days INTEGER DEFAULT 7,
-                min_sim_win_rate DECIMAL(5,2) DEFAULT 65.00,
-                min_sim_total_pnl DECIMAL(10,8) DEFAULT 5.00000000,
-                max_risk_per_trade DECIMAL(5,2) DEFAULT 2.00,
-                max_daily_risk DECIMAL(5,2) DEFAULT 10.00,
-                qualified_strategies_count INTEGER DEFAULT 0,
-                last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # 插入或更新配置
-        cursor.execute("""
-            INSERT INTO real_trading_control (id) VALUES (1)
-            ON CONFLICT (id) DO NOTHING
-        """)
-        
-        # 更新参数
-        if 'real_trading_enabled' in config_data:
-            real_trading_enabled = config_data['real_trading_enabled'].lower() == 'true'
-            cursor.execute("UPDATE real_trading_control SET real_trading_enabled = %s WHERE id = 1", 
-                         (real_trading_enabled,))
-        
-        if 'min_simulation_days' in config_data:
-            cursor.execute("UPDATE real_trading_control SET min_simulation_days = %s WHERE id = 1", 
-                         (int(config_data['min_simulation_days']),))
-        
-        if 'min_sim_win_rate' in config_data:
-            cursor.execute("UPDATE real_trading_control SET min_sim_win_rate = %s WHERE id = 1", 
-                         (float(config_data['min_sim_win_rate']),))
-        
-        if 'min_sim_total_pnl' in config_data:
-            cursor.execute("UPDATE real_trading_control SET min_sim_total_pnl = %s WHERE id = 1", 
-                         (float(config_data['min_sim_total_pnl']),))
-        
-        # 更新时间戳
-        cursor.execute("UPDATE real_trading_control SET last_update = CURRENT_TIMESTAMP WHERE id = 1")
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': '✅ 实盘交易控制参数已同步',
-            'synced_params': list(config_data.keys())
-        })
-        
-    except Exception as e:
-        logger.error(f"同步实盘交易配置失败: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'同步失败: {str(e)}'
-        })
-
-# ... existing code ...
+# API代码已移动到正确位置
 
