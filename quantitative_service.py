@@ -2005,33 +2005,24 @@ class AutomatedStrategyManager:
                 
             cursor = conn.cursor()
             
-            # 记录到进化历史表
+            # 记录到进化历史表（修复表名和字段名）
             cursor.execute("""
-                INSERT INTO strategy_evolution_history 
-                (strategy_id, generation, cycle, action_type, evolution_type,
-                 parameters, new_parameters, score_before, score_after,
-                 parameter_changes, parameter_analysis, evolution_reason, notes,
-                 created_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                INSERT INTO strategy_evolution_logs 
+                (strategy_id, generation, cycle_number, evolution_type,
+                 old_parameters, new_parameters, score_before, score_after,
+                 improvement, details, timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (
                 strategy_id,
                 1,  # generation
-                1,  # cycle
-                'parameter_evolution',
+                1,  # cycle_number
                 f'automated_{optimization_type}',
                 json.dumps(old_params),
                 json.dumps(new_params),
                 performance.get('score', 70.0),
                 performance.get('score', 70.0) + 1.0,  # 预期小幅提升
-                change_summary,
-                json.dumps({
-                    'total_changes': len(param_changes),
-                    'changes': param_changes[:10],
-                    'optimization_type': optimization_type,
-                    'change_summary': change_summary
-                }),
-                f"自动{optimization_type}: 策略评分{performance.get('score', 70.0):.1f}分",
-                f"系统执行{optimization_type}，参数变更{len(param_changes)}项: {change_summary}"
+                1.0,  # improvement
+                f"自动{optimization_type}: 策略评分{performance.get('score', 70.0):.1f}分，参数变更{len(param_changes)}项: {change_summary}"
             ))
             
             conn.commit()
