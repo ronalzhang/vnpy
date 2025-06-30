@@ -289,49 +289,49 @@ function renderArbitrageTable(opportunities) {
         
         // 交易对
         const symbolCell = document.createElement('td');
-        symbolCell.textContent = opp.symbol;
+        symbolCell.textContent = opp.symbol || '-';
         row.appendChild(symbolCell);
         
         // 买入所
         const buyExchangeCell = document.createElement('td');
-        buyExchangeCell.textContent = opp.buyExchange;
+        buyExchangeCell.textContent = opp.buy_exchange || '-';
         row.appendChild(buyExchangeCell);
         
         // 卖出所
         const sellExchangeCell = document.createElement('td');
-        sellExchangeCell.textContent = opp.sellExchange;
+        sellExchangeCell.textContent = opp.sell_exchange || '-';
         row.appendChild(sellExchangeCell);
         
-        // 买入价
+        // 买入价 - 添加null检查
         const buyPriceCell = document.createElement('td');
-        buyPriceCell.textContent = opp.buyPrice.toFixed(2);
+        buyPriceCell.textContent = (opp.buy_price && typeof opp.buy_price === 'number') ? opp.buy_price.toFixed(2) : '-';
         row.appendChild(buyPriceCell);
         
-        // 卖出价
+        // 卖出价 - 添加null检查
         const sellPriceCell = document.createElement('td');
-        sellPriceCell.textContent = opp.sellPrice.toFixed(2);
+        sellPriceCell.textContent = (opp.sell_price && typeof opp.sell_price === 'number') ? opp.sell_price.toFixed(2) : '-';
         row.appendChild(sellPriceCell);
         
         // 深度
         const depthCell = document.createElement('td');
-        depthCell.textContent = opp.depth ? opp.depth.toFixed(4) : '-';
+        depthCell.textContent = (opp.depth && typeof opp.depth === 'number') ? opp.depth.toFixed(4) : '-';
         row.appendChild(depthCell);
         
-        // 差价
+        // 差价 - 添加null检查
         const diffCell = document.createElement('td');
-        diffCell.textContent = opp.priceDiff.toFixed(2);
+        diffCell.textContent = (opp.price_diff && typeof opp.price_diff === 'number') ? opp.price_diff.toFixed(2) : '-';
         row.appendChild(diffCell);
         
-        // 差价百分比
+        // 差价百分比 - 添加null检查
         const diffPctCell = document.createElement('td');
         diffPctCell.className = 'text-success';
-        diffPctCell.textContent = opp.priceDiffPct.toFixed(2) + '%';
+        diffPctCell.textContent = (opp.price_diff_pct && typeof opp.price_diff_pct === 'number') ? (opp.price_diff_pct * 100).toFixed(2) + '%' : '-';
         row.appendChild(diffPctCell);
         
         // 可执行
         const executableCell = document.createElement('td');
         executableCell.className = 'text-center';
-        if (opp.executable) {
+        if (opp.is_executable) {
             executableCell.innerHTML = '<span class="badge bg-success">是</span>';
         } else {
             executableCell.innerHTML = '<span class="badge bg-secondary">否</span>';

@@ -136,7 +136,34 @@ body {
     transform: translateY(-1px);
 }
 
-/* 🗑️ 已删除重复的状态指示器定义，统一使用quantitative.css中的status-dot */
+/* ==================== 状态指示器 ==================== */
+/* 首页需要的状态圆点样式（来自quantitative.css） */
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #333; /* 默认黑色 */
+    display: inline-block;
+    margin-right: 8px;
+}
+
+/* 在线状态 - 金色闪动 */
+.status-dot.online {
+    background-color: #ffd700;
+    animation: golden-pulse 2s infinite;
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
+}
+
+/* 离线状态 - 黑色 */
+.status-dot.offline {
+    background-color: #333;
+}
+
+/* 警告状态 - 橙色 */
+.status-dot.warning {
+    background-color: #faad14;
+}
 
 @keyframes golden-pulse {
     0% {
