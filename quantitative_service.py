@@ -1760,15 +1760,15 @@ class AutomatedStrategyManager:
                     strategy_score = performance.get('score', 70.0)
                     
                     # 🎯 统一进化逻辑：所有策略都进行参数优化，不设分数门槛
-                    optimized_params = self._optimize_parameters_intelligently(current_params, performance)
-                    optimization_type = "智能进化"
+                                            optimized_params = self._optimize_parameters_intelligently(current_params, performance)
+                        optimization_type = "display"
                     
                     print(f"🧬 策略 {strategy_id[-8:]} 进行智能进化 (评分: {strategy_score:.1f})")
                     
                     if optimized_params != current_params:
                         # 更新策略参数
                         self._update_strategy_parameters(strategy_id, optimized_params)
-                        # 🔧 记录详细的参数变化历史
+                        # 🔧 记录详细的参数变化历史 (统一使用display类型)
                         self._record_parameter_evolution_history(strategy_id, current_params, optimized_params, performance, optimization_type)
                         logger.info(f"✅ 已完成策略 {strategy_id} 的{optimization_type}，参数已更新")
                     else:
