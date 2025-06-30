@@ -7247,50 +7247,54 @@ class ParameterOptimizer:
             print(f"📊 发现{len(bottlenecks)}个瓶颈: {list(bottlenecks.keys())}")
             
             # 根据瓶颈优化参数
-            for param_name, current_value in current_params.items():
-                # 🔧 参数名称映射，解决命名不一致问题
-                mapped_param_name = self._map_parameter_name(param_name)
-                if mapped_param_name not in self.optimization_directions:
-                    print(f"⚠️ 跳过不支持的参数: {param_name}")
-                    continue
+            for param_name, param_value in current_params.items():
+                try:
+                    # 🔧 参数名称映射，解决命名不一致问题
+                    mapped_param_name = self._map_parameter_name(param_name)
+                    if mapped_param_name not in self.optimization_directions:
+                        print(f"⚠️ 跳过不支持的参数: {param_name}")
+                        continue
+                        
+                    config = self.optimization_directions[mapped_param_name]
+                    min_val, max_val = config['range']
                     
-                config = self.optimization_directions[mapped_param_name]
-                min_val, max_val = config['range']
-                
-                # 确保当前值在合理范围内
-                current_value = max(min_val, min(max_val, float(current_value)))
-                
-                # 基于表现瓶颈决定优化方向
-                optimization_strategy = self.get_optimization_strategy(
-                    mapped_param_name, current_score, bottlenecks, strategy_stats
-                )
-                
-                new_value = self.apply_intelligent_optimization(
-                    mapped_param_name, current_value, optimization_strategy, config, strategy_stats
-                )
-                
-                # 确保新值在有效范围内
-                new_value = max(min_val, min(max_val, new_value))
-                
-                            # 🔧 记录有意义的变化（确保至少有1%的变化）并计算预期改进
-            change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
-            if change_ratio >= 0.01 or abs(new_value - current_value) > 0.01:  # 提高变化阈值
-                # 🧠 计算预期改进度
-                expected_improvement = self._calculate_expected_improvement(
-                    mapped_param_name, current_value, new_value, strategy_stats, optimization_strategy
-                )
-                
-                optimized_params[param_name] = round(new_value, 6)
-                changes.append({
-                    'parameter': param_name,
-                    'from': round(current_value, 6),
-                    'to': round(new_value, 6),
-                    'strategy': optimization_strategy,
-                    'reason': bottlenecks.get(param_name, f"{config.get('logic', '智能')} 优化"),
-                    'change_pct': round(change_ratio * 100, 2),
-                    'expected_improvement': expected_improvement,
-                    'impact_level': self._assess_parameter_impact(mapped_param_name, change_ratio)
-                })
+                    # 确保当前值在合理范围内
+                    current_value = max(min_val, min(max_val, float(param_value)))
+                    
+                    # 基于表现瓶颈决定优化方向
+                    optimization_strategy = self.get_optimization_strategy(
+                        mapped_param_name, current_score, bottlenecks, strategy_stats
+                    )
+                    
+                    new_value = self.apply_intelligent_optimization(
+                        mapped_param_name, current_value, optimization_strategy, config, strategy_stats
+                    )
+                    
+                    # 确保新值在有效范围内
+                    new_value = max(min_val, min(max_val, new_value))
+                    
+                    # 🔧 记录有意义的变化（确保至少有1%的变化）并计算预期改进
+                    change_ratio = abs(new_value - current_value) / current_value if current_value > 0 else 1
+                    if change_ratio >= 0.01 or abs(new_value - current_value) > 0.01:  # 提高变化阈值
+                        # 🧠 计算预期改进度
+                        expected_improvement = self._calculate_expected_improvement(
+                            mapped_param_name, current_value, new_value, strategy_stats, optimization_strategy
+                        )
+                        
+                        optimized_params[param_name] = round(new_value, 6)
+                        changes.append({
+                            'parameter': param_name,
+                            'from': round(current_value, 6),
+                            'to': round(new_value, 6),
+                            'strategy': optimization_strategy,
+                            'reason': bottlenecks.get(param_name, f"{config.get('logic', '智能')} 优化"),
+                            'change_pct': round(change_ratio * 100, 2),
+                            'expected_improvement': expected_improvement,
+                            'impact_level': self._assess_parameter_impact(mapped_param_name, change_ratio)
+                        })
+                except Exception as e:
+                    print(f"⚠️ 优化参数{param_name}失败: {e}")
+                    continue
             
             return optimized_params, changes
             
