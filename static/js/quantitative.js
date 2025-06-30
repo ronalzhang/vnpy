@@ -2260,7 +2260,7 @@ class UnifiedEvolutionLogManager {
     constructor() {
         this.logs = [];
         this.isLoading = false;
-        this.refreshInterval = 30000; // 30秒刷新一次
+        this.refreshInterval = 5000; // 🔥 优化：5秒刷新一次，提升响应速度
         this.refreshTimer = null;
         
         // 滚动配置
@@ -2273,7 +2273,7 @@ class UnifiedEvolutionLogManager {
         
         this.horizontalConfig = {
             containerId: 'strategyManagementEvolutionTicker', 
-            maxLogs: 10,
+            maxLogs: 30,  // 🔥 修复：改为30条日志
             scrollType: 'horizontal',
             animationDuration: 40000 // 40秒完整滚动
         };
@@ -2479,7 +2479,7 @@ class UnifiedEvolutionLogManager {
             return;
         }
         
-        // 🔥 修复：取最新的10条日志用于横向滚动，确保显示最新且完整的信息
+        // 🔥 修复：取最新的30条日志用于横向滚动，确保显示最新且完整的信息
         const recentLogs = [...this.logs]
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
             .slice(0, this.horizontalConfig.maxLogs);

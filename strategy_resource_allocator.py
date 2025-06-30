@@ -16,7 +16,7 @@ import json
 import os
 from datetime import datetime
 from collections import defaultdict
-import sqlite3
+import db_config  # 替换SQLite为PostgreSQL
 import math
 from decimal import Decimal
 
@@ -103,12 +103,12 @@ class StrategyResourceAllocator:
             return default_config
     
     def _connect_database(self):
-        """连接到数据库"""
+        """连接到PostgreSQL数据库"""
         try:
-            db_path = self.config["database_path"]
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            return conn
+            # 使用统一的PostgreSQL连接
+            db_adapter = db_config.DatabaseAdapter()
+            logger.info("已连接到PostgreSQL数据库")
+            return db_adapter
         except Exception as e:
             logger.error(f"数据库连接失败: {e}")
             return None
