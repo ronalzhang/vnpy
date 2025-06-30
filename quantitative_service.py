@@ -1756,20 +1756,14 @@ class AutomatedStrategyManager:
                         logger.warning(f"策略 {strategy_id} 没有参数信息，跳过优化")
                         continue
                     
-                    # 🔧 修复：根据策略评分确定优化强度和方向
+                    # 🔥 修复：不管多少分都要进化操作！统一使用智能优化
                     strategy_score = performance.get('score', 70.0)
-                    if strategy_score < 70.0:
-                        # 差策略：激进优化
-                        optimized_params = self._optimize_parameters_aggressively(current_params, performance)
-                        optimization_type = "激进优化"
-                    elif strategy_score < 85.0:
-                        # 良策略：精细优化
-                        optimized_params = self._optimize_parameters_precisely(current_params, performance)
-                        optimization_type = "精细优化"
-                    else:
-                        # 精英策略：微调优化
-                        optimized_params = self._optimize_parameters_conservatively(current_params, performance)
-                        optimization_type = "微调优化"
+                    
+                    # 🎯 统一进化逻辑：所有策略都进行参数优化，不设分数门槛
+                    optimized_params = self._optimize_parameters_intelligently(current_params, performance)
+                    optimization_type = "智能进化"
+                    
+                    print(f"🧬 策略 {strategy_id[-8:]} 进行智能进化 (评分: {strategy_score:.1f})")
                     
                     if optimized_params != current_params:
                         # 更新策略参数
@@ -2048,6 +2042,69 @@ class AutomatedStrategyManager:
             
         except Exception as e:
             logger.error(f"❌ 记录参数进化历史失败: {e}")
+
+    def _optimize_parameters_intelligently(self, current_params: Dict, performance: Dict) -> Dict:
+        """🧠 智能参数优化 - 统一优化逻辑，不设分数门槛"""
+        import random
+        try:
+            optimized_params = current_params.copy()
+            
+            # 🎯 智能优化强度：5-15%的适中调整
+            base_adjustment = 0.08  # 基础8%调整
+            
+            # 🔧 基于性能指标动态调整优化强度
+            win_rate = performance.get('win_rate', 50.0)
+            total_return = performance.get('total_return', 0.0)
+            total_trades = performance.get('total_trades', 0)
+            
+            # 动态调整优化强度
+            if win_rate < 40 or total_return < 0:
+                # 表现较差，增强优化
+                adjustment_range = base_adjustment * 1.5  # 12%
+            elif win_rate > 80 and total_return > 20:
+                # 表现优秀，温和优化
+                adjustment_range = base_adjustment * 0.5  # 4%
+            else:
+                # 中等表现，标准优化
+                adjustment_range = base_adjustment  # 8%
+            
+            # 🎯 对所有参数进行智能优化
+            params_optimized = 0
+            for param_name, param_value in current_params.items():
+                if isinstance(param_value, (int, float)) and param_value > 0:
+                    
+                    # 🔧 基于参数类型和性能指标选择优化方向
+                    if 'threshold' in param_name and win_rate < 60:
+                        # 胜率低，降低入场门槛
+                        direction = -1
+                        adjustment = random.uniform(0.03, adjustment_range)
+                    elif 'profit' in param_name and total_return < 10:
+                        # 收益低，提高目标
+                        direction = 1
+                        adjustment = random.uniform(0.05, adjustment_range * 1.2)
+                    elif 'stop_loss' in param_name and total_return < 0:
+                        # 亏损严重，收紧止损
+                        direction = -1
+                        adjustment = random.uniform(0.02, adjustment_range * 0.8)
+                    else:
+                        # 常规随机优化
+                        direction = random.choice([-1, 1])
+                        adjustment = random.uniform(0.02, adjustment_range)
+                    
+                    new_value = param_value * (1 + direction * adjustment)
+                    new_value = self._ensure_parameter_bounds(param_name, new_value)
+                    
+                    # 确保参数真的发生了变化
+                    if abs(new_value - param_value) > 0.001:
+                        optimized_params[param_name] = new_value
+                        params_optimized += 1
+            
+            print(f"  📊 智能优化完成: 调整了{params_optimized}个参数 (调整强度: {adjustment_range:.1%})")
+            return optimized_params
+            
+        except Exception as e:
+            logger.error(f"智能参数优化失败: {e}")
+            return current_params
 
     def _ensure_parameter_bounds(self, param_name: str, value: float) -> float:
         """🎯 确保参数在合理范围内"""
