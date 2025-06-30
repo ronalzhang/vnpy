@@ -2455,8 +2455,19 @@ class QuantitativeService:
         """安全执行高频池进化 - 带超时和资源控制"""
         try:
             if hasattr(self.four_tier_manager, 'evolve_high_freq_pool'):
-                # 执行高频池进化，不传递max_strategies参数
-                result = self.four_tier_manager.evolve_high_freq_pool()
+                # 🔧 修复异步调用问题：使用asyncio.run执行异步方法
+                import asyncio
+                try:
+                    # 如果已有事件循环，使用create_task
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        print("⚠️ [第2层] 检测到运行中的事件循环，跳过高频池进化以避免冲突")
+                        return
+                    else:
+                        result = loop.run_until_complete(self.four_tier_manager.evolve_high_freq_pool())
+                except RuntimeError:
+                    # 没有事件循环，创建新的
+                    result = asyncio.run(self.four_tier_manager.evolve_high_freq_pool())
                 print(f"📊 [第2层] 高频池进化完成")
             else:
                 print("⚠️ [第2层] 四层管理器未初始化，跳过进化")
@@ -2468,7 +2479,19 @@ class QuantitativeService:
         """安全执行前端显示策略进化"""
         try:
             if hasattr(self.four_tier_manager, 'evolve_display_strategies'):
-                result = self.four_tier_manager.evolve_display_strategies()
+                # 🔧 修复异步调用问题：使用asyncio.run执行异步方法
+                import asyncio
+                try:
+                    # 如果已有事件循环，使用create_task
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        print("⚠️ [第3层] 检测到运行中的事件循环，跳过前端策略进化以避免冲突")
+                        return
+                    else:
+                        result = loop.run_until_complete(self.four_tier_manager.evolve_display_strategies())
+                except RuntimeError:
+                    # 没有事件循环，创建新的
+                    result = asyncio.run(self.four_tier_manager.evolve_display_strategies())
                 print(f"📊 [第3层] 前端显示策略进化完成")
             else:
                 print("⚠️ [第3层] 四层管理器未初始化，跳过进化")
@@ -3833,12 +3856,18 @@ class QuantitativeService:
                         open_price = open_cycle[3]
                         open_time = open_cycle[2]
                     
+                    # 🔧 修复数据类型混用：确保所有数值都是float类型
                     # 计算持有分钟数
                     holding_minutes = max(1, int((datetime.now() - open_time).total_seconds() / 60))
                     
-                    # 计算周期总盈亏和MRoT
-                    cycle_pnl = pnl + (quantity * (price - open_price))  # 开仓+平仓总盈亏
-                    mrot_score = cycle_pnl / holding_minutes if holding_minutes > 0 else 0
+                    # 计算周期总盈亏和MRoT - 修复Decimal和float混用问题
+                    pnl_float = float(pnl) if pnl is not None else 0.0
+                    quantity_float = float(quantity) if quantity is not None else 0.0
+                    price_float = float(price) if price is not None else 0.0
+                    open_price_float = float(open_price) if open_price is not None else 0.0
+                    
+                    cycle_pnl = pnl_float + (quantity_float * (price_float - open_price_float))  # 开仓+平仓总盈亏
+                    mrot_score = cycle_pnl / holding_minutes if holding_minutes > 0 else 0.0
                     
                     # 更新平仓记录
                     self.db_manager.execute_query("""

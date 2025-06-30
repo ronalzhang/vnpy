@@ -1221,11 +1221,15 @@ def quantitative_strategies():
                 limit = int(request.args.get('limit', None) or 0) 
                 print(f"🚀 现代化策略API请求: limit={limit}")
                 
+                # 🔧 修复变量作用域错误：统一使用strategies变量
+                strategies = []  # 初始化strategies变量
+                
                 # 使用现代化管理器获取前端显示策略
                 try:
                     from modern_strategy_manager import get_modern_strategy_manager
                     manager = get_modern_strategy_manager()
                     frontend_data = manager.get_frontend_display_data()
+                    strategies = frontend_data  # 🔧 修复：将frontend_data赋值给strategies
                 except ImportError as e:
                     print(f"⚠️ 现代化策略管理器导入失败: {e}")
                     # 降级使用基础策略获取方式
@@ -1235,7 +1239,7 @@ def quantitative_strategies():
                     strategies = _get_basic_strategies_list()
                 
                 # 如果指定了limit，则截取
-                if limit > 0:
+                if limit > 0 and strategies:
                     strategies = strategies[:limit]
                 
                 # 🔥 修复现代化系统：重新计算胜率和收益，确保与详情页API数据一致
