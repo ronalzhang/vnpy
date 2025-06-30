@@ -325,7 +325,7 @@ function renderArbitrageTable(opportunities) {
         // 差价百分比 - 添加null检查
         const diffPctCell = document.createElement('td');
         diffPctCell.className = 'text-success';
-        diffPctCell.textContent = (opp.price_diff_pct && typeof opp.price_diff_pct === 'number') ? (opp.price_diff_pct * 100).toFixed(2) + '%' : '-';
+        diffPctCell.textContent = (opp.price_diff_pct && typeof opp.price_diff_pct === 'number') ? opp.price_diff_pct.toFixed(3) + '%' : '-';
         row.appendChild(diffPctCell);
         
         // 可执行
