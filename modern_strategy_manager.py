@@ -463,10 +463,14 @@ class FourTierStrategyManager:
             return False
 
     async def _execute_validation_trades(self, strategy: Dict, evolution_type: str, validation_count: int):
-        """执行验证交易"""
+        """执行验证交易并检查参数回退"""
         try:
             conn = self._get_db_connection()
             cursor = conn.cursor()
+            
+            # 🔄 添加参数回退机制：检查进化前后表现
+            old_score = strategy.get('final_score', 0)
+            validation_results = []
             
             for i in range(validation_count):
                 # 生成验证交易信号
@@ -498,14 +502,185 @@ class FourTierStrategyManager:
                     signal_data['timestamp'],
                     f"{evolution_type}_{i+1}"  # cycle_id
                 ))
+                
+                # 收集验证结果
+                validation_results.append(signal_data['expected_return'])
+            
+            # 🔄 关键：评估参数变化效果并决定是否回退
+            avg_validation_return = sum(validation_results) / len(validation_results)
+            new_estimated_score = old_score + (avg_validation_return * 2)  # 简化评分估算
+            
+            # 🚨 触发回退条件：
+            # 1. 新参数表现明显下降（评分降低超过3分）
+            # 2. 连续负收益
+            should_rollback = (
+                new_estimated_score < old_score - 3.0 or  # 评分下降超过3分
+                avg_validation_return < -1.0 or           # 平均负收益超过1%
+                all(r < 0 for r in validation_results)    # 所有验证交易都亏损
+            )
+            
+            if should_rollback:
+                await self._rollback_strategy_parameters(strategy, evolution_type, 
+                                                       old_score, new_estimated_score, 
+                                                       avg_validation_return)
+            else:
+                # 参数表现良好，更新评分
+                cursor.execute("""
+                    UPDATE strategies 
+                    SET final_score = %s, 
+                        last_validation_time = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (new_estimated_score, strategy['id']))
+                
+                logger.info(f"✅ 策略{strategy['id'][-4:]}参数验证通过：{old_score:.1f}→{new_estimated_score:.1f}")
             
             conn.commit()
             conn.close()
             
-            logger.debug(f"✅ 策略 {strategy['id']} 完成 {validation_count} 次{evolution_type}验证交易")
-            
         except Exception as e:
             logger.error(f"❌ 验证交易执行失败: {e}")
+
+    async def _rollback_strategy_parameters(self, strategy: Dict, evolution_type: str, 
+                                          old_score: float, new_score: float, 
+                                          validation_return: float):
+        """🔄 参数回退机制：恢复到上一个稳定的参数配置"""
+        try:
+            conn = self._get_db_connection()
+            cursor = conn.cursor()
+            
+            # 🔍 查找上一个成功的参数配置
+            cursor.execute("""
+                SELECT parameters, score_after, created_time
+                FROM strategy_evolution_history 
+                WHERE strategy_id = %s 
+                  AND score_after > %s 
+                  AND parameters IS NOT NULL
+                ORDER BY created_time DESC 
+                LIMIT 1
+            """, (strategy['id'], old_score - 2.0))  # 查找比当前评分高2分以上的历史配置
+            
+            rollback_record = cursor.fetchone()
+            
+            if rollback_record:
+                # 🔄 恢复到历史稳定参数
+                stable_params, stable_score, rollback_time = rollback_record
+                
+                if isinstance(stable_params, str):
+                    stable_params = json.loads(stable_params)
+                
+                cursor.execute("""
+                    UPDATE strategies 
+                    SET parameters = %s,
+                        final_score = %s,
+                        last_rollback_time = CURRENT_TIMESTAMP,
+                        rollback_count = COALESCE(rollback_count, 0) + 1
+                    WHERE id = %s
+                """, (json.dumps(stable_params), stable_score, strategy['id']))
+                
+                # 📝 记录回退操作
+                cursor.execute("""
+                    INSERT INTO strategy_evolution_history 
+                    (strategy_id, evolution_type, action_type,
+                     parameters, new_parameters, 
+                     score_before, score_after,
+                     improvement, evolution_reason, parameter_changes,
+                     created_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                """, (
+                    strategy['id'],
+                    f"{evolution_type}_rollback",
+                    "parameter_rollback",
+                    json.dumps(strategy.get('parameters', {})),  # 失败的参数
+                    json.dumps(stable_params),                   # 回退到的参数
+                    new_score,
+                    stable_score,
+                    stable_score - new_score,
+                    f"参数回退：验证表现差({validation_return:.2f}%)，回退到{rollback_time}的稳定配置",
+                    f"回退参数，恢复到评分{stable_score:.1f}的历史配置"
+                ))
+                
+                logger.warning(f"🔄 策略{strategy['id'][-4:]}参数回退：{new_score:.1f}→{stable_score:.1f} (验证收益{validation_return:.2f}%)")
+                
+            else:
+                # 🚨 没有找到稳定配置，使用默认安全参数
+                await self._apply_safe_default_parameters(strategy, evolution_type, new_score)
+            
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            logger.error(f"❌ 参数回退失败: {e}")
+
+    async def _apply_safe_default_parameters(self, strategy: Dict, evolution_type: str, failed_score: float):
+        """🛡️ 应用安全的默认参数配置"""
+        try:
+            conn = self._get_db_connection()
+            cursor = conn.cursor()
+            
+            # 🛡️ 定义安全的默认参数配置
+            safe_default_params = {
+                "lookback_period": 21.0,
+                "breakout_threshold": 0.02,
+                "quantity": 50.0,
+                "volume_threshold": 1000000.0,
+                "confirmation_periods": 3,
+                "atr_period": 14.0,
+                "atr_multiplier": 2.0,
+                "volume_ma_period": 20.0,
+                "rsi_period": 14.0,
+                "rsi_oversold": 30.0,
+                "rsi_overbought": 70.0,
+                "ma_short_period": 10.0,
+                "ma_long_period": 30.0,
+                "bollinger_period": 20.0,
+                "bollinger_std": 2.0,
+                "stop_loss_percent": 3.0,
+                "take_profit_percent": 6.0,
+                "max_holding_minutes": 60.0,
+                "risk_percent": 1.0
+            }
+            
+            # 🛡️ 设置保守的默认评分
+            safe_score = 45.0  # 略低于平均值，需要重新验证
+            
+            cursor.execute("""
+                UPDATE strategies 
+                SET parameters = %s,
+                    final_score = %s,
+                    last_safety_reset_time = CURRENT_TIMESTAMP,
+                    safety_reset_count = COALESCE(safety_reset_count, 0) + 1
+                WHERE id = %s
+            """, (json.dumps(safe_default_params), safe_score, strategy['id']))
+            
+            # 📝 记录安全重置操作
+            cursor.execute("""
+                INSERT INTO strategy_evolution_history 
+                (strategy_id, evolution_type, action_type,
+                 parameters, new_parameters,
+                 score_before, score_after,
+                 improvement, evolution_reason, parameter_changes,
+                 created_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, (
+                strategy['id'],
+                f"{evolution_type}_safety_reset",
+                "safety_parameter_reset",
+                json.dumps(strategy.get('parameters', {})),
+                json.dumps(safe_default_params),
+                failed_score,
+                safe_score,
+                safe_score - failed_score,
+                f"安全重置：无稳定历史配置，应用默认安全参数",
+                "重置为安全默认参数配置"
+            ))
+            
+            conn.commit()
+            conn.close()
+            
+            logger.warning(f"🛡️ 策略{strategy['id'][-4:]}安全重置：应用默认参数，评分→{safe_score}")
+            
+        except Exception as e:
+            logger.error(f"❌ 安全参数重置失败: {e}")
 
     def get_evolution_statistics(self):
         """获取四层进化系统统计信息"""
@@ -907,6 +1082,62 @@ class FourTierStrategyManager:
                 'significant_changes': 0,
                 'change_summary': '分析失败'
             }
+
+    def check_and_rollback_underperforming_strategies(self):
+        """🔍 主动检查并回退表现不佳的策略"""
+        try:
+            conn = self._get_db_connection()
+            cursor = conn.cursor()
+            
+            # 🔍 查找最近24小时内表现持续下降的策略
+            cursor.execute("""
+                SELECT DISTINCT s.id, s.final_score, s.parameters
+                FROM strategies s
+                JOIN trading_signals ts ON s.id = ts.strategy_id
+                WHERE ts.timestamp >= NOW() - INTERVAL '24 hours'
+                  AND ts.is_validation = TRUE
+                  AND s.final_score < 50.0  -- 低分策略
+                GROUP BY s.id, s.final_score, s.parameters
+                HAVING AVG(ts.expected_return) < -0.5  -- 平均负收益
+                   AND COUNT(ts.id) >= 5   -- 至少5次验证交易
+            """)
+            
+            underperforming_strategies = cursor.fetchall()
+            rollback_count = 0
+            
+            for strategy_id, current_score, current_params in underperforming_strategies:
+                try:
+                    # 应用回退机制
+                    strategy_data = {
+                        'id': strategy_id,
+                        'final_score': current_score,
+                        'parameters': json.loads(current_params) if isinstance(current_params, str) else current_params
+                    }
+                    
+                    await self._rollback_strategy_parameters(
+                        strategy_data, 
+                        "performance_check",
+                        current_score, 
+                        current_score - 5.0,  # 模拟下降
+                        -0.75  # 负收益
+                    )
+                    
+                    rollback_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"❌ 策略{strategy_id}回退失败: {e}")
+                    continue
+            
+            conn.close()
+            
+            if rollback_count > 0:
+                logger.info(f"🔄 主动参数回退完成：{rollback_count}个表现不佳策略已回退")
+            
+            return rollback_count
+            
+        except Exception as e:
+            logger.error(f"❌ 主动回退检查失败: {e}")
+            return 0
 
 
 def get_four_tier_strategy_manager() -> FourTierStrategyManager:
