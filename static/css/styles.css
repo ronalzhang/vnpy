@@ -136,32 +136,7 @@ body {
     transform: translateY(-1px);
 }
 
-/* 状态指示器 */
-.status-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 5px;
-}
-
-.status-online { 
-    background-color: #52c41a;
-}
-
-.status-offline { 
-    background-color: #333;
-}
-
-.status-warning { 
-    background-color: #faad14;
-}
-
-.status-running {
-    background-color: #ffd700;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
-    animation: golden-pulse 2s infinite;
-}
+/* 🗑️ 已删除重复的状态指示器定义，统一使用quantitative.css中的status-dot */
 
 @keyframes golden-pulse {
     0% {
@@ -414,7 +389,7 @@ body {
         white-space: nowrap;
     }
     
-    .status-indicator {
+    .status-dot {
         width: 5px;
         height: 5px;
     }

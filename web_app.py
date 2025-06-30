@@ -354,7 +354,7 @@ SYMBOLS = [
     "ADA/USDT", "DOT/USDT", "AVAX/USDT", "SHIB/USDT"
 ]
 EXCHANGES = ["binance", "okx", "bitget"]
-ARBITRAGE_THRESHOLD = 0.5
+ARBITRAGE_THRESHOLD = 0.1  # 🔧 修复：从0.5%降低到0.1%，提高套利机会检测敏感度
 CLOSE_THRESHOLD = 0.2
 
 # 交易所API客户端

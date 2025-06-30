@@ -238,7 +238,7 @@
                                 校长的量化系统
                             </a>
                             <div class="system-status">
-                                <span class="status-indicator status-offline" id="system-status-indicator"></span>
+                                <span class="status-dot offline" id="system-status-indicator"></span>
                                 <span id="system-status-text">离线</span>
                                 <span id="current-time">2025/6/4 05:05:27</span>
                             </div>
@@ -732,11 +732,11 @@
         
         if (running) {
             // 系统运行中 - 金色闪动
-            statusIndicator.className = 'status-indicator status-running';
-            statusText.textContent = '运行中';
+            statusIndicator.className = 'status-dot online';
+            statusText.textContent = '在线';
         } else {
             // 系统离线 - 黑色
-            statusIndicator.className = 'status-indicator status-offline';
+            statusIndicator.className = 'status-dot offline';
             statusText.textContent = '离线';
         }
         
@@ -1107,10 +1107,10 @@
             const statusText = document.getElementById('system-status-text');
             if (statusIndicator && statusText) {
                 if (isRunning) {
-                    statusIndicator.className = 'status-indicator status-running';
-                    statusText.textContent = '运行中';
+                    statusIndicator.className = 'status-dot online';
+                    statusText.textContent = '在线';
                 } else {
-                    statusIndicator.className = 'status-indicator status-offline';
+                    statusIndicator.className = 'status-dot offline';
                     statusText.textContent = '离线';
                 }
             }
