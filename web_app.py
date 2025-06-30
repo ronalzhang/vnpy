@@ -4573,15 +4573,41 @@ def get_unified_system_status():
             status['services']['pm2_processes'] = 'offline'
             status['details']['pm2_error'] = str(e)
         
-        # 4. 策略引擎检测
+        # 4. 策略引擎检测 - 检查后端量化服务状态
         try:
-            if hasattr(app, 'quant_service') and app.quant_service:
-                if hasattr(app.quant_service, 'is_system_enabled') and app.quant_service.is_system_enabled:
-                    status['services']['strategy_engine'] = 'online'
-                else:
-                    status['services']['strategy_engine'] = 'offline'
+            # 检查后端量化服务是否启用（通过内部API调用）
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 检查数据库中是否有活跃的策略和近期交易信号
+            cursor.execute("""
+                SELECT COUNT(*) as enabled_strategies FROM strategies WHERE enabled = 1
+            """)
+            result = cursor.fetchone()
+            enabled_strategies = result[0] if result else 0
+            
+            cursor.execute("""
+                SELECT COUNT(*) as recent_signals FROM trading_signals 
+                WHERE timestamp >= NOW() - INTERVAL '30 minutes'
+            """)
+            result = cursor.fetchone()
+            recent_signals = result[0] if result else 0
+            
+            conn.close()
+            
+            # 如果有启用的策略且有近期信号，认为策略引擎在线
+            if enabled_strategies > 0 and recent_signals > 0:
+                status['services']['strategy_engine'] = 'online'
+                status['details']['enabled_strategies'] = enabled_strategies
+                status['details']['recent_signals'] = recent_signals
+            elif enabled_strategies > 0:
+                status['services']['strategy_engine'] = 'degraded'  # 有策略但无近期信号
+                status['details']['enabled_strategies'] = enabled_strategies
+                status['details']['recent_signals'] = recent_signals
             else:
                 status['services']['strategy_engine'] = 'offline'
+                status['details']['strategy_note'] = '无启用的策略'
+                
         except Exception as e:
             status['services']['strategy_engine'] = 'offline'
             status['details']['strategy_error'] = str(e)
