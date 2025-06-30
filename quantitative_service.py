@@ -6968,6 +6968,21 @@ class ParameterOptimizer:
             }
         
         print(f"✅ 参数优化器初始化完成，支持{len(self.optimization_directions)}个参数的智能优化")
+    
+    def _map_parameter_name(self, param_name):
+        """🔧 参数名称映射，解决命名不一致问题"""
+        parameter_mapping = {
+            'rsi_overbought': 'rsi_upper',
+            'rsi_oversold': 'rsi_lower',
+            'bb_upper_mult': 'bollinger_std',
+            'bb_period': 'bollinger_period',
+            'ema_fast_period': 'macd_fast_period',
+            'ema_slow_period': 'macd_slow_period',
+            'sma_period': 'ema_period',
+            'adx_period': 'atr_period',
+            'adx_threshold': 'threshold'
+        }
+        return parameter_mapping.get(param_name, param_name)
         
     def calculate_performance_score(self, strategy_stats):
         """计算策略综合表现评分 - 直接实现评分逻辑"""
@@ -7030,10 +7045,13 @@ class ParameterOptimizer:
             
             # 根据瓶颈优化参数
             for param_name, current_value in current_params.items():
-                if param_name not in self.optimization_directions:
+                # 🔧 参数名称映射，解决命名不一致问题
+                mapped_param_name = self._map_parameter_name(param_name)
+                if mapped_param_name not in self.optimization_directions:
+                    print(f"⚠️ 跳过不支持的参数: {param_name}")
                     continue
                     
-                config = self.optimization_directions[param_name]
+                config = self.optimization_directions[mapped_param_name]
                 min_val, max_val = config['range']
                 
                 # 确保当前值在合理范围内
@@ -7041,11 +7059,11 @@ class ParameterOptimizer:
                 
                 # 基于表现瓶颈决定优化方向
                 optimization_strategy = self.get_optimization_strategy(
-                    param_name, current_score, bottlenecks, strategy_stats
+                    mapped_param_name, current_score, bottlenecks, strategy_stats
                 )
                 
                 new_value = self.apply_intelligent_optimization(
-                    param_name, current_value, optimization_strategy, config, strategy_stats
+                    mapped_param_name, current_value, optimization_strategy, config, strategy_stats
                 )
                 
                 # 确保新值在有效范围内
@@ -7056,7 +7074,7 @@ class ParameterOptimizer:
             if change_ratio >= 0.01 or abs(new_value - current_value) > 0.01:  # 提高变化阈值
                 # 🧠 计算预期改进度
                 expected_improvement = self._calculate_expected_improvement(
-                    param_name, current_value, new_value, strategy_stats, optimization_strategy
+                    mapped_param_name, current_value, new_value, strategy_stats, optimization_strategy
                 )
                 
                 optimized_params[param_name] = round(new_value, 6)
@@ -7068,7 +7086,7 @@ class ParameterOptimizer:
                     'reason': bottlenecks.get(param_name, f"{config.get('logic', '智能')} 优化"),
                     'change_pct': round(change_ratio * 100, 2),
                     'expected_improvement': expected_improvement,
-                    'impact_level': self._assess_parameter_impact(param_name, change_ratio)
+                    'impact_level': self._assess_parameter_impact(mapped_param_name, change_ratio)
                 })
             
             return optimized_params, changes
