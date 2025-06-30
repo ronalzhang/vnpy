@@ -4972,15 +4972,69 @@ def get_elimination_threshold_by_stage(total_strategies, avg_score):
 # ... existing code ...
 
 # 修改现有的评分判断逻辑
-def get_strategy_trade_mode(score):
-    """策略交易模式判断 - 保留验证交易vs真实交易二分法"""
+def get_strategy_trade_mode(score, strategy_id=None, parameters_recently_changed=None):
+    """🎯 策略交易模式判断 - 严格的验证逻辑
+    
+    核心原则：
+    1. 任何参数调整后的策略，无论分数多高，都必须先用验证交易验证新参数
+    2. 只有经过足够验证的参数才能用于真实交易
+    3. 绝不用真实资金做验证工作
+    """
+    
+    # 🚨 第一优先级：检查参数是否刚被修改
+    if parameters_recently_changed is None and strategy_id:
+        try:
+            # 检查策略是否有未验证的参数修改
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # 查询策略最近的参数修改记录
+            cursor.execute("""
+                SELECT 
+                    MAX(timestamp) as last_param_change,
+                    COUNT(*) as validation_trades_since_change
+                FROM (
+                    SELECT timestamp FROM strategy_optimization_logs 
+                    WHERE strategy_id = %s 
+                    ORDER BY timestamp DESC LIMIT 1
+                ) param_changes
+                LEFT JOIN trading_signals ts ON ts.strategy_id = %s 
+                    AND ts.timestamp > param_changes.timestamp
+                    AND ts.trade_type = 'validation'
+            """, (strategy_id, strategy_id))
+            
+            result = cursor.fetchone()
+            last_change = result[0] if result and result[0] else None
+            validation_count = result[1] if result and result[1] else 0
+            
+            cursor.close()
+            conn.close()
+            
+            # 如果有最近的参数修改且验证交易不足，强制验证交易
+            if last_change:
+                hours_since_change = (datetime.now() - last_change).total_seconds() / 3600
+                
+                # 🚨 严格验证要求：参数修改后需要至少20次验证交易 + 24小时等待
+                if hours_since_change < 24 or validation_count < 20:
+                    return "验证交易"  # 强制验证交易，保护资金安全
+                    
+        except Exception as e:
+            print(f"⚠️ 检查参数修改状态失败: {e}")
+            # 出错时保守处理，使用验证交易
+            return "验证交易"
+    
+    # 🚨 第二优先级：如果明确传入参数最近被修改，强制验证交易
+    if parameters_recently_changed:
+        return "验证交易"  # 绝不用真实资金验证新参数
+    
+    # 📊 第三优先级：基于分数的常规判断（仅适用于参数稳定的策略）
     tier_info = get_strategy_tier_by_score(score)
     
-    # 🎯 保留用户要求的二分法逻辑：大量验证交易 + 少量真实交易
-    if score >= 70.0:  # 70分以上才进行真实交易
+    # 70分以上且参数稳定的策略才能进行真实交易
+    if score >= 70.0:
         return "真实交易"
     else:
-        return "验证交易"  # 60-69分潜力策略也用验证交易完善
+        return "验证交易"
 
 # ... existing code ...
 
