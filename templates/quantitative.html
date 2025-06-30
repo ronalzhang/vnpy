@@ -598,15 +598,11 @@
                             </div>
                         </div>
 
-                            <!-- 进化频率配置 -->
+                            <!-- 🔧 统一进化频率配置 -->
                             <div class="tier-config-group">
-                                <h4>⏰ 进化频率配置</h4>
+                                <h4>⏰ 统一进化频率配置</h4>
+                                <p><small>🎯 已删除重复的传统进化间隔配置，统一使用Modern Strategy Manager的四层配置</small></p>
                                 <div class="config-grid">
-                                    <div class="config-item">
-                                        <label for="evolutionInterval">传统系统进化间隔 (分钟)</label>
-                                        <input type="number" id="evolutionInterval" name="evolutionInterval" min="1" max="60" step="1">
-                                        <small>传统进化系统的基础间隔设置</small>
-                            </div>
                                     <div class="config-item">
                                         <label for="low_freq_interval_hours">策略池进化间隔 (小时)</label>
                                         <input type="number" id="low_freq_interval_hours" name="low_freq_interval_hours" min="6" max="72" step="6">
@@ -686,6 +682,36 @@
                                     </div>
                                     </div>
                                 </div>
+
+                            <!-- 🔧 新增：实盘交易控制参数 -->
+                            <div class="tier-config-group">
+                                <h4>🎯 实盘交易控制参数</h4>
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <label for="real_trading_enabled">启用实盘交易</label>
+                                        <select id="real_trading_enabled" name="real_trading_enabled">
+                                            <option value="false">禁用</option>
+                                            <option value="true">启用</option>
+                                        </select>
+                                        <small>全局实盘交易开关</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="min_simulation_days">最少模拟天数</label>
+                                        <input type="number" id="min_simulation_days" name="min_simulation_days" min="1" max="30" step="1">
+                                        <small>策略进入实盘前的最少模拟交易天数</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="min_sim_win_rate">最低模拟胜率 (%)</label>
+                                        <input type="number" id="min_sim_win_rate" name="min_sim_win_rate" min="50" max="95" step="5">
+                                        <small>策略进入实盘交易的最低胜率要求</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="min_sim_total_pnl">最低模拟盈利 (USDT)</label>
+                                        <input type="number" id="min_sim_total_pnl" name="min_sim_total_pnl" min="0" max="100" step="1">
+                                        <small>策略进入实盘交易的最低累计盈利</small>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- 四层系统状态显示 -->
                             <div class="tier-config-group">

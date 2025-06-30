@@ -1643,8 +1643,7 @@ class QuantitativeSystem {
     // 更新管理配置表单
     updateManagementForm() {
         if (managementConfig) {
-            // 🔥 修复：安全设置传统配置元素，避免null错误
-            this.safeSetValue('evolutionInterval', managementConfig.evolutionInterval || 10);
+            // 🔧 修复：安全设置传统配置元素，避免null错误（删除evolutionInterval）
             this.safeSetValue('maxStrategies', managementConfig.maxStrategies || 20);
             this.safeSetValue('realTradingScore', managementConfig.realTradingScore || 65);
             this.safeSetValue('realTradingCount', managementConfig.realTradingCount || 2);
@@ -1665,19 +1664,12 @@ class QuantitativeSystem {
             
             // 🔧 新增：参数验证配置
             this.safeSetValue('paramValidationTrades', managementConfig.paramValidationTrades || 20);
-            this.safeSetValue('paramValidationHours', managementConfig.paramValidationHours || 24);
-            this.safeSetCheckbox('enableStrictValidation', managementConfig.enableStrictValidation !== false);  // 默认为true
             
-            // 🔧 新增：统一验证交易配置字段映射
-            this.safeSetValue('unified_validation_count', managementConfig.paramValidationTrades || 4);  // 统一验证次数
-            this.safeSetValue('validation_score_threshold_high', 80);  // 高分策略门槛
-            this.safeSetValue('validation_score_threshold_mid', 60);   // 中等策略门槛
-            this.safeSetValue('real_trading_score_threshold', managementConfig.realTradingScore || 65);  // 实盘交易评分门槛
-        }
-
-        // 🔥 新增：同时初始化四层配置管理器
-        if (window.fourTierConfigManager) {
-            window.fourTierConfigManager.loadConfig();
+            // 🔧 新增：设置实盘交易控制参数
+            this.safeSetValue('real_trading_enabled', managementConfig.real_trading_enabled || false);
+            this.safeSetValue('min_simulation_days', managementConfig.min_simulation_days || 7);
+            this.safeSetValue('min_sim_win_rate', managementConfig.min_sim_win_rate || 65);
+            this.safeSetValue('min_sim_total_pnl', managementConfig.min_sim_total_pnl || 5);
         }
     }
 
@@ -1710,7 +1702,6 @@ class QuantitativeSystem {
     async saveManagementConfig() {
         try {
             const updatedConfig = {
-                evolutionInterval: parseInt(document.getElementById('evolutionInterval')?.value) || 10,
                 maxStrategies: parseInt(document.getElementById('maxStrategies')?.value) || 20,
                 realTradingScore: parseFloat(document.getElementById('realTradingScore')?.value) || 65,
                 realTradingCount: parseInt(document.getElementById('realTradingCount')?.value) || 2,
@@ -1730,13 +1721,11 @@ class QuantitativeSystem {
                 minScore: parseFloat(document.getElementById('minScore')?.value) || 50,
                 // 🔧 新增：参数验证配置
                 paramValidationTrades: parseInt(document.getElementById('paramValidationTrades')?.value) || 20,
-                paramValidationHours: parseInt(document.getElementById('paramValidationHours')?.value) || 24,
-                enableStrictValidation: document.getElementById('enableStrictValidation')?.checked !== false,
-                // 🔧 新增：统一验证交易配置
-                unified_validation_count: parseInt(document.getElementById('unified_validation_count')?.value) || 4,
-                validation_score_threshold_high: parseFloat(document.getElementById('validation_score_threshold_high')?.value) || 80,
-                validation_score_threshold_mid: parseFloat(document.getElementById('validation_score_threshold_mid')?.value) || 60,
-                real_trading_score_threshold: parseFloat(document.getElementById('real_trading_score_threshold')?.value) || 65
+                // 🔧 新增：实盘交易控制参数
+                real_trading_enabled: document.getElementById('real_trading_enabled')?.value === 'true',
+                min_simulation_days: parseInt(document.getElementById('min_simulation_days')?.value) || 7,
+                min_sim_win_rate: parseFloat(document.getElementById('min_sim_win_rate')?.value) || 65,
+                min_sim_total_pnl: parseFloat(document.getElementById('min_sim_total_pnl')?.value) || 5
             };
 
             const response = await fetch('/api/quantitative/management-config', {
@@ -1770,7 +1759,6 @@ class QuantitativeSystem {
     // 重置管理配置
     resetManagementConfig() {
         const defaultConfig = {
-            evolutionInterval: 10,
             maxStrategies: 20,
             realTradingScore: 65,
             realTradingCount: 2,
@@ -1790,13 +1778,11 @@ class QuantitativeSystem {
             minScore: 50,
             // 🔧 新增：参数验证配置默认值
             paramValidationTrades: 20,
-            paramValidationHours: 24,
-            enableStrictValidation: true,
-            // 🔧 新增：统一验证交易配置默认值
-            unified_validation_count: 4,
-            validation_score_threshold_high: 80,
-            validation_score_threshold_mid: 60,
-            real_trading_score_threshold: 65
+            // 🔧 新增：实盘交易控制参数默认值
+            real_trading_enabled: false,
+            min_simulation_days: 7,
+            min_sim_win_rate: 65,
+            min_sim_total_pnl: 5
         };
 
         Object.assign(managementConfig, defaultConfig);
@@ -2690,7 +2676,7 @@ class FourTierConfigManager {
     populateTraditionalConfig(config) {
         // 填充传统配置字段
         const fields = [
-            'evolutionInterval', 'maxStrategies', 'realTradingScore', 'realTradingCount',
+            'maxStrategies', 'realTradingScore', 'realTradingCount',
             'validationAmount', 'realTradingAmount', 'minTrades', 'minWinRate', 
             'minProfit', 'maxDrawdown', 'minSharpeRatio'
         ];
@@ -2709,7 +2695,25 @@ class FourTierConfigManager {
             const element = document.getElementById(key);
             if (element && fourTierConfig[key]) {
                 const value = fourTierConfig[key].value || fourTierConfig[key];
-                element.value = value;
+                if (element.tagName === 'SELECT') {
+                    element.value = value.toString();
+                } else {
+                    element.value = value;
+                }
+            }
+        });
+        
+        // 🔧 新增：填充实盘交易控制参数
+        const realTradingFields = ['real_trading_enabled', 'min_simulation_days', 'min_sim_win_rate', 'min_sim_total_pnl'];
+        realTradingFields.forEach(field => {
+            const element = document.getElementById(field);
+            if (element && fourTierConfig[field]) {
+                const value = fourTierConfig[field].value || fourTierConfig[field];
+                if (element.tagName === 'SELECT') {
+                    element.value = value.toString();
+                } else {
+                    element.value = value;
+                }
             }
         });
     }
@@ -2758,10 +2762,10 @@ class FourTierConfigManager {
 
     async saveConfig() {
         try {
-            // 收集传统配置
+            // 🔧 收集传统配置（删除evolutionInterval，已统一到四层配置）
             const traditionalConfig = {};
             const traditionalFields = [
-                'evolutionInterval', 'maxStrategies', 'realTradingScore', 'realTradingCount',
+                'maxStrategies', 'realTradingScore', 'realTradingCount',
                 'validationAmount', 'realTradingAmount', 'minTrades', 'minWinRate',
                 'minProfit', 'maxDrawdown', 'minSharpeRatio'
             ];
@@ -2773,19 +2777,25 @@ class FourTierConfigManager {
                 }
             });
 
-            // 收集四层进化配置
+            // 收集四层进化配置（包含实盘交易控制参数）
             const fourTierConfig = {};
             const fourTierFields = [
                 'high_freq_pool_size', 'display_strategies_count', 'real_trading_count',
                 'low_freq_interval_hours', 'high_freq_interval_minutes', 'display_interval_minutes',
                 'low_freq_validation_count', 'high_freq_validation_count', 'display_validation_count',
-                'validation_amount', 'real_trading_amount', 'real_trading_score_threshold'
+                'validation_amount', 'real_trading_amount', 'real_trading_score_threshold',
+                // 🔧 新增：实盘交易控制参数
+                'real_trading_enabled', 'min_simulation_days', 'min_sim_win_rate', 'min_sim_total_pnl'
             ];
 
             fourTierFields.forEach(field => {
                 const element = document.getElementById(field);
                 if (element) {
-                    fourTierConfig[field] = parseFloat(element.value) || 0;
+                    if (element.tagName === 'SELECT') {
+                        fourTierConfig[field] = element.value === 'true';
+                    } else {
+                        fourTierConfig[field] = parseFloat(element.value) || 0;
+                    }
                 }
             });
 
