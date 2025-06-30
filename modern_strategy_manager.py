@@ -63,13 +63,23 @@ class FourTierStrategyManager:
     
     def __init__(self, db_config: Dict = None):
         """初始化四层策略管理器"""
-        # 数据库配置
-        self.db_config = db_config or {
-            'host': 'localhost',
-            'database': 'quantitative',
-            'user': 'quant_user',
-            'password': '123abc74531'
-        }
+        # 数据库配置 - 使用标准配置
+        if db_config:
+            self.db_config = db_config
+        else:
+            # 导入标准数据库配置
+            try:
+                import db_config as config_module
+                self.db_config = config_module.get_db_config()
+            except ImportError:
+                # 如果导入失败，使用默认配置
+                self.db_config = {
+                    'host': 'localhost',
+                    'port': 5432,
+                    'database': 'vnpy_db',
+                    'user': 'vnpy_user', 
+                    'password': 'vnpy_password'
+                }
         
         # 进化配置
         self.config = EvolutionConfig()
