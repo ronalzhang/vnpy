@@ -10017,7 +10017,7 @@ class EvolutionaryStrategyEngine:
                 json.dumps(strategy_config['parameters']),
                 strategy_config.get('generation', self.current_generation),
                 strategy_config.get('cycle', self.current_cycle),
-                strategy_config.get('parent_id'),
+                strategy_config.get('parent_id') or None,  # 🔧 修复：确保None值正确处理
                 strategy_config.get('creation_method', 'evolution'),
                 strategy_config.get('final_score', 48.0),  # 🔧 确保使用正确的初始评分，新策略48分高于淘汰线
                 strategy_config.get('win_rate', 0.55),   # 默认55%胜率，合理起点
