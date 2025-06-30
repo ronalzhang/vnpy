@@ -128,15 +128,15 @@ class FourTierStrategyManager:
             cursor.execute("SELECT config_key, config_value FROM four_tier_evolution_config")
             configs = cursor.fetchall()
             
-            for config_key, config_value in configs:
+                        for config_key, config_value in configs:
                 if hasattr(self.config, config_key):
-                        # 类型转换
+                    # 类型转换
                     current_value = getattr(self.config, config_key)
-                        if isinstance(current_value, int):
+                    if isinstance(current_value, int):
                         setattr(self.config, config_key, int(float(config_value)))
-                        elif isinstance(current_value, float):
+                    elif isinstance(current_value, float):
                         setattr(self.config, config_key, float(config_value))
-                        else:
+                    else:
                         setattr(self.config, config_key, config_value)
             
             conn.commit()
@@ -943,7 +943,7 @@ class FourTierStrategyManager:
                         
                         evolved_count += 1
                 
-        except Exception as e:
+                except Exception as e:
                     logger.error(f"❌ 进化策略{strategy['id'][:8]}失败: {e}")
                     continue
             

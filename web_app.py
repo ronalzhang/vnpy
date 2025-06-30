@@ -1317,31 +1317,30 @@ def quantitative_strategies():
             except ImportError as ie:
                 print(f"⚠️ 高级管理器不可用，使用基础查询: {ie}")
                 # 🔥 修复：统一使用有交易数据的STRAT_格式策略，避免显示空数据策略
-                limit = int(request.args.get('limit', 20))
+                limit = int(request.args.get('limit', 21))  # 默认显示21个
                 
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # 🔥 按分值排序显示策略，优先显示高分策略（正确的业务逻辑）
+                # 🔥 修复查询逻辑：简化查询，确保返回策略数据
                 simple_query = f"""
-                    SELECT DISTINCT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
-                           COUNT(t.id) as trade_count, MAX(t.timestamp) as latest_trade,
-                           s.generation, s.cycle
+                    SELECT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
+                           s.generation, s.cycle, s.parameters
                     FROM strategies s
-                    LEFT JOIN trading_signals t ON s.id = t.strategy_id AND t.executed = 1
-                    WHERE s.id LIKE 'STRAT_%'
-                    GROUP BY s.id, s.name, s.symbol, s.type, s.enabled, s.final_score, s.generation, s.cycle
-                    ORDER BY s.final_score DESC, COUNT(t.id) DESC, MAX(t.timestamp) DESC
+                    WHERE s.enabled = 1 AND s.id LIKE 'STRAT_%'
+                    ORDER BY s.final_score DESC, s.id
                     LIMIT {limit}
                 """
                 
                 cursor.execute(simple_query)
                 rows = cursor.fetchall()
                 
+                print(f"🔍 策略查询结果：找到 {len(rows)} 个策略")
+                
                 strategies = []
                 for row in rows:
                     try:
-                        sid, name, symbol, stype, enabled, score, trade_count, latest_trade, generation, cycle = row
+                        sid, name, symbol, stype, enabled, score, generation, cycle, parameters = row
                         
                         # 🔥 计算真实的win_rate和total_return
                         cursor.execute("""
@@ -1368,21 +1367,27 @@ def quantitative_strategies():
                                 total_return_percentage = (float(total_pnl) / total_investment)
                                 total_return_percentage = max(-0.5, min(total_return_percentage, 0.5))
                         
+                        # 解析参数
+                        try:
+                            parsed_params = json.loads(parameters) if parameters else {}
+                        except:
+                            parsed_params = {'quantity': 100, 'threshold': 0.02}
+                        
                         strategy = {
                             'id': sid,
-                            'name': name,
+                            'name': name or f"策略{sid[-4:]}",
                             'symbol': symbol or 'BTC/USDT',
                             'type': stype or 'momentum',
                             'enabled': bool(enabled),
-                            'final_score': float(score) if score else 0.0,
-                            'parameters': {'quantity': 100, 'threshold': 0.02},
+                            'final_score': float(score) if score else 50.0,
+                            'parameters': parsed_params,
                             'total_trades': actual_total_trades,
                             'win_rate': round(calculated_win_rate, 2),
                             'total_return': round(total_return_percentage, 2),
                             'generation': generation or 1,
                             'cycle': cycle or 1,
                             'evolution_display': f"第{generation or 1}代第{cycle or 1}轮",
-                            'trade_mode': 'verification' if float(score or 0) < 65 else 'real',
+                            'trade_mode': '真实交易' if float(score or 0) >= 65 else '验证交易',
                             'created_at': '',
                             'daily_return': round(total_return_percentage / 30, 6) if total_return_percentage else 0.0,
                             'sharpe_ratio': 0.0,
@@ -1400,7 +1405,7 @@ def quantitative_strategies():
                 cursor.close()
                 conn.close()
                 
-                print(f"✅ 基础查询返回{len(strategies)}个策略")
+                print(f"✅ 策略查询返回{len(strategies)}个策略")
                 
                 return jsonify({
                     "status": "success", 
