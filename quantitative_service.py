@@ -5685,9 +5685,11 @@ class QuantitativeService:
             
             while self.running:
                 try:
-                    # 🎯 每5分钟进行一次自动管理
+                    # 🎯 根据配置进行自动管理（默认3分钟）
                     self.strategy_manager.auto_manage_strategies()
-                    time.sleep(300)  # 5分钟
+                    # 🔧 修复：使用配置的进化间隔而不是硬编码的5分钟
+                    evolution_interval = getattr(self, 'evolution_interval', 3) * 60  # 默认3分钟，转换为秒
+                    time.sleep(evolution_interval)
                     
                 except Exception as e:
                     print(f"自动管理循环出错: {e}")
