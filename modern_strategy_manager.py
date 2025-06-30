@@ -538,7 +538,7 @@ class FourTierStrategyManager:
                 cursor.execute("""
                     UPDATE strategies 
                     SET final_score = %s, 
-                        last_validation_time = CURRENT_TIMESTAMP
+                        updated_at = CURRENT_TIMESTAMP
                     WHERE id = %s
                 """, (new_estimated_score, strategy['id']))
                 
@@ -582,8 +582,8 @@ class FourTierStrategyManager:
                     UPDATE strategies 
                     SET parameters = %s,
                         final_score = %s,
-                        last_rollback_time = CURRENT_TIMESTAMP,
-                        rollback_count = COALESCE(rollback_count, 0) + 1
+                        updated_at = CURRENT_TIMESTAMP,
+                        notes = COALESCE(notes, '') || ' [回退]'
                     WHERE id = %s
                 """, (json.dumps(stable_params), stable_score, strategy['id']))
                 
@@ -657,8 +657,8 @@ class FourTierStrategyManager:
                 UPDATE strategies 
                 SET parameters = %s,
                     final_score = %s,
-                    last_safety_reset_time = CURRENT_TIMESTAMP,
-                    safety_reset_count = COALESCE(safety_reset_count, 0) + 1
+                    updated_at = CURRENT_TIMESTAMP,
+                    notes = COALESCE(notes, '') || ' [安全重置]'
                 WHERE id = %s
             """, (json.dumps(safe_default_params), safe_score, strategy['id']))
             
