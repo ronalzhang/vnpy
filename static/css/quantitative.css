@@ -1316,62 +1316,6 @@
     }
 }
 
-/* 🎨 策略卡片增强样式 */
-.strategy-card {
-    transition: all 0.3s ease;
-    border: 1px solid #e9ecef;
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.strategy-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    border-color: #007bff;
-}
-
-.strategy-card .card-header {
-    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-    border-bottom: none;
-    padding: 12px 15px;
-}
-
-.strategy-card .score-badge {
-    font-size: 14px;
-    font-weight: 600;
-    padding: 6px 12px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(10px);
-}
-
-.strategy-card .metric-item {
-    padding: 8px 0;
-    border-bottom: 1px solid #f8f9fa;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.strategy-card .metric-item:last-child {
-    border-bottom: none;
-}
-
-.strategy-card .metric-label {
-    color: #6c757d;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.strategy-card .metric-value {
-    font-weight: 600;
-    color: #495057;
-}
-
-.strategy-card .profit-positive {
-    color: #28a745 !important;
-}
-
 .strategy-card .profit-negative {
     color: #dc3545 !important;
 }
@@ -1394,21 +1338,6 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* 🎨 加载状态指示器 */
-.loading-spinner {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #007bff;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
 
 /* 🎨 响应式优化 */
 @media (max-width: 768px) {
