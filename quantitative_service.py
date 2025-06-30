@@ -2234,13 +2234,16 @@ class QuantitativeService:
             print("🚀 统一进化系统已初始化 (Modern Strategy Manager)")
             print("   📊 管理策略进化、参数优化和实盘交易")
             
-            # 设置统一配置
+            # 🔧 统一配置：删除重复间隔配置，使用Modern Strategy Manager标准
             self.evolution_config = {
                 'enabled': True,
-                'evolution_interval': 180,  # 3分钟间隔
+                'unified_system': True,  # 标记使用统一系统
+                'manager': self.evolution_manager,  # 引用统一管理器
                 'max_concurrent_evolutions': 3,
                 'use_intelligent_evolution': True
             }
+            # 🗑️ 删除重复配置：'evolution_interval': 180 
+            # 统一使用Modern Strategy Manager的四层间隔配置
             
             print("✅ 统一进化系统配置完成")
             
@@ -2296,18 +2299,16 @@ class QuantitativeService:
         try:
             print("🚀 启动安全的四层进化调度器")
             
-            # 🛡️ 安全配置
+            # 🛡️ 安全配置 - 仅保留系统配置，间隔配置使用Modern Strategy Manager标准
             self.four_tier_config = {
                 'enabled': True,
                 'max_concurrent_tasks': 2,  # 限制并发任务数
-                'pool_evolution_interval': 24 * 3600,  # 24小时
-                'high_freq_interval': 60 * 60,  # 60分钟
-                'display_interval': 3 * 60,  # 3分钟
-                'trading_interval': 60,  # 1分钟
                 'safety_delay': 5,  # 安全延迟5秒
                 'max_evolution_time': 30,  # 单次进化最大30秒
                 'enable_real_trading': False  # 默认禁用实盘交易
             }
+            # 🗑️ 删除重复的间隔配置，统一使用Modern Strategy Manager:
+            # - pool_evolution_interval, high_freq_interval, display_interval, trading_interval
             
             # 🎯 启动定时任务而不是无限循环
             self._start_timed_evolution_tasks()
