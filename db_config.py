@@ -66,8 +66,32 @@ class DatabaseAdapter:
             # PostgreSQL使用%s占位符
             query = query.replace('?', '%s')
             
+            # 🔧 修复IndexError：验证参数长度和内容
             if params:
-                cursor.execute(query, params)
+                # 检查参数是否有效
+                try:
+                    # 验证参数tuple长度和内容
+                    param_count = query.count('%s')
+                    if len(params) != param_count:
+                        print(f"⚠️ 参数数量不匹配: 期望{param_count}个，实际{len(params)}个")
+                        print(f"Query: {query}")
+                        print(f"Params: {params}")
+                        return None
+                    
+                    # 检查参数中是否有problematic值
+                    for i, param in enumerate(params):
+                        if param is None:
+                            print(f"⚠️ 参数{i}为None: {params}")
+                        elif isinstance(param, str) and param == 'None':
+                            print(f"⚠️ 参数{i}为字符串'None': {params}")
+                    
+                    cursor.execute(query, params)
+                except (IndexError, TypeError) as param_error:
+                    print(f"❌ 参数处理错误: {param_error}")
+                    print(f"Query: {query}")
+                    print(f"Params: {params}")
+                    print(f"Params type: {type(params)}")
+                    return None
             else:
                 cursor.execute(query)
             
