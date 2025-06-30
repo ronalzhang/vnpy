@@ -10640,7 +10640,7 @@ class EvolutionaryStrategyEngine:
                     print(f"🛡️ 策略{strategy_id[-4:]}属于前端显示策略，继续参与进化")
                     # 🔧 修复：确保strategy_id有效再执行UPDATE
                     if strategy_id and strategy_id != 'None':
-                self.quantitative_service.db_manager.execute_query(
+                        self.quantitative_service.db_manager.execute_query(
                             "UPDATE strategies SET notes = 'validation_pending_optimization' WHERE id = %s",
                             (str(strategy_id),)
                         )

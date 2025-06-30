@@ -4599,15 +4599,15 @@ def get_unified_system_status():
             
             # 如果有启用的策略且有近期信号，认为策略引擎在线
             if enabled_strategies > 0 and recent_signals > 0:
-                    status['services']['strategy_engine'] = 'online'
+                status['services']['strategy_engine'] = 'online'
                 status['details']['enabled_strategies'] = enabled_strategies
                 status['details']['recent_signals'] = recent_signals
             elif enabled_strategies > 0:
                 status['services']['strategy_engine'] = 'degraded'  # 有策略但无近期信号
                 status['details']['enabled_strategies'] = enabled_strategies
                 status['details']['recent_signals'] = recent_signals
-                else:
-                    status['services']['strategy_engine'] = 'offline'
+            else:
+                status['services']['strategy_engine'] = 'offline'
                 status['details']['strategy_note'] = '无启用的策略'
                 
         except Exception as e:
