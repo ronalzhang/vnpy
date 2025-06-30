@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 # 助手常犯错误防范规则
 
@@ -9,6 +9,8 @@ alwaysApply: true
 - "禁止跳过检查现有代码直接新增功能 - 必须先用codebase_search、grep_search、read_file等工具全面检查现有实现"
 - "严格遵循部署流程：本地修改→提交仓库→服务器拉取→应用重启 - 缺少任何一步都是不完整的部署"
 - "禁止在服务器上直接修改代码或配置 - 所有修改必须在本地完成后推送"
+
+
 
 ## 重复功能创建防范
 - "禁止创建重复的服务/功能 - 如WebSocket服务器、状态管理器等，先检查是否已存在"

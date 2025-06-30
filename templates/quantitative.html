@@ -707,6 +707,28 @@
                                 </div>
                             </div>
 
+                            <!-- 参数验证配置 -->
+                            <div class="tier-config-group">
+                                <h4>🔬 参数验证配置</h4>
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <label for="paramValidationTrades">参数修改后验证交易次数</label>
+                                        <input type="number" id="paramValidationTrades" name="paramValidationTrades" min="5" max="50" step="5">
+                                        <small>参数修改后需要的验证交易次数（默认20次）</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="paramValidationHours">参数修改后等待时间 (小时)</label>
+                                        <input type="number" id="paramValidationHours" name="paramValidationHours" min="6" max="72" step="6">
+                                        <small>参数修改后需要的等待时间（默认24小时）</small>
+                                    </div>
+                                    <div class="config-item">
+                                        <label for="enableStrictValidation">启用严格验证</label>
+                                        <input type="checkbox" id="enableStrictValidation" name="enableStrictValidation" class="form-check-input">
+                                        <small>是否启用严格的参数验证机制</small>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- 交易金额配置 -->
                             <div class="tier-config-group">
                                 <h4>💰 交易金额配置</h4>

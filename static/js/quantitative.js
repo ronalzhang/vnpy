@@ -1614,6 +1614,11 @@ class QuantitativeSystem {
             this.safeSetValue('minProfitForTimeStop', managementConfig.minProfitForTimeStop || 1);
             this.safeSetValue('eliminationDays', managementConfig.eliminationDays || 7);
             this.safeSetValue('minScore', managementConfig.minScore || 50);
+            
+            // 🔧 新增：参数验证配置
+            this.safeSetValue('paramValidationTrades', managementConfig.paramValidationTrades || 20);
+            this.safeSetValue('paramValidationHours', managementConfig.paramValidationHours || 24);
+            this.safeSetCheckbox('enableStrictValidation', managementConfig.enableStrictValidation !== false);  // 默认为true
         }
 
         // 🔥 新增：同时初始化四层配置管理器
@@ -1629,6 +1634,16 @@ class QuantitativeSystem {
             element.value = value;
         } else {
             console.debug(`元素 ${elementId} 不存在，跳过设置`);
+        }
+    }
+
+    // 🔧 新增：安全设置复选框状态的辅助方法
+    safeSetCheckbox(elementId, checked) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.checked = checked;
+        } else {
+            console.debug(`复选框元素 ${elementId} 不存在，跳过设置`);
         }
     }
 
@@ -1658,7 +1673,11 @@ class QuantitativeSystem {
                 maxHoldingMinutes: parseInt(document.getElementById('maxHoldingMinutes').value) || 30,
                 minProfitForTimeStop: parseFloat(document.getElementById('minProfitForTimeStop').value) || 1,
                 eliminationDays: parseInt(document.getElementById('eliminationDays').value) || 7,
-                minScore: parseFloat(document.getElementById('minScore').value) || 50
+                minScore: parseFloat(document.getElementById('minScore').value) || 50,
+                // 🔧 新增：参数验证配置
+                paramValidationTrades: parseInt(document.getElementById('paramValidationTrades')?.value) || 20,
+                paramValidationHours: parseInt(document.getElementById('paramValidationHours')?.value) || 24,
+                enableStrictValidation: document.getElementById('enableStrictValidation')?.checked !== false
             };
 
             const response = await fetch('/api/quantitative/management-config', {
@@ -1709,7 +1728,11 @@ class QuantitativeSystem {
             maxHoldingMinutes: 30,
             minProfitForTimeStop: 1,
             eliminationDays: 7,
-            minScore: 50
+            minScore: 50,
+            // 🔧 新增：参数验证配置默认值
+            paramValidationTrades: 20,
+            paramValidationHours: 24,
+            enableStrictValidation: true
         };
 
         Object.assign(managementConfig, defaultConfig);
