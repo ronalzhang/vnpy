@@ -4823,41 +4823,41 @@ def get_strategy_logs_by_category(strategy_id):
         total_count = 0
         
         if log_type == 'evolution' or log_type == 'all':
-            # 🔧 修复：从strategy_optimization_logs表查询进化日志
+            # 🔧 修复：从strategy_evolution_history表查询进化日志
             cursor.execute("""
-                SELECT COUNT(*) FROM strategy_optimization_logs 
+                SELECT COUNT(*) FROM strategy_evolution_history 
                 WHERE strategy_id = %s
             """, (strategy_id,))
             evolution_count = cursor.fetchone()[0]
             
             cursor.execute("""
-                SELECT strategy_id, optimization_type, trigger_reason, old_parameters, new_parameters,
-                       target_success_rate, timestamp, validation_passed, created_time
-                FROM strategy_optimization_logs 
+                SELECT strategy_id, evolution_type, trigger_reason, parameters, new_parameters,
+                       score_after, created_time, action_type, parameter_changes
+                FROM strategy_evolution_history 
                 WHERE strategy_id = %s
-                ORDER BY timestamp DESC 
+                ORDER BY created_time DESC 
                 LIMIT %s OFFSET %s
             """, (strategy_id, limit, offset))
             
             evolution_rows = cursor.fetchall()
             
             for row in evolution_rows:
-                strategy_id_db, optimization_type, trigger_reason, old_parameters, new_parameters, target_success_rate, timestamp, validation_passed, created_time = row
+                strategy_id_db, evolution_type, trigger_reason, old_parameters, new_parameters, score_after, created_time, action_type, parameter_changes = row
                 
                 log_entry = {
                     'strategy_id': strategy_id_db,
                     'log_type': 'evolution',
-                    'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if timestamp else None,
+                    'timestamp': created_time.strftime('%Y-%m-%d %H:%M:%S') if created_time else None,
                     'created_at': created_time.strftime('%Y-%m-%d %H:%M:%S') if created_time else None,
-                    'optimization_type': optimization_type or '参数优化',
+                    'optimization_type': evolution_type or '参数优化',
                     'trigger_reason': trigger_reason or '自动优化',
                     'old_parameters': old_parameters or {},
                     'new_parameters': new_parameters or {},
-                    'target_success_rate': float(target_success_rate) if target_success_rate else 0,
+                    'target_success_rate': float(score_after) if score_after else 0,
                     'improvement': 0,
-                    'notes': f'{optimization_type} - {trigger_reason or "自动优化"}',
-                    'validation_passed': bool(validation_passed) if validation_passed is not None else False,
-                    'evolution_type': optimization_type,
+                    'notes': f'{evolution_type} - {trigger_reason or "自动优化"}',
+                    'validation_passed': action_type == 'evolution',
+                    'evolution_type': evolution_type,
                     'symbol': None,
                     'signal_type': None,
                     'price': 0,
@@ -4973,7 +4973,7 @@ def get_strategy_logs_by_category(strategy_id):
         
         # 🔧 处理all类型的总计数
         if log_type == 'all':
-            cursor.execute("SELECT COUNT(*) FROM strategy_optimization_logs WHERE strategy_id = %s", (strategy_id,))
+            cursor.execute("SELECT COUNT(*) FROM strategy_evolution_history WHERE strategy_id = %s", (strategy_id,))
             evolution_total = cursor.fetchone()[0]
             cursor.execute("SELECT COUNT(*) FROM trading_signals WHERE strategy_id = %s", (strategy_id,))
             trading_total = cursor.fetchone()[0]
