@@ -295,8 +295,8 @@
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-light btn-sm text-dark" onclick="toggleBalanceChart('7')" style="font-size: 0.75rem;">7天</button>
                             <button class="btn btn-warning btn-sm active" onclick="toggleBalanceChart('30')" style="font-size: 0.75rem;">30天</button>
-                        </div>
                     </div>
+                        </div>
                     <div class="card-body p-3">
                         <div class="balance-chart-container" style="height: 140px; position: relative;">
                             <canvas id="balanceChart2" style="display: none;"></canvas>
@@ -304,12 +304,12 @@
                                 <div class="loading-content text-center">
                                     <div class="spinner-border text-success mb-2" role="status">
                                         <span class="visually-hidden">Loading...</span>
-                                    </div>
+                    </div>
                                     <p class="text-muted small mb-0">正在加载资产数据...</p>
-                                </div>
-                            </div>
-                        </div>
-                        
+                </div>
+            </div>
+        </div>
+        
                         <!-- 里程碑展示 - 优化布局 -->
                         <div class="milestones-container mt-3">
                             <div class="row g-1 text-center">
@@ -317,8 +317,8 @@
                                     <div class="milestone-card p-2 rounded bg-light">
                                         <div class="milestone-value text-dark fw-bold small">10U</div>
                                         <div class="milestone-label text-muted" style="font-size: 0.7rem;">起始</div>
-                                    </div>
-                                </div>
+                    </div>
+                        </div>
                                 <div class="col-4">
                                     <div class="milestone-card p-2 rounded bg-warning bg-opacity-25">
                                         <div class="milestone-value text-dark fw-bold small" id="currentBalance2">12.3U</div>
@@ -344,7 +344,7 @@
                         <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-signal me-2"></i> 最新信号
                         </h6>
-                    </div>
+                        </div>
                     <div class="card-body p-3">
                         <div class="signals-container" style="height: 220px;">
                             <div class="signals-list h-100" style="overflow-y: auto;">
@@ -352,15 +352,15 @@
                                     <div class="loading-content text-center h-100 d-flex flex-column justify-content-center">
                                         <div class="spinner-border text-info mb-3" role="status">
                                             <span class="visually-hidden">Loading...</span>
-                                        </div>
+                    </div>
                                         <p class="text-muted small mb-0">正在加载交易信号...</p>
+                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                                    </div>
+                                </div>
+                                    </div>
+                                </div>
             
             <!-- 持仓管理 -->
             <div class="col-xl-3 col-lg-6 col-md-6">
@@ -369,7 +369,7 @@
                         <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-wallet me-2"></i> 持仓管理
                         </h6>
-                    </div>
+                            </div>
                     <div class="card-body p-3">
                         <div class="positions-container" style="height: 220px;">
                             <div class="positions-list h-100" style="overflow-y: auto;">
@@ -929,27 +929,64 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('⚡ 量化系统页面开始初始化...');
             
-            // 🔧 优化：错开API调用时间，避免服务器过载
-            forceLoadStrategies();
+            // 🔧 防止重复初始化
+            if (window.quantInitialized) {
+                console.log('⚠️ 页面已初始化，跳过重复初始化');
+                return;
+            }
+            window.quantInitialized = true;
             
-            // 🔧 修复：延迟加载底部模块，避免同时调用过多API
-            setTimeout(() => {
-                loadBottomModulesData();
-            }, 2000);  // 延迟2秒加载，避免与策略加载冲突
+            // 🔧 严格的加载控制：只初始化一次
+            let initializationTimer = null;
             
-            // 创建量化系统实例（如果存在）
-            if (typeof QuantitativeSystem !== 'undefined') {
-                quantitativeSystem = new QuantitativeSystem();
-                window.quantitativeSystem = quantitativeSystem;
-                window.app = quantitativeSystem;
-                console.log('✅ QuantitativeSystem 实例已创建');
+            function initializeOnce() {
+                if (initializationTimer) {
+                    clearTimeout(initializationTimer);
+                }
+                
+                initializationTimer = setTimeout(() => {
+                    console.log('🚀 开始策略数据加载...');
+                    forceLoadStrategies();
+                    
+                    // 🔧 修复：大幅延迟底部模块加载，避免与主要功能冲突
+                    setTimeout(() => {
+                        if (!window.bottomModulesLoading) {
+                            console.log('🔄 开始底部模块数据加载...');
+                            loadBottomModulesData();
+                        }
+                    }, 10000);  // 延迟10秒加载，确保主功能稳定
+                    
+                }, 1000);
             }
             
+            // 🔧 只执行一次初始化
+            initializeOnce();
+            
+            // 🔧 移除可能导致重复调用的全局对象创建
+            // 创建量化系统实例（如果存在）
+            if (typeof QuantitativeSystem !== 'undefined' && !window.quantitativeSystem) {
+                try {
+                    quantitativeSystem = new QuantitativeSystem();
+                    window.quantitativeSystem = quantitativeSystem;
+                    window.app = quantitativeSystem;
+                    console.log('✅ QuantitativeSystem 实例已创建');
+                } catch (e) {
+                    console.warn('⚠️ QuantitativeSystem 创建失败:', e);
+                }
+            }
+            
+            // 🔧 移除状态轮询，减少API调用
             // 启动状态管理器（如果存在）
-            if (typeof GlobalStatusManager !== 'undefined') {
-                const statusManager = new GlobalStatusManager();
-                statusManager.startStatusPolling();
-                console.log('✅ GlobalStatusManager 已启动');
+            if (typeof GlobalStatusManager !== 'undefined' && !window.globalStatusManager) {
+                try {
+                    const statusManager = new GlobalStatusManager();
+                    // 🔧 减少轮询频率，避免CPU占用过高
+                    statusManager.startStatusPolling && statusManager.startStatusPolling(30000); // 30秒轮询一次
+                    window.globalStatusManager = statusManager;
+                    console.log('✅ GlobalStatusManager 已启动（30秒轮询）');
+                } catch (e) {
+                    console.warn('⚠️ GlobalStatusManager 启动失败:', e);
+                }
             }
             
             // 标记初始化完成
@@ -1496,7 +1533,7 @@
                             if (element) {
                                 if (element.type === 'checkbox') {
                                     element.checked = value === true;
-                                } else {
+                } else {
                                     element.value = value;
                                 }
                                 console.log(`设置传统配置 ${key}:`, value);
@@ -1512,7 +1549,7 @@
                                 
                                 if (element.type === 'checkbox') {
                                     element.checked = value === true || value === 'true';
-                                } else {
+                } else {
                                     element.value = value;
                                 }
                                 console.log(`设置四层配置 ${key}:`, value);
@@ -2050,7 +2087,7 @@
             .finally(() => {
                 // 恢复按钮状态
                 if (saveBtn && originalText) {
-                    setTimeout(() => {
+            setTimeout(() => {
                         saveBtn.innerHTML = originalText;
                         saveBtn.disabled = false;
                     }, 1000);
@@ -2091,13 +2128,13 @@
             document.body.insertAdjacentHTML('beforeend', alertHtml);
             
             // 自动消失
-            setTimeout(() => {
+                        setTimeout(() => {
                 const alert = document.querySelector('.save-message-alert');
                 if (alert) {
                     alert.classList.remove('show');
                     setTimeout(() => alert.remove(), 300);
                 }
-            }, 3000);
+                        }, 3000);
         }
         
         // 🔧 增加自动保存功能 - 添加防抖机制

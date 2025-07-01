@@ -2338,13 +2338,19 @@ def get_system_status():
         
         # 获取现代化策略管理器配置
         try:
-            # 已删除重复的导入
+            # 🔧 修复：添加导入和异常处理
+            from modern_strategy_manager import get_modern_strategy_manager
             manager = get_modern_strategy_manager()
             evolution_interval = manager.config.evolution_interval
             max_strategies = manager.config.max_display_strategies
             real_trading_enabled = len(manager.select_trading_strategies()) > 0
+        except ImportError as e:
+            print(f"⚠️ 现代化策略管理器导入失败: {e}")
+            evolution_interval = 3
+            max_strategies = 21
+            real_trading_enabled = True
         except Exception as e:
-            print(f"获取现代化管理器配置失败: {e}")
+            print(f"⚠️ 获取现代化管理器配置失败: {e}")
             evolution_interval = 3
             max_strategies = 21
             real_trading_enabled = True
