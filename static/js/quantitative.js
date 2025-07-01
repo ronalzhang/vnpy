@@ -108,13 +108,10 @@ class GlobalStatusManager {
     }
     
     async startStatusPolling() {
-        // 🔧 性能优化：降低状态检查频率，每60秒检查一次系统状态
-        setInterval(async () => {
-            await this.checkSystemStatus();
-            await this.checkExchangeStatus();
-        }, 60000);
+        // 🗑️ 完全禁用状态轮询，节省内存和CPU资源
+        console.log('🗑️ 状态轮询已禁用，节省服务器资源');
         
-        // 立即执行一次
+        // 只执行一次初始检查，不再定期轮询
         await this.checkSystemStatus();
         await this.checkExchangeStatus();
     }
@@ -191,8 +188,8 @@ class QuantitativeSystem {
         this.accountInfo = {};
         this.exchangeStatus = {};
         
-        // 🔥 使用统一的进化日志管理器，替换原有的分散逻辑
-        this.evolutionLogManager = new UnifiedEvolutionLogManager();
+        // 🗑️ 禁用进化日志管理器，节省内存
+        // this.evolutionLogManager = new UnifiedEvolutionLogManager();
         
         this.bindEvents();
         this.loadSystemStatus(); // 加载真实系统状态
@@ -2471,17 +2468,12 @@ class UnifiedEvolutionLogManager {
         };
     }
     
-    // 开始日志轮询
+    // 🗑️ 禁用日志轮询，节省内存和CPU
     startPolling() {
-        // 立即加载一次
+        // 只加载一次，不再定时刷新
         this.loadLogs();
         
-        // 定时刷新
-        this.refreshTimer = setInterval(() => {
-            this.loadLogs();
-        }, this.refreshInterval);
-        
-        console.log('✅ 进化日志轮询已启动');
+        console.log('🗑️ 进化日志轮询已禁用，节省服务器资源');
     }
     
     // 停止日志轮询
@@ -3023,13 +3015,11 @@ class FourTierConfigManager {
     }
 
     startStatusUpdater() {
-        // 立即更新一次
+        // 只更新一次，不再定时更新
         this.updateTierStats();
         
-        // 🔧 性能优化：降低统计更新频率，每120秒更新一次统计
-        setInterval(() => {
-            this.updateTierStats();
-        }, 120000); // 改为120秒，减少API调用频率
+        // 🗑️ 完全禁用统计定时更新，节省资源
+        console.log('🗑️ 四层配置统计更新已禁用，节省服务器资源');
     }
 
     showNotification(message, type = 'info') {
@@ -3168,16 +3158,15 @@ class FourTierConfigManager {
     }
 }
 
-// 在量化系统初始化时启动四层配置管理器
-document.addEventListener('DOMContentLoaded', function() {
-    // 等待量化系统初始化完成后启动
-    setTimeout(() => {
-        if (typeof window.fourTierConfigManager === 'undefined') {
-            window.fourTierConfigManager = new FourTierConfigManager();
-            console.log('🚀 四层进化配置管理器已启动');
-        }
-    }, 1000);
-});
+// 🗑️ 禁用四层配置管理器自动启动，节省内存
+// document.addEventListener('DOMContentLoaded', function() {
+//     setTimeout(() => {
+//         if (typeof window.fourTierConfigManager === 'undefined') {
+//             window.fourTierConfigManager = new FourTierConfigManager();
+//             console.log('🚀 四层进化配置管理器已启动');
+//         }
+//     }, 1000);
+// });
 
 // =====================================================================================
 // 🌍 全局函数定义 - 供HTML onclick事件调用
