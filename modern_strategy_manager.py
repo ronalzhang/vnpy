@@ -587,17 +587,19 @@ class FourTierStrategyManager:
                     WHERE id = %s
                 """, (json.dumps(stable_params), stable_score, strategy['id']))
                 
-                # 📝 记录回退操作
+                # 📝 记录回退操作 - 修复generation字段
                 cursor.execute("""
                     INSERT INTO strategy_evolution_history 
-                    (strategy_id, evolution_type, action_type,
+                    (strategy_id, generation, cycle, evolution_type, action_type,
                      parameters, new_parameters, 
                      score_before, score_after,
                      improvement, evolution_reason, parameter_changes,
                      created_time)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
                 """, (
                     strategy['id'],
+                    strategy.get('generation', 1),              # 修复：添加generation
+                    strategy.get('cycle', 1),                   # 修复：添加cycle
                     f"{evolution_type}_rollback",
                     "parameter_rollback",
                     json.dumps(strategy.get('parameters', {})),  # 失败的参数
@@ -662,17 +664,19 @@ class FourTierStrategyManager:
                 WHERE id = %s
             """, (json.dumps(safe_default_params), safe_score, strategy['id']))
             
-            # 📝 记录安全重置操作
+            # 📝 记录安全重置操作 - 修复generation字段
             cursor.execute("""
                 INSERT INTO strategy_evolution_history 
-                (strategy_id, evolution_type, action_type,
+                (strategy_id, generation, cycle, evolution_type, action_type,
                  parameters, new_parameters,
                  score_before, score_after,
                  improvement, evolution_reason, parameter_changes,
                  created_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (
                 strategy['id'],
+                strategy.get('generation', 1),              # 修复：添加generation
+                strategy.get('cycle', 1),                   # 修复：添加cycle
                 f"{evolution_type}_safety_reset",
                 "safety_parameter_reset",
                 json.dumps(strategy.get('parameters', {})),
