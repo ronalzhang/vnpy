@@ -354,7 +354,7 @@ SYMBOLS = [
     "ADA/USDT", "DOT/USDT", "AVAX/USDT", "SHIB/USDT"
 ]
 EXCHANGES = ["binance", "okx", "bitget"]
-ARBITRAGE_THRESHOLD = 0.1  # 🔧 修复：从0.5%降低到0.1%，提高套利机会检测敏感度
+ARBITRAGE_THRESHOLD = 1.0  # 🔧 优化：提高到1.0%，减少无效套利机会记录，节省内存
 CLOSE_THRESHOLD = 0.2
 
 # 交易所API客户端
@@ -634,8 +634,16 @@ def calculate_price_differences(prices):
     
     # 按价差百分比降序排序
     result.sort(key=lambda x: x["price_diff_pct"], reverse=True)
-    # 保存历史记录
-    save_arbitrage_history()
+    
+    # 🔧 优化：减少保存频率，每10次检测才保存一次，避免频繁I/O
+    global _arbitrage_save_counter
+    if not hasattr(calculate_price_differences, '_arbitrage_save_counter'):
+        calculate_price_differences._arbitrage_save_counter = 0
+    
+    calculate_price_differences._arbitrage_save_counter += 1
+    if calculate_price_differences._arbitrage_save_counter >= 10:
+        save_arbitrage_history()
+        calculate_price_differences._arbitrage_save_counter = 0
     
     return result
 

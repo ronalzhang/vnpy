@@ -84,6 +84,62 @@ def _ensure_pandas():
 
 # 移除signal相关代码，避免在非主线程中使用signal模块
 
+class DatabaseCache:
+    """数据库缓存管理器 - 减少数据库查询，提升性能"""
+    
+    def __init__(self, cache_duration: int = 3600):
+        """
+        初始化缓存管理器
+        
+        Args:
+            cache_duration: 缓存持续时间（秒），默认1小时
+        """
+        self.cache = {}
+        self.cache_expiry = {}
+        self.cache_duration = cache_duration
+        self.lock = threading.Lock()
+        print(f"🗄️ 数据库缓存管理器初始化，缓存时长: {cache_duration}秒")
+    
+    def get(self, key: str) -> Optional[Any]:
+        """获取缓存数据"""
+        with self.lock:
+            if key in self.cache and not self.is_expired(key):
+                print(f"📥 缓存命中: {key}")
+                return self.cache[key]
+            return None
+    
+    def set(self, key: str, value: Any) -> None:
+        """设置缓存数据"""
+        with self.lock:
+            self.cache[key] = value
+            self.cache_expiry[key] = time.time() + self.cache_duration
+            print(f"📤 缓存设置: {key}")
+    
+    def is_expired(self, key: str) -> bool:
+        """检查缓存是否过期"""
+        return time.time() > self.cache_expiry.get(key, 0)
+    
+    def clear(self) -> None:
+        """清空所有缓存"""
+        with self.lock:
+            self.cache.clear()
+            self.cache_expiry.clear()
+            print("🗑️ 缓存已清空")
+    
+    def clear_expired(self) -> None:
+        """清除过期缓存"""
+        with self.lock:
+            current_time = time.time()
+            expired_keys = [k for k, expiry in self.cache_expiry.items() if current_time > expiry]
+            for key in expired_keys:
+                self.cache.pop(key, None)
+                self.cache_expiry.pop(key, None)
+            if expired_keys:
+                print(f"🗑️ 清除{len(expired_keys)}个过期缓存")
+
+# 创建全局缓存实例
+db_cache = DatabaseCache(cache_duration=3600)  # 1小时缓存
+
 class StrategyType(Enum):
     MOMENTUM = "momentum"          # 动量策略
     MEAN_REVERSION = "mean_reversion"  # 均值回归策略
