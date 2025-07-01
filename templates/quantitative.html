@@ -774,31 +774,162 @@
     <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
     
     <script>
-        // 量化系统初始化
+        // ==================== 强制量化系统初始化 ====================
         let quantitativeSystem;
+        let isInitialized = false;
+        
+        // 立即强制初始化数据加载
+        function forceLoadStrategies() {
+            console.log('🚀 强制加载策略数据...');
+            
+            const jsTestStatus = document.getElementById('jsTestStatus');
+            if (jsTestStatus) {
+                jsTestStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>连接API中...';
+            }
+            
+            // 直接调用API
+            fetch('/api/quantitative/strategies')
+                .then(response => {
+                    console.log('API响应状态:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('API数据:', data);
+                    
+                    if (data.status === 'success' && data.data) {
+                        const strategies = data.data;
+                        console.log(`✅ 成功加载 ${strategies.length} 个策略`);
+                        
+                        displayStrategies(strategies);
+                        
+                        if (jsTestStatus) {
+                            jsTestStatus.innerHTML = `<i class="fas fa-check me-2 text-success"></i>成功加载 ${strategies.length} 个策略`;
+                        }
+                    } else {
+                        throw new Error('API返回数据格式错误');
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ 策略加载失败:', error);
+                    
+                    if (jsTestStatus) {
+                        jsTestStatus.innerHTML = `<i class="fas fa-exclamation-triangle me-2 text-danger"></i>数据加载失败: ${error.message}`;
+                    }
+                });
+        }
+        
+        // 显示策略卡片
+        function displayStrategies(strategies) {
+            const container = document.getElementById('strategiesContainer');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            strategies.slice(0, 21).forEach(strategy => {
+                const strategyCard = `
+                    <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
+                        <div class="card strategy-card h-100">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title small mb-0">${strategy.name || '无名称'}</h6>
+                                    <span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'}">${strategy.enabled ? '运行中' : '已停止'}</span>
+                                </div>
+                                <div class="strategy-metrics small">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted">评分:</span>
+                                        <span class="fw-bold ${strategy.score >= 80 ? 'text-success' : strategy.score >= 60 ? 'text-warning' : 'text-danger'}">${strategy.score || 0}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted">收益率:</span>
+                                        <span class="fw-bold ${strategy.total_return_rate >= 0 ? 'text-success' : 'text-danger'}">${(strategy.total_return_rate || 0).toFixed(2)}%</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span class="text-muted">胜率:</span>
+                                        <span class="fw-bold">${(strategy.win_rate || 0).toFixed(1)}%</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">交易:</span>
+                                        <span class="fw-bold">${strategy.total_trades || 0}</span>
+                                    </div>
+                                </div>
+                                <div class="mt-2 d-flex gap-1">
+                                    <button class="btn btn-sm btn-outline-primary flex-fill" onclick="configStrategy('${strategy.id}')">
+                                        <i class="fas fa-cog"></i> 配置
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info" onclick="showStrategyLogs('${strategy.id}')">
+                                        <i class="fas fa-list"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += strategyCard;
+            });
+        }
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('⚡ 量化系统页面开始初始化...');
             
-            // 创建量化系统实例
-            quantitativeSystem = new QuantitativeSystem();
-            window.quantitativeSystem = quantitativeSystem;
-            window.app = quantitativeSystem; // 兼容性别名
+            // 立即强制加载数据
+            forceLoadStrategies();
             
-            // 启动状态管理器
-            const statusManager = new GlobalStatusManager();
-            statusManager.startStatusPolling();
+            // 创建量化系统实例（如果存在）
+            if (typeof QuantitativeSystem !== 'undefined') {
+                quantitativeSystem = new QuantitativeSystem();
+                window.quantitativeSystem = quantitativeSystem;
+                window.app = quantitativeSystem;
+                console.log('✅ QuantitativeSystem 实例已创建');
+            }
             
-            // 立即加载初始数据
-            setTimeout(() => {
-                if (quantitativeSystem) {
-                    console.log('🔄 开始加载初始数据...');
-                    quantitativeSystem.loadInitialData();
-                }
-            }, 500);
+            // 启动状态管理器（如果存在）
+            if (typeof GlobalStatusManager !== 'undefined') {
+                const statusManager = new GlobalStatusManager();
+                statusManager.startStatusPolling();
+                console.log('✅ GlobalStatusManager 已启动');
+            }
             
+            // 标记初始化完成
+            isInitialized = true;
             console.log('✅ 量化系统初始化完成');
         });
+        
+        // 强制刷新函数
+        function refreshStrategies() {
+            forceLoadStrategies();
+        }
+        
+        // 策略配置函数
+        function configStrategy(strategyId) {
+            console.log('配置策略:', strategyId);
+            // 显示策略配置模态框
+            const modal = new bootstrap.Modal(document.getElementById('strategyConfigModal'));
+            modal.show();
+        }
+        
+        // 显示策略日志函数
+        function showStrategyLogs(strategyId) {
+            console.log('显示策略日志:', strategyId);
+            // 显示策略日志模态框
+            const modal = new bootstrap.Modal(document.getElementById('strategyLogsModal'));
+            modal.show();
+        }
+        
+        // 显示所有日志函数
+        function showAllLogs() {
+            console.log('显示所有日志');
+            // 显示日志模态框
+            const modal = new bootstrap.Modal(document.getElementById('logsModal'));
+            modal.show();
+        }
+        
+        // 暴露必要的全局函数
+        window.forceLoadStrategies = forceLoadStrategies;
+        window.refreshStrategies = refreshStrategies;
+        window.displayStrategies = displayStrategies;
+        window.configStrategy = configStrategy;
+        window.showStrategyLogs = showStrategyLogs;
+        window.showAllLogs = showAllLogs;
     </script>
 </body>
 </html> 
