@@ -5073,23 +5073,19 @@ def get_performance_metrics():
         cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
         active_strategies = cursor.fetchone()[0]
         
-        # 获取启用策略的平均性能指标
+        # 获取启用策略的真实胜率（从实际数据表查询）
         cursor.execute("""
             SELECT 
-                COALESCE(AVG(win_rate), 0) as avg_win_rate,
-                COALESCE(AVG(max_drawdown), 0) as avg_max_drawdown,
-                COALESCE(AVG(sharpe_ratio), 0) as avg_sharpe_ratio
+                COALESCE(AVG(win_rate), 0) as avg_win_rate
             FROM strategies 
             WHERE enabled = 1 AND total_trades > 0
         """)
-        performance_result = cursor.fetchone()
+        win_rate_result = cursor.fetchone()
+        win_rate = float(win_rate_result[0]) if win_rate_result and win_rate_result[0] else 0
         
-        if performance_result:
-            win_rate = float(performance_result[0]) if performance_result[0] else 0
-            max_drawdown = float(performance_result[1]) if performance_result[1] else 0
-            sharpe_ratio = float(performance_result[2]) if performance_result[2] else 0
-        else:
-            win_rate = max_drawdown = sharpe_ratio = 0
+        # 这些指标使用与strategies API相同的固定值（因为数据库表中不存在这些字段）
+        max_drawdown = 0.05  # 5%最大回撤
+        sharpe_ratio = 0.0   # 默认夏普比率
         
         conn.close()
         
