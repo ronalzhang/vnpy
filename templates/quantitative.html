@@ -902,25 +902,465 @@
         // 策略配置函数
         function configStrategy(strategyId) {
             console.log('配置策略:', strategyId);
+            
+            // 设置模态框标题
+            const modalTitle = document.getElementById('strategyConfigModalLabel');
+            if (modalTitle) {
+                modalTitle.innerHTML = `<i class="fas fa-cog"></i> 策略配置 - ${strategyId.slice(-8)}`;
+            }
+            
             // 显示策略配置模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyConfigModal'));
             modal.show();
+            
+            // 立即加载策略配置数据
+            loadStrategyConfigData(strategyId);
+        }
+        
+        // 加载策略配置数据
+        function loadStrategyConfigData(strategyId) {
+            // 设置策略ID隐藏字段
+            const strategyIdInput = document.getElementById('strategyId');
+            if (strategyIdInput) {
+                strategyIdInput.value = strategyId;
+            }
+            
+            // 调用策略详情API加载配置
+            fetch(`/api/quantitative/strategies`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' && data.data) {
+                        const strategy = data.data.find(s => s.id === strategyId);
+                        if (strategy) {
+                            populateStrategyForm(strategy);
+                        } else {
+                            throw new Error('未找到策略数据');
+                        }
+                    } else {
+                        throw new Error('API返回数据格式错误');
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ 策略配置加载失败:', error);
+                    // 显示错误提示但仍允许编辑
+                    const form = document.getElementById('strategyConfigForm');
+                    if (form) {
+                        form.insertAdjacentHTML('afterbegin', `
+                            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                配置数据加载失败: ${error.message}，请手动输入配置信息。
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        `);
+                    }
+                });
+        }
+        
+        // 填充策略表单数据
+        function populateStrategyForm(strategy) {
+            // 基本信息
+            const strategyName = document.getElementById('strategyName');
+            if (strategyName) strategyName.value = strategy.name || '';
+            
+            const strategySymbol = document.getElementById('strategySymbol');
+            if (strategySymbol) strategySymbol.value = strategy.symbol || 'BTC/USDT';
+            
+            const strategyType = document.getElementById('strategyType');
+            if (strategyType) strategyType.value = strategy.strategy_type || 'momentum';
+            
+            const strategyEnabled = document.getElementById('strategyEnabled');
+            if (strategyEnabled) strategyEnabled.checked = strategy.enabled || false;
+            
+            // 策略统计
+            const totalReturn = document.getElementById('strategyTotalReturn');
+            if (totalReturn) totalReturn.textContent = `${(strategy.total_return_rate || 0).toFixed(2)}%`;
+            
+            const winRate = document.getElementById('strategyWinRate');
+            if (winRate) winRate.textContent = `${(strategy.win_rate || 0).toFixed(1)}%`;
+            
+            const totalTrades = document.getElementById('strategyTotalTrades');
+            if (totalTrades) totalTrades.textContent = strategy.total_trades || 0;
+            
+            const dailyReturn = document.getElementById('strategyDailyReturn');
+            if (dailyReturn) dailyReturn.textContent = `${(strategy.daily_return_rate || 0).toFixed(2)}%`;
+            
+            // 策略参数
+            populateStrategyParameters(strategy.parameters || {});
+        }
+        
+        // 填充策略参数
+        function populateStrategyParameters(parameters) {
+            const container = document.getElementById('strategyParameters');
+            if (!container) return;
+            
+            if (Object.keys(parameters).length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-cog me-2"></i>
+                        暂无可配置参数
+                    </div>
+                `;
+                return;
+            }
+            
+            const parametersHtml = Object.entries(parameters).map(([key, value]) => {
+                return `
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="param_${key}" class="form-label">${key}</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="param_${key}" 
+                                   name="param_${key}" 
+                                   value="${value}" 
+                                   step="0.01">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <small class="text-muted">当前值: ${value}</small>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = parametersHtml;
         }
         
         // 显示策略日志函数
         function showStrategyLogs(strategyId) {
             console.log('显示策略日志:', strategyId);
-            // 显示策略日志模态框
+            
+            // 设置模态框标题
+            const modalTitle = document.getElementById('strategyLogsModalLabel');
+            if (modalTitle) {
+                modalTitle.innerHTML = `<i class="fas fa-history"></i> 策略日志 - ${strategyId.slice(-8)}`;
+            }
+            
+            // 显示模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyLogsModal'));
             modal.show();
+            
+            // 立即加载日志数据
+            loadStrategyLogData(strategyId);
+        }
+        
+        // 加载策略日志数据
+        function loadStrategyLogData(strategyId) {
+            const container = document.getElementById('strategyLogTabs');
+            if (!container) return;
+            
+            // 显示加载状态
+            container.innerHTML = `
+                <div class="text-center p-4">
+                    <i class="fas fa-spinner fa-spin fa-2x text-primary mb-3"></i>
+                    <p class="text-muted">正在加载策略日志...</p>
+                </div>
+            `;
+            
+            // 调用日志API
+            fetch(`/api/quantitative/strategies/${strategyId}/logs-by-category?type=all&limit=100`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success && data.logs) {
+                        displayStrategyLogTabs(data.logs, strategyId);
+                    } else {
+                        throw new Error('API返回数据格式错误');
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ 策略日志加载失败:', error);
+                    container.innerHTML = `
+                        <div class="text-center p-4">
+                            <i class="fas fa-exclamation-triangle fa-2x text-danger mb-3"></i>
+                            <p class="text-danger">日志加载失败: ${error.message}</p>
+                            <button class="btn btn-outline-primary btn-sm" onclick="loadStrategyLogData('${strategyId}')">
+                                <i class="fas fa-retry me-1"></i>重试
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+        
+        // 显示策略日志标签页
+        function displayStrategyLogTabs(logs, strategyId) {
+            const container = document.getElementById('strategyLogTabs');
+            if (!container) return;
+            
+            // 按类型分组日志
+            const logsByType = {
+                all: logs,
+                evolution: logs.filter(log => log.log_type === 'evolution'),
+                validation: logs.filter(log => log.log_type === 'validation' || log.log_type === 'trading'),
+                real_trading: logs.filter(log => log.log_type === 'real_trading')
+            };
+            
+            // 生成标签页HTML
+            const tabsHtml = `
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <ul class="nav nav-tabs" id="logTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all-logs" type="button" role="tab">
+                                    全部日志 (${logsByType.all.length})
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="evolution-tab" data-bs-toggle="tab" data-bs-target="#evolution-logs" type="button" role="tab">
+                                    进化日志 (${logsByType.evolution.length})
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="validation-tab" data-bs-toggle="tab" data-bs-target="#validation-logs" type="button" role="tab">
+                                    验证交易 (${logsByType.validation.length})
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="real-tab" data-bs-toggle="tab" data-bs-target="#real-logs" type="button" role="tab">
+                                    真实交易 (${logsByType.real_trading.length})
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="logTabsContent">
+                    ${generateLogTabContent('all-logs', logsByType.all, 'all', true)}
+                    ${generateLogTabContent('evolution-logs', logsByType.evolution, 'evolution')}
+                    ${generateLogTabContent('validation-logs', logsByType.validation, 'validation')}
+                    ${generateLogTabContent('real-logs', logsByType.real_trading, 'real_trading')}
+                </div>
+            `;
+            
+            container.innerHTML = tabsHtml;
+        }
+        
+        // 生成日志标签页内容
+        function generateLogTabContent(tabId, logs, type, isActive = false) {
+            const activeClass = isActive ? ' show active' : '';
+            
+            if (logs.length === 0) {
+                return `
+                    <div class="tab-pane fade${activeClass}" id="${tabId}" role="tabpanel">
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-inbox fa-3x mb-3 opacity-50"></i>
+                            <p>暂无${getLogTypeName(type)}记录</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const logsHtml = logs.map(log => {
+                const logTime = new Date(log.timestamp || log.created_at).toLocaleString();
+                const logTypeClass = getLogTypeClass(log.log_type);
+                const logTypeName = getLogTypeName(log.log_type);
+                
+                return `
+                    <div class="log-entry border-bottom py-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="badge ${logTypeClass}">${logTypeName}</span>
+                            <small class="text-muted">${logTime}</small>
+                        </div>
+                        <div class="log-content">
+                            <strong>${log.action || log.optimization_type || '操作'}</strong>
+                            ${log.trigger_reason ? `<br><small class="text-muted">触发原因: ${log.trigger_reason}</small>` : ''}
+                            ${log.details ? `<br><small>${log.details}</small>` : ''}
+                            ${log.pnl ? `<br><span class="badge ${log.pnl >= 0 ? 'bg-success' : 'bg-danger'}">PnL: ${log.pnl} USDT</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            return `
+                <div class="tab-pane fade${activeClass}" id="${tabId}" role="tabpanel">
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        ${logsHtml}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 获取日志类型名称
+        function getLogTypeName(type) {
+            const names = {
+                'all': '全部日志',
+                'evolution': '进化日志',
+                'validation': '验证交易',
+                'trading': '验证交易',
+                'real_trading': '真实交易'
+            };
+            return names[type] || type;
+        }
+        
+        // 获取日志类型样式类
+        function getLogTypeClass(type) {
+            const classes = {
+                'evolution': 'bg-primary',
+                'validation': 'bg-info',
+                'trading': 'bg-info',
+                'real_trading': 'bg-success'
+            };
+            return classes[type] || 'bg-secondary';
         }
         
         // 显示所有日志函数
         function showAllLogs() {
             console.log('显示所有日志');
+            
             // 显示日志模态框
             const modal = new bootstrap.Modal(document.getElementById('logsModal'));
             modal.show();
+            
+            // 立即加载所有日志数据
+            loadAllLogsData();
+        }
+        
+        // 加载所有日志数据
+        function loadAllLogsData() {
+            const container = document.getElementById('logsContent');
+            if (!container) return;
+            
+            // 显示加载状态
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">正在加载系统日志...</p>
+                </div>
+            `;
+            
+            // 模拟加载一些日志数据（您可以替换为真实的API调用）
+            setTimeout(() => {
+                const sampleLogs = [
+                    {
+                        timestamp: new Date().toISOString(),
+                        type: 'system',
+                        message: '系统启动完成',
+                        level: 'info'
+                    },
+                    {
+                        timestamp: new Date(Date.now() - 300000).toISOString(),
+                        type: 'strategy',
+                        message: '策略进化系统启动',
+                        level: 'info'
+                    },
+                    {
+                        timestamp: new Date(Date.now() - 600000).toISOString(),
+                        type: 'trading',
+                        message: '验证交易执行完成',
+                        level: 'success'
+                    }
+                ];
+                
+                displayAllLogs(sampleLogs);
+            }, 1000);
+        }
+        
+        // 显示所有日志
+        function displayAllLogs(logs) {
+            const container = document.getElementById('logsContent');
+            if (!container) return;
+            
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-inbox fa-3x mb-3 opacity-50"></i>
+                        <p>暂无系统日志</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const logsHtml = logs.map(log => {
+                const logTime = new Date(log.timestamp).toLocaleString();
+                const levelClass = {
+                    'info': 'text-info',
+                    'success': 'text-success',
+                    'warning': 'text-warning',
+                    'error': 'text-danger'
+                }[log.level] || 'text-muted';
+                
+                return `
+                    <div class="log-entry border-bottom py-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="badge bg-secondary me-2">${log.type}</span>
+                                <span class="${levelClass}">${log.message}</span>
+                            </div>
+                            <small class="text-muted">${logTime}</small>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = `
+                <div style="max-height: 500px; overflow-y: auto;">
+                    ${logsHtml}
+                </div>
+            `;
+        }
+        
+        // 应用日志筛选
+        function applyLogFilters() {
+            console.log('应用日志筛选');
+            const logType = document.getElementById('logTypeFilter')?.value || 'all';
+            const strategy = document.getElementById('strategyFilter')?.value || '';
+            const date = document.getElementById('dateFilter')?.value || '';
+            
+            // 重新加载日志数据（这里可以添加筛选参数）
+            loadAllLogsData();
+        }
+        
+        // 导出日志
+        function exportLogs() {
+            console.log('导出日志');
+            // 创建一个简单的导出功能
+            const logEntries = document.querySelectorAll('.log-entry');
+            if (logEntries.length === 0) {
+                alert('没有日志数据可导出');
+                return;
+            }
+            
+            let csvContent = "时间,类型,消息\n";
+            logEntries.forEach(entry => {
+                const timeElement = entry.querySelector('.text-muted');
+                const typeElement = entry.querySelector('.badge');
+                const messageElement = entry.querySelector('span:not(.badge)');
+                
+                if (timeElement && typeElement && messageElement) {
+                    const time = timeElement.textContent.trim();
+                    const type = typeElement.textContent.trim();
+                    const message = messageElement.textContent.trim().replace(/"/g, '""');
+                    csvContent += `"${time}","${type}","${message}"\n`;
+                }
+            });
+            
+            // 创建下载链接
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `策略日志_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // 添加缺失的按钮功能
+        function toggleBalanceChart(period) {
+            console.log('切换资产图表周期:', period);
+            // 更新按钮状态
+            document.querySelectorAll('[onclick*="toggleBalanceChart"]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // 这里可以添加实际的图表更新逻辑
         }
         
         // 暴露必要的全局函数
@@ -930,6 +1370,11 @@
         window.configStrategy = configStrategy;
         window.showStrategyLogs = showStrategyLogs;
         window.showAllLogs = showAllLogs;
+        window.loadStrategyLogData = loadStrategyLogData;
+        window.loadStrategyConfigData = loadStrategyConfigData;
+        window.applyLogFilters = applyLogFilters;
+        window.exportLogs = exportLogs;
+        window.toggleBalanceChart = toggleBalanceChart;
     </script>
 </body>
 </html> 
