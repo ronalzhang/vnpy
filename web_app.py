@@ -5055,6 +5055,124 @@ def get_strategy_logs_by_category(strategy_id):
             'pagination': {'current_page': 1, 'total_pages': 0, 'total_count': 0, 'page_size': 30}
         }), 500
 
+# ==================== 新增：性能监控数据API ==================== 
+@app.route('/api/quantitative/performance-metrics', methods=['GET'])
+def get_performance_metrics():
+    """获取性能监控数据"""
+    try:
+        conn = psycopg2.connect(**db_config)
+        cursor = conn.cursor()
+        
+        # 获取活跃策略数量
+        cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = true")
+        active_strategies = cursor.fetchone()[0]
+        
+        # 获取总体胜率
+        cursor.execute("""
+            SELECT AVG(win_rate) 
+            FROM strategies 
+            WHERE total_trades > 0 AND enabled = true
+        """)
+        win_rate_result = cursor.fetchone()
+        win_rate = win_rate_result[0] if win_rate_result[0] else 0
+        
+        # 获取最大回撤
+        cursor.execute("""
+            SELECT AVG(max_drawdown) 
+            FROM strategies 
+            WHERE total_trades > 0 AND enabled = true
+        """)
+        max_drawdown_result = cursor.fetchone()
+        max_drawdown = max_drawdown_result[0] if max_drawdown_result[0] else 0
+        
+        # 获取夏普比率
+        cursor.execute("""
+            SELECT AVG(sharpe_ratio) 
+            FROM strategies 
+            WHERE total_trades > 0 AND enabled = true AND sharpe_ratio IS NOT NULL
+        """)
+        sharpe_ratio_result = cursor.fetchone()
+        sharpe_ratio = sharpe_ratio_result[0] if sharpe_ratio_result[0] else 0
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'active_strategies': active_strategies,
+                'win_rate': float(win_rate) if win_rate else 0,
+                'max_drawdown': float(max_drawdown) if max_drawdown else 0,
+                'sharpe_ratio': float(sharpe_ratio) if sharpe_ratio else 0
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ 获取性能监控数据失败: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'data': {
+                'active_strategies': 0,
+                'win_rate': 0,
+                'max_drawdown': 0,
+                'sharpe_ratio': 0
+            }
+        })
+
+# ==================== 新增：策略管理状态数据API ====================
+@app.route('/api/quantitative/management-status', methods=['GET'])
+def get_management_status():
+    """获取策略管理状态数据"""
+    try:
+        conn = psycopg2.connect(**db_config)
+        cursor = conn.cursor()
+        
+        # 获取活跃策略数量
+        cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = true")
+        active_strategies = cursor.fetchone()[0]
+        
+        # 获取真实交易策略数量（分数>=65且启用的前几名）
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM strategies 
+            WHERE enabled = true AND final_score >= 65
+            ORDER BY final_score DESC 
+            LIMIT 5
+        """)
+        real_trading_count = cursor.fetchone()[0]
+        
+        # 获取验证交易策略数量（所有启用的策略都在验证交易）
+        validation_count = active_strategies
+        
+        # 获取策略总数
+        cursor.execute("SELECT COUNT(*) FROM strategies")
+        total_strategies = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'active_strategies': active_strategies,
+                'real_trading_count': real_trading_count,
+                'validation_count': validation_count,
+                'total_strategies': total_strategies
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ 获取策略管理状态失败: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'data': {
+                'active_strategies': 0,
+                'real_trading_count': 0,
+                'validation_count': 0,
+                'total_strategies': 0
+            }
+        })
+
 # 🔧 修复：添加缺失的程序入口
 if __name__ == "__main__":
     main()
@@ -5359,124 +5477,4 @@ def get_strategy_trade_mode(score, strategy_id=None, parameters_recently_changed
 # ... existing code ...
 
 # API代码已移动到正确位置
-
-# ==================== 新增：性能监控数据API ==================== 
-@app.route('/api/quantitative/performance-metrics', methods=['GET'])
-def get_performance_metrics():
-    """获取性能监控数据"""
-    try:
-        conn = psycopg2.connect(**db_config)
-        cursor = conn.cursor()
-        
-        # 获取活跃策略数量
-        cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = true")
-        active_strategies = cursor.fetchone()[0]
-        
-        # 获取总体胜率
-        cursor.execute("""
-            SELECT AVG(win_rate) 
-            FROM strategies 
-            WHERE total_trades > 0 AND enabled = true
-        """)
-        win_rate_result = cursor.fetchone()
-        win_rate = win_rate_result[0] if win_rate_result[0] else 0
-        
-        # 获取最大回撤
-        cursor.execute("""
-            SELECT AVG(max_drawdown) 
-            FROM strategies 
-            WHERE total_trades > 0 AND enabled = true
-        """)
-        max_drawdown_result = cursor.fetchone()
-        max_drawdown = max_drawdown_result[0] if max_drawdown_result[0] else 0
-        
-        # 获取夏普比率
-        cursor.execute("""
-            SELECT AVG(sharpe_ratio) 
-            FROM strategies 
-            WHERE total_trades > 0 AND enabled = true AND sharpe_ratio IS NOT NULL
-        """)
-        sharpe_ratio_result = cursor.fetchone()
-        sharpe_ratio = sharpe_ratio_result[0] if sharpe_ratio_result[0] else 0
-        
-        conn.close()
-        
-        return jsonify({
-            'status': 'success',
-            'data': {
-                'active_strategies': active_strategies,
-                'win_rate': float(win_rate) if win_rate else 0,
-                'max_drawdown': float(max_drawdown) if max_drawdown else 0,
-                'sharpe_ratio': float(sharpe_ratio) if sharpe_ratio else 0
-            }
-        })
-        
-    except Exception as e:
-        print(f"❌ 获取性能监控数据失败: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e),
-            'data': {
-                'active_strategies': 0,
-                'win_rate': 0,
-                'max_drawdown': 0,
-                'sharpe_ratio': 0
-            }
-        })
-
-# ==================== 新增：策略管理状态数据API ====================
-@app.route('/api/quantitative/management-status', methods=['GET'])
-def get_management_status():
-    """获取策略管理状态数据"""
-    try:
-        conn = psycopg2.connect(**db_config)
-        cursor = conn.cursor()
-        
-        # 获取活跃策略数量
-        cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = true")
-        active_strategies = cursor.fetchone()[0]
-        
-        # 获取真实交易策略数量（分数>=65且启用的前几名）
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM strategies 
-            WHERE enabled = true AND final_score >= 65
-            ORDER BY final_score DESC 
-            LIMIT 5
-        """)
-        real_trading_count = cursor.fetchone()[0]
-        
-        # 获取验证交易策略数量（所有启用的策略都在验证交易）
-        validation_count = active_strategies
-        
-        # 获取策略总数
-        cursor.execute("SELECT COUNT(*) FROM strategies")
-        total_strategies = cursor.fetchone()[0]
-        
-        conn.close()
-        
-        return jsonify({
-            'status': 'success',
-            'data': {
-                'active_strategies': active_strategies,
-                'real_trading_count': real_trading_count,
-                'validation_count': validation_count,
-                'total_strategies': total_strategies
-            }
-        })
-        
-    except Exception as e:
-        print(f"❌ 获取策略管理状态失败: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e),
-            'data': {
-                'active_strategies': 0,
-                'real_trading_count': 0,
-                'validation_count': 0,
-                'total_strategies': 0
-            }
-        })
-
-    # ... existing code ...
 

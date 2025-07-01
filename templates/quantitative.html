@@ -850,7 +850,16 @@
                         const strategies = data.data;
                         console.log(`✅ 成功加载 ${strategies.length} 个策略`);
                         
-                        displayStrategies(strategies);
+                        // 🔧 修复：使用quantitativeSystem实例的方法
+                        if (window.quantitativeSystem) {
+                            window.quantitativeSystem.strategies = strategies;
+                            window.quantitativeSystem.renderStrategies();
+                        } else if (window.app) {
+                            window.app.strategies = strategies;
+                            window.app.renderStrategies();
+                        } else {
+                            console.error('❌ 未找到量化系统实例');
+                        }
                         
                         if (jsTestStatus) {
                             jsTestStatus.innerHTML = `<i class="fas fa-check me-2 text-success"></i>成功加载 ${strategies.length} 个策略`;
@@ -2123,7 +2132,7 @@
         // 暴露必要的全局函数
         window.forceLoadStrategies = forceLoadStrategies;
         window.refreshStrategies = refreshStrategies;
-        window.displayStrategies = displayStrategies;
+        // 🗑️ displayStrategies已删除，使用quantitativeSystem.renderStrategies()
         window.configStrategy = configStrategy;
         window.showStrategyLogs = showStrategyLogs;
         window.showAllLogs = showAllLogs;
