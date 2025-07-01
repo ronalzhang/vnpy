@@ -355,65 +355,102 @@ class QuantitativeSystem {
         }
     }
 
-    // 更新系统状态显示
+    // 🔧 修复：更新系统状态显示 - 统一导航栏和控制面板状态
     updateSystemStatus() {
-        const systemStatusEl = document.getElementById('systemStatus');
-        const systemToggle = document.getElementById('systemToggle');
-        
         // 检查状态值
         const isRunning = window.systemRunning || this.systemStatus?.running || false;
         
         console.log('🔄 更新系统状态显示:', {
             systemRunning: window.systemRunning,
             实例状态: this.systemStatus?.running,
-            最终状态: isRunning,
-            statusElement: !!systemStatusEl,
-            toggleElement: !!systemToggle
+            最终状态: isRunning
         });
         
+        // 🔧 修复：更新四个核心模块中的系统控制状态
+        const systemStatusDot = document.getElementById('systemStatusDot');
+        const systemStatusBadge = document.getElementById('systemStatusBadge');
+        const systemToggle = document.getElementById('systemToggle');
+        
         if (isRunning) {
-            // 系统控制台状态 - 运行中
-            if (systemStatusEl) {
-            systemStatusEl.innerHTML = '<span class="status-dot online"></span>在线';
+            // 四个核心模块的系统控制状态 - 在线
+            if (systemStatusDot) {
+                systemStatusDot.className = 'status-dot online me-2';
+            }
+            if (systemStatusBadge) {
+                systemStatusBadge.textContent = '在线';
+                systemStatusBadge.className = 'badge bg-success';
             }
             if (systemToggle) {
-            systemToggle.classList.add('active');
+                systemToggle.classList.add('active');
             }
             
-            // 更新顶部导航栏状态
-            const statusElement = document.getElementById('system-status-text');
-            const statusIndicator = document.getElementById('system-status-indicator');
-            if (statusElement) {
-                statusElement.textContent = '在线';
-                statusElement.className = 'text-success';
-            }
-            if (statusIndicator) {
-                statusIndicator.className = 'status-dot online';
-            }
+            // 🔧 修复：同步更新导航栏状态
+            this.updateNavigationStatus('在线', true);
             
-            console.log('✅ 系统状态已更新为在线');
+            console.log('✅ 系统状态已统一更新为在线');
         } else {
-            // 系统控制台状态 - 离线
-            if (systemStatusEl) {
-            systemStatusEl.innerHTML = '<span class="status-dot offline"></span>离线';
+            // 四个核心模块的系统控制状态 - 离线
+            if (systemStatusDot) {
+                systemStatusDot.className = 'status-dot offline me-2';
+            }
+            if (systemStatusBadge) {
+                systemStatusBadge.textContent = '离线';
+                systemStatusBadge.className = 'badge bg-secondary';
             }
             if (systemToggle) {
-            systemToggle.classList.remove('active');
+                systemToggle.classList.remove('active');
             }
             
-            // 更新顶部导航栏状态
-            const statusElement = document.getElementById('system-status-text');
-            const statusIndicator = document.getElementById('system-status-indicator');
-            if (statusElement) {
-                statusElement.textContent = '离线';
-                statusElement.className = 'text-muted';
-            }
-            if (statusIndicator) {
-                statusIndicator.className = 'status-dot offline';
-            }
+            // 🔧 修复：同步更新导航栏状态
+            this.updateNavigationStatus('离线', false);
             
-            console.log('⚠️ 系统状态已更新为离线');
+            console.log('⚠️ 系统状态已统一更新为离线');
         }
+    }
+    
+    // 🔧 新增：统一更新导航栏状态的辅助方法
+    updateNavigationStatus(statusText, isOnline) {
+        // 更新顶部导航栏状态文本（支持多种可能的元素ID）
+        const statusElements = [
+            'system-status-text',
+            'systemStatusText', 
+            'status-text'
+        ];
+        
+        statusElements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = statusText;
+                element.className = isOnline ? 'text-success' : 'text-muted';
+            }
+        });
+        
+        // 更新顶部导航栏状态指示器
+        const statusIndicators = [
+            'system-status-indicator',
+            'systemStatusIndicator',
+            'status-indicator'
+        ];
+        
+        statusIndicators.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.className = `status-dot ${isOnline ? 'online' : 'offline'}`;
+            }
+        });
+        
+        // 🔧 新增：更新导航栏时间戳旁边的状态（页面级别状态）
+        const navText = document.querySelector('nav .navbar-nav .nav-link');
+        if (navText && navText.textContent.includes('2025/')) {
+            // 找到包含时间的文本节点并更新状态
+            const timeText = navText.textContent;
+            const newText = timeText.replace(/(在线|离线)/, statusText);
+            if (newText !== timeText) {
+                navText.textContent = newText;
+            }
+        }
+        
+        console.log(`📡 导航栏状态已更新: ${statusText}`);
     }
 
     // 更新自动交易状态显示
@@ -2059,7 +2096,8 @@ class QuantitativeSystem {
         try {
             console.log('🔧 开始显示策略管理模态框...');
             
-            // 加载管理配置
+            // 🔧 修复：先加载策略状态数据，再加载配置
+            this.loadAutoManagementStatus();
             this.loadManagementConfig();
             
             // 🔥 新增：初始化四层配置管理器 - 延迟初始化确保DOM加载完成

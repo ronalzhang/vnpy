@@ -1327,10 +1327,10 @@ def quantitative_strategies():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # 🔧 修复：读取配置的display_strategies_count
+                # 🔧 修复：统一从四层进化配置表读取display_strategies_count
                 cursor.execute("""
                     SELECT config_value FROM four_tier_evolution_config 
-                    WHERE config_key = 'display_strategies_count'
+                    WHERE config_category = 'tier_size' AND config_key = 'display_strategies_count'
                 """)
                 config_result = cursor.fetchone()
                 
@@ -1338,11 +1338,25 @@ def quantitative_strategies():
                     try:
                         configured_limit = int(config_result[0])
                         limit = configured_limit
-                        print(f"🔧 使用配置的策略显示数量: {limit}")
+                        print(f"🔧 使用四层配置的策略显示数量: {limit}")
                     except (ValueError, TypeError):
                         print(f"⚠️ 配置值无效，使用默认值: {limit}")
                 else:
-                    print(f"⚠️ 未找到display_strategies_count配置，使用默认值: {limit}")
+                    # 🔧 回退检查传统管理配置表
+                    cursor.execute("""
+                        SELECT config_value FROM strategy_management_config 
+                        WHERE config_key = 'maxStrategies'
+                    """)
+                    fallback_result = cursor.fetchone()
+                    if fallback_result:
+                        try:
+                            configured_limit = int(fallback_result[0])
+                            limit = configured_limit
+                            print(f"🔧 使用传统配置的策略显示数量: {limit}")
+                        except (ValueError, TypeError):
+                            print(f"⚠️ 传统配置值无效，使用默认值: {limit}")
+                    else:
+                        print(f"⚠️ 未找到任何配置，使用默认值: {limit}")
                 
                 # 🔥 修复查询逻辑：使用正确的查询条件
                 simple_query = f"""
