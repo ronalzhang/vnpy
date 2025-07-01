@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/quantitative.css') }}">
     <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 </head>
-<body>
+<body class="quantitative-page">
     <!-- 重新设计的导航栏 -->
     <header>
         <nav class="navbar navbar-expand-lg">
@@ -321,11 +321,8 @@
                             <i class="fas fa-brain me-2"></i> 量化策略管理
                         </h6>
                         <div class="d-flex align-items-center">
-                            <button class="btn btn-sm btn-outline-primary me-2" onclick="showAllLogs()">
-                                <i class="fas fa-list me-1"></i>日志
-                            </button>
-                            <button class="btn btn-sm btn-primary" onclick="refreshStrategies()">
-                                <i class="fas fa-sync-alt me-1"></i>刷新
+                            <button class="btn btn-sm btn-outline-primary" onclick="showAllLogs()">
+                                <i class="fas fa-list me-1"></i>滚动日志
                             </button>
                         </div>
                     </div>
@@ -775,5 +772,33 @@
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
     <!-- 量化交易专用JavaScript -->
     <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
+    
+    <script>
+        // 量化系统初始化
+        let quantitativeSystem;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('⚡ 量化系统页面开始初始化...');
+            
+            // 创建量化系统实例
+            quantitativeSystem = new QuantitativeSystem();
+            window.quantitativeSystem = quantitativeSystem;
+            window.app = quantitativeSystem; // 兼容性别名
+            
+            // 启动状态管理器
+            const statusManager = new GlobalStatusManager();
+            statusManager.startStatusPolling();
+            
+            // 立即加载初始数据
+            setTimeout(() => {
+                if (quantitativeSystem) {
+                    console.log('🔄 开始加载初始数据...');
+                    quantitativeSystem.loadInitialData();
+                }
+            }, 500);
+            
+            console.log('✅ 量化系统初始化完成');
+        });
+    </script>
 </body>
 </html> 

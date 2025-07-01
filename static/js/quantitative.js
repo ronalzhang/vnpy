@@ -3138,4 +3138,41 @@ function showStrategyLogs(strategyId) {
     }
 }
 
+// 全局函数：查看全部日志
+function showAllLogs() {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.showAllLogs();
+    } else {
+        console.log('显示全部日志功能');
+        // 简单实现：显示日志模态框
+        const logModal = document.getElementById('logModal');
+        if (logModal) {
+            const modal = new bootstrap.Modal(logModal);
+            modal.show();
+        }
+    }
+}
+
+// 全局函数：刷新策略数据
+function refreshStrategies() {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.loadStrategies();
+    } else if (window.app) {
+        window.app.loadStrategies();
+    } else {
+        console.log('刷新策略数据');
+        location.reload();
+    }
+}
+
+// 全局函数：刷新日志
+function refreshLogs() {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.loadEvolutionLog();
+    } else {
+        console.log('刷新日志功能');
+        location.reload();
+    }
+}
+
 console.log('✅ 全局函数已定义完成');
