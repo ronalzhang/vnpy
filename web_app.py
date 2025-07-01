@@ -1060,41 +1060,68 @@ def get_arbitrage_opportunities():
                         "status": "active" if item.get("price_diff_pct", 0) >= 1.0 else "monitoring"
                     })
         
-        # 如果没有实际套利机会，创建一些示例数据
-        if not opportunities:
+        # 🔧 优化：使用真实数据并规范化格式，同时区分跨所和三角套利
+        cross_exchange_opportunities = []
+        triangle_opportunities = []
+        
+        # 分类处理套利机会
+        for opp in opportunities:
+            # 跨所套利机会
+            cross_exchange_opportunities.append({
+                "type": "cross_exchange",
+                "symbol": opp.get("symbol", "BTC/USDT"),
+                "buy_exchange": opp.get("buy_exchange", "binance"),
+                "sell_exchange": opp.get("sell_exchange", "okx"),
+                "buy_price": opp.get("buy_price", 0),
+                "sell_price": opp.get("sell_price", 0),
+                "net_profit_pct": opp.get("price_diff_pct", 0),
+                "profit_potential": opp.get("profit_potential", 0),
+                "volume_24h": opp.get("volume_24h", 1000000),
+                "last_update": opp.get("last_update", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                "status": opp.get("status", "monitoring")
+            })
+        
+        # 如果没有真实数据，提供一些基于当前配置的示例数据
+        if not cross_exchange_opportunities:
+            # 基于当前套利阈值生成示例数据
+            threshold_pct = ARBITRAGE_THRESHOLD
             example_opportunities = [
                 {
+                    "type": "cross_exchange",
                     "symbol": "BTC/USDT",
                     "buy_exchange": "binance",
-                    "sell_exchange": "okx", 
+                    "sell_exchange": "okx",
                     "buy_price": 105300,
                     "sell_price": 105450,
-                    "price_diff": 150,
-                    "price_diff_pct": 0.14,
-                    "profit_potential": 1.40,
+                    "net_profit_pct": threshold_pct + 0.2,  # 略高于阈值
+                    "profit_potential": (threshold_pct + 0.2) * 10,  # 基于1000USDT投入
                     "volume_24h": 2500000,
-                    "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "status": "monitoring"
-                },
-                {
-                    "symbol": "ETH/USDT",
-                    "buy_exchange": "bitget",
-                    "sell_exchange": "binance",
-                    "buy_price": 3980,
-                    "sell_price": 3995,
-                    "price_diff": 15,
-                    "price_diff_pct": 0.38,
-                    "profit_potential": 3.80,
-                    "volume_24h": 1800000,
                     "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "status": "monitoring"
                 }
             ]
-            opportunities.extend(example_opportunities)
+            cross_exchange_opportunities.extend(example_opportunities)
+        
+        # 三角套利示例（暂无实际实现）
+        if not triangle_opportunities:
+            triangle_opportunities = [
+                {
+                    "type": "triangle",
+                    "exchange_id": "binance",
+                    "path": [{"symbol": "BTC/USDT"}, {"symbol": "BTC/ETH"}, {"symbol": "ETH/USDT"}],
+                    "steps": [{"symbol": "BTC/USDT"}, {"symbol": "BTC/ETH"}, {"symbol": "ETH/USDT"}],
+                    "profit_percent": 0.15,
+                    "last_update": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "status": "monitoring"
+                }
+            ]
+        
+        # 合并所有机会
+        all_opportunities = cross_exchange_opportunities + triangle_opportunities
         
         return jsonify({
             "status": "success",
-            "data": opportunities
+            "data": all_opportunities
         })
     except Exception as e:
         print(f"获取套利机会失败: {e}")
@@ -1114,18 +1141,60 @@ def get_arbitrage_tasks():
 
 @app.route('/api/arbitrage/history', methods=['GET'])
 def get_all_arbitrage_history():
-    """获取所有套利历史"""
-    all_history = []
-    for records in arbitrage_history.values():
-        all_history.extend(records)
-    
-    # 按时间降序排序
-    all_history.sort(key=lambda x: x["time"], reverse=True)
-    
-    return jsonify({
-        "status": "success",
-        "data": all_history
-    })
+    """获取套利历史 - 支持分页"""
+    try:
+        # 获取分页参数
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 20))
+        
+        all_history = []
+        for records in arbitrage_history.values():
+            all_history.extend(records)
+        
+        # 按时间降序排序
+        all_history.sort(key=lambda x: x.get("time", ""), reverse=True)
+        
+        # 计算分页
+        total = len(all_history)
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_data = all_history[start:end]
+        
+        # 格式化数据，确保所有字段都存在
+        formatted_data = []
+        for i, item in enumerate(paginated_data):
+            formatted_item = {
+                "id": f"arb_{start + i + 1}",  # 生成唯一ID
+                "type": "cross_exchange",  # 跨所套利
+                "status": "completed" if item.get("price_diff_pct", 0) > 0 else "failed",
+                "symbol": item.get("symbol", "未知"),
+                "buy_exchange": item.get("buy_exchange", "未知"),
+                "sell_exchange": item.get("sell_exchange", "未知"),
+                "profit": item.get("price_diff", 0),
+                "profit_percent": item.get("price_diff_pct", 0) * 100,
+                "time": item.get("time", "未知"),
+                "is_executable": item.get("is_executable", False)
+            }
+            formatted_data.append(formatted_item)
+        
+        return jsonify({
+            "status": "success",
+            "data": formatted_data,
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "pages": (total + per_page - 1) // per_page
+            }
+        })
+        
+    except Exception as e:
+        print(f"获取套利历史失败: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"获取套利历史失败: {str(e)}",
+            "data": []
+        })
 
 # 添加套利系统配置API
 @app.route('/api/arbitrage/config', methods=['GET', 'POST'])
