@@ -4237,23 +4237,23 @@ def get_evolution_log():
         
         logs = []
         
-        # 🔥 修复：从正确的数据库表strategy_evolution_logs获取进化数据
+        # 🔥 修复：从正确的数据库表strategy_evolution_history获取进化数据（独立四层系统写入的表）
         cursor.execute("""
-            SELECT strategy_id, evolution_type, generation, cycle_number, 
+            SELECT strategy_id, evolution_type, generation, cycle, 
                    score_before, score_after, 
-                   old_parameters, new_parameters,
-                   improvement, details, timestamp, created_at
-            FROM strategy_evolution_logs 
-            ORDER BY COALESCE(timestamp, created_at) DESC 
+                   parameters as old_parameters, new_parameters,
+                   improvement, evolution_reason as details, created_time as timestamp, created_time as created_at
+            FROM strategy_evolution_history 
+            ORDER BY created_time DESC 
             LIMIT 200
         """)
         
         evolution_records = cursor.fetchall()
         print(f"🔍 获取到 {len(evolution_records)} 条进化历史记录")
         
-        # 处理进化历史记录（修复字段映射）
+        # 处理进化历史记录（修复字段映射到strategy_evolution_history表结构）
         for record in evolution_records:
-            (strategy_id, evolution_type, generation, cycle_number, 
+            (strategy_id, evolution_type, generation, cycle, 
              score_before, score_after, old_params, new_params,
              improvement, details, timestamp, created_at) = record
             
@@ -4268,19 +4268,19 @@ def get_evolution_log():
             else:
                 # 生成新的描述信息
                 if 'automated_display' in evolution_type or 'optimization' in evolution_type:
-                    detail_text = f"策略{strategy_id[-4:]}参数优化: 第{generation}代第{cycle_number}轮，评分{score_before:.1f}→{score_after:.1f}"
+                    detail_text = f"策略{strategy_id[-4:]}参数优化: 第{generation}代第{cycle}轮，评分{score_before:.1f}→{score_after:.1f}"
                     action = 'optimized'
                 elif evolution_type == 'elite_selected':
-                    detail_text = f"精英策略{strategy_id[-4:]}晋级: 第{generation}代第{cycle_number}轮，评分{score_after:.1f}"
+                    detail_text = f"精英策略{strategy_id[-4:]}晋级: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                     action = 'promoted'
                 elif 'protection' in evolution_type:
-                    detail_text = f"策略{strategy_id[-4:]}保护: 第{generation}代第{cycle_number}轮，评分{score_after:.1f}"
+                    detail_text = f"策略{strategy_id[-4:]}保护: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                     action = 'protected'
                 elif evolution_type == 'random_creation':
-                    detail_text = f"新策略{strategy_id[-4:]}创建: 第{generation}代第{cycle_number}轮，评分{score_after:.1f}"
+                    detail_text = f"新策略{strategy_id[-4:]}创建: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                     action = 'created'
                 else:
-                    detail_text = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle_number}轮，评分{score_after:.1f}"
+                    detail_text = f"策略{strategy_id[-4:]}进化: 第{generation}代第{cycle}轮，评分{score_after:.1f}"
                     action = 'evolved'
             
             # 🔧 处理参数分析
@@ -4367,7 +4367,7 @@ def get_evolution_log():
                 'strategy_name': f"策略{strategy_id[-4:]}",
                 'timestamp': actual_timestamp.isoformat() if actual_timestamp else None,
                 'generation': generation,
-                'cycle': cycle_number,
+                'cycle': cycle,
                 'score_before': float(score_before) if score_before else 0,
                 'score_after': float(score_after) if score_after else 0,
                 'improvement': float(improvement) if improvement else 0,
