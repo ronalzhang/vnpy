@@ -5073,32 +5073,23 @@ def get_performance_metrics():
         cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
         active_strategies = cursor.fetchone()[0]
         
-        # 获取总体胜率
+        # 获取启用策略的平均性能指标
         cursor.execute("""
-            SELECT AVG(win_rate) 
+            SELECT 
+                COALESCE(AVG(win_rate), 0) as avg_win_rate,
+                COALESCE(AVG(max_drawdown), 0) as avg_max_drawdown,
+                COALESCE(AVG(sharpe_ratio), 0) as avg_sharpe_ratio
             FROM strategies 
-            WHERE total_trades > 0 AND enabled = 1
+            WHERE enabled = 1 AND total_trades > 0
         """)
-        win_rate_result = cursor.fetchone()
-        win_rate = win_rate_result[0] if win_rate_result[0] else 0
+        performance_result = cursor.fetchone()
         
-        # 获取最大回撤
-        cursor.execute("""
-            SELECT AVG(max_drawdown) 
-            FROM strategies 
-            WHERE total_trades > 0 AND enabled = 1
-        """)
-        max_drawdown_result = cursor.fetchone()
-        max_drawdown = max_drawdown_result[0] if max_drawdown_result[0] else 0
-        
-        # 获取夏普比率
-        cursor.execute("""
-            SELECT AVG(sharpe_ratio) 
-            FROM strategies 
-            WHERE total_trades > 0 AND enabled = 1 AND sharpe_ratio IS NOT NULL
-        """)
-        sharpe_ratio_result = cursor.fetchone()
-        sharpe_ratio = sharpe_ratio_result[0] if sharpe_ratio_result[0] else 0
+        if performance_result:
+            win_rate = float(performance_result[0]) if performance_result[0] else 0
+            max_drawdown = float(performance_result[1]) if performance_result[1] else 0
+            sharpe_ratio = float(performance_result[2]) if performance_result[2] else 0
+        else:
+            win_rate = max_drawdown = sharpe_ratio = 0
         
         conn.close()
         
