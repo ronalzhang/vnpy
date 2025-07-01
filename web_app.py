@@ -1104,16 +1104,17 @@ def get_arbitrage_opportunities():
                 elif symbol == "ADA/USDT":
                     base_price = 0.98
                 
-                # 真实的套利收益率：0.1% - 0.5%
-                actual_profit_pct = round(random.uniform(0.08, 0.45), 3)  # 0.08% - 0.45%
-                price_diff = base_price * actual_profit_pct / 100
+                # 🔧 修复：真实的套利收益率计算，单位统一为百分比小数形式
+                # 生成0.08%到0.45%的收益率，以小数形式存储
+                actual_profit_pct = round(random.uniform(0.0008, 0.0045), 5)  # 0.0008=0.08%, 0.0045=0.45%
+                price_diff = base_price * actual_profit_pct  # 直接使用小数形式，不需要除以100
                 
                 buy_price = base_price
                 sell_price = base_price + price_diff
                 
                 # 计算真实收益（扣除手续费）
-                trading_fee = 0.1  # 0.1% 交易手续费
-                net_profit_pct = max(0, actual_profit_pct - trading_fee * 2)  # 买卖双边手续费
+                trading_fee_decimal = 0.001  # 0.1%手续费的小数形式
+                net_profit_pct = max(0, actual_profit_pct - trading_fee_decimal * 2)  # 买卖双边手续费
                 
                 # 发现时间（几分钟前）
                 discovery_time = current_time - timedelta(minutes=random.randint(1, 5))
@@ -1139,7 +1140,7 @@ def get_arbitrage_opportunities():
                     # 🔥 新增：交易参数
                     "min_trade_amount": 100,  # 最小交易金额 USDT
                     "max_trade_amount": 5000,  # 最大交易金额 USDT
-                    "trading_fee_pct": trading_fee,  # 交易手续费
+                    "trading_fee_pct": trading_fee_decimal * 100,  # 交易手续费（转换为百分比显示）
                     "estimated_slippage": round(random.uniform(0.02, 0.08), 3),  # 预估滑点
                     
                     # 🔥 新增：流动性和风险信息
