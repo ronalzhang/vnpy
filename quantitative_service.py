@@ -1846,6 +1846,15 @@ class QuantitativeService:
     def _initialize_four_tier_evolution(self):
         """初始化整合的四层进化系统"""
         try:
+            # 导入四层进化管理器
+            try:
+                from modern_strategy_manager import FourTierStrategyManager
+            except ImportError:
+                print("⚠️ modern_strategy_manager模块未找到，跳过四层进化系统初始化")
+                self.four_tier_manager = None
+                self.current_evolution_interval = 180
+                return
+                
             # 创建四层进化管理器（使用整合版本）
             self.four_tier_manager = FourTierStrategyManager(self.db_config)
             
