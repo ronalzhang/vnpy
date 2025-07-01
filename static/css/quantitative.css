@@ -923,23 +923,225 @@
     }
 }
 
-/* ==================== 系统控制面板样式 ==================== */
+/* ==================== 四个核心模块统一现代化样式 ==================== */
+
+/* 🎯 重置和统一四个核心模块的基础样式 */
+.row.mb-3 .col-xl-3 .card {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.row.mb-3 .col-xl-3 .card:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+    border-color: #d1d5db !important;
+}
+
+/* 🔧 系统控制卡片 - 蓝色主题 */
 .system-control-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
+    background: #ffffff !important;
+    color: #1f2937 !important;
+    border-top: 4px solid #3b82f6 !important;
 }
 
+.system-control-card .card-title {
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+
+.system-control-card .control-item {
+    padding: 0.5rem 0 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+
+.system-control-card .control-item:hover {
+    background: #f8fafc !important;
+    transform: translateX(2px) !important;
+}
+
+.system-control-card .status-dot {
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    display: inline-block !important;
+    animation: pulse 2s infinite !important;
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.system-control-card .status-dot.online {
+    background: #10b981 !important;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4) !important;
+}
+
+.system-control-card .status-dot.offline {
+    background: #ef4444 !important;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4) !important;
+}
+
+.system-control-card .btn-toggle {
+    width: 44px !important;
+    height: 22px !important;
+    border: none !important;
+    border-radius: 11px !important;
+    background: #e5e7eb !important;
+    position: relative !important;
+    cursor: pointer !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.system-control-card .btn-toggle::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 2px !important;
+    left: 2px !important;
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 50% !important;
+    background: white !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.system-control-card .btn-toggle.active {
+    background: #10b981 !important;
+}
+
+.system-control-card .btn-toggle.active::after {
+    transform: translateX(22px) !important;
+}
+
+/* 💰 账户总览卡片 - 绿色主题 */
 .account-card {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-    border: none;
+    background: #ffffff !important;
+    color: #1f2937 !important;
+    border-top: 4px solid #10b981 !important;
 }
 
+.account-card .card-title {
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+
+.account-card .metric-row {
+    padding: 0.25rem 0 !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+}
+
+.account-card .metric-row:hover {
+    background: #f0fdf4 !important;
+    transform: translateX(2px) !important;
+}
+
+.account-card .fw-bold {
+    font-size: 0.9rem !important;
+    color: #1f2937 !important;
+}
+
+/* 🔗 交易所状态卡片 - 紫色主题 */
 .exchange-card {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
-    border: none;
+    background: #ffffff !important;
+    color: #1f2937 !important;
+    border-top: 4px solid #8b5cf6 !important;
+}
+
+.exchange-card .card-title {
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+
+.exchange-card .exchange-item {
+    padding: 0.25rem 0 !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+}
+
+.exchange-card .exchange-item:hover {
+    background: #faf5ff !important;
+    transform: translateX(2px) !important;
+}
+
+.exchange-card .status-dot.online {
+    background: #10b981 !important;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.4) !important;
+    animation: statusPulse 2s infinite !important;
+}
+
+.exchange-card .badge {
+    font-size: 0.7rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 12px !important;
+}
+
+/* 📊 性能监控卡片 - 橙色主题 */
+.row.mb-3 .col-xl-3:nth-child(4) .card {
+    border-top: 4px solid #f59e0b !important;
+}
+
+.row.mb-3 .col-xl-3:nth-child(4) .card .card-title {
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+
+.performance-metrics .metric-row {
+    padding: 0.25rem 0 !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+}
+
+.performance-metrics .metric-row:hover {
+    background: #fffbeb !important;
+    transform: translateX(2px) !important;
+}
+
+.performance-metrics .fw-bold {
+    font-size: 0.9rem !important;
+    color: #1f2937 !important;
+}
+
+/* 📱 响应式设计优化 */
+@media (max-width: 768px) {
+    .row.mb-3 .col-xl-3 .card {
+        margin-bottom: 1rem !important;
+    }
+    
+    .system-control-card .control-item,
+    .account-card .metric-row,
+    .exchange-card .exchange-item,
+    .performance-metrics .metric-row {
+        font-size: 0.85rem !important;
+    }
+}
+
+/* 🎨 通用徽章和状态样式 */
+.badge.bg-success {
+    background: linear-gradient(135deg, #10b981, #047857) !important;
+}
+
+.text-success {
+    color: #10b981 !important;
+}
+
+.text-warning {
+    color: #f59e0b !important;
+}
+
+.text-primary {
+    color: #3b82f6 !important;
 }
 
 /* ==================== 策略卡片样式扩展 ==================== */

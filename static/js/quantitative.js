@@ -108,11 +108,11 @@ class GlobalStatusManager {
     }
     
     async startStatusPolling() {
-        // 每30秒检查一次系统状态
+        // 🔧 性能优化：降低状态检查频率，每60秒检查一次系统状态
         setInterval(async () => {
             await this.checkSystemStatus();
             await this.checkExchangeStatus();
-        }, 30000);
+        }, 60000);
         
         // 立即执行一次
         await this.checkSystemStatus();
@@ -723,6 +723,9 @@ class QuantitativeSystem {
         }).join('');
 
         console.log('策略卡片渲染完成');
+        
+        // 🔧 新增：更新性能监控数据
+        updatePerformanceMonitoring({ strategies: this.strategies });
     }
 
     // 渲染空策略提示（没有假数据）
@@ -2890,10 +2893,10 @@ class FourTierConfigManager {
         // 立即更新一次
         this.updateTierStats();
         
-        // 每30秒更新一次统计
+        // 🔧 性能优化：降低统计更新频率，每120秒更新一次统计
         setInterval(() => {
             this.updateTierStats();
-        }, 30000);
+        }, 120000); // 改为120秒，减少API调用频率
     }
 
     showNotification(message, type = 'info') {
@@ -3165,3 +3168,41 @@ function resetManagementConfig() {
 }
 
 console.log('✅ 全局函数已定义完成');
+
+// 🔧 新增：性能监控数据更新函数
+function updatePerformanceMonitoring(data) {
+    try {
+        if (data && data.strategies) {
+            const strategies = data.strategies;
+            const activeStrategies = strategies.filter(s => s.enabled && s.status === 'running');
+            
+            // 活跃策略数量
+            const activeCount = activeStrategies.length;
+            const activeElement = document.getElementById('activeStrategies');
+            if (activeElement) activeElement.textContent = activeCount;
+            
+            // 计算胜率
+            const totalTrades = activeStrategies.reduce((sum, s) => sum + (s.total_trades || 0), 0);
+            const winningTrades = activeStrategies.reduce((sum, s) => sum + (s.winning_trades || 0), 0);
+            const winRate = totalTrades > 0 ? ((winningTrades / totalTrades) * 100).toFixed(1) + '%' : '-';
+            const winRateElement = document.getElementById('winRate');
+            if (winRateElement) winRateElement.textContent = winRate;
+            
+            // 计算最大回撤
+            const maxDrawdowns = activeStrategies.map(s => s.max_drawdown || 0).filter(d => d > 0);
+            const maxDrawdown = maxDrawdowns.length > 0 ? Math.max(...maxDrawdowns).toFixed(2) + '%' : '-';
+            const maxDrawdownElement = document.getElementById('maxDrawdown');
+            if (maxDrawdownElement) maxDrawdownElement.textContent = maxDrawdown;
+            
+            // 计算平均夏普比率
+            const sharpeRatios = activeStrategies.map(s => s.sharpe_ratio || 0).filter(r => r > 0);
+            const avgSharpe = sharpeRatios.length > 0 ? (sharpeRatios.reduce((a, b) => a + b, 0) / sharpeRatios.length).toFixed(2) : '-';
+            const sharpeElement = document.getElementById('sharpeRatio');
+            if (sharpeElement) sharpeElement.textContent = avgSharpe;
+            
+            console.log('✅ 性能监控数据已更新:', { activeCount, winRate, maxDrawdown, avgSharpe });
+        }
+    } catch (error) {
+        console.error('❌ 更新性能监控数据失败:', error);
+    }
+}
