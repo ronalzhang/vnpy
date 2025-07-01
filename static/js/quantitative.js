@@ -382,9 +382,13 @@ class QuantitativeSystem {
             
             // 更新顶部导航栏状态
             const statusElement = document.getElementById('system-status-text');
+            const statusIndicator = document.getElementById('system-status-indicator');
             if (statusElement) {
                 statusElement.textContent = '在线';
                 statusElement.className = 'text-success';
+            }
+            if (statusIndicator) {
+                statusIndicator.className = 'status-dot online';
             }
             
             console.log('✅ 系统状态已更新为在线');
@@ -399,9 +403,13 @@ class QuantitativeSystem {
             
             // 更新顶部导航栏状态
             const statusElement = document.getElementById('system-status-text');
+            const statusIndicator = document.getElementById('system-status-indicator');
             if (statusElement) {
                 statusElement.textContent = '离线';
                 statusElement.className = 'text-muted';
+            }
+            if (statusIndicator) {
+                statusIndicator.className = 'status-dot offline';
             }
             
             console.log('⚠️ 系统状态已更新为离线');
@@ -3059,3 +3067,75 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 1000);
 });
+
+// =====================================================================================
+// 🌍 全局函数定义 - 供HTML onclick事件调用
+// =====================================================================================
+
+// 全局函数：系统启停控制
+function toggleSystem() {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.toggleSystem();
+    } else if (window.app) {
+        window.app.toggleSystem();
+    } else {
+        console.error('未找到量化系统实例');
+    }
+}
+
+// 全局函数：自动交易开关
+function toggleAutoTrading() {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.toggleAutoTrading();
+    } else if (window.app) {
+        window.app.toggleAutoTrading();
+    } else {
+        console.error('未找到量化系统实例');
+    }
+}
+
+// 全局函数：显示策略管理
+function showStrategyManagement() {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.showStrategyManagement();
+    } else if (window.app) {
+        window.app.showStrategyManagement();
+    } else {
+        console.error('未找到量化系统实例');
+    }
+}
+
+// 全局函数：切换余额图表周期
+function toggleBalanceChart(period) {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.toggleBalanceChart(period);
+    } else if (window.app) {
+        window.app.toggleBalanceChart(period);
+    } else {
+        console.error('未找到量化系统实例');
+    }
+}
+
+// 全局函数：显示策略配置
+function showStrategyConfig(strategyId) {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.showStrategyConfig(strategyId);
+    } else if (window.app) {
+        window.app.showStrategyConfig(strategyId);
+    } else {
+        console.error('未找到量化系统实例');
+    }
+}
+
+// 全局函数：显示策略日志
+function showStrategyLogs(strategyId) {
+    if (window.quantitativeSystem) {
+        window.quantitativeSystem.showStrategyLogs(strategyId);
+    } else if (window.app) {
+        window.app.showStrategyLogs(strategyId);
+    } else {
+        console.error('未找到量化系统实例');
+    }
+}
+
+console.log('✅ 全局函数已定义完成');
