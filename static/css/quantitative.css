@@ -380,61 +380,55 @@
     color: #6c757d;
 }
 
-/* ==================== 清除底部四个模块样式覆盖，重新设计 ==================== */
+/* ==================== 底部四个模块的现代化样式 ==================== */
 
-/* 🎯 底部模块容器：采用简洁现代风格 */
-.bottom-modules {
-    margin-top: 2rem;
-}
-
-/* 🎨 模块卡片基础样式：去除复杂覆盖，使用简洁设计 */
-.module-card {
+/* 🎯 针对实际HTML结构的四个模块卡片样式 */
+.row.g-3.mb-4 .col-xl-3 .card.h-100.shadow-sm.border-0 {
     background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+    transition: all 0.3s ease;
     overflow: hidden;
 }
 
-.module-card:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px);
+.row.g-3.mb-4 .col-xl-3 .card.h-100.shadow-sm.border-0:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+    transform: translateY(-2px);
+    border-color: #d1d5db !important;
 }
 
-/* 📊 模块头部样式：清爽的渐变设计 */
-.module-card .module-header {
-    padding: 1rem 1.5rem;
-    color: white;
-    font-weight: 600;
-    font-size: 0.95rem;
-    border-bottom: none;
+/* 📊 四个模块的头部样式优化 */
+.row.g-3.mb-4 .col-xl-3 .card .card-header {
+    border-bottom: none !important;
+    padding: 1rem 1.25rem;
+    border-radius: 12px 12px 0 0 !important;
 }
 
-.module-header.primary {
-    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+.row.g-3.mb-4 .col-xl-3 .card .card-header.bg-gradient-primary {
+    background: linear-gradient(135deg, #3b82f6, #1e40af) !important;
 }
 
-.module-header.success {
-    background: linear-gradient(135deg, #10b981, #059669);
+.row.g-3.mb-4 .col-xl-3 .card .card-header.bg-gradient-success {
+    background: linear-gradient(135deg, #10b981, #047857) !important;
 }
 
-.module-header.info {
-    background: linear-gradient(135deg, #06b6d4, #0891b2);
+.row.g-3.mb-4 .col-xl-3 .card .card-header.bg-gradient-info {
+    background: linear-gradient(135deg, #06b6d4, #0891b2) !important;
 }
 
-.module-header.warning {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
+.row.g-3.mb-4 .col-xl-3 .card .card-header.bg-gradient-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
 }
 
-/* 📋 模块内容区域：简洁布局 */
-.module-card .module-body {
-    padding: 1.5rem;
+/* 📋 四个模块的卡片内容区域 */
+.row.g-3.mb-4 .col-xl-3 .card .card-body {
+    padding: 1.25rem;
     background: #ffffff;
 }
 
-/* 🔄 加载状态：统一设计 */
-.module-loading {
+/* 🔄 加载状态优化 */
+.row.g-3.mb-4 .col-xl-3 .loading-content {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -443,136 +437,101 @@
     color: #6b7280;
 }
 
-.module-loading .spinner {
+.row.g-3.mb-4 .col-xl-3 .spinner-border {
     width: 2rem;
     height: 2rem;
-    border: 2px solid #e5e7eb;
-    border-top-color: #3b82f6;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 1rem;
+    border-width: 0.2em;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.module-loading p {
-    margin: 0;
-    font-size: 0.9rem;
-}
-
-/* 📈 图表容器：简洁边框 */
-.chart-container {
-    height: 220px;
-    position: relative;
+/* 📈 图表容器样式优化 */
+.performance-chart-container,
+.balance-chart-container {
     background: #fafafa;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    padding: 1rem;
+    padding: 0.75rem;
 }
 
-/* 🎯 里程碑样式：清爽卡片 */
-.milestone-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-    margin-top: 1rem;
+.chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #f8fafc;
+    border: 2px dashed #d1d5db;
+    border-radius: 6px;
 }
 
-.milestone-item {
+/* 🎯 里程碑卡片样式优化 */
+.milestones-container .milestone-card {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
     transition: all 0.2s ease;
 }
 
-.milestone-item:hover {
+.milestones-container .milestone-card:hover {
     background: #f1f5f9;
     border-color: #cbd5e1;
+    transform: translateY(-1px);
 }
 
 .milestone-value {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #1f2937;
-    margin-bottom: 0.25rem;
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: #1f2937 !important;
 }
 
 .milestone-label {
-    font-size: 0.75rem;
-    color: #6b7280;
+    font-size: 0.7rem !important;
+    color: #6b7280 !important;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
-/* 📊 数据列表：统一样式 */
-.data-list {
-    max-height: 220px;
-    overflow-y: auto;
+/* 📊 信号和持仓列表样式 */
+.signals-list,
+.positions-list {
+    background: #ffffff;
 }
 
-.data-item {
-    padding: 0.75rem;
-    border-bottom: 1px solid #f3f4f6;
-    transition: background-color 0.2s ease;
+.signals-container,
+.positions-container {
+    background: #fafafa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.5rem;
 }
 
-.data-item:hover {
-    background: #f9fafb;
+/* 📊 数据项样式 */
+.row.g-3.mb-4 .col-xl-3 .card .text-muted {
+    color: #6b7280 !important;
 }
 
-.data-item:last-child {
-    border-bottom: none;
+.row.g-3.mb-4 .col-xl-3 .card .small {
+    font-size: 0.8rem !important;
 }
 
-/* 📊 数据行布局 */
-.data-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.25rem;
-}
-
-.data-label {
-    font-size: 0.85rem;
-    color: #6b7280;
-}
-
-.data-value {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #1f2937;
-}
-
-.data-value.positive {
-    color: #059669;
-}
-
-.data-value.negative {
-    color: #dc2626;
-}
-
-/* 🔄 滚动条样式：简洁设计 */
-.data-list::-webkit-scrollbar {
+/* 🔄 滚动条样式优化 */
+.signals-list::-webkit-scrollbar,
+.positions-list::-webkit-scrollbar {
     width: 4px;
 }
 
-.data-list::-webkit-scrollbar-track {
+.signals-list::-webkit-scrollbar-track,
+.positions-list::-webkit-scrollbar-track {
     background: #f3f4f6;
     border-radius: 2px;
 }
 
-.data-list::-webkit-scrollbar-thumb {
+.signals-list::-webkit-scrollbar-thumb,
+.positions-list::-webkit-scrollbar-thumb {
     background: #d1d5db;
     border-radius: 2px;
 }
 
-.data-list::-webkit-scrollbar-thumb:hover {
+.signals-list::-webkit-scrollbar-thumb:hover,
+.positions-list::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
 }
 
