@@ -4863,7 +4863,7 @@ def get_strategy_logs_by_category(strategy_id):
                     'price': 0,
                     'quantity': 0,
                     'pnl': 0,
-                    'executed': validation_passed,
+                    'executed': action_type == 'evolution',
                     'confidence': 0,
                     'cycle_id': None,
                     'strategy_score': 0,
