@@ -2112,18 +2112,33 @@ class QuantitativeSystem {
     // 🔥 新增：策略管理配置显示
     showStrategyManagement() {
         try {
+            console.log('🔧 开始显示策略管理模态框...');
+            
             // 加载管理配置
             this.loadManagementConfig();
             
-            // 🔥 新增：初始化四层配置管理器
-            if (!window.fourTierConfigManager) {
-                window.fourTierConfigManager = new FourTierConfigManager();
-            }
-            window.fourTierConfigManager.init();
+            // 🔥 新增：初始化四层配置管理器 - 延迟初始化确保DOM加载完成
+            setTimeout(() => {
+                if (!window.fourTierConfigManager) {
+                    console.log('🔧 创建新的四层配置管理器...');
+                    window.fourTierConfigManager = new FourTierConfigManager();
+                } else {
+                    console.log('🔧 使用现有的四层配置管理器...');
+                }
+                
+                window.fourTierConfigManager.init().then(() => {
+                    console.log('✅ 四层配置管理器初始化完成');
+                }).catch(error => {
+                    console.error('❌ 四层配置管理器初始化失败:', error);
+                });
+            }, 500);
             
             // 显示策略管理模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
-        modal.show();
+            modal.show();
+            
+            console.log('✅ 策略管理模态框已显示');
+            
         } catch (error) {
             console.error('显示策略管理失败:', error);
             this.showMessage('显示策略管理失败', 'error');
@@ -2672,9 +2687,17 @@ class FourTierConfigManager {
     }
 
     async init() {
-        await this.loadConfig();
-        this.setupEventListeners();
-        this.startStatusUpdater();
+        try {
+            console.log('🚀 四层进化配置管理器初始化...');
+            await this.loadConfig();
+            this.setupEventListeners();
+            this.startStatusUpdater();
+            console.log('✅ 四层进化配置管理器初始化成功');
+            return Promise.resolve();
+        } catch (error) {
+            console.error('❌ 四层进化配置管理器初始化失败:', error);
+            return Promise.reject(error);
+        }
     }
 
     async loadConfig() {
@@ -2747,17 +2770,27 @@ class FourTierConfigManager {
     }
 
     setupEventListeners() {
-        // 保存配置按钮
+        // 保存配置按钮 - 多次绑定保护
         const saveBtn = document.getElementById('saveConfigBtn');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.saveConfig());
+        if (saveBtn && !saveBtn.hasAttribute('data-bound')) {
+            saveBtn.addEventListener('click', () => {
+                console.log('🔧 四层配置保存按钮被点击');
+                this.saveConfig();
+            });
+            saveBtn.setAttribute('data-bound', 'true');
+            console.log('✅ 四层配置保存按钮事件已绑定');
         }
 
         // 实时配置更新监听
-        const configInputs = document.querySelectorAll('#management-config input[type="number"]');
+        const configInputs = document.querySelectorAll('#strategyManagementForm input[type="number"], #strategyManagementForm select');
         configInputs.forEach(input => {
-            input.addEventListener('change', () => this.onConfigChange(input));
+            if (!input.hasAttribute('data-bound')) {
+                input.addEventListener('change', () => this.onConfigChange(input));
+                input.setAttribute('data-bound', 'true');
+            }
         });
+        
+        console.log(`✅ 已绑定 ${configInputs.length} 个配置输入框的事件监听`);
     }
 
     onConfigChange(input) {
@@ -3172,6 +3205,38 @@ function refreshLogs() {
     } else {
         console.log('刷新日志功能');
         location.reload();
+    }
+}
+
+// 🔧 新增：全局配置保存函数 - 兼容性支持
+function saveManagementConfig() {
+    console.log('🔧 全局配置保存函数被调用');
+    
+    // 优先使用四层配置管理器
+    if (window.fourTierConfigManager && typeof window.fourTierConfigManager.saveConfig === 'function') {
+        console.log('🔧 使用四层配置管理器保存配置');
+        window.fourTierConfigManager.saveConfig();
+    } 
+    // 回退到量化系统实例
+    else if (window.quantitativeSystem && typeof window.quantitativeSystem.saveManagementConfig === 'function') {
+        console.log('🔧 使用量化系统实例保存配置');
+        window.quantitativeSystem.saveManagementConfig();
+    } 
+    else {
+        console.error('❌ 找不到配置保存方法');
+        alert('配置保存功能暂时不可用，请刷新页面后重试');
+    }
+}
+
+// 🔧 新增：全局配置重置函数
+function resetManagementConfig() {
+    console.log('🔧 全局配置重置函数被调用');
+    
+    if (window.quantitativeSystem && typeof window.quantitativeSystem.resetManagementConfig === 'function') {
+        window.quantitativeSystem.resetManagementConfig();
+    } else {
+        console.error('❌ 找不到配置重置方法');
+        alert('配置重置功能暂时不可用');
     }
 }
 

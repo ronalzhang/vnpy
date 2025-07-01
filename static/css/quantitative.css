@@ -289,6 +289,223 @@
     border: 1px solid rgba(255, 77, 79, 0.2);
 }
 
+/* ==================== 策略卡片现代化样式 - 修复样式冲突 ==================== */
+.strategy-card {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15) !important;
+    transition: all 0.3s ease !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.strategy-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    pointer-events: none;
+}
+
+.strategy-card:hover {
+    transform: translateY(-8px) !important;
+    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 金色策略卡片样式 - 真实交易策略 */
+.strategy-card.golden {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 193, 7, 0.1)) !important;
+    border: 2px solid rgba(255, 215, 0, 0.4) !important;
+    box-shadow: 0 8px 32px rgba(255, 215, 0, 0.2) !important;
+    animation: golden-glow 3s ease-in-out infinite alternate !important;
+}
+
+.strategy-card.golden::before {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 193, 7, 0.05));
+}
+
+.strategy-card.golden:hover {
+    transform: translateY(-12px) !important;
+    box-shadow: 0 16px 48px rgba(255, 215, 0, 0.35) !important;
+}
+
+@keyframes golden-glow {
+    0% {
+        box-shadow: 0 8px 32px rgba(255, 215, 0, 0.2);
+    }
+    100% {
+        box-shadow: 0 12px 40px rgba(255, 215, 0, 0.4);
+    }
+}
+
+/* 策略卡片内容样式 */
+.strategy-card .card-body {
+    position: relative;
+    z-index: 1;
+    padding: 1.5rem !important;
+}
+
+.strategy-card .card-title {
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.strategy-card .card-title a {
+    color: inherit !important;
+    text-decoration: none !important;
+}
+
+.strategy-card .card-title a:hover {
+    color: #3498db !important;
+}
+
+.strategy-card .metric-item {
+    padding: 0.25rem 0;
+}
+
+.strategy-card .metric-item div {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.strategy-card .metric-item small {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* ==================== 底部四个模块现代化样式 ==================== */
+/* 收益曲线、资产增长、最新信号、持仓管理 */
+.col-xl-3 .card.h-100.shadow-sm.border-0 {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15) !important;
+    transition: all 0.3s ease !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.col-xl-3 .card.h-100.shadow-sm.border-0::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    pointer-events: none;
+    z-index: 0;
+}
+
+.col-xl-3 .card.h-100.shadow-sm.border-0:hover {
+    transform: translateY(-8px) !important;
+    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 渐变头部样式 */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, rgba(22, 119, 255, 0.9), rgba(64, 150, 255, 0.95)) !important;
+    backdrop-filter: blur(10px) !important;
+    border: none !important;
+}
+
+.bg-gradient-success {
+    background: linear-gradient(135deg, rgba(82, 196, 26, 0.9), rgba(115, 209, 61, 0.95)) !important;
+    backdrop-filter: blur(10px) !important;
+    border: none !important;
+}
+
+.bg-gradient-info {
+    background: linear-gradient(135deg, rgba(19, 194, 194, 0.9), rgba(54, 207, 201, 0.95)) !important;
+    backdrop-filter: blur(10px) !important;
+    border: none !important;
+}
+
+.bg-gradient-warning {
+    background: linear-gradient(135deg, rgba(250, 173, 20, 0.9), rgba(255, 197, 61, 0.95)) !important;
+    backdrop-filter: blur(10px) !important;
+    border: none !important;
+}
+
+/* 四个模块的内容区域 */
+.col-xl-3 .card .card-body {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+}
+
+.col-xl-3 .card .card-header {
+    position: relative;
+    z-index: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 图表占位符样式 */
+.chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: rgba(248, 249, 250, 0.5);
+    border-radius: 8px;
+    border: 2px dashed rgba(108, 117, 125, 0.3);
+}
+
+.loading-content {
+    text-align: center;
+}
+
+.loading-content .spinner-border {
+    width: 2rem;
+    height: 2rem;
+}
+
+/* 里程碑卡片样式 */
+.milestone-card {
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    transition: all 0.3s ease !important;
+}
+
+.milestone-card:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 信号和持仓列表样式 */
+.signals-list, .positions-list {
+    background: transparent;
+}
+
+.signals-list::-webkit-scrollbar, .positions-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.signals-list::-webkit-scrollbar-track, .positions-list::-webkit-scrollbar-track {
+    background: rgba(248, 249, 250, 0.5);
+    border-radius: 3px;
+}
+
+.signals-list::-webkit-scrollbar-thumb, .positions-list::-webkit-scrollbar-thumb {
+    background: rgba(108, 117, 125, 0.4);
+    border-radius: 3px;
+}
+
+.signals-list::-webkit-scrollbar-thumb:hover, .positions-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(108, 117, 125, 0.6);
+}
+
 .strategy-actions {
     display: flex;
     gap: 0.25rem;
