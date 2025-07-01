@@ -1723,66 +1723,10 @@ class QuantitativeSystem {
         return str.replace(/([A-Z])/g, '-$1').toLowerCase();
     }
 
-    // 保存管理配置
-    async saveManagementConfig() {
-        try {
-            const updatedConfig = {
-                maxStrategies: parseInt(document.getElementById('maxStrategies')?.value) || 20,
-                realTradingScore: parseFloat(document.getElementById('realTradingScore')?.value) || 65,
-                realTradingCount: parseInt(document.getElementById('realTradingCount')?.value) || 2,
-                validationAmount: parseFloat(document.getElementById('validationAmount')?.value) || 50,
-                realTradingAmount: parseFloat(document.getElementById('realTradingAmount')?.value) || 100,
-                minTrades: parseInt(document.getElementById('minTrades')?.value) || 10,
-                minWinRate: parseFloat(document.getElementById('minWinRate')?.value) || 65,
-                minProfit: parseFloat(document.getElementById('minProfit')?.value) || 0,
-                maxDrawdown: parseFloat(document.getElementById('maxDrawdown')?.value) || 10,
-                minSharpeRatio: parseFloat(document.getElementById('minSharpeRatio')?.value) || 1.0,
-                maxPositionSize: parseFloat(document.getElementById('maxPositionSize')?.value) || 100,
-                stopLossPercent: parseFloat(document.getElementById('stopLossPercent')?.value) || 5,
-                takeProfitPercent: parseFloat(document.getElementById('takeProfitPercent')?.value) || 4,
-                maxHoldingMinutes: parseInt(document.getElementById('maxHoldingMinutes')?.value) || 30,
-                minProfitForTimeStop: parseFloat(document.getElementById('minProfitForTimeStop')?.value) || 1,
-                eliminationDays: parseInt(document.getElementById('eliminationDays')?.value) || 7,
-                minScore: parseFloat(document.getElementById('minScore')?.value) || 50,
-                // 🔧 新增：参数验证配置
-                paramValidationTrades: parseInt(document.getElementById('paramValidationTrades')?.value) || 20,
-                // 🔧 新增：实盘交易控制参数
-                real_trading_enabled: document.getElementById('real_trading_enabled')?.value === 'true',
-                min_simulation_days: parseInt(document.getElementById('min_simulation_days')?.value) || 7,
-                min_sim_win_rate: parseFloat(document.getElementById('min_sim_win_rate')?.value) || 65,
-                min_sim_total_pnl: parseFloat(document.getElementById('min_sim_total_pnl')?.value) || 5
-            };
-
-            const response = await fetch('/api/quantitative/management-config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ config: updatedConfig })
-            });
-
-            const data = await response.json();
-            console.log('服务器响应:', data);
-            
-            if (data.success) {
-                // 🔥 立即更新本地配置
-                Object.assign(managementConfig, updatedConfig);
-                console.log('本地配置已更新:', managementConfig);
-                
-                this.showMessage('配置保存成功并同步到后端', 'success');
-                
-                // 不关闭弹窗，让用户看到配置已保存
-                // const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
-                // if (modal) modal.hide();
-            } else {
-                this.showMessage(data.message || '保存失败', 'error');
-            }
-        } catch (error) {
-            console.error('保存配置失败:', error);
-            this.showMessage('保存配置失败: ' + error.message, 'error');
-        }
-    }
+    // 🔧 配置保存已统一到HTML中，移除重复实现
 
     // 重置管理配置
-    resetManagementConfig() {
+    async resetManagementConfig() {
         const defaultConfig = {
             maxStrategies: 20,
             realTradingScore: 65,
@@ -1801,9 +1745,7 @@ class QuantitativeSystem {
             minProfitForTimeStop: 1,
             eliminationDays: 7,
             minScore: 50,
-            // 🔧 新增：参数验证配置默认值
             paramValidationTrades: 20,
-            // 🔧 新增：实盘交易控制参数默认值
             real_trading_enabled: false,
             min_simulation_days: 7,
             min_sim_win_rate: 65,
@@ -3208,25 +3150,7 @@ function refreshLogs() {
     }
 }
 
-// 🔧 新增：全局配置保存函数 - 兼容性支持
-function saveManagementConfig() {
-    console.log('🔧 全局配置保存函数被调用');
-    
-    // 优先使用四层配置管理器
-    if (window.fourTierConfigManager && typeof window.fourTierConfigManager.saveConfig === 'function') {
-        console.log('🔧 使用四层配置管理器保存配置');
-        window.fourTierConfigManager.saveConfig();
-    } 
-    // 回退到量化系统实例
-    else if (window.quantitativeSystem && typeof window.quantitativeSystem.saveManagementConfig === 'function') {
-        console.log('🔧 使用量化系统实例保存配置');
-        window.quantitativeSystem.saveManagementConfig();
-    } 
-    else {
-        console.error('❌ 找不到配置保存方法');
-        alert('配置保存功能暂时不可用，请刷新页面后重试');
-    }
-}
+// 🔧 移除JavaScript中的saveManagementConfig，统一使用HTML中的实现
 
 // 🔧 新增：全局配置重置函数
 function resetManagementConfig() {

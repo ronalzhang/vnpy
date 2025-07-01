@@ -754,7 +754,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-warning" onclick="resetManagementConfig()">恢复默认</button>
-                    <button type="button" class="btn btn-primary" id="saveConfigBtn">
+                    <button type="button" class="btn btn-primary" onclick="saveManagementConfig()">
                         <i class="fas fa-save me-1"></i>保存配置
                     </button>
                 </div>
@@ -2031,8 +2031,10 @@
             const fourTierKeys = [
                 'high_freq_pool_size', 'display_strategies_count', 'real_trading_count',
                 'low_freq_interval_hours', 'high_freq_interval_minutes', 'display_interval_minutes',
+                'unified_validation_count', 'validation_score_threshold_high', 'validation_score_threshold_mid',
                 'validation_amount', 'real_trading_amount', 'real_trading_score_threshold',
-                'real_trading_enabled', 'min_simulation_days', 'min_sim_win_rate', 'min_sim_total_pnl'
+                'real_trading_enabled', 'min_simulation_days', 'min_sim_win_rate', 'min_sim_total_pnl',
+                'minScore', 'eliminationDays'
             ];
             
             fourTierKeys.forEach(key => {

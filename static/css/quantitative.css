@@ -380,130 +380,200 @@
     color: #6c757d;
 }
 
-/* ==================== 底部四个模块现代化样式 ==================== */
-/* 收益曲线、资产增长、最新信号、持仓管理 */
-.col-xl-3 .card.h-100.shadow-sm.border-0 {
-    background: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    border-radius: 16px !important;
-    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15) !important;
-    transition: all 0.3s ease !important;
-    overflow: hidden !important;
-    position: relative !important;
+/* ==================== 清除底部四个模块样式覆盖，重新设计 ==================== */
+
+/* 🎯 底部模块容器：采用简洁现代风格 */
+.bottom-modules {
+    margin-top: 2rem;
 }
 
-.col-xl-3 .card.h-100.shadow-sm.border-0::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-    pointer-events: none;
-    z-index: 0;
+/* 🎨 模块卡片基础样式：去除复杂覆盖，使用简洁设计 */
+.module-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    overflow: hidden;
 }
 
-.col-xl-3 .card.h-100.shadow-sm.border-0:hover {
-    transform: translateY(-8px) !important;
-    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.25) !important;
-    border-color: rgba(255, 255, 255, 0.3) !important;
+.module-card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
 }
 
-/* 渐变头部样式 */
-.bg-gradient-primary {
-    background: linear-gradient(135deg, rgba(22, 119, 255, 0.9), rgba(64, 150, 255, 0.95)) !important;
-    backdrop-filter: blur(10px) !important;
-    border: none !important;
+/* 📊 模块头部样式：清爽的渐变设计 */
+.module-card .module-header {
+    padding: 1rem 1.5rem;
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-bottom: none;
 }
 
-.bg-gradient-success {
-    background: linear-gradient(135deg, rgba(82, 196, 26, 0.9), rgba(115, 209, 61, 0.95)) !important;
-    backdrop-filter: blur(10px) !important;
-    border: none !important;
+.module-header.primary {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
 }
 
-.bg-gradient-info {
-    background: linear-gradient(135deg, rgba(19, 194, 194, 0.9), rgba(54, 207, 201, 0.95)) !important;
-    backdrop-filter: blur(10px) !important;
-    border: none !important;
+.module-header.success {
+    background: linear-gradient(135deg, #10b981, #059669);
 }
 
-.bg-gradient-warning {
-    background: linear-gradient(135deg, rgba(250, 173, 20, 0.9), rgba(255, 197, 61, 0.95)) !important;
-    backdrop-filter: blur(10px) !important;
-    border: none !important;
+.module-header.info {
+    background: linear-gradient(135deg, #06b6d4, #0891b2);
 }
 
-/* 四个模块的内容区域 */
-.col-xl-3 .card .card-body {
-    position: relative;
-    z-index: 1;
-    background: transparent;
+.module-header.warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
 }
 
-.col-xl-3 .card .card-header {
-    position: relative;
-    z-index: 1;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+/* 📋 模块内容区域：简洁布局 */
+.module-card .module-body {
+    padding: 1.5rem;
+    background: #ffffff;
 }
 
-/* 图表占位符样式 */
-.chart-placeholder {
+/* 🔄 加载状态：统一设计 */
+.module-loading {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%;
-    background: rgba(248, 249, 250, 0.5);
-    border-radius: 8px;
-    border: 2px dashed rgba(108, 117, 125, 0.3);
+    height: 200px;
+    color: #6b7280;
 }
 
-.loading-content {
-    text-align: center;
-}
-
-.loading-content .spinner-border {
+.module-loading .spinner {
     width: 2rem;
     height: 2rem;
+    border: 2px solid #e5e7eb;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
 }
 
-/* 里程碑卡片样式 */
-.milestone-card {
-    background: rgba(255, 255, 255, 0.8) !important;
-    backdrop-filter: blur(10px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    transition: all 0.3s ease !important;
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-.milestone-card:hover {
-    background: rgba(255, 255, 255, 0.95) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+.module-loading p {
+    margin: 0;
+    font-size: 0.9rem;
 }
 
-/* 信号和持仓列表样式 */
-.signals-list, .positions-list {
-    background: transparent;
+/* 📈 图表容器：简洁边框 */
+.chart-container {
+    height: 220px;
+    position: relative;
+    background: #fafafa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
 }
 
-.signals-list::-webkit-scrollbar, .positions-list::-webkit-scrollbar {
-    width: 6px;
+/* 🎯 里程碑样式：清爽卡片 */
+.milestone-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-top: 1rem;
 }
 
-.signals-list::-webkit-scrollbar-track, .positions-list::-webkit-scrollbar-track {
-    background: rgba(248, 249, 250, 0.5);
-    border-radius: 3px;
+.milestone-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.2s ease;
 }
 
-.signals-list::-webkit-scrollbar-thumb, .positions-list::-webkit-scrollbar-thumb {
-    background: rgba(108, 117, 125, 0.4);
-    border-radius: 3px;
+.milestone-item:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
 }
 
-.signals-list::-webkit-scrollbar-thumb:hover, .positions-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(108, 117, 125, 0.6);
+.milestone-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.milestone-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* 📊 数据列表：统一样式 */
+.data-list {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.data-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background-color 0.2s ease;
+}
+
+.data-item:hover {
+    background: #f9fafb;
+}
+
+.data-item:last-child {
+    border-bottom: none;
+}
+
+/* 📊 数据行布局 */
+.data-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.data-label {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.data-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.data-value.positive {
+    color: #059669;
+}
+
+.data-value.negative {
+    color: #dc2626;
+}
+
+/* 🔄 滚动条样式：简洁设计 */
+.data-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.data-list::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 2px;
+}
+
+.data-list::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 2px;
+}
+
+.data-list::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
 }
 
 .strategy-actions {
