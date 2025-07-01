@@ -259,22 +259,26 @@
             </div>
         </div>
         
-        <!-- 底部四个功能模块 - 一行四列显示 -->
-        <div class="row mb-3">
+        <!-- 底部四个功能模块 - 优化排版布局 -->
+        <div class="row g-3 mb-4">
             <!-- 收益曲线 -->
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-header py-2">
-                        <h6 class="mb-0 d-flex align-items-center">
+            <div class="col-xl-3 col-lg-6 col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-gradient-primary text-white py-3 border-0">
+                        <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-chart-line me-2"></i> 收益曲线
                         </h6>
                     </div>
-                    <div class="card-body p-2">
-                        <div class="performance-chart" style="height: 200px;">
-                            <canvas id="performanceChart2"></canvas>
-                            <div class="text-center text-muted py-3" id="performanceChartPlaceholder">
-                                <i class="fas fa-chart-line fa-2x mb-2 opacity-50"></i>
-                                <p class="small">正在加载收益数据...</p>
+                    <div class="card-body p-3">
+                        <div class="performance-chart-container" style="height: 220px; position: relative;">
+                            <canvas id="performanceChart2" style="display: none;"></canvas>
+                            <div class="chart-placeholder" id="performanceChartPlaceholder">
+                                <div class="loading-content text-center">
+                                    <div class="spinner-border text-primary mb-3" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="text-muted small mb-0">正在加载收益数据...</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -282,45 +286,49 @@
             </div>
             
             <!-- 资产增长 -->
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 d-flex align-items-center">
+            <div class="col-xl-3 col-lg-6 col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-gradient-success text-white py-3 border-0 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-chart-area me-2"></i> 资产增长
                         </h6>
                         <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary btn-sm" onclick="toggleBalanceChart('7')">7天</button>
-                            <button class="btn btn-outline-primary btn-sm active" onclick="toggleBalanceChart('30')">30天</button>
+                            <button class="btn btn-light btn-sm text-dark" onclick="toggleBalanceChart('7')" style="font-size: 0.75rem;">7天</button>
+                            <button class="btn btn-warning btn-sm active" onclick="toggleBalanceChart('30')" style="font-size: 0.75rem;">30天</button>
                         </div>
                     </div>
-                    <div class="card-body p-2">
-                        <div class="balance-chart" style="height: 150px;">
-                            <canvas id="balanceChart2"></canvas>
-                            <div class="text-center text-muted py-3" id="balanceChartPlaceholder">
-                                <i class="fas fa-chart-area fa-2x mb-2 opacity-50"></i>
-                                <p class="small">正在加载资产数据...</p>
+                    <div class="card-body p-3">
+                        <div class="balance-chart-container" style="height: 140px; position: relative;">
+                            <canvas id="balanceChart2" style="display: none;"></canvas>
+                            <div class="chart-placeholder" id="balanceChartPlaceholder">
+                                <div class="loading-content text-center">
+                                    <div class="spinner-border text-success mb-2" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="text-muted small mb-0">正在加载资产数据...</p>
+                                </div>
                             </div>
                         </div>
                         
-                        <!-- 里程碑展示 - 更紧凑 -->
-                        <div class="milestones mt-2">
-                            <div class="row g-2 text-center">
+                        <!-- 里程碑展示 - 优化布局 -->
+                        <div class="milestones-container mt-3">
+                            <div class="row g-1 text-center">
                                 <div class="col-4">
-                                    <div class="milestone-item p-2">
-                                        <div class="milestone-value text-success small">10U</div>
-                                        <div class="milestone-label">起始</div>
+                                    <div class="milestone-card p-2 rounded bg-light">
+                                        <div class="milestone-value text-success fw-bold small">10U</div>
+                                        <div class="milestone-label text-muted" style="font-size: 0.7rem;">起始</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="milestone-item p-2">
-                                        <div class="milestone-value text-warning small" id="currentBalance2">9.7U</div>
-                                        <div class="milestone-label">当前</div>
+                                    <div class="milestone-card p-2 rounded bg-warning bg-opacity-25">
+                                        <div class="milestone-value text-warning fw-bold small" id="currentBalance2">12.3U</div>
+                                        <div class="milestone-label text-muted" style="font-size: 0.7rem;">当前</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="milestone-item p-2">
-                                        <div class="milestone-value text-primary small">100K</div>
-                                        <div class="milestone-label">目标</div>
+                                    <div class="milestone-card p-2 rounded bg-primary bg-opacity-25">
+                                        <div class="milestone-value text-primary fw-bold small">100K</div>
+                                        <div class="milestone-label text-muted" style="font-size: 0.7rem;">目标</div>
                                     </div>
                                 </div>
                             </div>
@@ -330,19 +338,23 @@
             </div>
             
             <!-- 最新信号 -->
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-header py-2">
-                        <h6 class="mb-0 d-flex align-items-center">
+            <div class="col-xl-3 col-lg-6 col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-gradient-info text-white py-3 border-0">
+                        <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-signal me-2"></i> 最新信号
                         </h6>
                     </div>
-                    <div class="card-body p-2">
-                        <div class="signals-list" style="max-height: 200px; overflow-y: auto;">
-                            <div id="signalsContainer2">
-                                <div class="text-center text-muted py-3">
-                                    <i class="fas fa-signal fa-2x mb-2 opacity-50"></i>
-                                    <p class="small">正在加载交易信号...</p>
+                    <div class="card-body p-3">
+                        <div class="signals-container" style="height: 220px;">
+                            <div class="signals-list h-100" style="overflow-y: auto;">
+                                <div id="signalsContainer2">
+                                    <div class="loading-content text-center h-100 d-flex flex-column justify-content-center">
+                                        <div class="spinner-border text-info mb-3" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="text-muted small mb-0">正在加载交易信号...</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -350,20 +362,24 @@
                 </div>
             </div>
             
-            <!-- 持仓管理 - 新增的第四个模块 -->
-            <div class="col-lg-3 col-md-6 mb-3">
-                <div class="card h-100">
-                    <div class="card-header py-2">
-                        <h6 class="mb-0 d-flex align-items-center">
+            <!-- 持仓管理 -->
+            <div class="col-xl-3 col-lg-6 col-md-6">
+                <div class="card h-100 shadow-sm border-0">
+                    <div class="card-header bg-gradient-warning text-white py-3 border-0">
+                        <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-wallet me-2"></i> 持仓管理
                         </h6>
                     </div>
-                    <div class="card-body p-2">
-                        <div class="positions-list" style="max-height: 200px; overflow-y: auto;">
-                            <div id="positionsContainer">
-                                <div class="text-center text-muted py-3">
-                                    <i class="fas fa-wallet fa-2x mb-2 opacity-50"></i>
-                                    <p class="small">正在加载持仓数据...</p>
+                    <div class="card-body p-3">
+                        <div class="positions-container" style="height: 220px;">
+                            <div class="positions-list h-100" style="overflow-y: auto;">
+                                <div id="positionsContainer">
+                                    <div class="loading-content text-center h-100 d-flex flex-column justify-content-center">
+                                        <div class="spinner-border text-warning mb-3" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="text-muted small mb-0">正在加载持仓数据...</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -478,8 +494,8 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" id="saveStrategyConfig">保存配置</button>
-                    <button type="button" class="btn btn-warning" id="resetStrategyParams">重置参数</button>
+                    <button type="button" class="btn btn-primary" onclick="saveStrategyConfig()">保存配置</button>
+                    <button type="button" class="btn btn-warning" onclick="resetStrategyParams()">重置参数</button>
                 </div>
             </div>
         </div>
@@ -737,8 +753,8 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-warning" id="resetManagementConfig">恢复默认</button>
-                    <button type="button" class="btn btn-primary" id="saveManagementConfig">保存配置</button>
+                    <button type="button" class="btn btn-warning" onclick="resetManagementConfig()">恢复默认</button>
+                    <button type="button" class="btn btn-primary" onclick="saveManagementConfig()">保存配置</button>
                 </div>
             </div>
         </div>
@@ -1096,8 +1112,8 @@
                 </div>
             `;
             
-            // 调用日志API
-            fetch(`/api/quantitative/strategies/${strategyId}/logs-by-category?type=all&limit=100`)
+                        // 调用进化日志API（修复数据源）
+            fetch(`/api/quantitative/evolution-log?strategy_id=${strategyId}&limit=50`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
@@ -1105,9 +1121,20 @@
                     return response.json();
                 })
                 .then(data => {
-                    if (data.success && data.logs) {
-                        displayStrategyLogTabs(data.logs, strategyId);
-                } else {
+                    if (data.success || data.status === 'success') {
+                        const logs = data.logs || data.data || [];
+                        // 转换数据格式以适配显示逻辑（使用正确字段名）
+                        const formattedLogs = logs.map(log => ({
+                            ...log,
+                            log_type: log.evolution_type || 'evolution',
+                            action: log.action_type || '策略进化',
+                            trigger_reason: log.trigger_reason || log.evolution_reason || log.notes,
+                            timestamp: log.timestamp,
+                            details: `Gen${log.generation}/Cycle${log.cycle} - ${log.action_type} - ${log.trigger_reason || '无原因'}`,
+                            pnl: log.improvement || null
+                        }));
+                        displayStrategyLogTabs(formattedLogs, strategyId);
+                    } else {
                         throw new Error('API返回数据格式错误');
                     }
                 })
@@ -1178,7 +1205,7 @@
             container.innerHTML = tabsHtml;
         }
         
-        // 生成日志标签页内容
+        // 生成日志标签页内容 - 优化UI样式
         function generateLogTabContent(tabId, logs, type, isActive = false) {
             const activeClass = isActive ? ' show active' : '';
             
@@ -1193,22 +1220,50 @@
                 `;
             }
             
-            const logsHtml = logs.map(log => {
+            const logsHtml = logs.map((log, index) => {
                 const logTime = new Date(log.timestamp || log.created_at).toLocaleString();
                 const logTypeClass = getLogTypeClass(log.log_type);
                 const logTypeName = getLogTypeName(log.log_type);
                 
                 return `
-                    <div class="log-entry border-bottom py-3">
+                    <div class="log-entry mb-3 border rounded p-3 shadow-sm bg-white">
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <span class="badge ${logTypeClass}">${logTypeName}</span>
-                            <small class="text-muted">${logTime}</small>
+                            <div class="d-flex align-items-center">
+                                <span class="badge ${logTypeClass} me-2">${logTypeName}</span>
+                                <small class="text-primary fw-bold">#${String(index + 1).padStart(3, '0')}</small>
+                            </div>
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>${logTime}
+                            </small>
                         </div>
                         <div class="log-content">
-                            <strong>${log.action || log.optimization_type || '操作'}</strong>
-                            ${log.trigger_reason ? `<br><small class="text-muted">触发原因: ${log.trigger_reason}</small>` : ''}
-                            ${log.details ? `<br><small>${log.details}</small>` : ''}
-                            ${log.pnl ? `<br><span class="badge ${log.pnl >= 0 ? 'bg-success' : 'bg-danger'}">PnL: ${log.pnl} USDT</span>` : ''}
+                            <div class="mb-2">
+                                <strong class="text-dark">${log.action || log.optimization_type || '策略操作'}</strong>
+                            </div>
+                            ${log.trigger_reason ? `
+                                <div class="mb-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-lightning me-1"></i>
+                                        <strong>触发原因:</strong> ${log.trigger_reason}
+                                    </small>
+                                </div>
+                            ` : ''}
+                            ${log.details ? `
+                                <div class="mb-2">
+                                    <small class="text-secondary">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        ${log.details}
+                                    </small>
+                                </div>
+                            ` : ''}
+                            ${log.pnl ? `
+                                <div class="mt-2">
+                                    <span class="badge ${log.pnl >= 0 ? 'bg-success' : 'bg-danger'} fs-6">
+                                        <i class="fas fa-dollar-sign me-1"></i>
+                                        PnL: ${log.pnl} USDT
+                                    </span>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 `;
@@ -1216,7 +1271,7 @@
             
             return `
                 <div class="tab-pane fade${activeClass}" id="${tabId}" role="tabpanel">
-                    <div style="max-height: 400px; overflow-y: auto;">
+                    <div class="logs-container" style="max-height: 500px; overflow-y: auto; padding: 10px;">
                         ${logsHtml}
                     </div>
                 </div>
@@ -1509,20 +1564,27 @@
                     { time: '09:08', symbol: 'BTC/USDT', action: 'BUY', price: '43,180', strategy: 'cf6b57ea' }
                 ];
                 
-                container.innerHTML = sampleSignals.map(signal => `
-                    <div class="signal-item border-bottom py-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="d-flex align-items-center">
-                                    <span class="badge ${signal.action === 'BUY' ? 'bg-success' : 'bg-danger'} me-2">${signal.action}</span>
-                                    <small class="fw-bold">${signal.symbol}</small>
+                container.innerHTML = sampleSignals.map((signal, index) => `
+                    <div class="signal-item mb-2 p-3 rounded border bg-light">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <span class="badge ${signal.action === 'BUY' ? 'bg-success' : 'bg-danger'} me-2 px-2 py-1">${signal.action}</span>
+                                    <strong class="text-dark">${signal.symbol}</strong>
                                 </div>
-                                <small class="text-muted">价格: $${signal.price}</small>
+                                <div class="signal-details">
+                                    <small class="text-muted d-block">
+                                        <i class="fas fa-dollar-sign me-1"></i>
+                                        价格: $${signal.price}
+                                    </small>
+                                    <small class="text-muted d-block">
+                                        <i class="fas fa-robot me-1"></i>
+                                        策略${signal.strategy.slice(-4)}
+                                    </small>
+                                </div>
                             </div>
                             <div class="text-end">
-                                <small class="text-muted">${signal.time}</small>
-                                <br>
-                                <small class="text-muted">策略${signal.strategy.slice(-4)}</small>
+                                <small class="text-primary fw-bold">${signal.time}</small>
                             </div>
                         </div>
                     </div>
@@ -1542,21 +1604,181 @@
                     { symbol: 'SOL/USDT', amount: '1.2', value: '89.4', pnl: '-0.8', pnlPercent: '-0.9%' }
                 ];
                 
-                container.innerHTML = samplePositions.map(pos => `
-                    <div class="position-item border-bottom py-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-bold small">${pos.symbol}</div>
-                                <small class="text-muted">${pos.amount}</small>
+                container.innerHTML = samplePositions.map((pos, index) => `
+                    <div class="position-item mb-2 p-3 rounded border ${pos.pnl.startsWith('+') ? 'bg-success-subtle border-success-subtle' : 'bg-danger-subtle border-danger-subtle'}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center mb-2">
+                                    <strong class="text-dark">${pos.symbol}</strong>
+                                    <span class="badge bg-secondary ms-2 small">${pos.amount}</span>
+                                </div>
+                                <div class="position-value">
+                                    <small class="text-muted">
+                                        <i class="fas fa-coins me-1"></i>
+                                        持仓价值: $${pos.value}
+                                    </small>
+                                </div>
                             </div>
                             <div class="text-end">
-                                <div class="fw-bold small">$${pos.value}</div>
-                                <small class="${pos.pnl.startsWith('+') ? 'text-success' : 'text-danger'}">${pos.pnl} USDT (${pos.pnlPercent})</small>
+                                <div class="pnl-container">
+                                    <div class="fw-bold ${pos.pnl.startsWith('+') ? 'text-success' : 'text-danger'}">${pos.pnl} USDT</div>
+                                    <small class="${pos.pnl.startsWith('+') ? 'text-success' : 'text-danger'}">${pos.pnlPercent}</small>
+                                </div>
                             </div>
                         </div>
                     </div>
                 `).join('');
             }, 1500);
+        }
+        
+        // 策略参数保存逻辑
+        function saveStrategyConfig() {
+            const strategyId = document.getElementById('strategyId')?.value;
+            if (!strategyId) {
+                alert('策略ID不能为空');
+                return;
+            }
+            
+            // 收集表单数据
+            const formData = {
+                name: document.getElementById('strategyName')?.value,
+                symbol: document.getElementById('strategySymbol')?.value,
+                type: document.getElementById('strategyType')?.value,
+                enabled: document.getElementById('strategyEnabled')?.checked
+            };
+            
+            // 收集策略参数
+            const parameters = {};
+            const paramInputs = document.querySelectorAll('#strategyParameters input[id^="param_"]');
+            paramInputs.forEach(input => {
+                const key = input.id.replace('param_', '');
+                const value = parseFloat(input.value) || input.value;
+                parameters[key] = value;
+            });
+            
+            formData.parameters = parameters;
+            
+            console.log('保存策略配置:', { strategyId, formData });
+            
+            // 调用保存API
+            fetch(`/api/quantitative/strategies/${strategyId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.status === 'success') {
+                    alert('策略配置保存成功！');
+                    // 关闭模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('strategyConfigModal'));
+                    if (modal) modal.hide();
+                    // 重新加载策略列表
+                    forceLoadStrategies();
+                } else {
+                    throw new Error(data.message || '保存失败');
+                }
+            })
+            .catch(error => {
+                console.error('保存策略配置失败:', error);
+                alert(`保存失败: ${error.message}`);
+            });
+        }
+        
+        // 重置策略参数
+        function resetStrategyParams() {
+            const strategyId = document.getElementById('strategyId')?.value;
+            if (!strategyId) return;
+            
+            if (confirm('确定要重置策略参数到默认值吗？')) {
+                // 重新加载策略配置
+                loadStrategyConfigData(strategyId);
+            }
+        }
+        
+        // 重置策略管理配置
+        function resetManagementConfig() {
+            if (confirm('确定要恢复策略管理配置到默认值吗？')) {
+                // 重置所有表单字段到默认值
+                document.getElementById('strategyManagementForm').reset();
+                // 设置一些默认值
+                const defaultConfigs = {
+                    'high_freq_pool_size': 1000,
+                    'display_strategies_count': 21,
+                    'real_trading_count': 3,
+                    'low_freq_interval_hours': 24,
+                    'high_freq_interval_minutes': 60,
+                    'display_interval_minutes': 3,
+                    'minScore': 10,
+                    'eliminationDays': 7,
+                    'unified_validation_count': 3,
+                    'validation_score_threshold_high': 80,
+                    'validation_score_threshold_mid': 60,
+                    'validation_amount': 50,
+                    'real_trading_amount': 200,
+                    'real_trading_score_threshold': 70,
+                    'real_trading_enabled': 'false',
+                    'min_simulation_days': 7,
+                    'min_sim_win_rate': 60,
+                    'min_sim_total_pnl': 10
+                };
+                
+                Object.entries(defaultConfigs).forEach(([key, value]) => {
+                    const element = document.getElementById(key);
+                    if (element) {
+                        if (element.type === 'checkbox') {
+                            element.checked = value === 'true';
+                        } else {
+                            element.value = value;
+                        }
+                    }
+                });
+                
+                alert('配置已恢复到默认值！');
+            }
+        }
+        
+        // 保存策略管理配置
+        function saveManagementConfig() {
+            const formData = {};
+            
+            // 收集配置表单数据
+            const configInputs = document.querySelectorAll('#strategyManagementForm input, #strategyManagementForm select');
+            configInputs.forEach(input => {
+                let value = input.value;
+                if (input.type === 'number') {
+                    value = parseFloat(value) || 0;
+                } else if (input.type === 'checkbox') {
+                    value = input.checked;
+                }
+                formData[input.name || input.id] = value;
+            });
+            
+            console.log('保存管理配置:', formData);
+            
+            fetch('/api/quantitative/management-config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.status === 'success') {
+                    alert('策略管理配置保存成功！');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
+                    if (modal) modal.hide();
+                } else {
+                    throw new Error(data.message || '保存失败');
+                }
+            })
+            .catch(error => {
+                console.error('保存管理配置失败:', error);
+                alert(`保存失败: ${error.message}`);
+            });
         }
         
         // 暴露必要的全局函数
@@ -1579,6 +1801,10 @@
         window.showStrategyManagement = showStrategyManagement;
         window.toggleSystem = toggleSystem;
         window.toggleAutoTrading = toggleAutoTrading;
+        window.saveStrategyConfig = saveStrategyConfig;
+        window.resetStrategyParams = resetStrategyParams;
+        window.saveManagementConfig = saveManagementConfig;
+        window.resetManagementConfig = resetManagementConfig;
     </script>
 </body>
 </html> 
