@@ -1443,12 +1443,8 @@
 }
 
 
-/* 🎨 响应式优化 */
+/* 🎨 响应式优化 - 统一的策略卡样式 */
 @media (max-width: 768px) {
-    .strategy-card {
-        margin-bottom: 15px;
-    }
-    
     .status-indicator {
         margin-bottom: 10px;
     }
@@ -1467,13 +1463,8 @@
     }
 }
 
-/* 🎨 深色模式支持 */
+/* 🎨 深色模式支持 - 统一的策略卡样式 */
 @media (prefers-color-scheme: dark) {
-    .strategy-card {
-        background-color: #2d3748;
-        border-color: #4a5568;
-    }
-    
     .ticker-item {
         background: rgba(45, 55, 72, 0.8);
         color: #e2e8f0;

@@ -1322,12 +1322,12 @@ def quantitative_strategies():
             except ImportError as ie:
                 print(f"⚠️ 高级管理器不可用，使用基础查询: {ie}")
                 # 🔥 修复：统一使用有交易数据的STRAT_格式策略，避免显示空数据策略
-                limit = int(request.args.get('limit', 21))  # 默认显示21个
+                limit = int(request.args.get('limit', 12))  # 默认显示12个（用户要求从6改到12）
                 
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # 🔧 修复：统一从四层进化配置表读取display_strategies_count
+                # 🔧 修复：强制优先从四层进化配置表读取display_strategies_count
                 cursor.execute("""
                     SELECT config_value FROM four_tier_evolution_config 
                     WHERE config_category = 'tier_size' AND config_key = 'display_strategies_count'
@@ -1337,10 +1337,13 @@ def quantitative_strategies():
                 if config_result:
                     try:
                         configured_limit = int(config_result[0])
-                        limit = configured_limit
-                        print(f"🔧 使用四层配置的策略显示数量: {limit}")
-                    except (ValueError, TypeError):
-                        print(f"⚠️ 配置值无效，使用默认值: {limit}")
+                        if configured_limit > 0:  # 确保配置值有效
+                            limit = configured_limit
+                            print(f"✅ 强制使用四层配置的策略显示数量: {limit}")
+                        else:
+                            print(f"⚠️ 四层配置值无效({configured_limit})，使用默认值: {limit}")
+                    except (ValueError, TypeError) as e:
+                        print(f"⚠️ 四层配置值解析失败({config_result[0]})，使用默认值: {limit}")
                 else:
                     # 🔧 回退检查传统管理配置表
                     cursor.execute("""
@@ -1351,10 +1354,13 @@ def quantitative_strategies():
                     if fallback_result:
                         try:
                             configured_limit = int(fallback_result[0])
-                            limit = configured_limit
-                            print(f"🔧 使用传统配置的策略显示数量: {limit}")
+                            if configured_limit > 0:
+                                limit = configured_limit
+                                print(f"✅ 使用传统配置的策略显示数量: {limit}")
+                            else:
+                                print(f"⚠️ 传统配置值无效({configured_limit})，使用默认值: {limit}")
                         except (ValueError, TypeError):
-                            print(f"⚠️ 传统配置值无效，使用默认值: {limit}")
+                            print(f"⚠️ 传统配置值解析失败，使用默认值: {limit}")
                     else:
                         print(f"⚠️ 未找到任何配置，使用默认值: {limit}")
                 
@@ -3977,7 +3983,7 @@ def manage_strategy_config():
             # 插入四层进化默认配置
             four_tier_configs = [
                 ('high_freq_pool_size', '2000', '高频池大小', 'tier_size'),
-                ('display_strategies_count', '21', '前端显示数量', 'tier_size'),
+                ('display_strategies_count', '12', '前端显示数量', 'tier_size'),
                 ('real_trading_count', '3', '实盘交易数量', 'tier_size'),
                 ('low_freq_interval_hours', '24', '策略池进化间隔(小时)', 'evolution_frequency'),
                 ('high_freq_interval_minutes', '60', '高频池进化间隔(分钟)', 'evolution_frequency'),

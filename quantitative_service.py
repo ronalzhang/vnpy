@@ -105,7 +105,7 @@ class EvolutionConfig:
     """四层进化配置"""
     # 层级数量配置
     high_freq_pool_size: int = 2000        # 高频池大小
-    display_strategies_count: int = 21      # 前端显示数量
+    display_strategies_count: int = 12      # 前端显示数量（用户要求从6改到12）
     real_trading_count: int = 3             # 实盘交易数量
     
     # 进化频率配置（分钟）
@@ -10205,7 +10205,7 @@ class EvolutionaryStrategyEngine:
                         WHERE id = %s AND id IN (
                             SELECT id FROM strategies 
                             WHERE enabled = 1 AND final_score IS NOT NULL AND final_score > 0
-                            ORDER BY final_score DESC LIMIT 21
+                            ORDER BY final_score DESC LIMIT 50
                         )
                     """, (str(strategy_id),), fetch_one=True)
                 

@@ -38,7 +38,7 @@ class EvolutionConfig:
     """四层进化配置"""
     # 层级数量配置
     high_freq_pool_size: int = 2000        # 高频池大小
-    display_strategies_count: int = 21      # 前端显示数量
+    display_strategies_count: int = 12      # 前端显示数量（用户要求从6改到12）
     real_trading_count: int = 3             # 实盘交易数量
     
     # 进化频率配置（分钟）
@@ -114,7 +114,7 @@ class FourTierStrategyManager:
             # 插入默认配置
             default_configs = [
                 ('high_freq_pool_size', '2000', '高频池大小', 'tier_size'),
-                ('display_strategies_count', '21', '前端显示数量', 'tier_size'),
+                ('display_strategies_count', '12', '前端显示数量', 'tier_size'),
                 ('real_trading_count', '3', '实盘交易数量', 'tier_size'),
                 ('low_freq_interval_hours', '24', '低频进化间隔(小时)', 'evolution_frequency'),
                 ('high_freq_interval_minutes', '60', '高频进化间隔(分钟)', 'evolution_frequency'),
