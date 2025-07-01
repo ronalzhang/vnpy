@@ -4874,7 +4874,7 @@ def get_strategy_logs_by_category(strategy_id):
                     'mrot_score': 0,
                     'open_time': None,
                     'close_time': None,
-                    'success': bool(validation_passed),
+                    'success': action_type == 'evolution',
                     'metadata': {}
                 }
                 
