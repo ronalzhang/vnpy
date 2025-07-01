@@ -5070,14 +5070,14 @@ def get_performance_metrics():
         cursor = conn.cursor()
         
         # 获取活跃策略数量
-        cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = true")
+        cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
         active_strategies = cursor.fetchone()[0]
         
         # 获取总体胜率
         cursor.execute("""
             SELECT AVG(win_rate) 
             FROM strategies 
-            WHERE total_trades > 0 AND enabled = true
+            WHERE total_trades > 0 AND enabled = 1
         """)
         win_rate_result = cursor.fetchone()
         win_rate = win_rate_result[0] if win_rate_result[0] else 0
@@ -5086,7 +5086,7 @@ def get_performance_metrics():
         cursor.execute("""
             SELECT AVG(max_drawdown) 
             FROM strategies 
-            WHERE total_trades > 0 AND enabled = true
+            WHERE total_trades > 0 AND enabled = 1
         """)
         max_drawdown_result = cursor.fetchone()
         max_drawdown = max_drawdown_result[0] if max_drawdown_result[0] else 0
@@ -5095,7 +5095,7 @@ def get_performance_metrics():
         cursor.execute("""
             SELECT AVG(sharpe_ratio) 
             FROM strategies 
-            WHERE total_trades > 0 AND enabled = true AND sharpe_ratio IS NOT NULL
+            WHERE total_trades > 0 AND enabled = 1 AND sharpe_ratio IS NOT NULL
         """)
         sharpe_ratio_result = cursor.fetchone()
         sharpe_ratio = sharpe_ratio_result[0] if sharpe_ratio_result[0] else 0
@@ -5134,14 +5134,14 @@ def get_management_status():
         cursor = conn.cursor()
         
         # 获取活跃策略数量
-        cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = true")
+        cursor.execute("SELECT COUNT(*) FROM strategies WHERE enabled = 1")
         active_strategies = cursor.fetchone()[0]
         
         # 获取真实交易策略数量（分数>=65且启用的前几名）
         cursor.execute("""
             SELECT COUNT(*) 
             FROM strategies 
-            WHERE enabled = true AND final_score >= 65
+            WHERE enabled = 1 AND final_score >= 65
             ORDER BY final_score DESC 
             LIMIT 5
         """)
