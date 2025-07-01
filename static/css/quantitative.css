@@ -289,96 +289,7 @@
     border: 1px solid rgba(255, 77, 79, 0.2);
 }
 
-/* ==================== 策略卡片现代化样式 - 修复样式冲突 ==================== */
-.strategy-card {
-    background: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    border-radius: 16px !important;
-    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15) !important;
-    transition: all 0.3s ease !important;
-    overflow: hidden !important;
-    position: relative !important;
-}
-
-.strategy-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-    pointer-events: none;
-}
-
-.strategy-card:hover {
-    transform: translateY(-8px) !important;
-    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.25) !important;
-    border-color: rgba(255, 255, 255, 0.3) !important;
-}
-
-/* 金色策略卡片样式 - 真实交易策略 */
-.strategy-card.golden {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 193, 7, 0.1)) !important;
-    border: 2px solid rgba(255, 215, 0, 0.4) !important;
-    box-shadow: 0 8px 32px rgba(255, 215, 0, 0.2) !important;
-    animation: golden-glow 3s ease-in-out infinite alternate !important;
-}
-
-.strategy-card.golden::before {
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 193, 7, 0.05));
-}
-
-.strategy-card.golden:hover {
-    transform: translateY(-12px) !important;
-    box-shadow: 0 16px 48px rgba(255, 215, 0, 0.35) !important;
-}
-
-@keyframes golden-glow {
-    0% {
-        box-shadow: 0 8px 32px rgba(255, 215, 0, 0.2);
-    }
-    100% {
-        box-shadow: 0 12px 40px rgba(255, 215, 0, 0.4);
-    }
-}
-
-/* 策略卡片内容样式 */
-.strategy-card .card-body {
-    position: relative;
-    z-index: 1;
-    padding: 1.5rem !important;
-}
-
-.strategy-card .card-title {
-    font-weight: 600 !important;
-    color: #2c3e50 !important;
-    margin-bottom: 0.5rem !important;
-}
-
-.strategy-card .card-title a {
-    color: inherit !important;
-    text-decoration: none !important;
-}
-
-.strategy-card .card-title a:hover {
-    color: #3498db !important;
-}
-
-.strategy-card .metric-item {
-    padding: 0.25rem 0;
-}
-
-.strategy-card .metric-item div {
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-.strategy-card .metric-item small {
-    font-size: 0.75rem;
-    color: #6c757d;
-}
+/* 🗑️ 旧样式已删除，使用新的清理后样式 */
 
 /* ==================== 底部四个模块的现代化样式 ==================== */
 
@@ -1010,122 +921,7 @@
     color: #3b82f6 !important;
 }
 
-/* ==================== 策略卡片样式扩展 ==================== */
-.strategy-card {
-    transition: all 0.3s ease;
-    border-left: 4px solid var(--primary-color);
-}
-
-.strategy-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
-.strategy-running {
-    border-left-color: var(--success-color);
-    background-color: #f6ffed;
-}
-
-.strategy-stopped {
-    border-left-color: var(--error-color);
-    background-color: #fff2f0;
-}
-
-/* 🌟 现代化策略卡片样式 */
-.strategy-card.golden {
-    background: linear-gradient(135deg, #fff9e6 0%, #fff2c7 50%, #ffecb3 100%);
-    border: 2px solid #ffa000;
-    box-shadow: 0 8px 32px rgba(255, 160, 0, 0.3);
-    position: relative;
-    overflow: hidden;
-}
-
-.strategy-card.golden::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #ffa000, #ff8f00, #ff6f00, #ff8f00, #ffa000);
-    animation: golden-shimmer 3s ease-in-out infinite;
-}
-
-.strategy-card.golden .card-header {
-    background: linear-gradient(135deg, #ffa000 0%, #ff8f00 50%, #ff6f00 100%);
-    color: #fff;
-    position: relative;
-    overflow: hidden;
-}
-
-.strategy-card.golden .card-header::after {
-    content: '👑';
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 18px;
-    animation: crown-glow 2s ease-in-out infinite;
-}
-
-.strategy-card.golden .score-badge {
-    background: rgba(255, 255, 255, 0.9);
-    color: #ff6f00;
-    font-weight: 700;
-    border: 2px solid rgba(255, 255, 255, 0.5);
-}
-
-.strategy-card.golden:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 16px 48px rgba(255, 160, 0, 0.4);
-    border-color: #ff8f00;
-}
-
-@keyframes golden-shimmer {
-    0%, 100% {
-        background-position: 0% 50%;
-    }
-    50% {
-        background-position: 100% 50%;
-    }
-}
-
-@keyframes crown-glow {
-    0%, 100% {
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-        transform: translateY(-50%) scale(1);
-    }
-    50% {
-        text-shadow: 0 0 20px rgba(255, 255, 255, 1);
-        transform: translateY(-50%) scale(1.1);
-    }
-}
-
-/* 策略进化状态指示器 */
-.strategy-card .evolution-indicator {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    z-index: 10;
-}
-
-.strategy-card .evolution-indicator.recent {
-    background: #10b981;
-    box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
-    animation: pulse 2s infinite;
-}
-
-.strategy-card .evolution-indicator.normal {
-    background: #6b7280;
-}
-
-.strategy-card .evolution-indicator.pending {
-    background: #f59e0b;
-    animation: pulse 2s infinite;
-}
+/* 🗑️ 删除重复的策略卡片样式 - 使用统一的新样式 */
 
 /* 策略指标样式 */
 .strategy-metrics .metric-item {
@@ -1630,13 +1426,7 @@
     }
 }
 
-.strategy-card .profit-negative {
-    color: #dc3545 !important;
-}
-
-.strategy-card .profit-neutral {
-    color: #6c757d !important;
-}
+/* 🗑️ 删除重复的profit样式 */
 
 /* 🎨 按钮组优化 */
 .btn-group-enhanced .btn {
@@ -2441,6 +2231,229 @@ body.quantitative-page {
         background: rgba(60, 60, 60, 0.6);
         border-color: rgba(255, 255, 255, 0.2);
         color: rgba(255, 255, 255, 0.9);
+    }
+}
+
+/* 🗑️ 这里有重复的策略卡样式已删除，使用文件顶部的新样式 */
+
+/* ==================== 策略日志新设计 ==================== */
+.strategy-logs-modal .modal-dialog {
+    max-width: 90vw;
+    height: 85vh;
+}
+
+.strategy-logs-modal .modal-content {
+    height: 100%;
+    border: none;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.strategy-logs-modal .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 1rem 1.5rem;
+}
+
+.strategy-logs-modal .modal-body {
+    padding: 0;
+    height: calc(100% - 60px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 日志筛选器 */
+.logs-filter {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.logs-filter .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logs-filter .filter-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #4a5568;
+    margin: 0;
+}
+
+.logs-filter select,
+.logs-filter input {
+    font-size: 0.85rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+}
+
+/* 日志表格 */
+.logs-table-container {
+    flex: 1;
+    overflow: auto;
+    padding: 1.5rem;
+}
+
+.logs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.logs-table th {
+    background: #f1f5f9;
+    color: #374151;
+    font-weight: 600;
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 2px solid #e2e8f0;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.logs-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+}
+
+.logs-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+/* 日志类型标签 */
+.log-type-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.log-type-badge.type-trade {
+    background: #dcfdf7;
+    color: #065f46;
+}
+
+.log-type-badge.type-evolution {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.log-type-badge.type-optimization {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.log-type-badge.type-error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* 日志内容格式 */
+.log-content {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    max-width: 300px;
+    word-break: break-word;
+}
+
+.log-timestamp {
+    color: #6b7280;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* 分页控件 */
+.logs-pagination {
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+}
+
+.pagination-info {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.pagination-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.pagination-controls .btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+}
+
+/* ==================== 性能监控模块修复 ==================== */
+.performance-metrics .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.performance-metrics .metric-row:last-child {
+    border-bottom: none;
+}
+
+.performance-metrics .metric-row small {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.performance-metrics .metric-row span {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 768px) {
+    .strategy-card {
+        margin-bottom: 1rem;
+    }
+    
+    .strategy-metrics {
+        padding: 0.5rem;
+    }
+    
+    .strategy-metrics .metric-item div {
+        font-size: 0.85rem;
+    }
+    
+    .strategy-logs-modal .modal-dialog {
+        max-width: 95vw;
+        height: 90vh;
+        margin: 1rem;
+    }
+    
+    .logs-filter {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .logs-table-container {
+        padding: 1rem;
     }
 }
 

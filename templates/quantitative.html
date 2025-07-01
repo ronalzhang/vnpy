@@ -868,65 +868,7 @@
                 });
         }
         
-                // 显示策略卡片
-        function displayStrategies(strategies) {
-            const container = document.getElementById('strategiesContainer');
-            if (!container) return;
-            
-            container.innerHTML = '';
-            
-            // 🔧 修复：移除硬编码的21个限制，使用完整的策略列表
-            // strategies.slice(0, 21).forEach(strategy => {
-            strategies.forEach(strategy => {
-                // 修复代数显示 - 使用正确的字段名
-                const generation = strategy.generation || 1;
-                const evolutionCount = strategy.evolution_count || 0;
-                const finalScore = strategy.final_score || strategy.score || 0;
-                
-                const strategyCard = `
-                    <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
-                        <div class="card strategy-card h-100">
-                            <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 class="card-title small mb-0">${strategy.name || '无名称'}</h6>
-                                    <span class="badge ${strategy.enabled ? 'bg-success' : 'bg-secondary'}">${strategy.enabled ? '运行中' : '已停止'}</span>
-                                </div>
-                                <div class="strategy-metrics small">
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <span class="text-muted">第${generation}代${evolutionCount}轮:</span>
-                                        <span class="fw-bold ${finalScore >= 80 ? 'text-success' : finalScore >= 60 ? 'text-warning' : 'text-danger'}">${finalScore.toFixed(1)}分</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <span class="text-muted">收益率:</span>
-                                        <span class="fw-bold ${(strategy.total_return || 0) >= 0 ? 'text-success' : 'text-danger'}">${((strategy.total_return || 0) * 100).toFixed(2)}%</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <span class="text-muted">胜率:</span>
-                                        <span class="fw-bold">${((strategy.win_rate || 0) * 100).toFixed(1)}%</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between">
-                                        <span class="text-muted">交易:</span>
-                                        <span class="fw-bold">${strategy.total_trades || 0}</span>
-                                    </div>
-                                </div>
-                                <div class="mt-2 d-flex gap-1">
-                                    <button class="btn btn-sm btn-outline-primary flex-fill" onclick="configStrategy('${strategy.id}')">
-                                        <i class="fas fa-cog"></i> 配置
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-info" onclick="showStrategyLogs('${strategy.id}')">
-                                        <i class="fas fa-list"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += strategyCard;
-            });
-            
-            // 🔧 修复：移除重复的底部模块加载调用
-            // loadBottomModulesData();
-        }
+                // 🗑️ 删除重复的策略卡生成函数，使用quantitative.js中的统一逻辑
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('⚡ 量化系统页面开始初始化...');

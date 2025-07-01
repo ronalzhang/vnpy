@@ -223,6 +223,9 @@ class QuantitativeSystem {
             // 加载策略数据
             await this.loadStrategies();
             
+            // 🔧 新增：加载性能监控数据
+            await this.loadPerformanceMetrics();
+            
             // 加载账户信息
             await this.loadAccountInfo();
             
@@ -2099,6 +2102,7 @@ class QuantitativeSystem {
             // 🔧 修复：先加载策略状态数据，再加载配置
             this.loadAutoManagementStatus();
             this.loadManagementConfig();
+            this.loadManagementStatus(); // 🔧 新增：加载策略配置页面顶部的四个数值
             
             // 🔥 新增：初始化四层配置管理器 - 延迟初始化确保DOM加载完成
             setTimeout(() => {
@@ -2348,6 +2352,117 @@ class QuantitativeSystem {
                 }
             });
         }
+    }
+
+    // 加载性能监控数据
+    async loadPerformanceMetrics() {
+        try {
+            const response = await fetch('/api/quantitative/performance-metrics');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log('性能监控数据:', data);
+            
+            if (data.status === 'success' && data.data) {
+                this.updatePerformanceDisplay(data.data);
+            } else {
+                console.warn('性能监控数据格式异常:', data);
+                this.showPerformanceLoadingError();
+            }
+        } catch (error) {
+            console.error('❌ 性能监控数据加载失败:', error);
+            this.showPerformanceLoadingError();
+        }
+    }
+
+    // 更新性能监控显示
+    updatePerformanceDisplay(metrics) {
+        const elements = {
+            'activeStrategies': metrics.active_strategies || 0,
+            'winRate': metrics.win_rate ? `${(metrics.win_rate * 100).toFixed(1)}%` : '-',
+            'maxDrawdown': metrics.max_drawdown ? `${(metrics.max_drawdown * 100).toFixed(2)}%` : '-',
+            'sharpeRatio': metrics.sharpe_ratio ? metrics.sharpe_ratio.toFixed(3) : '-'
+        };
+
+        Object.entries(elements).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+                element.classList.remove('text-muted');
+                element.classList.add('text-primary');
+            }
+        });
+
+        console.log('✅ 性能监控数据已更新');
+    }
+
+    // 显示性能监控加载错误
+    showPerformanceLoadingError() {
+        const elements = ['activeStrategies', 'winRate', 'maxDrawdown', 'sharpeRatio'];
+        elements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = '暂无';
+                element.classList.add('text-muted');
+            }
+        });
+    }
+
+    // 加载策略配置页面数据
+    async loadManagementStatus() {
+        try {
+            const response = await fetch('/api/quantitative/management-status');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log('策略管理状态数据:', data);
+            
+            if (data.status === 'success' && data.data) {
+                this.updateManagementStatusDisplay(data.data);
+            } else {
+                console.warn('策略管理状态数据格式异常:', data);
+                this.showManagementStatusError();
+            }
+        } catch (error) {
+            console.error('❌ 策略管理状态数据加载失败:', error);
+            this.showManagementStatusError();
+        }
+    }
+
+    // 更新策略管理状态显示
+    updateManagementStatusDisplay(status) {
+        const elements = {
+            'currentActiveStrategies': status.active_strategies || 0,
+            'realTradingStrategiesCount': status.real_trading_count || 0,
+            'validationStrategiesCount': status.validation_count || 0,
+            'totalStrategiesCount': status.total_strategies || 0
+        };
+
+        Object.entries(elements).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+                element.classList.remove('text-muted');
+            }
+        });
+
+        console.log('✅ 策略管理状态已更新');
+    }
+
+    // 显示策略管理状态错误
+    showManagementStatusError() {
+        const elements = ['currentActiveStrategies', 'realTradingStrategiesCount', 'validationStrategiesCount', 'totalStrategiesCount'];
+        elements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = '-';
+                element.classList.add('text-muted');
+            }
+        });
     }
 }
 
