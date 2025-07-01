@@ -5066,7 +5066,7 @@ def get_strategy_logs_by_category(strategy_id):
 def get_performance_metrics():
     """获取性能监控数据"""
     try:
-        conn = psycopg2.connect(**db_config)
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         # 获取活跃策略数量
@@ -5130,7 +5130,7 @@ def get_performance_metrics():
 def get_management_status():
     """获取策略管理状态数据"""
     try:
-        conn = psycopg2.connect(**db_config)
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         # 获取活跃策略数量
