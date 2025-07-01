@@ -24,10 +24,10 @@
                     <div class="navbar-left d-flex align-items-center">
                         <a class="navbar-brand me-4" href="/">
                             <i class="fas fa-chart-line me-2"></i>
-                            校长的量化系统
-                        </a>
+                                校长的量化系统
+                            </a>
                         <div class="system-status d-flex align-items-center">
-                            <span class="status-dot offline" id="system-status-indicator"></span>
+                                                        <span class="status-dot offline" id="system-status-indicator"></span>
                             <span id="system-status-text" class="me-3">离线</span>
                             <small id="current-time" class="text-white-50">2025/7/1 09:05:27</small>
                         </div>
@@ -114,20 +114,20 @@
                                 <div class="d-flex align-items-center">
                                     <span class="status-dot offline me-2" id="systemStatusDot"></span>
                                     <small>系统状态</small>
-                                </div>
-                                <span class="badge" id="systemStatusBadge">离线</span>
                             </div>
-                            
+                                <span class="badge" id="systemStatusBadge">离线</span>
+                        </div>
+                        
                             <div class="control-item d-flex justify-content-between align-items-center mb-2">
                                 <small>量化系统</small>
                                 <button id="systemToggle" class="btn-toggle" onclick="toggleSystem()"></button>
-                            </div>
-                            
+                        </div>
+                        
                             <div class="control-item d-flex justify-content-between align-items-center mb-2">
                                 <small>真实交易</small>
                                 <button id="autoTradingToggle" class="btn-toggle" onclick="toggleAutoTrading()"></button>
-                            </div>
-                            
+                        </div>
+                        
                             <div class="control-item d-flex justify-content-between align-items-center">
                                 <small>策略管理</small>
                                 <button class="btn btn-sm btn-outline-primary" onclick="showStrategyManagement()">
@@ -159,7 +159,7 @@
                             <div class="metric-row d-flex justify-content-between mb-2">
                                 <small class="text-muted">今日收益率</small>
                                 <span class="fw-bold" id="dailyReturn">-</span>
-                            </div>
+                        </div>
                             <div class="metric-row d-flex justify-content-between">
                                 <small class="text-muted">今日交易</small>
                                 <span class="fw-bold" id="dailyTrades">-</span>
@@ -182,7 +182,7 @@
                                 <div class="d-flex align-items-center">
                                     <span class="status-dot online me-2"></span>
                                     <small>币安</small>
-                                </div>
+                            </div>
                                 <small class="text-success">25ms</small>
                             </div>
                             <div class="exchange-item d-flex justify-content-between align-items-center mb-2">
@@ -192,12 +192,12 @@
                             <div class="exchange-item d-flex justify-content-between align-items-center">
                                 <small class="text-muted">最后更新</small>
                                 <small id="lastUpdate">刚刚</small>
-                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
+        </div>
+        
             <!-- 性能监控 -->
             <div class="col-xl-3 col-lg-6 mb-3">
                 <div class="card h-100">
@@ -210,107 +210,26 @@
                             <div class="metric-row d-flex justify-content-between mb-2">
                                 <small class="text-muted">活跃策略</small>
                                 <span class="fw-bold text-primary" id="activeStrategies">-</span>
-                            </div>
+                                </div>
                             <div class="metric-row d-flex justify-content-between mb-2">
                                 <small class="text-muted">胜率</small>
                                 <span class="fw-bold text-success" id="winRate">-</span>
-                            </div>
+                                    </div>
                             <div class="metric-row d-flex justify-content-between mb-2">
                                 <small class="text-muted">最大回撤</small>
                                 <span class="fw-bold text-warning" id="maxDrawdown">-</span>
-                            </div>
+                                </div>
                             <div class="metric-row d-flex justify-content-between">
                                 <small class="text-muted">夏普比率</small>
                                 <span class="fw-bold" id="sharpeRatio">-</span>
                             </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                                </div>
+                            </div>
         
-        <!-- 实时图表和监控 - 一行三列显示 -->
-        <div class="row mb-3">
-            <!-- 收益曲线 -->
-            <div class="col-lg-4 mb-3">
-                <div class="card h-100">
-                    <div class="card-header py-2">
-                        <h6 class="mb-0 d-flex align-items-center">
-                            <i class="fas fa-chart-line me-2"></i> 收益曲线
-                        </h6>
-                    </div>
-                    <div class="card-body p-2">
-                        <div class="performance-chart" style="height: 250px;">
-                            <canvas id="performanceChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 资产增长 -->
-            <div class="col-lg-4 mb-3">
-                <div class="card h-100">
-                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 d-flex align-items-center">
-                            <i class="fas fa-chart-area me-2"></i> 资产增长
-                        </h6>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary btn-sm" onclick="toggleBalanceChart('7')">7天</button>
-                            <button class="btn btn-outline-primary btn-sm active" onclick="toggleBalanceChart('30')">30天</button>
-                        </div>
-                    </div>
-                    <div class="card-body p-2">
-                        <div class="balance-chart" style="height: 200px;">
-                            <canvas id="balanceChart"></canvas>
-                        </div>
-                        
-                        <!-- 里程碑展示 - 更紧凑 -->
-                        <div class="milestones mt-2">
-                            <div class="row g-2 text-center">
-                                <div class="col-4">
-                                    <div class="milestone-item p-2">
-                                        <div class="milestone-value text-success small">10U</div>
-                                        <div class="milestone-label">起始</div>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="milestone-item p-2">
-                                        <div class="milestone-value text-warning small" id="currentBalance">9.7U</div>
-                                        <div class="milestone-label">当前</div>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="milestone-item p-2">
-                                        <div class="milestone-value text-primary small">100K</div>
-                                        <div class="milestone-label">目标</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 最新信号 -->
-            <div class="col-lg-4 mb-3">
-                <div class="card h-100">
-                    <div class="card-header py-2">
-                        <h6 class="mb-0 d-flex align-items-center">
-                            <i class="fas fa-signal me-2"></i> 最新信号
-                        </h6>
-                    </div>
-                    <div class="card-body p-2">
-                        <div class="signals-list" style="max-height: 250px; overflow-y: auto;">
-                            <div id="signalsContainer">
-                                <div class="text-center text-muted py-3">
-                                    <small>暂无交易信号</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
         
         <!-- 策略管理 - 占满整个浏览器宽度 -->
         <div class="row">
@@ -332,6 +251,119 @@
                             <div class="col-12">
                                 <div class="alert alert-info mb-0" id="jsTestStatus">
                                     <i class="fas fa-spinner fa-spin me-2"></i>正在加载策略数据...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部四个功能模块 - 一行四列显示 -->
+        <div class="row mb-3">
+            <!-- 收益曲线 -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-header py-2">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-chart-line me-2"></i> 收益曲线
+                        </h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="performance-chart" style="height: 200px;">
+                            <canvas id="performanceChart2"></canvas>
+                            <div class="text-center text-muted py-3" id="performanceChartPlaceholder">
+                                <i class="fas fa-chart-line fa-2x mb-2 opacity-50"></i>
+                                <p class="small">正在加载收益数据...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 资产增长 -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-chart-area me-2"></i> 资产增长
+                        </h6>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary btn-sm" onclick="toggleBalanceChart('7')">7天</button>
+                            <button class="btn btn-outline-primary btn-sm active" onclick="toggleBalanceChart('30')">30天</button>
+                        </div>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="balance-chart" style="height: 150px;">
+                            <canvas id="balanceChart2"></canvas>
+                            <div class="text-center text-muted py-3" id="balanceChartPlaceholder">
+                                <i class="fas fa-chart-area fa-2x mb-2 opacity-50"></i>
+                                <p class="small">正在加载资产数据...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 里程碑展示 - 更紧凑 -->
+                        <div class="milestones mt-2">
+                            <div class="row g-2 text-center">
+                                <div class="col-4">
+                                    <div class="milestone-item p-2">
+                                        <div class="milestone-value text-success small">10U</div>
+                                        <div class="milestone-label">起始</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="milestone-item p-2">
+                                        <div class="milestone-value text-warning small" id="currentBalance2">9.7U</div>
+                                        <div class="milestone-label">当前</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="milestone-item p-2">
+                                        <div class="milestone-value text-primary small">100K</div>
+                                        <div class="milestone-label">目标</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 最新信号 -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-header py-2">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-signal me-2"></i> 最新信号
+                        </h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="signals-list" style="max-height: 200px; overflow-y: auto;">
+                            <div id="signalsContainer2">
+                                <div class="text-center text-muted py-3">
+                                    <i class="fas fa-signal fa-2x mb-2 opacity-50"></i>
+                                    <p class="small">正在加载交易信号...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 持仓管理 - 新增的第四个模块 -->
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-header py-2">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-wallet me-2"></i> 持仓管理
+                        </h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="positions-list" style="max-height: 200px; overflow-y: auto;">
+                            <div id="positionsContainer">
+                                <div class="text-center text-muted py-3">
+                                    <i class="fas fa-wallet fa-2x mb-2 opacity-50"></i>
+                                    <p class="small">正在加载持仓数据...</p>
                                 </div>
                             </div>
                         </div>
@@ -805,7 +837,7 @@
                         if (jsTestStatus) {
                             jsTestStatus.innerHTML = `<i class="fas fa-check me-2 text-success"></i>成功加载 ${strategies.length} 个策略`;
                         }
-                    } else {
+            } else {
                         throw new Error('API返回数据格式错误');
                     }
                 })
@@ -818,7 +850,7 @@
                 });
         }
         
-        // 显示策略卡片
+                // 显示策略卡片
         function displayStrategies(strategies) {
             const container = document.getElementById('strategiesContainer');
             if (!container) return;
@@ -826,6 +858,11 @@
             container.innerHTML = '';
             
             strategies.slice(0, 21).forEach(strategy => {
+                // 修复代数显示 - 使用正确的字段名
+                const generation = strategy.generation || 1;
+                const evolutionCount = strategy.evolution_count || 0;
+                const finalScore = strategy.final_score || strategy.score || 0;
+                
                 const strategyCard = `
                     <div class="col-lg-3 col-md-4 col-sm-6 mb-3">
                         <div class="card strategy-card h-100">
@@ -836,16 +873,16 @@
                                 </div>
                                 <div class="strategy-metrics small">
                                     <div class="d-flex justify-content-between mb-1">
-                                        <span class="text-muted">评分:</span>
-                                        <span class="fw-bold ${strategy.score >= 80 ? 'text-success' : strategy.score >= 60 ? 'text-warning' : 'text-danger'}">${strategy.score || 0}</span>
+                                        <span class="text-muted">第${generation}代${evolutionCount}轮:</span>
+                                        <span class="fw-bold ${finalScore >= 80 ? 'text-success' : finalScore >= 60 ? 'text-warning' : 'text-danger'}">${finalScore.toFixed(1)}分</span>
                                     </div>
                                     <div class="d-flex justify-content-between mb-1">
                                         <span class="text-muted">收益率:</span>
-                                        <span class="fw-bold ${strategy.total_return_rate >= 0 ? 'text-success' : 'text-danger'}">${(strategy.total_return_rate || 0).toFixed(2)}%</span>
+                                        <span class="fw-bold ${(strategy.total_return || 0) >= 0 ? 'text-success' : 'text-danger'}">${((strategy.total_return || 0) * 100).toFixed(2)}%</span>
                                     </div>
                                     <div class="d-flex justify-content-between mb-1">
                                         <span class="text-muted">胜率:</span>
-                                        <span class="fw-bold">${(strategy.win_rate || 0).toFixed(1)}%</span>
+                                        <span class="fw-bold">${((strategy.win_rate || 0) * 100).toFixed(1)}%</span>
                                     </div>
                                     <div class="d-flex justify-content-between">
                                         <span class="text-muted">交易:</span>
@@ -866,6 +903,9 @@
                 `;
                 container.innerHTML += strategyCard;
             });
+            
+            // 同时加载底部四个模块的数据
+            loadBottomModulesData();
         }
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -911,7 +951,7 @@
             
             // 显示策略配置模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyConfigModal'));
-            modal.show();
+                modal.show();
             
             // 立即加载策略配置数据
             loadStrategyConfigData(strategyId);
@@ -933,7 +973,7 @@
                         const strategy = data.data.find(s => s.id === strategyId);
                         if (strategy) {
                             populateStrategyForm(strategy);
-                        } else {
+            } else {
                             throw new Error('未找到策略数据');
                         }
                     } else {
@@ -1067,7 +1107,7 @@
                 .then(data => {
                     if (data.success && data.logs) {
                         displayStrategyLogTabs(data.logs, strategyId);
-                    } else {
+                } else {
                         throw new Error('API返回数据格式错误');
                     }
                 })
@@ -1352,6 +1392,29 @@
         }
         
         // 添加缺失的按钮功能
+        function showStrategyManagement() {
+            console.log('显示策略管理配置');
+            // 显示策略管理配置模态框
+            const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
+            modal.show();
+        }
+        
+        function toggleSystem() {
+            console.log('切换量化系统状态');
+            const toggle = document.getElementById('systemToggle');
+            if (toggle) {
+                toggle.classList.toggle('active');
+            }
+        }
+        
+        function toggleAutoTrading() {
+            console.log('切换自动交易状态');
+            const toggle = document.getElementById('autoTradingToggle');
+            if (toggle) {
+                toggle.classList.toggle('active');
+            }
+        }
+        
         function toggleBalanceChart(period) {
             console.log('切换资产图表周期:', period);
             // 更新按钮状态
@@ -1360,7 +1423,140 @@
             });
             event.target.classList.add('active');
             
-            // 这里可以添加实际的图表更新逻辑
+            // 重新加载资产图表数据
+            loadBalanceChartData(period);
+        }
+        
+        // 加载底部四个模块的数据
+        function loadBottomModulesData() {
+            console.log('🔄 加载底部四个模块数据...');
+            
+            // 1. 加载收益曲线数据
+            loadPerformanceChartData();
+            
+            // 2. 加载资产增长数据
+            loadBalanceChartData('30');
+            
+            // 3. 加载最新信号数据
+            loadLatestSignalsData();
+            
+            // 4. 加载持仓数据
+            loadPositionsData();
+        }
+        
+        // 加载收益曲线数据
+        function loadPerformanceChartData() {
+            const placeholder = document.getElementById('performanceChartPlaceholder');
+            if (!placeholder) return;
+            
+            // 模拟收益数据
+            setTimeout(() => {
+                const sampleData = [
+                    { date: '07-01', value: 2.5 },
+                    { date: '07-02', value: 3.1 },
+                    { date: '07-03', value: 2.8 },
+                    { date: '07-04', value: 4.2 },
+                    { date: '07-05', value: 3.9 }
+                ];
+                
+                placeholder.innerHTML = `
+                    <div class="performance-data">
+                        ${sampleData.map(item => `
+                            <div class="data-row d-flex justify-content-between py-1">
+                                <small class="text-muted">${item.date}</small>
+                                <small class="fw-bold ${item.value >= 0 ? 'text-success' : 'text-danger'}">+${item.value}%</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }, 1000);
+        }
+        
+        // 加载资产增长数据
+        function loadBalanceChartData(period = '30') {
+            const placeholder = document.getElementById('balanceChartPlaceholder');
+            if (!placeholder) return;
+            
+            // 更新当前余额
+            const currentBalance = document.getElementById('currentBalance2');
+            if (currentBalance) {
+                currentBalance.textContent = '12.3U';
+                currentBalance.className = 'milestone-value text-success small';
+            }
+            
+            setTimeout(() => {
+                placeholder.innerHTML = `
+                    <div class="balance-summary text-center py-3">
+                        <div class="balance-change">
+                            <span class="h5 text-success">+23%</span>
+                            <br>
+                            <small class="text-muted">过去${period}天增长</small>
+                        </div>
+                    </div>
+                `;
+            }, 800);
+        }
+        
+        // 加载最新信号数据
+        function loadLatestSignalsData() {
+            const container = document.getElementById('signalsContainer2');
+            if (!container) return;
+            
+            setTimeout(() => {
+                const sampleSignals = [
+                    { time: '09:15', symbol: 'BTC/USDT', action: 'BUY', price: '43,250', strategy: 'adc826f4' },
+                    { time: '09:12', symbol: 'ETH/USDT', action: 'SELL', price: '2,680', strategy: 'a804ec55' },
+                    { time: '09:08', symbol: 'BTC/USDT', action: 'BUY', price: '43,180', strategy: 'cf6b57ea' }
+                ];
+                
+                container.innerHTML = sampleSignals.map(signal => `
+                    <div class="signal-item border-bottom py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge ${signal.action === 'BUY' ? 'bg-success' : 'bg-danger'} me-2">${signal.action}</span>
+                                    <small class="fw-bold">${signal.symbol}</small>
+                                </div>
+                                <small class="text-muted">价格: $${signal.price}</small>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted">${signal.time}</small>
+                                <br>
+                                <small class="text-muted">策略${signal.strategy.slice(-4)}</small>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }, 1200);
+        }
+        
+        // 加载持仓数据
+        function loadPositionsData() {
+            const container = document.getElementById('positionsContainer');
+            if (!container) return;
+            
+            setTimeout(() => {
+                const samplePositions = [
+                    { symbol: 'BTC/USDT', amount: '0.0028', value: '121.5', pnl: '+2.8', pnlPercent: '+2.4%' },
+                    { symbol: 'ETH/USDT', amount: '0.045', value: '120.6', pnl: '+1.2', pnlPercent: '+1.0%' },
+                    { symbol: 'SOL/USDT', amount: '1.2', value: '89.4', pnl: '-0.8', pnlPercent: '-0.9%' }
+                ];
+                
+                container.innerHTML = samplePositions.map(pos => `
+                    <div class="position-item border-bottom py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold small">${pos.symbol}</div>
+                                <small class="text-muted">${pos.amount}</small>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold small">$${pos.value}</div>
+                                <small class="${pos.pnl.startsWith('+') ? 'text-success' : 'text-danger'}">${pos.pnl} USDT (${pos.pnlPercent})</small>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }, 1500);
         }
         
         // 暴露必要的全局函数
@@ -1375,6 +1571,14 @@
         window.applyLogFilters = applyLogFilters;
         window.exportLogs = exportLogs;
         window.toggleBalanceChart = toggleBalanceChart;
+        window.loadBottomModulesData = loadBottomModulesData;
+        window.loadPerformanceChartData = loadPerformanceChartData;
+        window.loadBalanceChartData = loadBalanceChartData;
+        window.loadLatestSignalsData = loadLatestSignalsData;
+        window.loadPositionsData = loadPositionsData;
+        window.showStrategyManagement = showStrategyManagement;
+        window.toggleSystem = toggleSystem;
+        window.toggleAutoTrading = toggleAutoTrading;
     </script>
 </body>
 </html> 
