@@ -828,54 +828,7 @@
         let quantitativeSystem;
         let isInitialized = false;
         
-        // 立即强制初始化数据加载
-        function forceLoadStrategies() {
-            console.log('🚀 强制加载策略数据...');
-            
-            const jsTestStatus = document.getElementById('jsTestStatus');
-            if (jsTestStatus) {
-                jsTestStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>连接API中...';
-            }
-            
-            // 直接调用API
-            fetch('/api/quantitative/strategies')
-                .then(response => {
-                    console.log('API响应状态:', response.status);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('API数据:', data);
-                    
-                    if (data.status === 'success' && data.data) {
-                        const strategies = data.data;
-                        console.log(`✅ 成功加载 ${strategies.length} 个策略`);
-                        
-                        // 🔧 修复：使用quantitativeSystem实例的方法
-                        if (window.quantitativeSystem) {
-                            window.quantitativeSystem.strategies = strategies;
-                            window.quantitativeSystem.renderStrategies();
-                        } else if (window.app) {
-                            window.app.strategies = strategies;
-                            window.app.renderStrategies();
-                        } else {
-                            console.error('❌ 未找到量化系统实例');
-                        }
-                        
-                        if (jsTestStatus) {
-                            jsTestStatus.innerHTML = `<i class="fas fa-check me-2 text-success"></i>成功加载 ${strategies.length} 个策略`;
-                        }
-            } else {
-                        throw new Error('API返回数据格式错误');
-                    }
-                })
-                .catch(error => {
-                    console.error('❌ 策略加载失败:', error);
-                    
-                    if (jsTestStatus) {
-                        jsTestStatus.innerHTML = `<i class="fas fa-exclamation-triangle me-2 text-danger"></i>数据加载失败: ${error.message}`;
-                    }
-                });
-        }
+        // 🗑️ 删除冲突的forceLoadStrategies函数 - 统一使用quantitative.js中的加载逻辑
         
                 // 🗑️ 删除重复的策略卡生成函数，使用quantitative.js中的统一逻辑
         
@@ -898,8 +851,7 @@
                 }
                 
                 initializationTimer = setTimeout(() => {
-                    console.log('🚀 开始策略数据加载...');
-                    forceLoadStrategies();
+                    console.log('🚀 依赖quantitative.js进行数据加载...');
                     
                     // 🔧 修复：大幅延迟底部模块加载，避免与主要功能冲突
                     setTimeout(() => {
@@ -912,21 +864,49 @@
                 }, 1000);
             }
             
-            // 🔧 只执行一次初始化
-            initializeOnce();
+                    // 🔧 先定义全局定时器管理器，解决变量提升问题
+        const GlobalTimerManager = {
+            timers: new Set(),
             
-            // 🔧 移除可能导致重复调用的全局对象创建
-            // 创建量化系统实例（如果存在）
-            if (typeof QuantitativeSystem !== 'undefined' && !window.quantitativeSystem) {
-                try {
-                    quantitativeSystem = new QuantitativeSystem();
-                    window.quantitativeSystem = quantitativeSystem;
-                    window.app = quantitativeSystem;
-                    console.log('✅ QuantitativeSystem 实例已创建');
-                } catch (e) {
-                    console.warn('⚠️ QuantitativeSystem 创建失败:', e);
+            addTimer: function(timerId) {
+                this.timers.add(timerId);
+                return timerId;
+            },
+            
+            clearTimer: function(timerId) {
+                if (timerId) {
+                    clearTimeout(timerId);
+                    this.timers.delete(timerId);
                 }
+            },
+            
+            clearAllTimers: function() {
+                console.log('🧹 清理所有定时器，共计:', this.timers.size);
+                this.timers.forEach(timerId => {
+                    clearTimeout(timerId);
+                });
+                this.timers.clear();
             }
+        };
+        
+        // 暴露定时器管理器到全局
+        window.GlobalTimerManager = GlobalTimerManager;
+        
+        // 🔧 只执行一次初始化
+        initializeOnce();
+        
+        // 🔧 移除可能导致重复调用的全局对象创建
+        // 创建量化系统实例（如果存在）
+        if (typeof QuantitativeSystem !== 'undefined' && !window.quantitativeSystem) {
+            try {
+                quantitativeSystem = new QuantitativeSystem();
+                window.quantitativeSystem = quantitativeSystem;
+                window.app = quantitativeSystem;
+                console.log('✅ QuantitativeSystem 实例已创建');
+            } catch (e) {
+                console.warn('⚠️ QuantitativeSystem 创建失败:', e);
+            }
+        }
             
             // 🔧 移除状态轮询，减少API调用
             // 启动状态管理器（如果存在）
@@ -950,9 +930,15 @@
             console.log('✅ 量化系统初始化完成');
         });
         
-        // 强制刷新函数
+        // 🔧 修复：使用quantitative.js中的统一刷新逻辑
         function refreshStrategies() {
-            forceLoadStrategies();
+            if (window.app && window.app.loadStrategies) {
+                window.app.loadStrategies();
+            } else if (window.quantitativeSystem && window.quantitativeSystem.loadStrategies) {
+                window.quantitativeSystem.loadStrategies();
+            } else {
+                console.warn('⚠️ 未找到策略刷新方法');
+            }
         }
         
         // 🗑️ 删除重复的策略配置函数，统一使用quantitative.js中的逻辑
@@ -1785,32 +1771,7 @@
         window.saveManagementConfig = saveManagementConfig;
         window.resetManagementConfig = resetManagementConfig;
         
-        // 🔧 全局定时器清理机制
-        const GlobalTimerManager = {
-            timers: new Set(),
-            
-            addTimer: function(timerId) {
-                this.timers.add(timerId);
-                return timerId;
-            },
-            
-            clearTimer: function(timerId) {
-                if (timerId) {
-                    clearTimeout(timerId);
-                    this.timers.delete(timerId);
-                }
-            },
-            
-            clearAllTimers: function() {
-                console.log('🧹 清理所有定时器，共计:', this.timers.size);
-                this.timers.forEach(timerId => {
-                    clearTimeout(timerId);
-                });
-                this.timers.clear();
-            }
-        };
-        
-        // 页面卸载时清理所有定时器
+        // 🔧 页面卸载时清理所有定时器
         window.addEventListener('beforeunload', function() {
             GlobalTimerManager.clearAllTimers();
             console.log('✅ 页面卸载，已清理所有定时器');
@@ -1823,9 +1784,6 @@
                 console.log('✅ 页面隐藏，已清理所有定时器');
             }
         });
-        
-        // 暴露定时器管理器到全局
-        window.GlobalTimerManager = GlobalTimerManager;
     </script>
 
     <!-- 🎨 页面美化样式增强 -->
