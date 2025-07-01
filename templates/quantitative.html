@@ -259,7 +259,7 @@
             </div>
         </div>
         
-        <!-- 底部四个功能模块 - 优化排版布局 -->
+        <!-- 底部四个功能模块 - 重新设计统一样式 -->
         <div class="row g-3 mb-4">
             <!-- 收益曲线 -->
             <div class="col-xl-3 col-lg-6 col-md-6">
@@ -295,8 +295,8 @@
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-light btn-sm text-dark" onclick="toggleBalanceChart('7')" style="font-size: 0.75rem;">7天</button>
                             <button class="btn btn-warning btn-sm active" onclick="toggleBalanceChart('30')" style="font-size: 0.75rem;">30天</button>
-                    </div>
                         </div>
+                    </div>
                     <div class="card-body p-3">
                         <div class="balance-chart-container" style="height: 140px; position: relative;">
                             <canvas id="balanceChart2" style="display: none;"></canvas>
@@ -304,30 +304,30 @@
                                 <div class="loading-content text-center">
                                     <div class="spinner-border text-success mb-2" role="status">
                                         <span class="visually-hidden">Loading...</span>
-                    </div>
+                                    </div>
                                     <p class="text-muted small mb-0">正在加载资产数据...</p>
-                </div>
-            </div>
-        </div>
-        
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- 里程碑展示 - 优化布局 -->
                         <div class="milestones-container mt-3">
                             <div class="row g-1 text-center">
                                 <div class="col-4">
                                     <div class="milestone-card p-2 rounded bg-light">
-                                        <div class="milestone-value text-success fw-bold small">10U</div>
+                                        <div class="milestone-value text-dark fw-bold small">10U</div>
                                         <div class="milestone-label text-muted" style="font-size: 0.7rem;">起始</div>
-                    </div>
-                        </div>
+                                    </div>
+                                </div>
                                 <div class="col-4">
                                     <div class="milestone-card p-2 rounded bg-warning bg-opacity-25">
-                                        <div class="milestone-value text-warning fw-bold small" id="currentBalance2">12.3U</div>
+                                        <div class="milestone-value text-dark fw-bold small" id="currentBalance2">12.3U</div>
                                         <div class="milestone-label text-muted" style="font-size: 0.7rem;">当前</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="milestone-card p-2 rounded bg-primary bg-opacity-25">
-                                        <div class="milestone-value text-primary fw-bold small">100K</div>
+                                        <div class="milestone-value text-dark fw-bold small">100K</div>
                                         <div class="milestone-label text-muted" style="font-size: 0.7rem;">目标</div>
                                     </div>
                                 </div>
@@ -344,7 +344,7 @@
                         <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-signal me-2"></i> 最新信号
                         </h6>
-                        </div>
+                    </div>
                     <div class="card-body p-3">
                         <div class="signals-container" style="height: 220px;">
                             <div class="signals-list h-100" style="overflow-y: auto;">
@@ -352,15 +352,15 @@
                                     <div class="loading-content text-center h-100 d-flex flex-column justify-content-center">
                                         <div class="spinner-border text-info mb-3" role="status">
                                             <span class="visually-hidden">Loading...</span>
-                    </div>
+                                        </div>
                                         <p class="text-muted small mb-0">正在加载交易信号...</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                                    </div>
-                                </div>
-                                    </div>
-                                </div>
-                                    </div>
-                                </div>
+                    </div>
+                </div>
+            </div>
             
             <!-- 持仓管理 -->
             <div class="col-xl-3 col-lg-6 col-md-6">
@@ -369,7 +369,7 @@
                         <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-wallet me-2"></i> 持仓管理
                         </h6>
-                            </div>
+                    </div>
                     <div class="card-body p-3">
                         <div class="positions-container" style="height: 220px;">
                             <div class="positions-list h-100" style="overflow-y: auto;">
@@ -1455,16 +1455,178 @@
         
         // 添加缺失的按钮功能
         function showStrategyManagement() {
-            console.log('显示策略管理配置');
-            // 显示策略管理配置模态框
-            const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
-            modal.show();
+            console.log('打开策略管理配置页面');
             
-            // 🔧 启用自动保存功能
-            setTimeout(() => {
-                enableAutoSave();
-                console.log('✅ 策略管理配置自动保存已启用');
-            }, 500);
+            // 🔧 加载配置数据并记录旧值
+            loadManagementConfigData().then(() => {
+                // 显示弹窗
+                const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
+                modal.show();
+                
+                // 🔧 记录关键配置的初始值，用于判断是否需要重新加载
+                const displayCountInput = document.getElementById('display_strategies_count');
+                const realTradingCountInput = document.getElementById('real_trading_count');
+                
+                if (displayCountInput) {
+                    displayCountInput.dataset.oldValue = displayCountInput.value;
+                    console.log('🔧 记录display_strategies_count旧值:', displayCountInput.value);
+                }
+                
+                if (realTradingCountInput) {
+                    realTradingCountInput.dataset.oldValue = realTradingCountInput.value;
+                    console.log('🔧 记录real_trading_count旧值:', realTradingCountInput.value);
+                }
+            });
+        }
+        
+        // 🔥 新增：加载策略管理配置数据 - 修复数据格式处理
+        function loadManagementConfigData() {
+            return fetch('/api/quantitative/management-config')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('📊 加载到的管理配置数据:', data);
+                    
+                    if (data.success || data.status === 'success') {
+                        const config = data.config || {};
+                        const fourTierConfig = data.four_tier_config || {};
+                        
+                        // 🔧 填充传统配置
+                        Object.entries(config).forEach(([key, value]) => {
+                            const element = document.getElementById(key);
+                            if (element) {
+                                if (element.type === 'checkbox') {
+                                    element.checked = value === true;
+                                } else {
+                                    element.value = value;
+                                }
+                                console.log(`设置传统配置 ${key}:`, value);
+                            }
+                        });
+                        
+                        // 🔧 修复：处理四层进化配置的嵌套结构
+                        Object.entries(fourTierConfig).forEach(([key, configData]) => {
+                            const element = document.getElementById(key);
+                            if (element) {
+                                // 后端返回的是 {value: xxx, description: xxx, category: xxx} 格式
+                                const value = configData.value !== undefined ? configData.value : configData;
+                                
+                                if (element.type === 'checkbox') {
+                                    element.checked = value === true || value === 'true';
+                                } else {
+                                    element.value = value;
+                                }
+                                console.log(`设置四层配置 ${key}:`, value);
+                            }
+                        });
+                        
+                        // 🔧 更新状态显示
+                        updateSystemStatusDisplay(data);
+                        
+                    } else {
+                        console.error('加载管理配置失败:', data.message);
+                        alert('加载配置失败，将使用默认值');
+                        setDefaultManagementConfig();
+                    }
+                })
+                .catch(error => {
+                    console.error('获取管理配置失败:', error);
+                    alert('获取配置失败，将使用默认值');
+                    setDefaultManagementConfig();
+                });
+        }
+        
+        // 🔧 设置默认管理配置
+        function setDefaultManagementConfig() {
+            const defaultConfigs = {
+                'high_freq_pool_size': 1000,
+                'display_strategies_count': 4,  // 🔧 从21改为4，匹配用户测试结果
+                'real_trading_count': 3,
+                'low_freq_interval_hours': 24,
+                'high_freq_interval_minutes': 60,
+                'display_interval_minutes': 3,
+                'minScore': 10,
+                'eliminationDays': 7,
+                'unified_validation_count': 3,
+                'validation_score_threshold_high': 80,
+                'validation_score_threshold_mid': 60,
+                'validation_amount': 50,
+                'real_trading_amount': 200,
+                'real_trading_score_threshold': 70,
+                'real_trading_enabled': 'false',
+                'min_simulation_days': 7,
+                'min_sim_win_rate': 60,
+                'min_sim_total_pnl': 10
+            };
+            
+            Object.entries(defaultConfigs).forEach(([key, value]) => {
+                const element = document.getElementById(key);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = value === 'true';
+                    } else {
+                        element.value = value;
+                    }
+                }
+            });
+        }
+        
+        // 🔧 更新系统状态显示 - 修复数据格式处理
+        function updateSystemStatusDisplay(data) {
+            console.log('🔧 更新系统状态显示，输入数据:', data);
+            
+            const config = data.config || {};
+            const fourTierConfig = data.four_tier_config || {};
+            
+            // 更新四层系统状态显示
+            if (fourTierConfig && Object.keys(fourTierConfig).length > 0) {
+                const tier1Count = document.getElementById('tier1_count');
+                const tier2Count = document.getElementById('tier2_count');
+                const tier3Count = document.getElementById('tier3_count');
+                const tier4Count = document.getElementById('tier4_count');
+                
+                // 从fourTierConfig中提取值（处理嵌套结构）
+                const getConfigValue = (key) => {
+                    const configData = fourTierConfig[key];
+                    return configData ? (configData.value !== undefined ? configData.value : configData) : null;
+                };
+                
+                if (tier1Count) tier1Count.textContent = data.total_strategies || '1000+';
+                if (tier2Count) tier2Count.textContent = getConfigValue('high_freq_pool_size') || '2000';
+                if (tier3Count) tier3Count.textContent = getConfigValue('display_strategies_count') || '21';
+                if (tier4Count) tier4Count.textContent = getConfigValue('real_trading_count') || '3';
+                
+                // 更新理论进化频率
+                const lowFreqHours = getConfigValue('low_freq_interval_hours') || 24;
+                const highFreqMinutes = getConfigValue('high_freq_interval_minutes') || 60;
+                const displayMinutes = getConfigValue('display_interval_minutes') || 3;
+                
+                const tier1Evolutions = document.getElementById('tier1_evolutions');
+                const tier2Evolutions = document.getElementById('tier2_evolutions');
+                const tier3Evolutions = document.getElementById('tier3_evolutions');
+                
+                if (tier1Evolutions) tier1Evolutions.textContent = Math.round(60 / lowFreqHours * 10) / 10;
+                if (tier2Evolutions) tier2Evolutions.textContent = Math.round(60 / (highFreqMinutes / 60) * 10) / 10;
+                if (tier3Evolutions) tier3Evolutions.textContent = Math.round(60 / (displayMinutes / 60) * 10) / 10;
+                
+                // 更新评分门槛
+                const tier4Threshold = document.getElementById('tier4_threshold');
+                if (tier4Threshold) tier4Threshold.textContent = getConfigValue('real_trading_score_threshold') || '70';
+                
+                console.log('✅ 四层系统状态已更新');
+            }
+            
+            // 更新策略数量统计（这些数据通常不在配置API中，需要另外获取）
+            const currentActive = document.getElementById('currentActiveStrategies');
+            const realTradingCount = document.getElementById('realTradingStrategiesCount');
+            const validationCount = document.getElementById('validationStrategiesCount');
+            const totalCount = document.getElementById('totalStrategiesCount');
+            
+            if (currentActive) currentActive.textContent = data.active_strategies || '-';
+            if (realTradingCount) realTradingCount.textContent = data.real_trading_strategies || '-';
+            if (validationCount) validationCount.textContent = data.validation_strategies || '-';
+            if (totalCount) totalCount.textContent = data.total_strategies || '-';
+            
+            console.log('✅ 系统状态显示更新完成');
         }
         
         function toggleSystem() {
@@ -1787,7 +1949,7 @@
             }
         }
         
-        // 保存策略管理配置 - 优化提示和自动保存
+        // 保存策略管理配置 - 优化提示和智能重新加载
         function saveManagementConfig() {
             // 显示保存中提示
             const saveBtn = event?.target;
@@ -1798,6 +1960,10 @@
             }
             
             const formData = {};
+            
+            // 🔧 保存前记录影响策略显示的关键配置
+            const oldDisplayCount = document.getElementById('display_strategies_count')?.dataset.oldValue;
+            const oldRealTradingCount = document.getElementById('real_trading_count')?.dataset.oldValue;
             
             // 收集配置表单数据
             const configInputs = document.querySelectorAll('#strategyManagementForm input, #strategyManagementForm select');
@@ -1851,28 +2017,27 @@
                 if (data.success || data.status === 'success') {
                     showSaveMessage('策略管理配置保存成功！', 'success');
                     
-                    // 🔧 修复：保存成功后不自动关闭页面，让用户手动关闭
-                    // setTimeout(() => {
-                    //     const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
-                    //     if (modal) modal.hide();
-                    //     
-                    //     // 🔧 修复：重新加载策略以应用新配置
-                    //     setTimeout(() => {
-                    //         forceLoadStrategies();
-                    //     }, 500);
-                    // }, 1500);
+                    // 🔧 智能重新加载：只有在影响策略显示的配置改变时才重新加载
+                    const newDisplayCount = formData.display_strategies_count;
+                    const newRealTradingCount = formData.real_trading_count;
                     
-                    // 🔧 新逻辑：立即重新加载策略以应用新配置，但保持配置页面开启
-                    console.log('🔄 配置保存成功，立即应用新配置...');
+                    const needReloadStrategies = (
+                        oldDisplayCount && oldDisplayCount != newDisplayCount ||
+                        oldRealTradingCount && oldRealTradingCount != newRealTradingCount
+                    );
                     
-                    // 延迟重新加载策略，确保后端配置已更新
-                    setTimeout(() => {
-                        forceLoadStrategies();
-                        console.log('✅ 策略列表已重新加载，新配置已生效');
-                        
-                        // 显示配置生效提示
-                        showSaveMessage('配置已生效，策略列表已更新！', 'success');
-                    }, 1000);
+                    if (needReloadStrategies) {
+                        console.log('🔄 检测到策略显示配置改变，重新加载策略列表...');
+                        setTimeout(() => {
+                            forceLoadStrategies();
+                            showSaveMessage('策略显示配置已更新！', 'success');
+                        }, 1000);
+                    } else {
+                        console.log('✅ 配置保存成功，无需重新加载策略列表');
+                        setTimeout(() => {
+                            showSaveMessage('配置保存完成，无需重新加载！', 'success');
+                        }, 1500);
+                    }
                     
                 } else {
                     throw new Error(data.message || '保存失败');
