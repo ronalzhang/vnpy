@@ -927,13 +927,13 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('⚡ 量化系统页面开始初始化...');
             
-            // 立即强制加载数据
+            // 🔧 优化：错开API调用时间，避免服务器过载
             forceLoadStrategies();
             
-            // 🔧 修复：同时加载底部模块数据
+            // 🔧 修复：延迟加载底部模块，避免同时调用过多API
             setTimeout(() => {
                 loadBottomModulesData();
-            }, 1500);
+            }, 2000);  // 延迟2秒加载，避免与策略加载冲突
             
             // 创建量化系统实例（如果存在）
             if (typeof QuantitativeSystem !== 'undefined') {
@@ -1493,21 +1493,55 @@
             loadBalanceChartData(period);
         }
         
-        // 加载底部四个模块的数据
+        // 加载底部四个模块的数据 - 优化并发控制
         function loadBottomModulesData() {
             console.log('🔄 加载底部四个模块数据...');
             
-            // 1. 加载收益曲线数据
-            loadPerformanceChartData();
+            // 🔧 防止重复加载
+            if (window.bottomModulesLoading) {
+                console.log('⚠️ 底部模块正在加载中，跳过重复请求');
+                return;
+            }
             
-            // 2. 加载资产增长数据
-            loadBalanceChartData('30');
+            window.bottomModulesLoading = true;
             
-            // 3. 加载最新信号数据
-            loadLatestSignalsData();
-            
-            // 4. 加载持仓数据
-            loadPositionsData();
+            try {
+                // 🔧 错开加载时间，避免同时发送多个请求
+                
+                // 1. 加载收益曲线数据
+                const timer1 = GlobalTimerManager.addTimer(setTimeout(() => {
+                    loadPerformanceChartData();
+                    GlobalTimerManager.clearTimer(timer1);
+                }, 500));
+                
+                // 2. 加载资产增长数据  
+                const timer2 = GlobalTimerManager.addTimer(setTimeout(() => {
+                    loadBalanceChartData('30');
+                    GlobalTimerManager.clearTimer(timer2);
+                }, 1000));
+                
+                // 3. 加载最新信号数据
+                const timer3 = GlobalTimerManager.addTimer(setTimeout(() => {
+                    loadLatestSignalsData();
+                    GlobalTimerManager.clearTimer(timer3);
+                }, 1500));
+                
+                // 4. 加载持仓数据
+                const timer4 = GlobalTimerManager.addTimer(setTimeout(() => {
+                    loadPositionsData();
+                    GlobalTimerManager.clearTimer(timer4);
+                    
+                    // 🔧 所有模块加载完成
+                    setTimeout(() => {
+                        window.bottomModulesLoading = false;
+                        console.log('✅ 底部四个模块数据加载完成');
+                    }, 1000);
+                }, 2000));
+                
+            } catch (error) {
+                console.error('❌ 底部模块数据加载失败:', error);
+                window.bottomModulesLoading = false;
+            }
         }
         
         // 加载收益曲线数据
@@ -1886,18 +1920,37 @@
             }, 3000);
         }
         
-        // 🔧 增加自动保存功能
+        // 🔧 增加自动保存功能 - 添加防抖机制
         function enableAutoSave() {
             const inputs = document.querySelectorAll('#strategyManagementForm input, #strategyManagementForm select');
+            
+            // 🔧 防抖：避免频繁保存
+            let debounceTimer = null;
+            const DEBOUNCE_DELAY = 3000; // 3秒防抖延迟
+            
             inputs.forEach(input => {
                 input.addEventListener('change', function() {
-                    console.log('配置项发生变化，准备自动保存...');
-                    // 延迟自动保存，避免频繁请求
-                    clearTimeout(window.autoSaveTimer);
-                    window.autoSaveTimer = setTimeout(() => {
+                    console.log('🔧 配置项发生变化，准备自动保存...');
+                    
+                    // 清除之前的定时器
+                    if (debounceTimer) {
+                        clearTimeout(debounceTimer);
+                    }
+                    
+                    // 🔧 设置新的防抖定时器，避免频繁请求
+                    debounceTimer = setTimeout(() => {
+                        console.log('🔄 执行自动保存...');
                         saveManagementConfig();
-                    }, 1000);
+                    }, DEBOUNCE_DELAY);
                 });
+            });
+            
+            // 🔧 页面卸载时清理定时器
+            window.addEventListener('beforeunload', function() {
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = null;
+                }
             });
         }
         
@@ -1925,6 +1978,48 @@
         window.resetStrategyParams = resetStrategyParams;
         window.saveManagementConfig = saveManagementConfig;
         window.resetManagementConfig = resetManagementConfig;
+        
+        // 🔧 全局定时器清理机制
+        const GlobalTimerManager = {
+            timers: new Set(),
+            
+            addTimer: function(timerId) {
+                this.timers.add(timerId);
+                return timerId;
+            },
+            
+            clearTimer: function(timerId) {
+                if (timerId) {
+                    clearTimeout(timerId);
+                    this.timers.delete(timerId);
+                }
+            },
+            
+            clearAllTimers: function() {
+                console.log('🧹 清理所有定时器，共计:', this.timers.size);
+                this.timers.forEach(timerId => {
+                    clearTimeout(timerId);
+                });
+                this.timers.clear();
+            }
+        };
+        
+        // 页面卸载时清理所有定时器
+        window.addEventListener('beforeunload', function() {
+            GlobalTimerManager.clearAllTimers();
+            console.log('✅ 页面卸载，已清理所有定时器');
+        });
+        
+        // 页面隐藏时也清理定时器（移动端兼容）
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                GlobalTimerManager.clearAllTimers();
+                console.log('✅ 页面隐藏，已清理所有定时器');
+            }
+        });
+        
+        // 暴露定时器管理器到全局
+        window.GlobalTimerManager = GlobalTimerManager;
     </script>
 
     <!-- 🎨 页面美化样式增强 -->
