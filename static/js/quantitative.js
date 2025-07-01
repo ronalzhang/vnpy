@@ -1220,7 +1220,7 @@ class QuantitativeSystem {
         }
     }
 
-    // 🔥 新增：初始化日志标签页
+    // 🔥 重新设计：初始化紧凑型日志标签页
     initLogTabs(strategyId) {
         const tabContainer = document.getElementById('strategyLogTabs');
         if (!tabContainer) return;
@@ -1255,71 +1255,27 @@ class QuantitativeSystem {
             
             <div class="tab-content" id="logTabContent">
                 <div class="tab-pane fade show active" id="real-trading" role="tabpanel">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>时间</th>
-                <th>交易对</th>
-                                    <th>信号</th>
-                                    <th>价格</th>
-                <th>数量</th>
-                                    <th>盈亏</th>
-                                    <th>置信度</th>
-                                    <th>状态</th>
-            </tr>
-                            </thead>
-                            <tbody id="realTradingLogs">
-                                <tr><td colspan="8" class="text-center">加载中...</td></tr>
-                            </tbody>
-                        </table>
+                    <div id="realTradingLogs">
+                        <div class="text-center py-4">
+                            <i class="fas fa-spinner fa-spin"></i> 加载中...
+                        </div>
                     </div>
-                    <div id="realTradingPagination"></div>
                 </div>
                 
                 <div class="tab-pane fade" id="validation" role="tabpanel">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead class="table-dark">
-            <tr>
-                <th>时间</th>
-                                    <th>交易对</th>
-                <th>信号</th>
-                <th>价格</th>
-                <th>数量</th>
-                <th>盈亏</th>
-                                    <th>置信度</th>
-                                    <th>验证类型</th>
-            </tr>
-                            </thead>
-                            <tbody id="validationLogs">
-                                <tr><td colspan="8" class="text-center">点击标签页加载验证日志</td></tr>
-                            </tbody>
-                        </table>
+                    <div id="validationLogs">
+                        <div class="text-center py-4">
+                            <i class="fas fa-mouse-pointer"></i> 点击标签页加载验证日志
+                        </div>
                     </div>
-                    <div id="validationPagination"></div>
                 </div>
                 
                 <div class="tab-pane fade" id="evolution" role="tabpanel">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>时间</th>
-                                    <th>类型</th>
-                                    <th>触发原因</th>
-                                    <th>旧参数</th>
-                                    <th>新参数</th>
-                                    <th>目标胜率</th>
-                                    <th>状态</th>
-                </tr>
-                            </thead>
-                            <tbody id="evolutionLogs">
-                                <tr><td colspan="7" class="text-center">点击标签页加载进化日志</td></tr>
-                            </tbody>
-                        </table>
+                    <div id="evolutionLogs">
+                        <div class="text-center py-4">
+                            <i class="fas fa-mouse-pointer"></i> 点击标签页加载进化日志
+                        </div>
                     </div>
-                    <div id="evolutionPagination"></div>
                 </div>
             </div>
         `;
@@ -1365,7 +1321,7 @@ class QuantitativeSystem {
         }
     }
 
-    // 🔥 新增：渲染分类日志
+    // 🔥 重新设计：渲染紧凑型分类日志 - 一行一条记录
     renderCategorizedLogs(logType, logs) {
         const containerMap = {
             'real_trading': 'realTradingLogs',
@@ -1379,61 +1335,85 @@ class QuantitativeSystem {
         if (!container) return;
         
         if (!logs || logs.length === 0) {
-            container.innerHTML = `<tr><td colspan="8" class="text-center text-muted">暂无${this.getLogTypeName(logType)}记录</td></tr>`;
+            container.innerHTML = `
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-inbox fa-2x mb-2 opacity-50"></i>
+                    <p>暂无${this.getLogTypeName(logType)}记录</p>
+                </div>
+            `;
             return;
         }
         
+        // 🔥 新设计：使用紧凑布局替代表格
+        container.innerHTML = `
+            <div class="compact-list-container">
+                ${logs.map((log, index) => this.renderCompactLogEntry(log, logType, index)).join('')}
+            </div>
+        `;
+    }
+
+    // 🔥 新增：渲染紧凑型日志条目
+    renderCompactLogEntry(log, logType, index) {
+        const time = this.formatTimeCompact(log.timestamp);
+        const sequenceNum = String(index + 1).padStart(3, '0');
+        
         if (logType === 'evolution') {
-            // 渲染进化日志
-            container.innerHTML = logs.map(log => `
-                <tr>
-                    <td>${this.formatTime(log.timestamp)}</td>
-                    <td><span class="badge bg-info">${log.optimization_type || log.signal_type || '参数调整'}</span></td>
-                    <td>${log.trigger_reason || '自动优化'}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="app.showParameterDetails('${JSON.stringify(log.old_parameters || {}).replace(/'/g, "\\'")}', '旧参数')">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="app.showParameterDetails('${JSON.stringify(log.new_parameters || {}).replace(/'/g, "\\'")}', '新参数')">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </td>
-                    <td>${log.target_success_rate || 0}%</td>
-                    <td>
-                        <span class="badge ${log.validation_passed ? 'bg-success' : 'bg-warning'}">
-                            ${log.validation_passed ? '已应用' : '待验证'}
-                        </span>
-                    </td>
-                </tr>
-            `).join('');
+            // 进化日志紧凑格式
+            return `
+                <div class="log-entry-compact">
+                    <div class="log-sequence-number">#${sequenceNum}</div>
+                    <div class="log-timestamp-compact">${time}</div>
+                    <div class="log-type-badge-compact evolution">进化</div>
+                    <div class="log-content-compact">
+                        <strong>${log.optimization_type || '参数优化'}</strong> - 
+                        ${log.trigger_reason || '自动优化'} 
+                        (目标胜率: ${log.target_success_rate || 0}%)
+                    </div>
+                    <div class="log-strategy-id-compact">${this.extractStrategyId(log.strategy_id)}</div>
+                </div>
+            `;
         } else {
-            // 渲染交易日志（实盘和验证）
-            container.innerHTML = logs.map(log => `
-                <tr class="${logType === 'validation' ? 'table-info' : ''}">
-                    <td>${this.formatTime(log.timestamp)}</td>
-                    <td>${log.symbol || 'N/A'}</td>
-                    <td>
-                        <span class="badge ${log.signal_type === 'buy' ? 'bg-success' : 'bg-danger'}">
-                            ${(log.signal_type || '').toUpperCase()}
+            // 交易日志紧凑格式（实盘和验证）
+            const actionClass = log.signal_type === 'buy' ? 'buy' : 'sell';
+            const pnlClass = log.pnl >= 0 ? 'positive' : 'negative';
+            const statusClass = log.executed ? 'success' : 'warning';
+            
+            return `
+                <div class="log-entry-compact">
+                    <div class="log-sequence-number">#${sequenceNum}</div>
+                    <div class="log-timestamp-compact">${time}</div>
+                    <div class="log-type-badge-compact ${logType}">${logType === 'real_trading' ? '实盘' : '验证'}</div>
+                    <div class="log-content-compact">
+                        <span class="signal-action-compact ${actionClass}">${(log.signal_type || '').toUpperCase()}</span>
+                        <strong>${log.symbol || 'N/A'}</strong> @ 
+                        $${log.price ? log.price.toFixed(4) : '0'} × 
+                        ${log.quantity ? log.quantity.toFixed(4) : '0'} = 
+                        <span class="position-pnl-compact ${pnlClass}">
+                            ${log.pnl >= 0 ? '+' : ''}${(log.pnl || 0).toFixed(4)}U
                         </span>
-                    </td>
-                    <td>${log.price ? log.price.toFixed(6) : '0'}</td>
-                    <td>${log.quantity ? log.quantity.toFixed(6) : '0'}</td>
-                    <td class="${log.pnl >= 0 ? 'text-success' : 'text-danger'}">
-                        ${log.pnl >= 0 ? '+' : ''}${(log.pnl || 0).toFixed(6)}U
-                    </td>
-                    <td>${log.confidence ? (log.confidence * 100).toFixed(1) : '0'}%</td>
-                    <td>
-                        <span class="badge ${log.executed ? 'bg-success' : 'bg-secondary'}">
-                            ${log.executed ? '已执行' : '待执行'}
-                        </span>
-                        ${logType === 'validation' ? '<br><small class="text-muted">验证交易</small>' : ''}
-                    </td>
-                </tr>
-            `).join('');
+                        <small class="text-muted ms-2">(${log.confidence ? (log.confidence * 100).toFixed(1) : '0'}%)</small>
+                    </div>
+                    <div class="log-strategy-id-compact">${this.extractStrategyId(log.strategy_id)}</div>
+                </div>
+            `;
         }
+    }
+
+    // 🔥 新增：格式化紧凑时间显示
+    formatTimeCompact(timestamp) {
+        if (!timestamp) return '--:--';
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString('zh-CN', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+
+    // 🔥 新增：提取策略ID后几位
+    extractStrategyId(strategyId) {
+        if (!strategyId) return '----';
+        return strategyId.slice(-6);
     }
 
     // 🔥 修复：更新单个标签页计数

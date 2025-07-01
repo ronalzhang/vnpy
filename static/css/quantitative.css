@@ -2417,6 +2417,217 @@ body.quantitative-page {
     font-size: 0.9rem;
 }
 
+/* ==================== 新增：紧凑型日志布局 ==================== */
+/* 🎨 紧凑型日志条目 - 一行一条记录 */
+.log-entry-compact {
+    display: flex;
+    align-items: center;
+    padding: 6px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    background: white;
+    transition: all 0.2s ease;
+    min-height: 36px;
+    font-size: 0.8rem;
+}
+
+.log-entry-compact:hover {
+    background: #f8fafc;
+    border-left: 3px solid #4f46e5;
+    padding-left: 13px;
+}
+
+.log-entry-compact:nth-child(even) {
+    background: #fafbfc;
+}
+
+.log-entry-compact:nth-child(even):hover {
+    background: #f1f5f9;
+}
+
+/* 🎨 紧凑型日志组件 */
+.log-timestamp-compact {
+    font-size: 0.7rem;
+    color: #6b7280;
+    white-space: nowrap;
+    min-width: 90px;
+    margin-right: 8px;
+    flex-shrink: 0;
+    font-family: 'Courier New', monospace;
+}
+
+.log-type-badge-compact {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+    border-radius: 6px;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.log-type-badge-compact.evolution {
+    background: #e0e7ff;
+    color: #4338ca;
+    border: 1px solid #c7d2fe;
+}
+
+.log-type-badge-compact.validation {
+    background: #dcfce7;
+    color: #059669;
+    border: 1px solid #a7f3d0;
+}
+
+.log-type-badge-compact.real_trading {
+    background: #fed7aa;
+    color: #ea580c;
+    border: 1px solid #fdba74;
+}
+
+.log-content-compact {
+    flex-grow: 1;
+    color: #374151;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 8px;
+}
+
+.log-strategy-id-compact {
+    font-size: 0.65rem;
+    color: #6366f1;
+    background: #f0f4ff;
+    padding: 1px 4px;
+    border-radius: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+    font-family: 'Courier New', monospace;
+}
+
+/* 🎨 底部交易信号和持仓管理 - 紧凑模式 */
+.compact-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    background: #fafbfc;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.compact-list-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    background: white;
+    transition: background-color 0.15s ease;
+    min-height: 32px;
+    font-size: 0.75rem;
+}
+
+.compact-list-item:hover {
+    background: #f8fafc;
+}
+
+.compact-list-item:last-child {
+    border-bottom: none;
+}
+
+/* 🎨 交易信号紧凑样式 */
+.signal-time-compact {
+    font-size: 0.7rem;
+    color: #6b7280;
+    min-width: 40px;
+    margin-right: 8px;
+    font-family: 'Courier New', monospace;
+}
+
+.signal-pair-compact {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    min-width: 70px;
+    margin-right: 8px;
+}
+
+.signal-action-compact {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-weight: 600;
+    min-width: 30px;
+    text-align: center;
+    margin-right: 8px;
+}
+
+.signal-action-compact.buy {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.signal-action-compact.sell {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.signal-price-compact {
+    font-size: 0.7rem;
+    color: #6b7280;
+    flex-grow: 1;
+    text-align: right;
+}
+
+/* 🎨 持仓管理紧凑样式 */
+.position-symbol-compact {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    min-width: 70px;
+    margin-right: 8px;
+}
+
+.position-amount-compact {
+    font-size: 0.7rem;
+    color: #6b7280;
+    min-width: 60px;
+    margin-right: 8px;
+    text-align: right;
+}
+
+.position-pnl-compact {
+    font-size: 0.7rem;
+    font-weight: 600;
+    min-width: 50px;
+    text-align: right;
+}
+
+.position-pnl-compact.positive {
+    color: #059669;
+}
+
+.position-pnl-compact.negative {
+    color: #dc2626;
+}
+
+/* 🎨 滚动条优化 */
+.compact-list-container::-webkit-scrollbar {
+    width: 4px;
+}
+
+.compact-list-container::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 2px;
+}
+
+.compact-list-container::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 2px;
+}
+
+.compact-list-container::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
 /* ==================== 响应式设计 ==================== */
 @media (max-width: 768px) {
     .strategy-card {
@@ -2445,6 +2656,30 @@ body.quantitative-page {
     
     .logs-table-container {
         padding: 1rem;
+    }
+    
+    /* 移动端紧凑布局调整 */
+    .log-entry-compact {
+        padding: 4px 8px;
+        min-height: 30px;
+        font-size: 0.75rem;
+    }
+    
+    .log-timestamp-compact {
+        min-width: 70px;
+        font-size: 0.65rem;
+    }
+    
+    .compact-list-item {
+        padding: 3px 8px;
+        min-height: 28px;
+        font-size: 0.7rem;
+    }
+    
+    .signal-pair-compact,
+    .position-symbol-compact {
+        min-width: 60px;
+        font-size: 0.7rem;
     }
 }
 
