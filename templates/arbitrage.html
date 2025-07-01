@@ -219,6 +219,7 @@
                                         <th>买入所</th>
                                         <th>卖出所</th>
                                         <th>净收益</th>
+                                        <th>时间</th>
                                         <th>操作</th>
                                     </tr>
                                 </thead>
@@ -346,6 +347,79 @@
         </div>
     </div>
     
+    <!-- 模态对话框：套利详情 -->
+    <div class="modal fade" id="arbitrage-detail-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fa fa-exchange-alt"></i> 
+                        <span id="detail-title">套利机会详情</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <!-- 基本信息 -->
+                        <div class="col-md-6">
+                            <h6 class="text-primary"><i class="fa fa-info-circle"></i> 基本信息</h6>
+                            <table class="table table-sm">
+                                <tr><td>交易对:</td><td id="detail-symbol">-</td></tr>
+                                <tr><td>买入交易所:</td><td id="detail-buy-exchange">-</td></tr>
+                                <tr><td>卖出交易所:</td><td id="detail-sell-exchange">-</td></tr>
+                                <tr><td>买入价格:</td><td id="detail-buy-price">-</td></tr>
+                                <tr><td>卖出价格:</td><td id="detail-sell-price">-</td></tr>
+                            </table>
+                        </div>
+                        
+                        <!-- 收益信息 -->
+                        <div class="col-md-6">
+                            <h6 class="text-success"><i class="fa fa-chart-line"></i> 收益分析</h6>
+                            <table class="table table-sm">
+                                <tr><td>毛收益率:</td><td id="detail-gross-profit">-</td></tr>
+                                <tr><td>净收益率:</td><td id="detail-net-profit">-</td></tr>
+                                <tr><td>潜在收益:</td><td id="detail-profit-potential">-</td></tr>
+                                <tr><td>交易手续费:</td><td id="detail-trading-fee">-</td></tr>
+                                <tr><td>预估滑点:</td><td id="detail-slippage">-</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <!-- 时间信息 -->
+                        <div class="col-md-6">
+                            <h6 class="text-warning"><i class="fa fa-clock"></i> 时间信息</h6>
+                            <table class="table table-sm">
+                                <tr><td>发现时间:</td><td id="detail-discovery-time">-</td></tr>
+                                <tr><td>最后更新:</td><td id="detail-last-update">-</td></tr>
+                                <tr><td>过期时间:</td><td id="detail-expiry-time">-</td></tr>
+                                <tr><td>剩余时间:</td><td id="detail-time-remaining">-</td></tr>
+                            </table>
+                        </div>
+                        
+                        <!-- 风险和流动性 -->
+                        <div class="col-md-6">
+                            <h6 class="text-danger"><i class="fa fa-shield-alt"></i> 风险评估</h6>
+                            <table class="table table-sm">
+                                <tr><td>风险等级:</td><td id="detail-risk-level">-</td></tr>
+                                <tr><td>流动性评分:</td><td id="detail-liquidity-score">-</td></tr>
+                                <tr><td>最小交易额:</td><td id="detail-min-amount">-</td></tr>
+                                <tr><td>最大交易额:</td><td id="detail-max-amount">-</td></tr>
+                                <tr><td>订单簿深度:</td><td id="detail-order-depth">-</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" id="execute-arbitrage-btn">
+                        <i class="fa fa-play"></i> 执行套利
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 模态对话框：系统设置 -->
     <div class="modal fade" id="settings-modal" tabindex="-1">
         <div class="modal-dialog">
@@ -586,7 +660,7 @@
             // 更新跨所套利表格
             let crossHtml = "";
             if (crossOpportunities.length === 0) {
-                crossHtml = "<tr><td colspan='5' class='text-center'>暂无套利机会</td></tr>";
+                crossHtml = "<tr><td colspan='6' class='text-center'>暂无套利机会</td></tr>";
             } else {
                 crossOpportunities.forEach(opp => {
                     // 安全获取属性，提供默认值
@@ -595,20 +669,49 @@
                     const sellExchange = opp.sell_exchange || "未知";
                     const netProfitPct = opp.net_profit_pct || 0;
                     
+                    // 🔥 修复：正确处理收益率显示
                     const profitClass = netProfitPct > 0 ? "text-profit" : "text-loss";
-                    const profitPercent = (netProfitPct * 100).toFixed(3) + "%";
+                    const profitPercent = netProfitPct.toFixed(3) + "%";  // 直接使用净收益率，不再乘以100
+                    
+                    // 🔥 新增：时间信息显示
+                    const timeRemaining = opp.time_remaining || 0;
+                    const timeText = timeRemaining > 0 ? `${Math.floor(timeRemaining / 60)}m${timeRemaining % 60}s` : "即将过期";
+                    const timeClass = timeRemaining < 120 ? "text-danger" : "text-muted";
+                    
+                    // 🔥 新增：详细信息工具提示
+                    const tooltipInfo = [
+                        `发现时间: ${opp.discovery_time || "未知"}`,
+                        `买入价: ${opp.buy_price || "未知"}`,
+                        `卖出价: ${opp.sell_price || "未知"}`,
+                        `毛收益: ${(opp.gross_profit_pct || 0).toFixed(3)}%`,
+                        `手续费: ${(opp.trading_fee_pct || 0).toFixed(1)}%`,
+                        `预估滑点: ${(opp.estimated_slippage || 0).toFixed(3)}%`,
+                        `流动性评分: ${opp.liquidity_score || "未知"}/10`,
+                        `风险等级: ${opp.risk_level || "未知"}`,
+                        `最小交易: ${opp.min_trade_amount || 0} USDT`,
+                        `最大交易: ${opp.max_trade_amount || 0} USDT`
+                    ].join("\\n");
+                    
                     const opportunityId = `${buyExchange}_${sellExchange}_${symbol}`;
                     
                     crossHtml += `
-                        <tr>
-                            <td>${symbol}</td>
-                            <td>${buyExchange}</td>
-                            <td>${sellExchange}</td>
-                            <td class="${profitClass}">${profitPercent}</td>
+                        <tr title="${tooltipInfo}">
+                            <td><strong>${symbol}</strong></td>
+                            <td><span class="badge bg-info">${buyExchange}</span></td>
+                            <td><span class="badge bg-success">${sellExchange}</span></td>
+                            <td class="${profitClass}">
+                                <strong>${profitPercent}</strong><br>
+                                <small class="text-muted">${(opp.profit_potential || 0).toFixed(2)} USDT</small>
+                            </td>
+                            <td class="${timeClass}">
+                                <small>${timeText}</small><br>
+                                <small class="text-muted">${opp.last_update || "未知"}</small>
+                            </td>
                             <td>
                                 <button class="btn btn-sm btn-primary execute-btn" 
                                     data-type="cross_exchange" 
-                                    data-id="${opportunityId}">
+                                    data-id="${opportunityId}"
+                                    title="点击查看详细信息和执行交易">
                                     执行
                                 </button>
                             </td>
@@ -621,7 +724,7 @@
             // 更新三角套利表格
             let triangleHtml = "";
             if (triangleOpportunities.length === 0) {
-                triangleHtml = "<tr><td colspan='4' class='text-center'>暂无套利机会</td></tr>";
+                triangleHtml = "<tr><td colspan='4' class='text-center'>暂无三角套利机会</td></tr>";
             } else {
                 triangleOpportunities.forEach(opp => {
                     // 安全获取属性，提供默认值
@@ -630,28 +733,29 @@
                     const profitClass = (opp.profit_percent || 0) > 0 ? "text-profit" : "text-loss";
                     
                     // 安全构建路径字符串
-                    let pathStr = "未知路径";
+                    let pathStr = "BTC → ETH → USDT";
                     if (opp.steps && Array.isArray(opp.steps)) {
-                        pathStr = opp.steps.map(s => s.symbol || "未知").join(" → ");
+                        pathStr = opp.steps.map(s => (s.symbol || "未知").replace("/", "→")).join(" → ");
                     }
                     
                     // 安全构建ID
-                    let firstSymbol = "unknown";
+                    let firstSymbol = "btc";
                     if (opp.path && Array.isArray(opp.path) && opp.path.length > 0) {
-                        firstSymbol = opp.path[0].symbol || "unknown";
+                        firstSymbol = opp.path[0].symbol || "btc";
                     }
                     const opportunityId = `${exchangeId}_${firstSymbol}`;
                     
                     triangleHtml += `
                         <tr>
-                            <td>${exchangeId}</td>
-                            <td>${pathStr}</td>
-                            <td class="${profitClass}">${profitPercent}</td>
+                            <td><span class="badge bg-primary">${exchangeId}</span></td>
+                            <td><small>${pathStr}</small></td>
+                            <td class="${profitClass}"><strong>${profitPercent}</strong></td>
                             <td>
-                                <button class="btn btn-sm btn-primary execute-btn" 
+                                <button class="btn btn-sm btn-outline-primary execute-btn" 
                                     data-type="triangle" 
-                                    data-id="${opportunityId}">
-                                    执行
+                                    data-id="${opportunityId}"
+                                    title="三角套利暂未完全实现">
+                                    监控
                                 </button>
                             </td>
                         </tr>
@@ -664,7 +768,23 @@
             $(".execute-btn").click(function() {
                 const type = $(this).data("type");
                 const id = $(this).data("id");
-                executeArbitrage(type, id);
+                
+                // 🔥 新增：如果是跨所套利，显示详情模态框
+                if (type === "cross_exchange") {
+                    // 找到对应的套利机会数据
+                    const opportunity = crossOpportunities.find(opp => 
+                        `${opp.buy_exchange}_${opp.sell_exchange}_${opp.symbol}` === id
+                    );
+                    
+                    if (opportunity) {
+                        showArbitrageDetail(opportunity);
+                    } else {
+                        executeArbitrage(type, id);
+                    }
+                } else {
+                    // 三角套利直接执行（暂未完全实现）
+                    executeArbitrage(type, id);
+                }
             });
         }
         
@@ -897,6 +1017,54 @@
             });
         }
         
+        // 🔥 新增：显示套利详情模态框
+        function showArbitrageDetail(opportunity) {
+            // 填充详情数据
+            $("#detail-title").text(`${opportunity.symbol} 跨所套利机会`);
+            $("#detail-symbol").text(opportunity.symbol || "-");
+            $("#detail-buy-exchange").html(`<span class="badge bg-info">${opportunity.buy_exchange || "-"}</span>`);
+            $("#detail-sell-exchange").html(`<span class="badge bg-success">${opportunity.sell_exchange || "-"}</span>`);
+            $("#detail-buy-price").text(`${opportunity.buy_price || 0} USDT`);
+            $("#detail-sell-price").text(`${opportunity.sell_price || 0} USDT`);
+            
+            // 收益信息
+            $("#detail-gross-profit").html(`<span class="text-success">${(opportunity.gross_profit_pct || 0).toFixed(3)}%</span>`);
+            $("#detail-net-profit").html(`<span class="text-success"><strong>${(opportunity.net_profit_pct || 0).toFixed(3)}%</strong></span>`);
+            $("#detail-profit-potential").html(`<span class="text-success"><strong>${(opportunity.profit_potential || 0).toFixed(2)} USDT</strong></span>`);
+            $("#detail-trading-fee").text(`${(opportunity.trading_fee_pct || 0).toFixed(1)}%`);
+            $("#detail-slippage").text(`${(opportunity.estimated_slippage || 0).toFixed(3)}%`);
+            
+            // 时间信息
+            $("#detail-discovery-time").text(opportunity.discovery_time || "-");
+            $("#detail-last-update").text(opportunity.last_update || "-");
+            $("#detail-expiry-time").text(opportunity.expiry_time || "-");
+            
+            const timeRemaining = opportunity.time_remaining || 0;
+            const timeText = timeRemaining > 0 ? `${Math.floor(timeRemaining / 60)}分${timeRemaining % 60}秒` : "已过期";
+            const timeClass = timeRemaining < 120 ? "text-danger" : "text-success";
+            $("#detail-time-remaining").html(`<span class="${timeClass}"><strong>${timeText}</strong></span>`);
+            
+            // 风险和流动性
+            const riskLevel = opportunity.risk_level || "未知";
+            const riskClass = riskLevel === "low" ? "text-success" : riskLevel === "medium" ? "text-warning" : "text-danger";
+            $("#detail-risk-level").html(`<span class="badge ${riskClass === 'text-success' ? 'bg-success' : riskClass === 'text-warning' ? 'bg-warning' : 'bg-danger'}">${riskLevel}</span>`);
+            
+            $("#detail-liquidity-score").html(`<strong>${opportunity.liquidity_score || 0}</strong>/10`);
+            $("#detail-min-amount").text(`${opportunity.min_trade_amount || 0} USDT`);
+            $("#detail-max-amount").text(`${opportunity.max_trade_amount || 0} USDT`);
+            $("#detail-order-depth").text(`${(opportunity.order_book_depth || 0).toLocaleString()} USDT`);
+            
+            // 绑定执行按钮事件
+            $("#execute-arbitrage-btn").off("click").on("click", function() {
+                const opportunityId = `${opportunity.buy_exchange}_${opportunity.sell_exchange}_${opportunity.symbol}`;
+                executeArbitrage("cross_exchange", opportunityId);
+                $("#arbitrage-detail-modal").modal("hide");
+            });
+            
+            // 显示模态框
+            $("#arbitrage-detail-modal").modal("show");
+        }
+        
         // 执行套利
         function executeArbitrage(type, opportunityId) {
             const data = {
@@ -911,11 +1079,14 @@
                 data: JSON.stringify(data),
                 success: function(response) {
                     if (response.status === "success") {
-                        addLog("套利", `${getTypeName(type)}套利执行已提交`);
+                        addLog("套利", `${getTypeName(type)}套利执行已提交，任务ID: ${response.data?.task_id || "未知"}`);
                         setTimeout(refreshData, 2000);
                     } else {
                         addLog("错误", `执行套利失败: ${response.message}`);
                     }
+                },
+                error: function(xhr, status, error) {
+                    addLog("错误", `执行套利失败: ${error}`);
                 }
             });
         }
