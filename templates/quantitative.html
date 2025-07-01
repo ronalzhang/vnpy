@@ -873,7 +873,9 @@
             
             container.innerHTML = '';
             
-            strategies.slice(0, 21).forEach(strategy => {
+            // 🔧 修复：移除硬编码的21个限制，使用完整的策略列表
+            // strategies.slice(0, 21).forEach(strategy => {
+            strategies.forEach(strategy => {
                 // 修复代数显示 - 使用正确的字段名
                 const generation = strategy.generation || 1;
                 const evolutionCount = strategy.evolution_count || 0;
@@ -920,8 +922,8 @@
                 container.innerHTML += strategyCard;
             });
             
-            // 同时加载底部四个模块的数据
-            loadBottomModulesData();
+            // 🔧 修复：移除重复的底部模块加载调用
+            // loadBottomModulesData();
         }
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -1849,16 +1851,29 @@
                 if (data.success || data.status === 'success') {
                     showSaveMessage('策略管理配置保存成功！', 'success');
                     
-                    // 关闭模态框
+                    // 🔧 修复：保存成功后不自动关闭页面，让用户手动关闭
+                    // setTimeout(() => {
+                    //     const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
+                    //     if (modal) modal.hide();
+                    //     
+                    //     // 🔧 修复：重新加载策略以应用新配置
+                    //     setTimeout(() => {
+                    //         forceLoadStrategies();
+                    //     }, 500);
+                    // }, 1500);
+                    
+                    // 🔧 新逻辑：立即重新加载策略以应用新配置，但保持配置页面开启
+                    console.log('🔄 配置保存成功，立即应用新配置...');
+                    
+                    // 延迟重新加载策略，确保后端配置已更新
                     setTimeout(() => {
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
-                        if (modal) modal.hide();
+                        forceLoadStrategies();
+                        console.log('✅ 策略列表已重新加载，新配置已生效');
                         
-                        // 🔧 修复：重新加载策略以应用新配置
-                        setTimeout(() => {
-                            forceLoadStrategies();
-                        }, 500);
-                    }, 1500);
+                        // 显示配置生效提示
+                        showSaveMessage('配置已生效，策略列表已更新！', 'success');
+                    }, 1000);
+                    
                 } else {
                     throw new Error(data.message || '保存失败');
                 }
@@ -2055,35 +2070,87 @@
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15) !important;
         }
         
-        /* 🎨 渐变色标题美化 */
+        /* 🎨 渐变色标题美化 - 修复可读性 */
         .bg-gradient-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+            color: white !important;
         }
         
         .bg-gradient-success {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important;
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+            color: white !important;
         }
         
         .bg-gradient-info {
-            background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%) !important;
+            background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%) !important;
+            color: white !important;
         }
         
         .bg-gradient-warning {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+            background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%) !important;
+            color: white !important;
         }
         
-        /* 📊 策略卡片样式增强 */
+        /* 📊 策略卡片样式增强 - 提高对比度 */
         .strategy-card {
             background: white !important;
             border-radius: 12px !important;
-            border: 1px solid rgba(0, 0, 0, 0.08) !important;
+            border: 2px solid rgba(79, 70, 229, 0.1) !important;
             transition: all 0.3s ease;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
         }
         
         .strategy-card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.15) !important;
+            border-color: rgba(79, 70, 229, 0.3) !important;
+        }
+        
+        /* 🎯 里程碑卡片文字优化 */
+        .milestone-value {
+            color: #1f2937 !important;
+            font-weight: 700 !important;
+            font-size: 1.1rem !important;
+        }
+        
+        .milestone-label {
+            color: #6b7280 !important;
+            font-weight: 500 !important;
+        }
+        
+        /* 📋 信号和持仓卡片内容优化 */
+        .signal-item, .position-item {
+            background: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #1f2937 !important;
+        }
+        
+        .signal-item .badge, .position-item .badge {
+            font-weight: 600 !important;
+        }
+        
+        /* 🌟 加载状态文字优化 */
+        .loading-content {
+            color: #4b5563 !important;
+        }
+        
+        .text-muted {
+            color: #6b7280 !important;
+        }
+        
+        /* 📊 数据行文字优化 */
+        .data-row {
+            color: #374151 !important;
+        }
+        
+        .data-row .text-success {
+            color: #059669 !important;
+            font-weight: 600 !important;
+        }
+        
+        .data-row .text-danger {
+            color: #dc2626 !important;
+            font-weight: 600 !important;
         }
         
         /* 🔄 加载动画优化 */
@@ -2145,30 +2212,6 @@
             border-radius: 12px !important;
             font-weight: 500;
             backdrop-filter: blur(10px);
-        }
-        
-        /* 💎 里程碑卡片美化 */
-        .milestone-card {
-            transition: all 0.3s ease;
-        }
-        
-        .milestone-card:hover {
-            transform: scale(1.05);
-        }
-        
-        /* 🌟 加载状态美化 */
-        .spinner-border {
-            border-width: 3px !important;
-        }
-        
-        /* 📋 进化日志卡片美化 */
-        .log-entry {
-            border-radius: 10px !important;
-            transition: all 0.3s ease;
-        }
-        
-        .log-entry:hover {
-            background: rgba(102, 126, 234, 0.05) !important;
         }
     </style>
 </body>

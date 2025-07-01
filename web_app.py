@@ -1327,6 +1327,23 @@ def quantitative_strategies():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
+                # 🔧 修复：读取配置的display_strategies_count
+                cursor.execute("""
+                    SELECT config_value FROM four_tier_evolution_config 
+                    WHERE config_key = 'display_strategies_count'
+                """)
+                config_result = cursor.fetchone()
+                
+                if config_result:
+                    try:
+                        configured_limit = int(config_result[0])
+                        limit = configured_limit
+                        print(f"🔧 使用配置的策略显示数量: {limit}")
+                    except (ValueError, TypeError):
+                        print(f"⚠️ 配置值无效，使用默认值: {limit}")
+                else:
+                    print(f"⚠️ 未找到display_strategies_count配置，使用默认值: {limit}")
+                
                 # 🔥 修复查询逻辑：使用正确的查询条件
                 simple_query = f"""
                     SELECT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
