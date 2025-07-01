@@ -295,8 +295,8 @@
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-light btn-sm text-dark" onclick="toggleBalanceChart('7')" style="font-size: 0.75rem;">7天</button>
                             <button class="btn btn-warning btn-sm active" onclick="toggleBalanceChart('30')" style="font-size: 0.75rem;">30天</button>
-                        </div>
                     </div>
+                        </div>
                     <div class="card-body p-3">
                         <div class="balance-chart-container" style="height: 140px; position: relative;">
                             <canvas id="balanceChart2" style="display: none;"></canvas>
@@ -304,12 +304,12 @@
                                 <div class="loading-content text-center">
                                     <div class="spinner-border text-success mb-2" role="status">
                                         <span class="visually-hidden">Loading...</span>
-                                    </div>
+                    </div>
                                     <p class="text-muted small mb-0">正在加载资产数据...</p>
-                                </div>
-                            </div>
-                        </div>
-                        
+                </div>
+            </div>
+        </div>
+        
                         <!-- 里程碑展示 - 优化布局 -->
                         <div class="milestones-container mt-3">
                             <div class="row g-1 text-center">
@@ -317,8 +317,8 @@
                                     <div class="milestone-card p-2 rounded bg-light">
                                         <div class="milestone-value text-success fw-bold small">10U</div>
                                         <div class="milestone-label text-muted" style="font-size: 0.7rem;">起始</div>
-                                    </div>
-                                </div>
+                    </div>
+                        </div>
                                 <div class="col-4">
                                     <div class="milestone-card p-2 rounded bg-warning bg-opacity-25">
                                         <div class="milestone-value text-warning fw-bold small" id="currentBalance2">12.3U</div>
@@ -344,7 +344,7 @@
                         <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-signal me-2"></i> 最新信号
                         </h6>
-                    </div>
+                        </div>
                     <div class="card-body p-3">
                         <div class="signals-container" style="height: 220px;">
                             <div class="signals-list h-100" style="overflow-y: auto;">
@@ -352,15 +352,15 @@
                                     <div class="loading-content text-center h-100 d-flex flex-column justify-content-center">
                                         <div class="spinner-border text-info mb-3" role="status">
                                             <span class="visually-hidden">Loading...</span>
-                                        </div>
+                    </div>
                                         <p class="text-muted small mb-0">正在加载交易信号...</p>
+                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                                    </div>
+                                </div>
+                                    </div>
+                                </div>
             
             <!-- 持仓管理 -->
             <div class="col-xl-3 col-lg-6 col-md-6">
@@ -369,7 +369,7 @@
                         <h6 class="mb-0 d-flex align-items-center fw-bold">
                             <i class="fas fa-wallet me-2"></i> 持仓管理
                         </h6>
-                    </div>
+                            </div>
                     <div class="card-body p-3">
                         <div class="positions-container" style="height: 220px;">
                             <div class="positions-list h-100" style="overflow-y: auto;">
@@ -930,6 +930,11 @@
             // 立即强制加载数据
             forceLoadStrategies();
             
+            // 🔧 修复：同时加载底部模块数据
+            setTimeout(() => {
+                loadBottomModulesData();
+            }, 1500);
+            
             // 创建量化系统实例（如果存在）
             if (typeof QuantitativeSystem !== 'undefined') {
                 quantitativeSystem = new QuantitativeSystem();
@@ -1054,7 +1059,7 @@
                     <div class="text-center text-muted py-3">
                         <i class="fas fa-cog me-2"></i>
                         暂无可配置参数
-                    </div>
+                </div>
                 `;
                 return;
             }
@@ -1062,7 +1067,7 @@
             const parametersHtml = Object.entries(parameters).map(([key, value]) => {
                 return `
                     <div class="row mb-3">
-                        <div class="col-md-6">
+                    <div class="col-md-6">
                             <label for="param_${key}" class="form-label">${key}</label>
                             <input type="number" 
                                    class="form-control" 
@@ -1073,7 +1078,7 @@
                         </div>
                         <div class="col-md-6 d-flex align-items-end">
                             <small class="text-muted">当前值: ${value}</small>
-                        </div>
+                    </div>
                     </div>
                 `;
             }).join('');
@@ -1174,12 +1179,12 @@
                                 <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all-logs" type="button" role="tab">
                                     全部日志 (${logsByType.all.length})
                                 </button>
-                            </li>
+                                </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="evolution-tab" data-bs-toggle="tab" data-bs-target="#evolution-logs" type="button" role="tab">
                                     进化日志 (${logsByType.evolution.length})
                                 </button>
-                            </li>
+                                </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="validation-tab" data-bs-toggle="tab" data-bs-target="#validation-logs" type="button" role="tab">
                                     验证交易 (${logsByType.validation.length})
@@ -1189,8 +1194,8 @@
                                 <button class="nav-link" id="real-tab" data-bs-toggle="tab" data-bs-target="#real-logs" type="button" role="tab">
                                     真实交易 (${logsByType.real_trading.length})
                                 </button>
-                            </li>
-                        </ul>
+                                </li>
+                            </ul>
                     </div>
                 </div>
                 
@@ -1215,8 +1220,8 @@
                         <div class="text-center text-muted py-5">
                             <i class="fas fa-inbox fa-3x mb-3 opacity-50"></i>
                             <p>暂无${getLogTypeName(type)}记录</p>
-                        </div>
-                    </div>
+                </div>
+                </div>
                 `;
             }
             
@@ -1231,7 +1236,7 @@
                             <div class="d-flex align-items-center">
                                 <span class="badge ${logTypeClass} me-2">${logTypeName}</span>
                                 <small class="text-primary fw-bold">#${String(index + 1).padStart(3, '0')}</small>
-                            </div>
+                </div>
                             <small class="text-muted">
                                 <i class="fas fa-clock me-1"></i>${logTime}
                             </small>
@@ -1307,7 +1312,7 @@
             
             // 显示日志模态框
             const modal = new bootstrap.Modal(document.getElementById('logsModal'));
-            modal.show();
+                modal.show();
             
             // 立即加载所有日志数据
             loadAllLogsData();
@@ -1452,6 +1457,12 @@
             // 显示策略管理配置模态框
             const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
             modal.show();
+            
+            // 🔧 启用自动保存功能
+            setTimeout(() => {
+                enableAutoSave();
+                console.log('✅ 策略管理配置自动保存已启用');
+            }, 500);
         }
         
         function toggleSystem() {
@@ -1730,7 +1741,7 @@
                     if (element) {
                         if (element.type === 'checkbox') {
                             element.checked = value === 'true';
-                        } else {
+                    } else {
                             element.value = value;
                         }
                     }
@@ -1740,8 +1751,16 @@
             }
         }
         
-        // 保存策略管理配置
+        // 保存策略管理配置 - 优化提示和自动保存
         function saveManagementConfig() {
+            // 显示保存中提示
+            const saveBtn = event?.target;
+            const originalText = saveBtn?.innerHTML;
+            if (saveBtn) {
+                saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>保存中...';
+                saveBtn.disabled = true;
+            }
+            
             const formData = {};
             
             // 收集配置表单数据
@@ -1758,26 +1777,127 @@
             
             console.log('保存管理配置:', formData);
             
+            // 显示保存提示
+            showSaveMessage('正在保存配置...', 'info');
+            
+            // 🔧 修复：更新API数据格式以匹配后端要求
+            const requestData = {
+                config: formData,  // 传统配置
+                four_tier_config: {}  // 四层进化配置
+            };
+            
+            // 将四层相关配置分类到four_tier_config
+            const fourTierKeys = [
+                'high_freq_pool_size', 'display_strategies_count', 'real_trading_count',
+                'low_freq_interval_hours', 'high_freq_interval_minutes', 'display_interval_minutes',
+                'validation_amount', 'real_trading_amount', 'real_trading_score_threshold',
+                'real_trading_enabled', 'min_simulation_days', 'min_sim_win_rate', 'min_sim_total_pnl'
+            ];
+            
+            fourTierKeys.forEach(key => {
+                if (formData[key] !== undefined) {
+                    requestData.four_tier_config[key] = formData[key];
+                    delete requestData.config[key];  // 从传统配置中移除
+                }
+            });
+            
+            console.log('🔧 配置数据格式:', requestData);
+            
             fetch('/api/quantitative/management-config', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(requestData)
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.status === 'success') {
-                    alert('策略管理配置保存成功！');
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
-                    if (modal) modal.hide();
+                    showSaveMessage('策略管理配置保存成功！', 'success');
+                    
+                    // 关闭模态框
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('strategyManagementModal'));
+                        if (modal) modal.hide();
+                        
+                        // 🔧 修复：重新加载策略以应用新配置
+                        setTimeout(() => {
+                            forceLoadStrategies();
+                        }, 500);
+                    }, 1500);
                 } else {
                     throw new Error(data.message || '保存失败');
                 }
             })
             .catch(error => {
                 console.error('保存管理配置失败:', error);
-                alert(`保存失败: ${error.message}`);
+                showSaveMessage(`保存失败: ${error.message}`, 'error');
+            })
+            .finally(() => {
+                // 恢复按钮状态
+                if (saveBtn && originalText) {
+                    setTimeout(() => {
+                        saveBtn.innerHTML = originalText;
+                        saveBtn.disabled = false;
+                    }, 1000);
+                }
+            });
+        }
+        
+        // 显示保存消息提示
+        function showSaveMessage(message, type = 'info') {
+            // 移除现有提示
+            const existingAlert = document.querySelector('.save-message-alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            const alertClass = {
+                'success': 'alert-success',
+                'error': 'alert-danger',
+                'info': 'alert-info',
+                'warning': 'alert-warning'
+            }[type] || 'alert-info';
+            
+            const icon = {
+                'success': 'fas fa-check-circle',
+                'error': 'fas fa-exclamation-triangle', 
+                'info': 'fas fa-info-circle',
+                'warning': 'fas fa-exclamation-circle'
+            }[type] || 'fas fa-info-circle';
+            
+            const alertHtml = `
+                <div class="alert ${alertClass} alert-dismissible fade show save-message-alert" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                    <i class="${icon} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', alertHtml);
+            
+            // 自动消失
+            setTimeout(() => {
+                const alert = document.querySelector('.save-message-alert');
+                if (alert) {
+                    alert.classList.remove('show');
+                    setTimeout(() => alert.remove(), 300);
+                }
+            }, 3000);
+        }
+        
+        // 🔧 增加自动保存功能
+        function enableAutoSave() {
+            const inputs = document.querySelectorAll('#strategyManagementForm input, #strategyManagementForm select');
+            inputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    console.log('配置项发生变化，准备自动保存...');
+                    // 延迟自动保存，避免频繁请求
+                    clearTimeout(window.autoSaveTimer);
+                    window.autoSaveTimer = setTimeout(() => {
+                        saveManagementConfig();
+                    }, 1000);
+                });
             });
         }
         
@@ -1806,5 +1926,155 @@
         window.saveManagementConfig = saveManagementConfig;
         window.resetManagementConfig = resetManagementConfig;
     </script>
+
+    <!-- 🎨 页面美化样式增强 -->
+    <style>
+        /* 🌈 整体背景美化 */
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        
+        /* 📦 容器美化 */
+        .container-fluid {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 🎯 卡片增强效果 */
+        .card {
+            border: none !important;
+            border-radius: 15px !important;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1) !important;
+            transition: all 0.3s ease !important;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px) !important;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15) !important;
+        }
+        
+        /* 🎨 渐变色标题美化 */
+        .bg-gradient-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        }
+        
+        .bg-gradient-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important;
+        }
+        
+        .bg-gradient-info {
+            background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%) !important;
+        }
+        
+        .bg-gradient-warning {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+        }
+        
+        /* 📊 策略卡片样式增强 */
+        .strategy-card {
+            background: white !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(0, 0, 0, 0.08) !important;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
+        }
+        
+        .strategy-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
+        }
+        
+        /* 🔄 加载动画优化 */
+        .loading-content {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* 🎯 按钮样式增强 */
+        .btn {
+            border-radius: 8px !important;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        /* 📈 状态徽章美化 */
+        .badge {
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+            padding: 0.4rem 0.8rem !important;
+            border-radius: 20px !important;
+        }
+        
+        /* 🎨 模态框美化 */
+        .modal-content {
+            border: none !important;
+            border-radius: 15px !important;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+            border-radius: 15px 15px 0 0 !important;
+        }
+        
+        /* 📊 配置表单样式 */
+        .form-control, .form-select {
+            border-radius: 8px !important;
+            border: 1px solid rgba(0, 0, 0, 0.1) !important;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+        }
+        
+        /* 🌈 成功提示美化 */
+        .save-message-alert {
+            border: none !important;
+            border-radius: 12px !important;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* 💎 里程碑卡片美化 */
+        .milestone-card {
+            transition: all 0.3s ease;
+        }
+        
+        .milestone-card:hover {
+            transform: scale(1.05);
+        }
+        
+        /* 🌟 加载状态美化 */
+        .spinner-border {
+            border-width: 3px !important;
+        }
+        
+        /* 📋 进化日志卡片美化 */
+        .log-entry {
+            border-radius: 10px !important;
+            transition: all 0.3s ease;
+        }
+        
+        .log-entry:hover {
+            background: rgba(102, 126, 234, 0.05) !important;
+        }
+    </style>
 </body>
 </html> 
