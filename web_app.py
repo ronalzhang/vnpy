@@ -1327,13 +1327,13 @@ def quantitative_strategies():
                 conn = get_db_connection()
                 cursor = conn.cursor()
                 
-                # 🔥 修复查询逻辑：简化查询，确保返回策略数据
+                # 🔥 修复查询逻辑：使用正确的查询条件
                 simple_query = f"""
                     SELECT s.id, s.name, s.symbol, s.type, s.enabled, s.final_score,
-                           s.generation, s.cycle, s.parameters
+                           s.generation, s.cycle, s.parameters, s.evolution_count
                     FROM strategies s
-                    WHERE s.enabled = 1 AND s.id LIKE 'STRAT_%'
-                    ORDER BY s.final_score DESC, s.id
+                    WHERE s.final_score IS NOT NULL AND s.final_score > 0
+                    ORDER BY s.final_score DESC NULLS LAST, s.generation DESC, s.id
                     LIMIT {limit}
                 """
                 
@@ -1345,7 +1345,7 @@ def quantitative_strategies():
                 strategies = []
                 for row in rows:
                     try:
-                        sid, name, symbol, stype, enabled, score, generation, cycle, parameters = row
+                        sid, name, symbol, stype, enabled, score, generation, cycle, parameters, evolution_count = row
                         
                         # 🔥 计算真实的win_rate和total_return
                         cursor.execute("""
@@ -1391,7 +1391,8 @@ def quantitative_strategies():
                             'total_return': round(total_return_percentage, 2),
                             'generation': generation or 1,
                             'cycle': cycle or 1,
-                            'evolution_display': f"第{generation or 1}代第{cycle or 1}轮",
+                            'evolution_count': evolution_count or 0,
+                            'evolution_display': f"第{generation or 1}代第{evolution_count or 0}轮",
                             'trade_mode': '真实交易' if float(score or 0) >= 65 else '验证交易',
                             'created_at': '',
                             'daily_return': round(total_return_percentage / 30, 6) if total_return_percentage else 0.0,
