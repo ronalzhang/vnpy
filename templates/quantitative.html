@@ -15,53 +15,48 @@
     <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
 </head>
 <body>
+    <!-- 重新设计的导航栏 -->
     <header>
-        <nav class="navbar navbar-expand-lg" style="background: linear-gradient(135deg, #1677ff, #4096ff);">
-            <div class="container-fluid">
-                <div class="navbar-content">
+        <nav class="navbar navbar-expand-lg">
+            <div class="container-fluid px-4">
+                <div class="navbar-content w-100 d-flex justify-content-between align-items-center">
                     <!-- 左侧：品牌名和系统状态 -->
-                    <div class="navbar-left">
-                        <div class="navbar-brand-group">
-                            <a class="navbar-brand" href="/">
-                                <i class="fas fa-chart-line"></i>
-                                校长的量化系统
-                            </a>
-                            <div class="system-status">
-                                                        <span class="status-dot offline" id="system-status-indicator"></span>
-                                <span id="system-status-text">离线</span>
-                                <span id="current-time">2025/6/4 05:05:27</span>
-                            </div>
+                    <div class="navbar-left d-flex align-items-center">
+                        <a class="navbar-brand me-4" href="/">
+                            <i class="fas fa-chart-line me-2"></i>
+                            校长的量化系统
+                        </a>
+                        <div class="system-status d-flex align-items-center">
+                            <span class="status-dot offline" id="system-status-indicator"></span>
+                            <span id="system-status-text" class="me-3">离线</span>
+                            <small id="current-time" class="text-white-50">2025/7/1 09:05:27</small>
                         </div>
                     </div>
                     
                     <!-- 右侧：导航菜单 -->
-                    <ul class="navbar-nav">
-                        <li class="nav-item">
+                    <ul class="navbar-nav d-flex flex-row">
+                        <li class="nav-item me-3">
                             <a class="nav-link" href="/">
-                                <i class="fas fa-home"></i>
-                                <span class="nav-link-desktop-text">市场数据</span>
-                                <span class="nav-link-mobile-text">市场</span>
+                                <i class="fas fa-home me-1"></i>
+                                <span class="d-none d-md-inline">市场数据</span>
                             </a>
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item me-3">
                             <a class="nav-link active" href="/quantitative.html">
-                                <i class="fas fa-robot"></i>
-                                <span class="nav-link-desktop-text">量化交易</span>
-                                <span class="nav-link-mobile-text">量化</span>
+                                <i class="fas fa-robot me-1"></i>
+                                <span class="d-none d-md-inline">量化交易</span>
                             </a>
                         </li>
-                        <li class="nav-item">
+                        <li class="nav-item me-3">
                             <a class="nav-link" href="/arbitrage.html">
-                                <i class="fas fa-exchange-alt"></i>
-                                <span class="nav-link-desktop-text">套利系统</span>
-                                <span class="nav-link-mobile-text">套利</span>
+                                <i class="fas fa-exchange-alt me-1"></i>
+                                <span class="d-none d-md-inline">套利系统</span>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/operations-log.html">
-                                <i class="fas fa-list-alt"></i>
-                                <span class="nav-link-desktop-text">操作日志</span>
-                                <span class="nav-link-mobile-text">日志</span>
+                                <i class="fas fa-list-alt me-1"></i>
+                                <span class="d-none d-md-inline">日志</span>
                             </a>
                         </li>
                     </ul>
@@ -70,26 +65,28 @@
         </nav>
     </header>
 
-    <div class="container-fluid mt-4">
+    <!-- 主要内容区域 - 采用更紧凑的布局 -->
+    <div class="container-fluid px-4 py-3">
         
-        <!-- 优化后的策略进化滚动日志 -->
-        <div class="row mb-4">
+        <!-- 策略进化实时监控 - 优化为更紧凑的显示 -->
+        <div class="row mb-3">
             <div class="col-12">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0">
-                            <i class="fas fa-chart-line me-2"></i>策略进化实时监控
+                <div class="card border-0">
+                    <div class="card-header d-flex justify-content-between align-items-center py-3">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-chart-line me-2 text-primary"></i>
+                            策略进化实时监控
                         </h6>
                         <div class="d-flex align-items-center">
-                            <span class="badge bg-light text-primary me-2" id="evolutionLogCount">0 条记录</span>
-                            <button class="btn btn-sm btn-outline-light" onclick="showAllLogs()">
+                            <span class="badge me-2" id="evolutionLogCount">0 条记录</span>
+                            <button class="btn btn-sm btn-outline-primary" onclick="showAllLogs()">
                                 <i class="fas fa-list me-1"></i>查看全部
                             </button>
                         </div>
                     </div>
                     <div class="card-body p-0">
-                        <!-- 增强的滚动日志显示 -->
-                        <div class="evolution-ticker-container" style="height: 120px; overflow: hidden; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                        <!-- 进化日志滚动显示 -->
+                        <div class="evolution-ticker-container" style="height: 100px;">
                             <div class="evolution-ticker" id="evolutionTicker">
                                 <div class="ticker-item">
                                     <span class="text-muted">正在加载策略进化日志...</span>
@@ -101,51 +98,40 @@
             </div>
         </div>
         
-        <!-- 顶部控制面板 -->
-        <div class="row mb-4">
+        <!-- 核心控制面板 - 采用4列布局更紧凑 -->
+        <div class="row mb-3">
             <!-- 系统控制台 -->
-            <div class="col-md-4 mb-3">
+            <div class="col-xl-3 col-lg-6 mb-3">
                 <div class="card system-control-card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-cog"></i> 系统控制台
-                        </h5>
+                    <div class="card-body p-3">
+                        <h6 class="card-title mb-3 d-flex align-items-center">
+                            <i class="fas fa-cog me-2"></i> 系统控制
+                        </h6>
                         
-                        <!-- 系统状态 -->
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>系统状态</span>
-                                <span id="systemStatus">
-                                    <span class="status-dot offline"></span>
-                                    离线
-                                </span>
+                        <!-- 控制项目 -->
+                        <div class="control-items">
+                            <div class="control-item d-flex justify-content-between align-items-center mb-2">
+                                <div class="d-flex align-items-center">
+                                    <span class="status-dot offline me-2" id="systemStatusDot"></span>
+                                    <small>系统状态</small>
+                                </div>
+                                <span class="badge" id="systemStatusBadge">离线</span>
                             </div>
-                        </div>
-                        
-                        <!-- 系统启停控制 -->
-                        <div class="mb-3" data-system="quantitative">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>量化系统</span>
-                                <button id="systemToggle" class="btn-toggle" onclick="toggleSystem()">
-                                </button>
+                            
+                            <div class="control-item d-flex justify-content-between align-items-center mb-2">
+                                <small>量化系统</small>
+                                <button id="systemToggle" class="btn-toggle" onclick="toggleSystem()"></button>
                             </div>
-                        </div>
-                        
-                        <!-- 自动交易开关 -->
-                        <div class="mb-3" data-system="auto-trading">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>真实交易</span>
-                                <button id="autoTradingToggle" class="btn-toggle" onclick="toggleAutoTrading()">
-                                </button>
+                            
+                            <div class="control-item d-flex justify-content-between align-items-center mb-2">
+                                <small>真实交易</small>
+                                <button id="autoTradingToggle" class="btn-toggle" onclick="toggleAutoTrading()"></button>
                             </div>
-                        </div>
-                        
-                        <!-- 策略管理 -->
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>策略管理</span>
-                                <button class="btn btn-sm btn-outline-light" onclick="showStrategyManagement()">
-                                    <i class="fas fa-cogs"></i> 配置
+                            
+                            <div class="control-item d-flex justify-content-between align-items-center">
+                                <small>策略管理</small>
+                                <button class="btn btn-sm btn-outline-primary" onclick="showStrategyManagement()">
+                                    <i class="fas fa-cogs"></i>
                                 </button>
                             </div>
                         </div>
@@ -154,34 +140,29 @@
             </div>
             
             <!-- 账户总览 -->
-            <div class="col-md-4 mb-3">
+            <div class="col-xl-3 col-lg-6 mb-3">
                 <div class="card account-card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-wallet"></i> 账户总览
-                        </h5>
+                    <div class="card-body p-3">
+                        <h6 class="card-title mb-3 d-flex align-items-center">
+                            <i class="fas fa-wallet me-2"></i> 账户总览
+                        </h6>
                         
-                        <div class="row text-center">
-                            <div class="col-6">
-                                <div class="metric-value" id="totalBalance">-</div>
-                                <div class="metric-label">总资产</div>
+                        <div class="account-metrics">
+                            <div class="metric-row d-flex justify-content-between mb-2">
+                                <small class="text-muted">总资产</small>
+                                <span class="fw-bold" id="totalBalance">-</span>
                             </div>
-                            <div class="col-6">
-                                <div class="metric-value text-success" id="dailyPnl">-</div>
-                                <div class="metric-label">今日盈亏</div>
+                            <div class="metric-row d-flex justify-content-between mb-2">
+                                <small class="text-muted">今日盈亏</small>
+                                <span class="fw-bold text-success" id="dailyPnl">-</span>
                             </div>
-                        </div>
-                        
-                        <hr style="border-color: rgba(255,255,255,0.3);">
-                        
-                        <div class="row text-center">
-                            <div class="col-6">
-                                <div class="metric-value" id="dailyReturn">-</div>
-                                <div class="metric-label">今日收益率</div>
+                            <div class="metric-row d-flex justify-content-between mb-2">
+                                <small class="text-muted">今日收益率</small>
+                                <span class="fw-bold" id="dailyReturn">-</span>
                             </div>
-                            <div class="col-6">
-                                <div class="metric-value" id="dailyTrades">-</div>
-                                <div class="metric-label">今日交易</div>
+                            <div class="metric-row d-flex justify-content-between">
+                                <small class="text-muted">今日交易</small>
+                                <span class="fw-bold" id="dailyTrades">-</span>
                             </div>
                         </div>
                     </div>
@@ -189,72 +170,58 @@
             </div>
             
             <!-- 交易所状态 -->
-            <div class="col-md-4 mb-3">
+            <div class="col-xl-3 col-lg-6 mb-3">
                 <div class="card exchange-card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="fas fa-link"></i> 交易所状态
-                        </h5>
+                    <div class="card-body p-3">
+                        <h6 class="card-title mb-3 d-flex align-items-center">
+                            <i class="fas fa-link me-2"></i> 交易所状态
+                        </h6>
                         
                         <div id="exchangeStatus">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span>
-                                    <span class="status-dot online"></span>
-                                    币安 (Binance)
-                                </span>
-                                <small>25ms</small>
+                            <div class="exchange-item d-flex justify-content-between align-items-center mb-2">
+                                <div class="d-flex align-items-center">
+                                    <span class="status-dot online me-2"></span>
+                                    <small>币安</small>
+                                </div>
+                                <small class="text-success">25ms</small>
                             </div>
-                            
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span>API权限</span>
-                                <span class="badge bg-success">现货交易</span>
+                            <div class="exchange-item d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-muted">API权限</small>
+                                <span class="badge bg-success">现货</span>
                             </div>
-                            
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>最后更新</span>
+                            <div class="exchange-item d-flex justify-content-between align-items-center">
+                                <small class="text-muted">最后更新</small>
                                 <small id="lastUpdate">刚刚</small>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- 策略管理 -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">
-                            <i class="fas fa-brain"></i> 量化策略管理
-                        </h5>
-                        <div class="d-flex align-items-center">
-                            <!-- 策略进化滚动日志 -->
-                            <div class="evolution-log-container me-3">
-                                <div class="evolution-log-header">
-                                    <i class="fas fa-chart-line text-primary me-1"></i>
-                                    <small class="text-muted">策略进化日志</small>
-                                </div>
-                                <div class="evolution-log-content" id="strategyManagementEvolutionLog">
-                                    <div class="evolution-log-ticker" id="strategyManagementEvolutionTicker">
-                                        <!-- 滚动日志内容将通过JavaScript动态加载 -->
-                                    </div>
-                                </div>
+            
+            <!-- 性能监控 -->
+            <div class="col-xl-3 col-lg-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body p-3">
+                        <h6 class="card-title mb-3 d-flex align-items-center">
+                            <i class="fas fa-tachometer-alt me-2"></i> 性能监控
+                        </h6>
+                        
+                        <div class="performance-metrics">
+                            <div class="metric-row d-flex justify-content-between mb-2">
+                                <small class="text-muted">活跃策略</small>
+                                <span class="fw-bold text-primary" id="activeStrategies">-</span>
                             </div>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-outline-info btn-sm" onclick="showAllLogs()" title="查看全部日志">
-                                    <i class="fas fa-list"></i>
-                                </button>
+                            <div class="metric-row d-flex justify-content-between mb-2">
+                                <small class="text-muted">胜率</small>
+                                <span class="fw-bold text-success" id="winRate">-</span>
                             </div>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="row" id="strategiesContainer">
-                            <!-- 策略卡片将通过JavaScript动态生成 -->
-                            <div class="col-12">
-                                <div class="alert alert-warning" id="jsTestStatus">
-                                    🔧 正在测试JavaScript执行...
-                                </div>
+                            <div class="metric-row d-flex justify-content-between mb-2">
+                                <small class="text-muted">最大回撤</small>
+                                <span class="fw-bold text-warning" id="maxDrawdown">-</span>
+                            </div>
+                            <div class="metric-row d-flex justify-content-between">
+                                <small class="text-muted">夏普比率</small>
+                                <span class="fw-bold" id="sharpeRatio">-</span>
                             </div>
                         </div>
                     </div>
@@ -262,123 +229,107 @@
             </div>
         </div>
         
-        <!-- 实时监控 -->
-        <div class="row mb-4">
-            <!-- 持仓监控 -->
-            <div class="col-md-6 mb-3">
+        <!-- 策略管理和图表 - 采用更紧凑的布局 -->
+        <div class="row">
+            <!-- 策略管理 -->
+            <div class="col-lg-8 mb-3">
                 <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">
-                            <i class="fas fa-coins"></i> 当前持仓
+                    <div class="card-header d-flex justify-content-between align-items-center py-3">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-brain me-2"></i> 量化策略管理
                         </h6>
+                        <div class="d-flex align-items-center">
+                            <button class="btn btn-sm btn-outline-primary me-2" onclick="showAllLogs()">
+                                <i class="fas fa-list me-1"></i>日志
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="refreshStrategies()">
+                                <i class="fas fa-sync-alt me-1"></i>刷新
+                            </button>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>交易对</th>
-                                        <th>数量</th>
-                                        <th>均价</th>
-                                        <th>浮盈</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="positionsTable">
-                                    <tr>
-                                        <td colspan="4" class="text-center text-muted">暂无持仓</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div class="card-body p-3">
+                        <div class="row" id="strategiesContainer">
+                            <!-- 策略卡片将通过JavaScript动态生成 -->
+                            <div class="col-12">
+                                <div class="alert alert-info mb-0" id="jsTestStatus">
+                                    <i class="fas fa-spinner fa-spin me-2"></i>正在加载策略数据...
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- 交易信号 -->
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">
-                            <i class="fas fa-signal"></i> 最新信号
+            <!-- 实时图表和监控 -->
+            <div class="col-lg-4 mb-3">
+                <!-- 收益曲线 -->
+                <div class="card mb-3">
+                    <div class="card-header py-2">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-chart-line me-2"></i> 收益曲线
                         </h6>
                     </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>时间</th>
-                                        <th>交易对</th>
-                                        <th>信号</th>
-                                        <th>置信度</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="signalsTable">
-                                    <tr>
-                                        <td colspan="4" class="text-center text-muted">暂无信号</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 收益曲线图 -->
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">
-                            <i class="fas fa-chart-line"></i> 收益曲线
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="performance-chart">
+                    <div class="card-body p-2">
+                        <div class="performance-chart" style="height: 200px;">
                             <canvas id="performanceChart"></canvas>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0">
-                            <i class="fas fa-chart-area"></i> 资产增长历程
+                
+                <!-- 资产增长 -->
+                <div class="card mb-3">
+                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-chart-area me-2"></i> 资产增长
                         </h6>
-                        <div>
-                            <button class="btn btn-sm btn-outline-primary" onclick="toggleBalanceChart('30')">30天</button>
-                            <button class="btn btn-sm btn-outline-primary active" onclick="toggleBalanceChart('90')">90天</button>
-                            <button class="btn btn-sm btn-outline-primary" onclick="toggleBalanceChart('365')">1年</button>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary btn-sm" onclick="toggleBalanceChart('7')">7天</button>
+                            <button class="btn btn-outline-primary btn-sm active" onclick="toggleBalanceChart('30')">30天</button>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <div class="balance-chart">
+                    <div class="card-body p-2">
+                        <div class="balance-chart" style="height: 180px;">
                             <canvas id="balanceChart"></canvas>
                         </div>
                         
-                        <!-- 里程碑展示 -->
-                        <div class="milestones mt-3">
-                            <div class="row text-center">
+                        <!-- 里程碑展示 - 更紧凑 -->
+                        <div class="milestones mt-2">
+                            <div class="row g-2 text-center">
                                 <div class="col-4">
-                                    <div class="milestone-item">
-                                        <div class="milestone-value text-success">10U</div>
-                                        <div class="milestone-label">起始资金</div>
+                                    <div class="milestone-item p-2">
+                                        <div class="milestone-value text-success small">10U</div>
+                                        <div class="milestone-label">起始</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="milestone-item">
-                                        <div class="milestone-value text-warning" id="currentBalance">9.7U</div>
-                                        <div class="milestone-label">当前资产</div>
+                                    <div class="milestone-item p-2">
+                                        <div class="milestone-value text-warning small" id="currentBalance">9.7U</div>
+                                        <div class="milestone-label">当前</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
-                                    <div class="milestone-item">
-                                        <div class="milestone-value text-primary">100,000U</div>
-                                        <div class="milestone-label">目标资产</div>
+                                    <div class="milestone-item p-2">
+                                        <div class="milestone-value text-primary small">100K</div>
+                                        <div class="milestone-label">目标</div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 最新信号 -->
+                <div class="card">
+                    <div class="card-header py-2">
+                        <h6 class="mb-0 d-flex align-items-center">
+                            <i class="fas fa-signal me-2"></i> 最新信号
+                        </h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="signals-list" style="max-height: 200px; overflow-y: auto;">
+                            <div id="signalsContainer">
+                                <div class="text-center text-muted py-3">
+                                    <small>暂无交易信号</small>
                                 </div>
                             </div>
                         </div>
@@ -759,389 +710,65 @@
         </div>
     </div>
 
-    <!-- 移除重复的初始化逻辑，统一到DOM加载完成后处理 -->
-    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // 🔥 立即定义全局函数 - 确保所有onclick事件都能正确工作
-        window.toggleSystem = function() {
-            if (window.app) {
-                window.app.toggleSystem();
-            } else {
-                console.error('❌ app对象未初始化');
-            }
-        };
-        
-        window.toggleAutoTrading = function() {
-            if (window.app) {
-                window.app.toggleAutoTrading();
-            } else {
-                console.error('❌ app对象未初始化');
-            }
-        };
-        
-        window.refreshStrategies = function() {
-            if (window.app) {
-                window.app.loadStrategies();
-            } else {
-                console.error('❌ app对象未初始化');
-            }
-        };
-        
-        window.showStrategyManagement = function() {
-            if (window.app) {
-                window.app.loadManagementConfig();
-                const modal = new bootstrap.Modal(document.getElementById('strategyManagementModal'));
-                modal.show();
-            } else {
-                console.error('❌ app对象未初始化');
-            }
-        };
-        
-        // 🔥 全局函数：策略日志查看
-        window.showStrategyLogs = function(strategyId) {
-            if (window.app && typeof window.app.showStrategyLogs === 'function') {
-                window.app.showStrategyLogs(strategyId);
-            } else {
-                console.error('❌ app对象或showStrategyLogs方法未初始化', {
-                    hasApp: !!window.app,
-                    hasMethod: window.app ? typeof window.app.showStrategyLogs : 'no app',
-                    appMethods: window.app ? Object.getOwnPropertyNames(Object.getPrototypeOf(window.app)) : 'no app'
-                });
-            }
-        };
-        
-        // 🔥 全局函数：策略配置
-        window.showStrategyConfig = function(strategyId) {
-            if (window.app && typeof window.app.showStrategyConfig === 'function') {
-                window.app.showStrategyConfig(strategyId);
-            } else {
-                console.error('❌ app对象或showStrategyConfig方法未初始化');
-            }
-        };
-        
-        // 🔥 全局函数：余额图表切换
-        window.toggleBalanceChart = function(period) {
-            if (window.app && typeof window.app.toggleBalanceChart === 'function') {
-                window.app.toggleBalanceChart(period);
-            } else {
-                console.error('❌ app对象或toggleBalanceChart方法未初始化');
-            }
-        };
-        
-        window.showAllLogs = function() {
-            if (window.app && window.app.allEvolutionLogs) {
-                // 初始化分页变量
-                window.app.logsCurrentPage = 1;
-                window.app.logsPerPage = 20;
-                
-                // 创建全部日志模态框
-                const modalHtml = `
-                <div class="modal fade" id="allLogsModal" tabindex="-1">
-                <div class="modal-dialog modal-xl">
-                <div class="modal-content">
+    <!-- 日志查看弹窗 -->
+    <div class="modal fade" id="logsModal" tabindex="-1" aria-labelledby="logsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
                 <div class="modal-header">
-                <h5 class="modal-title">
-                <i class="fas fa-list me-2"></i>所有策略进化日志
-                <span class="badge bg-primary ms-2" id="logsTotal">共 ${window.app.allEvolutionLogs.length} 条</span>
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title" id="logsModalLabel">
+                        <i class="fas fa-list-alt"></i> 策略日志
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                <div class="table-responsive">
-                <table class="table table-hover">
-                <thead>
-                <tr><th style="width: 20%">时间</th><th style="width: 15%">操作</th><th style="width: 65%">详情</th></tr>
-                </thead>
-                <tbody id="allLogsTableBody"></tbody>
-                </table>
-                </div>
-                <!-- 分页控件 -->
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center">
-                            <span class="text-muted me-3" id="pageInfo">第1页，共1页</span>
-                            <span class="text-muted" id="recordInfo">显示第1-15条，共0条记录</span>
+                    <!-- 日志筛选 -->
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <select class="form-select" id="logTypeFilter">
+                                <option value="all">所有日志</option>
+                                <option value="evolution">进化日志</option>
+                                <option value="validation">验证交易</option>
+                                <option value="real_trading">真实交易</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="strategyFilter">
+                                <option value="">所有策略</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="date" class="form-control" id="dateFilter">
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary" onclick="applyLogFilters()">
+                                <i class="fas fa-search"></i> 筛选
+                            </button>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <nav>
-                            <ul class="pagination justify-content-end mb-0">
-                                <li class="page-item" id="prevPage">
-                                    <a class="page-link" href="#" onclick="changeLogsPage(window.app.logsCurrentPage - 1)">上一页</a>
-                                </li>
-                                <li class="page-item active" id="currentPageItem">
-                                    <span class="page-link" id="currentPageSpan">1</span>
-                                </li>
-                                <li class="page-item" id="nextPage">
-                                    <a class="page-link" href="#" onclick="changeLogsPage(window.app.logsCurrentPage + 1)">下一页</a>
-                                </li>
-                            </ul>
-                        </nav>
+                    
+                    <!-- 日志内容 -->
+                    <div id="logsContent">
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">正在加载日志...</p>
+                        </div>
                     </div>
                 </div>
-                </div>
                 <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" onclick="exportLogs()">
+                        <i class="fas fa-download"></i> 导出
+                    </button>
                 </div>
-                </div>
-                </div>
-                </div>`;
-                
-                // 删除已存在的模态框
-                const existingModal = document.getElementById('allLogsModal');
-                if (existingModal) existingModal.remove();
-                
-                // 添加新模态框并显示
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-                
-                // 渲染日志数据
-                renderLogsPage();
-                
-                const modal = new bootstrap.Modal(document.getElementById('allLogsModal'));
-                modal.show();
-            } else {
-                console.log('暂无日志数据');
-            }
-        };
-        
-        // 渲染日志分页数据
-        window.renderLogsPage = function() {
-            if (!window.app || !window.app.allEvolutionLogs) return;
-            
-            const tbody = document.getElementById('allLogsTableBody');
-            if (!tbody) return;
-            
-            // 修复排序：确保最新日志在前面
-            const allLogs = [...window.app.allEvolutionLogs].sort((a, b) => {
-                const timeA = new Date(a.timestamp || '1970-01-01').getTime();
-                const timeB = new Date(b.timestamp || '1970-01-01').getTime();
-                return timeB - timeA; // 降序排列，最新在前
-            });
-            
-            // 计算分页
-            const totalLogs = allLogs.length;
-            const totalPages = Math.ceil(totalLogs / window.app.logsPerPage);
-            const startIndex = (window.app.logsCurrentPage - 1) * window.app.logsPerPage;
-            const endIndex = Math.min(startIndex + window.app.logsPerPage, totalLogs);
-            const currentPageLogs = allLogs.slice(startIndex, endIndex);
-            
-            // 渲染表格数据
-            tbody.innerHTML = currentPageLogs.map(log => {
-                const time = new Date(log.timestamp).toLocaleString('zh-CN');
-                let actionClass = 'secondary';
-                let actionText = '变更';
-                
-                switch(log.action) {
-                    case 'created':
-                        actionClass = 'success';
-                        actionText = '新增';
-                        break;
-                    case 'eliminated':
-                        actionClass = 'danger';
-                        actionText = '淘汰';
-                        break;
-                    case 'optimized':
-                        actionClass = 'primary';
-                        actionText = '优化';
-                        break;
-                    case 'updated':
-                        actionClass = 'info';
-                        actionText = '更新';
-                        break;
-                    case 'promoted':
-                        actionClass = 'warning';
-                        actionText = '晋级';
-                        break;
-                    case 'protected':
-                        actionClass = 'info';
-                        actionText = '保护';
-                        break;
-                    case 'evolved':
-                        actionClass = 'primary';
-                        actionText = '进化';
-                        break;
-                }
-                
-                return `
-                    <tr>
-                        <td class="text-muted">${time}</td>
-                        <td><span class="badge bg-${actionClass}">${actionText}</span></td>
-                        <td>${log.details}</td>
-                    </tr>
-                `;
-            }).join('');
-            
-            // 更新分页信息
-            const pageInfo = document.getElementById('pageInfo');
-            const recordInfo = document.getElementById('recordInfo');
-            const currentPageSpan = document.getElementById('currentPageSpan');
-            const prevPage = document.getElementById('prevPage');
-            const nextPage = document.getElementById('nextPage');
-            
-            if (pageInfo) pageInfo.textContent = `第${window.app.logsCurrentPage}页，共${totalPages}页`;
-            if (recordInfo) recordInfo.textContent = `显示第${startIndex + 1}-${endIndex}条，共${totalLogs}条记录`;
-            if (currentPageSpan) currentPageSpan.textContent = window.app.logsCurrentPage;
-            
-            // 更新按钮状态
-            if (prevPage) {
-                if (window.app.logsCurrentPage <= 1) {
-                    prevPage.classList.add('disabled');
-                } else {
-                    prevPage.classList.remove('disabled');
-                }
-            }
-            
-            if (nextPage) {
-                if (window.app.logsCurrentPage >= totalPages) {
-                    nextPage.classList.add('disabled');
-                } else {
-                    nextPage.classList.remove('disabled');
-                }
-            }
-        };
-        
-        // 切换日志页面
-        window.changeLogsPage = function(page) {
-            if (!window.app || !window.app.allEvolutionLogs) return;
-            
-            const totalPages = Math.ceil(window.app.allEvolutionLogs.length / window.app.logsPerPage);
-            
-            if (page < 1 || page > totalPages) return;
-            
-            window.app.logsCurrentPage = page;
-            renderLogsPage();
-        };
+            </div>
+        </div>
+    </div>
 
-        // 更新当前时间
-        function updateCurrentTime() {
-            const now = new Date();
-            const timeString = now.toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
-            const timeElement = document.getElementById('current-time');
-            if (timeElement) {
-                timeElement.textContent = timeString;
-            }
-        }
-
-        // 页面加载时立即更新时间
-        updateCurrentTime();
-        
-        // 每秒更新时间
-        setInterval(updateCurrentTime, 1000);
-    </script>
-    <script src="/static/js/quantitative.js"></script>
-    <script>
-        // 🔥 全局变量声明（必须在初始化之前，但避免重复声明）
-        // systemRunning、autoTradingEnabled、refreshTimer、evolutionLogTimer、managementConfig 已在 quantitative.js 中声明
-        
-        // ✅ 确保app是全局变量（app变量已在quantitative.js中声明）
-        // window.app = null;  // 将在initializeApp()中设置
-        // var app = null;     // 已在quantitative.js中声明，避免重复
-        
-        // 🔥 统一的应用初始化函数
-        function initializeApp() {
-            console.log('🚀 开始初始化量化交易系统...');
-            
-            // 检查QuantitativeSystem类是否存在
-            if (typeof QuantitativeSystem === 'undefined') {
-                console.error('❌ QuantitativeSystem类未定义，quantitative.js可能没有正确加载');
-                return false;
-            }
-            
-            try {
-                // 🔥 创建全局app实例
-                const quantSystem = new QuantitativeSystem();
-                window.app = quantSystem;
-                // 🔥 同时设置为直接全局变量，兼容onclick事件
-                window.app = quantSystem;
-                app = quantSystem;
-                console.log('✅ 量化交易系统实例创建成功');
-                
-                // 立即加载数据
-                window.app.loadSystemStatus();
-                window.app.loadStrategies();
-                window.app.loadAccountInfo();
-                window.app.loadPositions();
-                window.app.loadSignals();
-                
-                // 绑定策略管理配置按钮事件
-                bindManagementConfigEvents();
-                
-                return true;
-            } catch (error) {
-                console.error(`❌ 量化交易系统初始化失败: ${error.message}`, error);
-                return false;
-            }
-        }
-        
-        // 🔥 绑定策略管理配置按钮事件
-        function bindManagementConfigEvents() {
-            // 策略管理配置按钮
-            const managementBtn = document.querySelector('button[onclick="showStrategyManagement()"]');
-            if (managementBtn) {
-                managementBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    showStrategyManagement();
-                });
-            }
-            
-            // 保存配置按钮
-            const saveBtn = document.getElementById('saveManagementConfig');
-            if (saveBtn) {
-                saveBtn.addEventListener('click', function() {
-                    if (window.app) {
-                        window.app.saveManagementConfig();
-                    }
-                });
-            }
-            
-            // 重置配置按钮
-            const resetBtn = document.getElementById('resetManagementConfig');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', function() {
-                    if (window.app) {
-                        window.app.resetManagementConfig();
-                    }
-                });
-            }
-        }
-        
-        // DOM加载完成后初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            // 延迟一点确保quantitative.js完全加载
-            setTimeout(() => {
-                const success = initializeApp();
-                
-                // 在页面上显示初始化状态
-                const testEl = document.getElementById('jsTestStatus');
-                if (testEl) {
-                    if (success) {
-                        testEl.innerHTML = '🎉 应用初始化成功！系统正常运行';
-                        testEl.className = 'alert alert-success';
-                        // 3秒后隐藏测试信息
-                        setTimeout(() => {
-                            testEl.style.display = 'none';
-                        }, 3000);
-                    } else {
-                        testEl.innerHTML = '❌ 应用初始化失败，请刷新页面重试';
-                        testEl.className = 'alert alert-danger';
-                    }
-                }
-            }, 1000);
-        });
-        
-        // 应用初始化完成后的清理工作
-        console.log('✅ 全局函数已定义完成');
-        
-    </script>
-    <!-- 实时监控脚本 - 暂时禁用，待WebSocket服务启动后再启用 -->
-    <!-- <script src="/static/js/real_time_monitor.js"></script> -->
+    <!-- Bootstrap JavaScript -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
+    <!-- 量化交易专用JavaScript -->
+    <script src="{{ url_for('static', filename='js/quantitative.js') }}"></script>
 </body>
 </html> 

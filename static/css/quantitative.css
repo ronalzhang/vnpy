@@ -1638,3 +1638,497 @@
     background: linear-gradient(135deg, #fff3cd 0%, #ffffff 100%);
 }
 
+/* ==================== iOS 18 液体半透明风格设计 ==================== */
+
+/* 主体背景 - 液态渐变 */
+body {
+    background: linear-gradient(135deg, 
+        #f0f4ff 0%, 
+        #e8f2ff 25%, 
+        #fff2e8 50%, 
+        #f0f8ff 75%, 
+        #f5f0ff 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* ==================== 液体卡片基础样式 ==================== */
+.card, .stat-card, .system-control-card, .account-card, .exchange-card, .strategy-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    box-shadow: 
+        0 8px 32px rgba(31, 38, 135, 0.15),
+        0 4px 16px rgba(31, 38, 135, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    overflow: hidden;
+    position: relative;
+}
+
+.card:hover, .stat-card:hover, .system-control-card:hover, 
+.account-card:hover, .exchange-card:hover, .strategy-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 
+        0 16px 56px rgba(31, 38, 135, 0.2),
+        0 8px 24px rgba(31, 38, 135, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ==================== 液体渐变背景卡片 ==================== */
+.stat-card {
+    background: linear-gradient(135deg, 
+        rgba(22, 119, 255, 0.8) 0%, 
+        rgba(64, 150, 255, 0.85) 50%,
+        rgba(102, 179, 255, 0.9) 100%);
+    color: white;
+    padding: 2rem;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, 
+        transparent 30%, 
+        rgba(255, 255, 255, 0.1) 50%, 
+        transparent 70%);
+    transform: rotate(-45deg);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(-45deg); }
+    50% { transform: translateX(100%) translateY(100%) rotate(-45deg); }
+}
+
+/* ==================== 系统控制卡片特殊样式 ==================== */
+.system-control-card {
+    background: linear-gradient(135deg, 
+        rgba(82, 196, 26, 0.1) 0%, 
+        rgba(115, 209, 61, 0.15) 100%);
+    backdrop-filter: blur(25px) saturate(200%);
+    border: 1px solid rgba(82, 196, 26, 0.2);
+}
+
+.account-card {
+    background: linear-gradient(135deg, 
+        rgba(250, 173, 20, 0.1) 0%, 
+        rgba(255, 197, 61, 0.15) 100%);
+    backdrop-filter: blur(25px) saturate(200%);
+    border: 1px solid rgba(250, 173, 20, 0.2);
+}
+
+.exchange-card {
+    background: linear-gradient(135deg, 
+        rgba(19, 194, 194, 0.1) 0%, 
+        rgba(54, 207, 201, 0.15) 100%);
+    backdrop-filter: blur(25px) saturate(200%);
+    border: 1px solid rgba(19, 194, 194, 0.2);
+}
+
+/* ==================== 液体按钮设计 ==================== */
+.btn {
+    border-radius: 16px;
+    padding: 12px 24px;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+    color: white;
+    box-shadow: 0 4px 16px rgba(22, 119, 255, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(22, 119, 255, 0.4);
+    background: linear-gradient(135deg, #0056d3 0%, #2680ff 100%);
+}
+
+.btn-outline-primary {
+    background: rgba(22, 119, 255, 0.1);
+    border: 1px solid rgba(22, 119, 255, 0.3);
+    color: #1677ff;
+    backdrop-filter: blur(10px);
+}
+
+.btn-outline-primary:hover {
+    background: rgba(22, 119, 255, 0.2);
+    border-color: rgba(22, 119, 255, 0.5);
+    transform: translateY(-1px);
+}
+
+/* ==================== 液体开关设计 ==================== */
+.btn-toggle {
+    width: 64px;
+    height: 32px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, 
+        rgba(199, 199, 199, 0.6) 0%, 
+        rgba(199, 199, 199, 0.8) 100%);
+    border: 1px solid rgba(199, 199, 199, 0.4);
+    position: relative;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    backdrop-filter: blur(10px);
+}
+
+.btn-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 13px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.btn-toggle.active {
+    background: linear-gradient(135deg, 
+        rgba(82, 196, 26, 0.8) 0%, 
+        rgba(115, 209, 61, 0.9) 100%);
+    border-color: rgba(82, 196, 26, 0.6);
+}
+
+.btn-toggle.active::after {
+    transform: translateX(32px);
+    background: linear-gradient(135deg, #ffffff 0%, #f0fff0 100%);
+}
+
+/* ==================== 液体模态框 ==================== */
+.modal-content {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 28px;
+    box-shadow: 
+        0 24px 64px rgba(31, 38, 135, 0.2),
+        0 12px 32px rgba(31, 38, 135, 0.1);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, 
+        rgba(22, 119, 255, 0.05) 0%, 
+        rgba(64, 150, 255, 0.08) 100%);
+    border-bottom: 1px solid rgba(22, 119, 255, 0.1);
+    border-radius: 28px 28px 0 0;
+    padding: 2rem;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+.modal-footer {
+    background: linear-gradient(135deg, 
+        rgba(248, 249, 250, 0.8) 0%, 
+        rgba(233, 236, 239, 0.9) 100%);
+    border-top: 1px solid rgba(233, 236, 239, 0.3);
+    border-radius: 0 0 28px 28px;
+    padding: 1.5rem 2rem;
+}
+
+/* ==================== 液体表单元素 ==================== */
+.form-control, .form-select {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(233, 236, 239, 0.4);
+    border-radius: 16px;
+    padding: 12px 16px;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.form-control:focus, .form-select:focus {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(22, 119, 255, 0.5);
+    box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.1);
+    transform: translateY(-1px);
+}
+
+/* ==================== 进化日志液体滚动容器 ==================== */
+.evolution-ticker-container {
+    background: linear-gradient(135deg, 
+        rgba(248, 249, 250, 0.8) 0%, 
+        rgba(233, 236, 239, 0.9) 100%);
+    border-radius: 20px;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(233, 236, 239, 0.3);
+    overflow: hidden;
+    height: 120px;
+}
+
+.ticker-item {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    margin: 8px 12px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.ticker-item:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateX(4px);
+    border-color: rgba(22, 119, 255, 0.2);
+}
+
+/* ==================== 策略卡片液体设计 ==================== */
+.strategy-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+    overflow: hidden;
+}
+
+.strategy-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, 
+        rgba(22, 119, 255, 0.6) 0%, 
+        rgba(64, 150, 255, 0.8) 50%,
+        rgba(102, 179, 255, 0.6) 100%);
+    border-radius: 24px 24px 0 0;
+}
+
+.strategy-card.golden {
+    background: linear-gradient(135deg, 
+        rgba(255, 215, 0, 0.1) 0%, 
+        rgba(255, 248, 220, 0.8) 50%,
+        rgba(255, 215, 0, 0.1) 100%);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    box-shadow: 
+        0 8px 32px rgba(255, 215, 0, 0.2),
+        0 4px 16px rgba(255, 215, 0, 0.1);
+}
+
+.strategy-card.golden::before {
+    background: linear-gradient(90deg, 
+        rgba(255, 215, 0, 0.8) 0%, 
+        rgba(255, 223, 0, 1) 50%,
+        rgba(255, 215, 0, 0.8) 100%);
+    animation: golden-flow 3s infinite;
+}
+
+@keyframes golden-flow {
+    0%, 100% { transform: translateX(-100%); }
+    50% { transform: translateX(100%); }
+}
+
+/* ==================== 液体徽章和标签 ==================== */
+.badge {
+    background: rgba(22, 119, 255, 0.1);
+    color: #1677ff;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(22, 119, 255, 0.2);
+    border-radius: 12px;
+    padding: 6px 12px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.badge.bg-success {
+    background: rgba(82, 196, 26, 0.1);
+    color: #52c41a;
+    border-color: rgba(82, 196, 26, 0.2);
+}
+
+.badge.bg-warning {
+    background: rgba(250, 173, 20, 0.1);
+    color: #faad14;
+    border-color: rgba(250, 173, 20, 0.2);
+}
+
+.badge.bg-danger {
+    background: rgba(255, 77, 79, 0.1);
+    color: #ff4d4f;
+    border-color: rgba(255, 77, 79, 0.2);
+}
+
+/* ==================== 状态指示器液体设计 ==================== */
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    position: relative;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.status-dot.online {
+    background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+    animation: pulse-green 2s infinite;
+}
+
+.status-dot.offline {
+    background: linear-gradient(135deg, #d9d9d9 0%, #f0f0f0 100%);
+}
+
+@keyframes pulse-green {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(82, 196, 26, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(82, 196, 26, 0.8);
+    }
+}
+
+/* ==================== 导航栏液体设计 ==================== */
+.navbar {
+    background: linear-gradient(135deg, 
+        rgba(22, 119, 255, 0.9) 0%, 
+        rgba(64, 150, 255, 0.95) 100%) !important;
+    backdrop-filter: blur(30px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.navbar-brand, .nav-link {
+    color: rgba(255, 255, 255, 0.95) !important;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.nav-link:hover, .nav-link.active {
+    color: white !important;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+/* ==================== 表格液体设计 ==================== */
+.table {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(15px);
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.table th {
+    background: rgba(22, 119, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(22, 119, 255, 0.2);
+    font-weight: 600;
+    color: #1677ff;
+}
+
+.table td {
+    background: rgba(255, 255, 255, 0.4);
+    border-bottom: 1px solid rgba(233, 236, 239, 0.3);
+}
+
+/* ==================== 图表容器液体设计 ==================== */
+.chart-container, .performance-chart, .balance-chart {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 1.5rem;
+}
+
+/* ==================== 里程碑液体设计 ==================== */
+.milestone-item {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(15px);
+    border-radius: 16px;
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.milestone-item:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-2px);
+}
+
+.milestone-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.milestone-label {
+    font-size: 0.9rem;
+    color: rgba(0, 0, 0, 0.6);
+    font-weight: 500;
+}
+
+/* ==================== 响应式液体设计 ==================== */
+@media (max-width: 768px) {
+    .card, .stat-card, .system-control-card, 
+    .account-card, .exchange-card, .strategy-card {
+        border-radius: 20px;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-card {
+        height: auto;
+        padding: 1.5rem;
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .modal-content {
+        border-radius: 24px;
+        margin: 1rem;
+    }
+    
+    .btn {
+        border-radius: 14px;
+        padding: 10px 20px;
+    }
+}
+
+/* ==================== 深色模式适配 ==================== */
+@media (prefers-color-scheme: dark) {
+    body {
+        background: linear-gradient(135deg, 
+            #0a0a0a 0%, 
+            #1a1a1a 25%, 
+            #2a1a1a 50%, 
+            #1a1a2a 75%, 
+            #1a0a2a 100%);
+    }
+    
+    .card, .stat-card, .system-control-card, 
+    .account-card, .exchange-card, .strategy-card {
+        background: rgba(40, 40, 40, 0.8);
+        border-color: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .form-control, .form-select {
+        background: rgba(60, 60, 60, 0.6);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.9);
+    }
+}
+
