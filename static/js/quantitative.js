@@ -1255,7 +1255,7 @@ class QuantitativeSystem {
                     <div id="realTradingLogs">
                         <div class="text-center py-4">
                             <i class="fas fa-spinner fa-spin"></i> 加载中...
-                        </div>
+                    </div>
                     </div>
                 </div>
                 
@@ -1263,7 +1263,7 @@ class QuantitativeSystem {
                     <div id="validationLogs">
                         <div class="text-center py-4">
                             <i class="fas fa-mouse-pointer"></i> 点击标签页加载验证日志
-                        </div>
+                    </div>
                     </div>
                 </div>
                 
@@ -1271,7 +1271,7 @@ class QuantitativeSystem {
                     <div id="evolutionLogs">
                         <div class="text-center py-4">
                             <i class="fas fa-mouse-pointer"></i> 点击标签页加载进化日志
-                        </div>
+                    </div>
                     </div>
                 </div>
             </div>

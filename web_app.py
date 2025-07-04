@@ -642,7 +642,7 @@ def calculate_price_differences(prices):
     
     calculate_price_differences._arbitrage_save_counter += 1
     if calculate_price_differences._arbitrage_save_counter >= 10:
-        save_arbitrage_history()
+    save_arbitrage_history()
         calculate_price_differences._arbitrage_save_counter = 0
     
     return result
@@ -1203,11 +1203,11 @@ def get_all_arbitrage_history():
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 20))
         
-        all_history = []
-        for records in arbitrage_history.values():
-            all_history.extend(records)
-        
-        # 按时间降序排序
+    all_history = []
+    for records in arbitrage_history.values():
+        all_history.extend(records)
+    
+    # 按时间降序排序
         all_history.sort(key=lambda x: x.get("time", ""), reverse=True)
         
         # 计算分页
@@ -1232,9 +1232,9 @@ def get_all_arbitrage_history():
                 "is_executable": item.get("is_executable", False)
             }
             formatted_data.append(formatted_item)
-        
-        return jsonify({
-            "status": "success",
+    
+    return jsonify({
+        "status": "success",
             "data": formatted_data,
             "pagination": {
                 "page": page,
@@ -1250,7 +1250,7 @@ def get_all_arbitrage_history():
             "status": "error",
             "message": f"获取套利历史失败: {str(e)}",
             "data": []
-        })
+    })
 
 # 添加套利系统配置API
 @app.route('/api/arbitrage/config', methods=['GET', 'POST'])
@@ -1471,7 +1471,7 @@ def quantitative_strategies():
                     try:
                         configured_limit = int(config_result[0])
                         if configured_limit > 0:  # 确保配置值有效
-                            limit = configured_limit
+                        limit = configured_limit
                             print(f"✅ 强制使用四层配置的策略显示数量: {limit}")
                         else:
                             print(f"⚠️ 四层配置值无效({configured_limit})，使用默认值: {limit}")
@@ -1488,7 +1488,7 @@ def quantitative_strategies():
                         try:
                             configured_limit = int(fallback_result[0])
                             if configured_limit > 0:
-                                limit = configured_limit
+                            limit = configured_limit
                                 print(f"✅ 使用传统配置的策略显示数量: {limit}")
                             else:
                                 print(f"⚠️ 传统配置值无效({configured_limit})，使用默认值: {limit}")

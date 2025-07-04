@@ -886,22 +886,22 @@
         
         // 暴露定时器管理器到全局
         window.GlobalTimerManager = GlobalTimerManager;
-        
-        // 🔧 只执行一次初始化
-        initializeOnce();
-        
-        // 🔧 移除可能导致重复调用的全局对象创建
-        // 创建量化系统实例（如果存在）
-        if (typeof QuantitativeSystem !== 'undefined' && !window.quantitativeSystem) {
-            try {
-                quantitativeSystem = new QuantitativeSystem();
-                window.quantitativeSystem = quantitativeSystem;
-                window.app = quantitativeSystem;
-                console.log('✅ QuantitativeSystem 实例已创建');
-            } catch (e) {
-                console.warn('⚠️ QuantitativeSystem 创建失败:', e);
+            
+            // 🔧 只执行一次初始化
+            initializeOnce();
+            
+            // 🔧 移除可能导致重复调用的全局对象创建
+            // 创建量化系统实例（如果存在）
+            if (typeof QuantitativeSystem !== 'undefined' && !window.quantitativeSystem) {
+                try {
+                    quantitativeSystem = new QuantitativeSystem();
+                    window.quantitativeSystem = quantitativeSystem;
+                    window.app = quantitativeSystem;
+                    console.log('✅ QuantitativeSystem 实例已创建');
+                } catch (e) {
+                    console.warn('⚠️ QuantitativeSystem 创建失败:', e);
+                }
             }
-        }
             
             // 🗑️ 禁用状态轮询，节省服务器资源
             console.log('🗑️ 状态轮询已完全禁用，节省服务器资源和网络流量');
@@ -1254,7 +1254,7 @@
         // 🗑️ 已删除底部四个模块，节省资源和内存
         function loadBottomModulesData() {
             console.log('🗑️ 底部模块已禁用，不再加载数据');
-            window.bottomModulesLoading = false;
+                window.bottomModulesLoading = false;
         }
         
         // 🗑️ 已删除收益曲线模块
@@ -1467,10 +1467,10 @@
                     });
                     
                     // 延迟重新加载，确保后端配置已更新
-                    setTimeout(() => {
-                        forceLoadStrategies();
+                        setTimeout(() => {
+                            forceLoadStrategies();
                         showSaveMessage('✅ 策略配置已更新并重新加载！', 'success');
-                    }, 1500);
+                        }, 1500);
                     
                 } else {
                     throw new Error(data.message || '保存失败');

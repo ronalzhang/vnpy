@@ -7,3 +7,4 @@ alwaysApply: true
     "交易操作必须有日志记录",
     "所有金额计算使用Decimal类型而非float",
     "套利策略必须考虑手续费和滑点"
+    
